@@ -1,0 +1,9 @@
+{
+  "source": "github:metyatech/agent-rules",
+  "domains": ["node", "web"],
+  "extra": [
+    "agent-rules-private/rules/course-site-metadata.md",
+    "agent-rules-private/rules/course-site-content-authoring.md"
+  ],
+  "output": "AGENTS.md"
+}

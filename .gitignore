@@ -1,0 +1,25 @@
+# Dependencies
+/node_modules
+
+# Next output
+/.next
+/out
+
+# Generated content (synced from external repo)
+/.course-content
+/content/*
+!/content/.keep
+/public/*
+!/public/.keep
+/public/_pagefind
+
+# Misc
+.DS_Store
+
+# Playwright
+/playwright-report
+/test-results
+
+# TypeScript incremental
+*.tsbuildinfo
+
