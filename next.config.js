@@ -16,6 +16,9 @@ const withNextra = nextra({
 const nextConfig = {
   reactStrictMode: true,
   trailingSlash: true,
+  env: {
+    NEXT_PUBLIC_WORKS_BASE_URL: process.env.NEXT_PUBLIC_WORKS_BASE_URL ?? '',
+  },
   images: {
     unoptimized: true,
   },
@@ -27,4 +30,3 @@ const nextConfig = {
 };
 
 export default withNextra(nextConfig);
-
