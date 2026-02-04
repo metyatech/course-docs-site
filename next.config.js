@@ -16,6 +16,7 @@ const withNextra = nextra({
 const nextConfig = {
   reactStrictMode: true,
   trailingSlash: true,
+  transpilePackages: ['@metyatech/course-docs-platform'],
   env: {
     NEXT_PUBLIC_WORKS_BASE_URL: process.env.NEXT_PUBLIC_WORKS_BASE_URL ?? '',
   },
@@ -24,6 +25,9 @@ const nextConfig = {
   },
   pageExtensions: ['ts', 'tsx', 'js', 'jsx', 'md', 'mdx'],
   webpack: (config, { isServer }) => {
+    config.resolve = config.resolve ?? {};
+    config.resolve.symlinks = false;
+
     const projectRoot = fileURLToPath(new URL('.', import.meta.url));
     return applyCourseAssetWebpackRules(config, { isServer, projectRoot });
   },
