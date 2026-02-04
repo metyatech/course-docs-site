@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - courseRepo: metyatech/javascript-course-docs
+            e2ePort: 3101
+          - courseRepo: metyatech/programming-course-docs
+            e2ePort: 3102
+    env:
+      COURSE_CONTENT_REPO: ${{ matrix.courseRepo }}
+      COURSE_CONTENT_REF: master
+      E2E_PORT: ${{ matrix.e2ePort }}
+      PLAYWRIGHT_MAX_FAILURES: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
