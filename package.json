@@ -18,6 +18,7 @@
   "dependencies": {
     "@mdx-js/react": "^3.1.1",
     "@metyatech/course-docs-platform": "git+https://github.com/metyatech/course-docs-platform.git#main",
+    "dotenv": "^17.2.3",
     "next": "^15.5.11",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",

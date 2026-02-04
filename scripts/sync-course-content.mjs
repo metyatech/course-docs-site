@@ -1,10 +1,18 @@
 import { spawnSync } from 'node:child_process';
+import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const projectRoot = process.cwd();
 const workRoot = path.join(projectRoot, '.course-content');
 const cloneDir = path.join(workRoot, 'repo');
+
+for (const envFile of ['.env', '.env.local']) {
+  const envPath = path.join(projectRoot, envFile);
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, override: true });
+  }
+}
 
 const courseRepo = process.env.COURSE_CONTENT_REPO ?? 'metyatech/javascript-course-docs';
 const courseRef = process.env.COURSE_CONTENT_REF ?? 'master';
