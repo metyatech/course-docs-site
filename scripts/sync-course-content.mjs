@@ -21,10 +21,16 @@ const readEnv = (filename) => {
 
 // Env precedence:
 // - process.env (explicit) wins
-// - .env.local overrides .env
-const fileEnv = { ...readEnv('.env'), ...readEnv('.env.local') };
+// - later files override earlier files
+const explicitEnvKeys = new Set(Object.keys(process.env));
+const fileEnv = {
+  ...readEnv('.env'),
+  ...readEnv('.env.local'),
+  ...readEnv('.env.course'),
+  ...readEnv('.env.course.local'),
+};
 for (const [key, value] of Object.entries(fileEnv)) {
-  if (process.env[key] === undefined) {
+  if (!explicitEnvKeys.has(key)) {
     process.env[key] = value;
   }
 }
@@ -49,6 +55,15 @@ const run = (command, args) => {
 };
 
 const rmIfExists = (targetPath) => {
+  try {
+    const st = fs.lstatSync(targetPath);
+    if (st.isSymbolicLink()) {
+      fs.unlinkSync(targetPath);
+      return;
+    }
+  } catch {
+    // ignore
+  }
   fs.rmSync(targetPath, { recursive: true, force: true });
 };
 

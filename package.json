@@ -12,8 +12,9 @@
     "postinstall": "patch-package",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
     "lint": "npm run typecheck",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npm run sync:content && tsc --noEmit",
     "test": "npm run test:e2e",
+    "test:dev-switch": "node --test tests/dev-switch.test.mjs",
     "test:e2e": "playwright test -c node_modules/@metyatech/course-docs-e2e/playwright.config.mjs"
   },
   "dependencies": {

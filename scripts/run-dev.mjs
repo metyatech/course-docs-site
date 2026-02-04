@@ -9,6 +9,7 @@ const projectRoot = process.cwd();
 const isWindows = process.platform === 'win32';
 const command = isWindows ? 'cmd.exe' : 'npm';
 const npmArgs = isWindows ? ['/c', 'npm', 'run'] : ['run'];
+const devInnerMode = (process.env.COURSE_DOCS_SITE_DEV_INNER ?? '').trim();
 
 const readEnvFile = (filename) => {
   const envPath = path.join(projectRoot, filename);
@@ -39,10 +40,18 @@ const normalizeCourseEnv = (env) => {
 const getCourseEnv = () => {
   const fromDotEnv = readEnvFile('.env');
   const fromDotEnvLocal = readEnvFile('.env.local');
+  const fromCourseEnv = readEnvFile('.env.course');
+  const fromCourseEnvLocal = readEnvFile('.env.course.local');
   const fromEnv = { ...process.env };
 
   // process.env wins over files
-  return normalizeCourseEnv({ ...fromDotEnv, ...fromDotEnvLocal, ...fromEnv });
+  return normalizeCourseEnv({
+    ...fromDotEnv,
+    ...fromDotEnvLocal,
+    ...fromCourseEnv,
+    ...fromCourseEnvLocal,
+    ...fromEnv,
+  });
 };
 
 let lastCourseEnv = getCourseEnv();
@@ -62,7 +71,13 @@ const runSync = () =>
 
 const startDev = () => {
   devExitExpected = false;
-  devProcess = spawn(command, [...npmArgs, 'dev:inner', '--', ...args], { stdio: 'inherit' });
+  if (devInnerMode === 'stub') {
+    devProcess = spawn(process.execPath, ['scripts/dev-inner-stub.mjs', ...args], {
+      stdio: 'inherit',
+    });
+  } else {
+    devProcess = spawn(command, [...npmArgs, 'dev:inner', '--', ...args], { stdio: 'inherit' });
+  }
   devProcess.on('exit', (devCode) => {
     if (devExitExpected) {
       return;
@@ -170,19 +185,26 @@ const createEnvWatcher = () => {
     }, 250);
   };
 
-  const watcher = fs.watch(projectRoot, { persistent: true }, (_eventType, filename) => {
-    if (!filename) {
+  const watchFiles = ['.env', '.env.local', '.env.course', '.env.course.local'].map((f) =>
+    path.join(projectRoot, f)
+  );
+
+  // `fs.watch()` is not reliable with atomic save patterns (common on Windows).
+  // Use polling-based watchers for env files to ensure course switching always triggers.
+  for (const filePath of watchFiles) {
+    fs.watchFile(filePath, { interval: 250 }, (curr, prev) => {
+      if (curr.mtimeMs === prev.mtimeMs && curr.size === prev.size) {
+        return;
+      }
       schedule();
-      return;
-    }
-    if (filename === '.env' || filename === '.env.local') {
-      schedule();
-    }
-  });
+    });
+  }
 
   return {
     close: () => {
-      watcher.close();
+      for (const filePath of watchFiles) {
+        fs.unwatchFile(filePath);
+      }
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }

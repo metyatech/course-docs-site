@@ -1,0 +1,23 @@
+diff --git a/node_modules/nextra/dist/server/loader.js b/node_modules/nextra/dist/server/loader.js
+index bd74981..8f55f0e 100644
+--- a/node_modules/nextra/dist/server/loader.js
++++ b/node_modules/nextra/dist/server/loader.js
+@@ -144,10 +144,14 @@ async function getLastCommitTime(filePath) {
+   try {
+     return await repository.getFileLatestModifiedDateAsync(relativePath);
+   } catch {
+-    logger.warn(
+-      "Failed to get the last modified timestamp from Git for the file",
+-      relativePath
+-    );
++    // This repo intentionally syncs `content/` from external repositories.
++    // Those files are not tracked in this repo, so git timestamp lookups are expected to fail.
++    if (relativePath !== "content" && !relativePath.startsWith(`content${path.sep}`)) {
++      logger.warn(
++        "Failed to get the last modified timestamp from Git for the file",
++        relativePath
++      );
++    }
+   }
+ }
+ export {

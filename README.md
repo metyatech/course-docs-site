@@ -7,7 +7,9 @@ Shared site runtime (Next.js + Nextra) for multiple course content repositories.
 This repo does **not** store course content in Git. The `content/` directory is synced from a public content repo
 at build/dev time.
 
-Required env vars:
+`site.config.ts` is also synced (generated) and is intentionally gitignored.
+
+Required env vars (files or environment):
 
 - `COURSE_CONTENT_REPO` (e.g. `metyatech/javascript-course-docs`)
 - `COURSE_CONTENT_REF` (optional, default: `master`)
@@ -37,6 +39,18 @@ To preview local, unpushed content changes:
 
 ```sh
 COURSE_CONTENT_DIR=../javascript-course-docs npm run dev
+```
+
+### Using `.env.course.local` (recommended)
+
+Keep secrets in `.env.local` and put only course selection variables in `.env.course.local`.
+`npm run dev` watches `.env(.local)` and `.env.course(.local)` and will restart the dev server when the course
+selection changes.
+
+Example `.env.course.local`:
+
+```dotenv
+COURSE_CONTENT_DIR=../programming-course-docs
 ```
 
 PowerShell example:

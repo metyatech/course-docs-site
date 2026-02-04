@@ -12,10 +12,12 @@
 /public/*
 !/public/.keep
 /public/_pagefind
+/site.config.ts
 
 # Misc
 .DS_Store
 .env.local
+.env.course
 .env.*.local
 .vercel
 
