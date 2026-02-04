@@ -12,6 +12,10 @@ Required env vars:
 - `COURSE_CONTENT_REPO` (e.g. `metyatech/javascript-course-docs`)
 - `COURSE_CONTENT_REF` (optional, default: `master`)
 
+Local development (optional):
+
+- `COURSE_CONTENT_DIR` (local path to a content repo; when set, the site links `content/` and `public/` from it for fast iteration)
+
 Optional env vars:
 
 - `NEXT_PUBLIC_WORKS_BASE_URL` (e.g. `https://metyatech.github.io/programming-course-student-works`)
@@ -27,6 +31,12 @@ See `.env.example` for the full list.
 ```sh
 npm install
 COURSE_CONTENT_REPO=metyatech/javascript-course-docs npm run dev
+```
+
+To preview local, unpushed content changes:
+
+```sh
+COURSE_CONTENT_DIR=../javascript-course-docs npm run dev
 ```
 
 ## Build

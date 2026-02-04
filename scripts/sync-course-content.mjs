@@ -8,6 +8,7 @@ const cloneDir = path.join(workRoot, 'repo');
 
 const courseRepo = process.env.COURSE_CONTENT_REPO ?? 'metyatech/javascript-course-docs';
 const courseRef = process.env.COURSE_CONTENT_REF ?? 'master';
+const courseDir = process.env.COURSE_CONTENT_DIR;
 
 const requiredPaths = [
   { label: 'content', rel: 'content' },
@@ -26,6 +27,12 @@ const run = (command, args) => {
 
 const rmIfExists = (targetPath) => {
   fs.rmSync(targetPath, { recursive: true, force: true });
+};
+
+const tryLinkDir = (target, linkPath) => {
+  rmIfExists(linkPath);
+  fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+  fs.symlinkSync(target, linkPath, 'junction');
 };
 
 const copyDir = (from, to) => {
@@ -53,14 +60,23 @@ const copyFile = (from, to) => {
   fs.copyFileSync(from, to);
 };
 
-fs.mkdirSync(workRoot, { recursive: true });
-rmIfExists(cloneDir);
+let sourceRoot = cloneDir;
 
-const repoUrl = `https://github.com/${courseRepo}.git`;
-run('git', ['clone', '--depth', '1', '--branch', courseRef, repoUrl, cloneDir]);
+if (courseDir && courseDir.trim()) {
+  sourceRoot = path.resolve(projectRoot, courseDir);
+  if (!fs.existsSync(sourceRoot) || !fs.statSync(sourceRoot).isDirectory()) {
+    throw new Error(`COURSE_CONTENT_DIR is not a directory: ${sourceRoot}`);
+  }
+} else {
+  fs.mkdirSync(workRoot, { recursive: true });
+  rmIfExists(cloneDir);
+
+  const repoUrl = `https://github.com/${courseRepo}.git`;
+  run('git', ['clone', '--depth', '1', '--branch', courseRef, repoUrl, cloneDir]);
+}
 
 for (const required of requiredPaths) {
-  const resolved = path.join(cloneDir, required.rel);
+  const resolved = path.join(sourceRoot, required.rel);
   if (!fs.existsSync(resolved)) {
     throw new Error(
       `Missing required path in content repo: ${required.label} (${required.rel})`
@@ -68,22 +84,47 @@ for (const required of requiredPaths) {
   }
 }
 
-const contentFrom = path.join(cloneDir, 'content');
+const contentFrom = path.join(sourceRoot, 'content');
 const contentTo = path.join(projectRoot, 'content');
 rmIfExists(contentTo);
-copyDir(contentFrom, contentTo);
-fs.mkdirSync(contentTo, { recursive: true });
+if (courseDir && courseDir.trim()) {
+  try {
+    tryLinkDir(contentFrom, contentTo);
+  } catch (error) {
+    console.warn(
+      `Warning: failed to link content directory, falling back to copy. (${error})`
+    );
+    copyDir(contentFrom, contentTo);
+  }
+} else {
+  copyDir(contentFrom, contentTo);
+}
+
+if (!fs.existsSync(contentTo)) {
+  fs.mkdirSync(contentTo, { recursive: true });
+}
 fs.writeFileSync(path.join(contentTo, '.keep'), '');
 
-const siteConfigFrom = path.join(cloneDir, 'site.config.ts');
+const siteConfigFrom = path.join(sourceRoot, 'site.config.ts');
 const siteConfigTo = path.join(projectRoot, 'site.config.ts');
 copyFile(siteConfigFrom, siteConfigTo);
 
-const publicFrom = path.join(cloneDir, 'public');
+const publicFrom = path.join(sourceRoot, 'public');
 const publicTo = path.join(projectRoot, 'public');
 if (fs.existsSync(publicFrom)) {
   rmIfExists(publicTo);
-  copyDir(publicFrom, publicTo);
+  if (courseDir && courseDir.trim()) {
+    try {
+      tryLinkDir(publicFrom, publicTo);
+    } catch (error) {
+      console.warn(
+        `Warning: failed to link public directory, falling back to copy. (${error})`
+      );
+      copyDir(publicFrom, publicTo);
+    }
+  } else {
+    copyDir(publicFrom, publicTo);
+  }
   fs.mkdirSync(publicTo, { recursive: true });
   fs.writeFileSync(path.join(publicTo, '.keep'), '');
 }
