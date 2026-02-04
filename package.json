@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@mdx-js/react": "^3.1.1",
-    "@metyatech/course-docs-platform": "github:metyatech/course-docs-platform#main",
+    "@metyatech/course-docs-platform": "git+https://github.com/metyatech/course-docs-platform.git#main",
     "next": "^15.5.11",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
@@ -25,7 +25,7 @@
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
-    "@metyatech/course-docs-e2e": "github:metyatech/course-docs-e2e#main",
+    "@metyatech/course-docs-e2e": "git+https://github.com/metyatech/course-docs-e2e.git#main",
     "@playwright/test": "^1.55.0",
     "@types/node": "^25.0.9",
     "@types/react": "^19.2.9",
