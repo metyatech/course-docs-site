@@ -39,6 +39,14 @@ To preview local, unpushed content changes:
 COURSE_CONTENT_DIR=../javascript-course-docs npm run dev
 ```
 
+PowerShell example:
+
+```powershell
+Set-Location -LiteralPath .\course-docs-site
+$env:COURSE_CONTENT_DIR = '..\javascript-course-docs'
+npm run dev
+```
+
 ## Build
 
 ```sh
