@@ -53,6 +53,8 @@ Example `.env.course.local`:
 COURSE_CONTENT_DIR=../programming-course-docs
 ```
 
+Template: `.env.course.local.example`
+
 PowerShell example:
 
 ```powershell
