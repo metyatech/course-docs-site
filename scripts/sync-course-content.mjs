@@ -7,10 +7,25 @@ const projectRoot = process.cwd();
 const workRoot = path.join(projectRoot, '.course-content');
 const cloneDir = path.join(workRoot, 'repo');
 
-for (const envFile of ['.env', '.env.local']) {
-  const envPath = path.join(projectRoot, envFile);
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath, override: true });
+const readEnv = (filename) => {
+  const envPath = path.join(projectRoot, filename);
+  if (!fs.existsSync(envPath)) {
+    return {};
+  }
+  try {
+    return dotenv.parse(fs.readFileSync(envPath));
+  } catch {
+    return {};
+  }
+};
+
+// Env precedence:
+// - process.env (explicit) wins
+// - .env.local overrides .env
+const fileEnv = { ...readEnv('.env'), ...readEnv('.env.local') };
+for (const [key, value] of Object.entries(fileEnv)) {
+  if (process.env[key] === undefined) {
+    process.env[key] = value;
   }
 }
 

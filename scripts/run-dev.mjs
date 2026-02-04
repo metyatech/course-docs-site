@@ -37,21 +37,81 @@ const normalizeCourseEnv = (env) => {
 };
 
 const getCourseEnv = () => {
-  const fromEnv = { ...process.env };
   const fromDotEnv = readEnvFile('.env');
   const fromDotEnvLocal = readEnvFile('.env.local');
-  return normalizeCourseEnv({ ...fromEnv, ...fromDotEnv, ...fromDotEnvLocal });
+  const fromEnv = { ...process.env };
+
+  // process.env wins over files
+  return normalizeCourseEnv({ ...fromDotEnv, ...fromDotEnvLocal, ...fromEnv });
 };
 
 let lastCourseEnv = getCourseEnv();
 let syncRunning = false;
 let syncQueued = false;
+let restarting = false;
+let restartQueued = false;
+let devProcess = null;
+let devExitExpected = false;
+let shuttingDown = false;
 
 const runSync = () =>
   new Promise((resolve) => {
     const child = spawn(command, [...npmArgs, 'sync:content'], { stdio: 'inherit' });
     child.on('exit', (code) => resolve(code ?? 1));
   });
+
+const startDev = () => {
+  devExitExpected = false;
+  devProcess = spawn(command, [...npmArgs, 'dev:inner', '--', ...args], { stdio: 'inherit' });
+  devProcess.on('exit', (devCode) => {
+    if (devExitExpected) {
+      return;
+    }
+    process.exit(devCode ?? 1);
+  });
+};
+
+const stopDev = async () => {
+  if (!devProcess) {
+    return;
+  }
+
+  const proc = devProcess;
+  devProcess = null;
+  devExitExpected = true;
+
+  const exited = new Promise((resolve) => proc.on('exit', () => resolve()));
+  try {
+    proc.kill();
+  } catch {
+    // ignore
+  }
+
+  let killTimer;
+  if (isWindows) {
+    killTimer = setTimeout(() => {
+      try {
+        // Kill process tree (npm/cmd/next) on Windows.
+        spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
+      } catch {
+        // ignore
+      }
+    }, 1000);
+  } else {
+    killTimer = setTimeout(() => {
+      try {
+        proc.kill('SIGKILL');
+      } catch {
+        // ignore
+      }
+    }, 5000);
+  }
+
+  await exited;
+  if (killTimer) {
+    clearTimeout(killTimer);
+  }
+};
 
 const queueSync = async () => {
   syncQueued = true;
@@ -73,6 +133,23 @@ const queueSync = async () => {
   syncRunning = false;
 };
 
+const queueRestart = async () => {
+  restartQueued = true;
+  if (restarting) {
+    return;
+  }
+
+  restarting = true;
+  while (restartQueued) {
+    restartQueued = false;
+
+    await stopDev();
+    await queueSync();
+    startDev();
+  }
+  restarting = false;
+};
+
 const createEnvWatcher = () => {
   let debounceTimer;
 
@@ -89,7 +166,7 @@ const createEnvWatcher = () => {
       if (!changed) {
         return;
       }
-      await queueSync();
+      await queueRestart();
     }, 250);
   };
 
@@ -115,12 +192,18 @@ const createEnvWatcher = () => {
 
 queueSync().then(() => {
   const envWatcher = createEnvWatcher();
+  startDev();
 
-  const dev = spawn(command, [...npmArgs, 'dev:inner', '--', ...args], {
-    stdio: 'inherit',
-  });
-  dev.on('exit', (devCode) => {
+  const closeAll = async () => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
     envWatcher.close();
-    process.exit(devCode ?? 1);
-  });
+    await stopDev();
+    process.exit(0);
+  };
+
+  process.on('SIGINT', () => void closeAll());
+  process.on('SIGTERM', () => void closeAll());
 });
