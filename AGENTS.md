@@ -636,3 +636,51 @@ CSS:
 
 - ルールにない独自フォーマットを導入しない（解析不能になる）
 - ルール変更が必要な場合は、先に本ルールへ追記してから問題を作る
+
+Source: agent-rules-private/rules/course-site-repository-architecture.md
+
+## Course docs repository architecture (DRY)
+
+This document describes the canonical repository split for metyatech course documentation sites.
+The goal is to keep the system DRY and minimize duplicated “site runtime” code across courses.
+
+### Repositories and responsibilities
+
+- `metyatech/course-docs-site`
+  - The **only** runnable site app (Next.js + Nextra).
+  - Syncs `content/` and `site.config.ts` from a course content repository at dev/build time.
+  - Owns routing, layouts, middleware, and end-to-end tests for the site runtime.
+- `metyatech/course-docs-platform`
+  - Shared, reusable building blocks consumed by `course-docs-site`.
+  - Owns MDX components, remark/rehype config, webpack asset rules, and shared site features.
+- `<course>-course-docs` (e.g. `metyatech/javascript-course-docs`, `metyatech/programming-course-docs`)
+  - **Content-only** repositories (no Next.js app code).
+  - Owns only course content and course-specific configuration.
+- `metyatech/programming-course-student-works` (student submissions, large binaries)
+  - Student works hosting repository (GitHub Pages).
+  - Generates and publishes `works-index.json` for the course site to render the works list.
+
+### Content repository rules (course docs repos)
+
+- Must be content-only:
+  - Keep only `content/**`, `public/img/**` (static site assets), and `site.config.ts`.
+  - Do not add Next.js/Nextra app runtime files (`next.config.js`, `src/app`, `package.json`, etc.).
+- `public/img/favicon.ico` is expected by `site.config.ts` (`faviconHref`).
+  - Do not keep framework boilerplate assets (e.g. Docusaurus logos) unless referenced by content.
+- Do not store secrets in a content repo:
+  - `.env.local` is local-only and belongs in `course-docs-site` (and is gitignored).
+
+### Student works hosting rules
+
+- Do not store `student-works` binaries in a course content repo.
+- Prefer a dedicated GitHub Pages repository for works hosting.
+- Publish a machine-readable index for the site runtime:
+  - `works-index.json` at `<NEXT_PUBLIC_WORKS_BASE_URL>/works-index.json`.
+  - The site reads this index server-side to render the works list.
+
+### Deployment rules (Vercel)
+
+- Do **not** use Vercel’s GitHub integration for course sites.
+- Deploy via GitHub Actions using the Vercel CLI:
+  - Secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+  - The workflow should checkout `metyatech/course-docs-site` and build/deploy it.

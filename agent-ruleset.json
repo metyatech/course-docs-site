@@ -3,7 +3,8 @@
   "domains": ["node", "web"],
   "extra": [
     "agent-rules-private/rules/course-site-metadata.md",
-    "agent-rules-private/rules/course-site-content-authoring.md"
+    "agent-rules-private/rules/course-site-content-authoring.md",
+    "agent-rules-private/rules/course-site-repository-architecture.md"
   ],
   "output": "AGENTS.md"
 }
