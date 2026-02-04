@@ -7,4 +7,3 @@ const npxArgs = isWindows ? ['/c', 'npx'] : [];
 
 const child = spawn(command, [...npxArgs, 'next', 'dev', ...args], { stdio: 'inherit' });
 child.on('exit', (code) => process.exit(code ?? 1));
-

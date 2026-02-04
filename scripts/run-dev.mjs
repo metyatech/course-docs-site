@@ -18,4 +18,3 @@ sync.on('exit', (code) => {
   });
   dev.on('exit', (devCode) => process.exit(devCode ?? 1));
 });
-

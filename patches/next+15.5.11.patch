@@ -1,0 +1,28 @@
+diff --git a/node_modules/next/dist/build/swc/index.js b/node_modules/next/dist/build/swc/index.js
+index ff1fdbf..486f006 100644
+--- a/node_modules/next/dist/build/swc/index.js
++++ b/node_modules/next/dist/build/swc/index.js
+@@ -196,7 +196,8 @@ const __INTERNAL_CUSTOM_TURBOPACK_BINDINGS = process.env.__INTERNAL_CUSTOM_TURBO
+ function checkVersionMismatch(pkgData) {
+     const version = pkgData.version;
+     if (version && version !== nextVersion) {
+-        _log.warn(`Mismatching @next/swc version, detected: ${version} while Next.js is on ${nextVersion}. Please ensure these match`);
++        // This mismatch can be expected for backport builds where platform SWC binaries are
++        // intentionally published at a different version. Avoid noisy warnings in course docs repos.
+     }
+ }
+ // These are the platforms we'll try to load wasm bindings first,
+diff --git a/node_modules/next/dist/esm/build/swc/index.js b/node_modules/next/dist/esm/build/swc/index.js
+index 38a6fbd..e307e81 100644
+--- a/node_modules/next/dist/esm/build/swc/index.js
++++ b/node_modules/next/dist/esm/build/swc/index.js
+@@ -78,7 +78,8 @@ const __INTERNAL_CUSTOM_TURBOPACK_BINDINGS = process.env.__INTERNAL_CUSTOM_TURBO
+ function checkVersionMismatch(pkgData) {
+     const version = pkgData.version;
+     if (version && version !== nextVersion) {
+-        Log.warn(`Mismatching @next/swc version, detected: ${version} while Next.js is on ${nextVersion}. Please ensure these match`);
++        // This mismatch can be expected for backport builds where platform SWC binaries are
++        // intentionally published at a different version. Avoid noisy warnings in course docs repos.
+     }
+ }
+ // These are the platforms we'll try to load wasm bindings first,

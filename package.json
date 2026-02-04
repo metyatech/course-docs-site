@@ -9,6 +9,7 @@
     "dev:inner": "node scripts/dev-inner.mjs",
     "start": "next start",
     "build": "npm run sync:content && next build",
+    "postinstall": "patch-package",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
     "lint": "npm run typecheck",
     "typecheck": "tsc --noEmit",
@@ -33,6 +34,7 @@
     "@types/react-dom": "^19.2.3",
     "cross-env": "^10.1.0",
     "pagefind": "^1.4.0",
+    "patch-package": "^8.0.0",
     "typescript": "^5.9.3"
   },
   "engines": {
