@@ -234,6 +234,19 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/observability-and-diagnos
 - Services must have readiness and liveness checks; fail fast when dependencies are unavailable.
 - CLIs should provide a verbose mode and clear error output; add a self-check command when it reduces support burden.
 
+Source: github:metyatech/agent-rules@HEAD/rules/global/planning-and-approval-gate.md
+
+# Planning and approval gate
+
+- Default to a two-phase workflow: plan first, execute after explicit user approval.
+- Before any state-changing execution (writing or modifying files, running formatters/linters/tests/builds, installing dependencies, or running git commands beyond status/diff/log), do all of the following:
+  - Restate the request as concrete acceptance criteria.
+  - Ask blocking questions and list key assumptions/risks.
+  - Produce a written plan (use your planning tool, e.g., `update_plan`) including the intended file changes and the commands you plan to run.
+  - Ask for approval explicitly and wait for a clear “yes” before executing.
+- Allowed before approval: clarifying questions and read-only inspection (reading files, searching, and `git status` / `git diff` / `git log`).
+- Exception: if the user explicitly requests immediate execution (e.g., “skip planning”, “just do it”), proceed without this gate.
+
 Source: github:metyatech/agent-rules@HEAD/rules/global/quality-testing-and-errors.md
 
 # Quality, testing, and error handling
@@ -378,219 +391,174 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/web/web-ui-and-testing.m
 
 Source: agent-rules-private/rules/course-site-metadata.md
 
-## 教材サイトのメタデータ/サイドバー
+## Course site metadata / sidebar rules
 
-- ページのタイトルは各ページの frontmatter（`title`）で定義し、`_meta.ts` では上書きしない。
-- ページを持たないフォルダ（`index.mdx` がないグルーピング用途）の表示名は、`_meta.ts` で指定する。
-- サイドバーの初期折りたたみは `theme.config.tsx` の `sidebar` 設定（`defaultMenuCollapseLevel` / `autoCollapse`）で制御し、例外が必要な場合のみ `theme.collapsed` を使う。
+- Define a page title in frontmatter (`title`); do not override titles in `_meta.ts`.
+- For grouping-only folders (no `index.mdx`), set the display label in `_meta.ts`.
+- Control default sidebar collapse behavior via `theme.config.tsx` sidebar settings (`defaultMenuCollapseLevel`, `autoCollapse`).
+  - Use `theme.collapsed` only when an exception is truly necessary.
 
 Source: agent-rules-private/rules/course-site-content-authoring.md
 
-## 教材サイト（本文・演習）作成ルール
+## Course site content authoring (pages / exercises / exams)
 
-本ファイルには、教材サイトに共通して適用する「安定したルール」を中心に記載する。
-個別事例・暫定判断・可変仕様・特定リポジトリ固有設定は、原則としてこのファイルに書かない。
+This module defines stable, cross-course rules for authoring course content.
+Write these rules in a way that keeps learning outcomes (clarity, sequencing, reproducibility) as the top priority.
 
-### 意思決定の優先順位
+### Decision priority
 
-教材では「学習効果（分かりやすさ・段階性・再現性）」を最優先する。
+- Prefer learning effectiveness over convenience or brevity.
 
-## 本文・サンプル
+## Page content and samples
 
-- 教材ページ（`content/` 配下。主に `content/docs/`）の本文・ラベル・出力文は日本語で、学習者が理解できる語彙で書く。
-- 本文は冗長にしない。長い説明が必要な場合は、短い段落・箇条書き・小見出しで分割し、段階的に進める。
-- 編集者向けメモや方針（例: 「ここでは扱わない」「編集メモ: ...」）やメタ的内容（例: 「AIが考える...」）は本文に入れない。
-- 用語・見出し構成・説明の粒度は既存ページのパターンに合わせ、学習者が迷わない一貫性を優先する。
-- サンプルは「1サンプル=1トピック」を守り、短く単純にする（長くなる場合は分割/段階化）。
-- 識別子（変数名・クラス名・`id` 等）は意図が推測できる短い名前にする。1文字変数は原則避ける（例外: `i`, `j`）。
-- 出力があるコードは期待値を併記する（例: `console.log(x); // 出力: ...`）。
-- サンプルコード内のコメント（`// ...` / `/* ... */`）は原則日本語で書く（学習者向けのため）。
-- コードブロックは言語指定を付ける（例: `js`, `ts`, `html`, `css`）。
-- 章の冒頭では「どこで使うか」を1～2文で示して動機付けを行う。
-- 実在サイト例を出す場合は、個人情報が表示されるページや認証が必要なページへリンクしない。
+- Write learner-facing text (body, labels, output strings) in Japanese using beginner-friendly vocabulary.
+- Keep prose non-verbose; split longer explanations into short paragraphs, bullet lists, and small headings.
+- Do not include editor notes, meta commentary, or policy statements in learner-facing content.
+- Keep terminology, heading structure, and explanation granularity consistent with existing pages.
+- Keep samples focused: one sample = one topic; split when a sample becomes long.
+- Use intention-revealing identifiers; avoid 1-letter variables except `i`/`j`.
+- For code that produces output, include expected output inline (e.g. `console.log(x); // 出力: ...`).
+- Write comments inside sample code in Japanese.
+- Add language info to fenced code blocks (`js`, `ts`, `html`, `css`).
+- At the start of a chapter, add 1–2 sentences explaining where/why the topic is used.
+- When referencing real websites, do not link to pages that show personal data or require authentication.
 
-## 既習事項の扱い
+## Prerequisites (learned vs. not yet learned)
 
-- 既習/未習の判定は `content/**/_meta.ts` の並び順を基準にする（既習=前のページ + 当該ページ内で説明済み）。
-- 未習の API / 構文が必要になる場合は、前提説明を先に追加するか、出題/解説の設計を変更する。
+- Use the order in `content/**/_meta.ts` as the source of truth for what is already learned.
+- If a page/exercise would require an unlearned API or syntax, add prerequisite explanation first or redesign the task.
 
-## 主要ディレクトリとページ追加
+## Directories and adding pages (Nextra standard)
 
-- 教材サイトのフレームワークは **Nextra（Next.js + MDX）を標準**とし、新規に Docusaurus は採用しない。
-- 主要: `content/`（教材）, `content/**/_meta.ts`（並び順）, `next.config.js` / `theme.config.tsx` / `src/app/`（設定・ルーティング）, `public/`（サイト全体の静的ファイル）。
-- 新規ページは「フォルダ化ページ」に統一し、`content/docs/<chapter>/<slug>/index.mdx`（コンポーネントを全く使わない場合は `index.md`）に作成する。
-  - 先頭に frontmatter（`title`）を設定する。
-  - 必要なコンポーネントは frontmatter の直後で import する（MDX）。
-- ページを追加/分割した場合は、同階層の `_meta.ts` も更新し、既習事項（上記「既習事項の扱い」）と矛盾しない並びにする（迷う場合は末尾追加を基本とする）。
+- The standard framework is Nextra (Next.js + MDX); do not introduce Docusaurus for new course sites.
+- Key paths:
+  - `content/` (docs), `content/**/_meta.ts` (ordering), `theme.config.tsx` / `src/app/` (routing/layout), `public/` (static).
+- Create new pages as “folder pages”:
+  - `content/docs/<chapter>/<slug>/index.mdx` (use `index.md` only if no components are needed).
+  - Include frontmatter `title` at the top.
+  - Place required imports immediately after frontmatter (MDX).
+- When adding/splitting pages, update the sibling `_meta.ts` so ordering matches prerequisites (append to the end when unsure).
 
-## 試験資料（content/exams）の構成・命名
+## Exam content layout (`content/exams`)
 
-- 年度で分ける: `content/exams/<year>/...`（`<year>` は `2026` のような数値のみ）。
-- 学期→試験→種別の順で固定する: `content/exams/<year>/<term>/<exam>/<kind>/index.mdx`
-- グルーピング用途のフォルダはページを持たせない（`index.mdx` を置かない）。表示名は `_meta.ts` で指定する。
-- 命名（日本語→スラッグ / 英語表現）:
-  - 前期 → `1semester` / first semester
-  - 後期 → `2semester` / second semester
-  - 中間試験 → `1midterm-exam` / midterm exam
-  - 期末試験 → `2final-exam` / final exam
-  - 概要 → `overview` / overview
-  - 試験対策 → `preparation` / preparation
+- Split by year: `content/exams/<year>/...` where `<year>` is numeric (e.g. `2026`).
+- Use the fixed order: term → exam → kind:
+  - `content/exams/<year>/<term>/<exam>/<kind>/index.mdx`
+- Do not create pages for grouping-only folders (no `index.mdx`); set their display name in `_meta.ts`.
+- Slug conventions:
+  - First semester: `1semester`
+  - Second semester: `2semester`
+  - Midterm: `1midterm-exam`
+  - Final: `2final-exam`
+  - Overview: `overview`
+  - Preparation: `preparation`
 
-## 試験対策問題 / 小テスト（markdown-question-spec 原本）
+## Preparation questions / quizzes (source of truth = plain Markdown)
 
-- 試験対策問題（将来的な小テスト含む）の**原本はプレーンな Markdown（`.md`）**で管理する。
-  - 形式は `markdown-to-qti/docs/markdown-question-spec.md` に準拠する（この仕様自体は変更しない）。
-  - 1問=1ファイルで、`q1.qspec.md` のように `.qspec.md` 拡張子で明示する（配置ディレクトリは任意）。
-- Course Docs Site での表示は、原本 Markdown をそのまま出さず、サイト側の変換で `<Exercise>` / `<Solution>` に整形して表示する（原本は Markdown ツールチェーン互換のまま維持する）。
-- `## Prompt` 内の `### Exam` などの見出しは **仕様の拡張ではなく表示側の慣習**として扱う。
-  - 表示上の扱いは `course-docs-platform/docs/markdown-question-spec-course-docs-rendering.md` を参照する。
+- Store the *source of truth* as plain Markdown that conforms to `markdown-to-qti/docs/markdown-question-spec.md`.
+  - 1 question = 1 file.
+  - No frontmatter.
+  - Keep the required heading structure (`#`, `## Type`, `## Prompt`, ...).
+- Mark question-spec sources explicitly by filename:
+  - Use the `.qspec.md` extension (e.g. `q1.qspec.md`).
+  - Directory placement is arbitrary; transformation is keyed by the extension.
+- In display pages (`index.mdx`), import and render each question (e.g. `import Q1 from './q1.qspec.md'` then `<Q1 />`).
+- Course Docs Site renders question-spec Markdown via `@metyatech/course-docs-platform`:
+  - `Type: cloze` converts `{{answer}}` to `${answer}` and enables blanks (including inside code blocks).
+  - Inside `## Prompt`, `### Exam` is treated as a presentation convention (rendered as a tip callout titled `本試験では`).
+  - `## Scoring` is rendered as an info callout titled `採点基準・配点`.
+  - `## Explanation` is rendered inside `<Solution>`.
+  - Details: `course-docs-platform/docs/markdown-question-spec-course-docs-rendering.md`.
 
-## ページ資材（img / assets）
+## Page assets (images / downloads)
 
-- 画像・配布物などページに紐づく資材は「ページ単位」で管理する（共有置き場を作らない）。
-- 画像は `content/**/<slug>/img/...` に置く。
-  - ページ内表示の画像: `![...](./img/example.png)` のように相対パスで参照する。
-  - MDX で読み込みが必要な画像: `import exampleUrl from "./img/example.png";` のように import する。
-- 配布（ダウンロード）するファイルは `content/**/<slug>/assets/...` に置く。
-  - `import fileUrl from "./assets/<name>";` のように import し、`<a href={fileUrl} download="<name>">...</a>` を使う。
-    - `download` を指定しないとハッシュ名になるため、原則として付ける。
-    - import はURL文字列を返す前提で扱う（`.default` を付けない）。
-- 「同一章内で複数ページ共通」「サイト全体で共通」などの共有置き場は作らない。
-  - 複数ページで同じ資材を使い回す場合でも、各ページの `img/` / `assets/` にコピーして持つ（依存関係を作らない）。
+- Keep page assets page-scoped (no shared asset directory).
+- Images live in `content/**/<slug>/img/...`:
+  - Inline Markdown images: `![...](./img/example.png)`
+  - When an image must be loaded in MDX code: `import exampleUrl from './img/example.png'`
+- Downloadable files live in `content/**/<slug>/assets/...`:
+  - `import fileUrl from './assets/<name>';`
+  - Use `<a href={fileUrl} download="<name>">...</a>` (always set `download` to avoid hashed filenames).
+  - Treat imports as URL strings (do not use `.default`).
+- When the same asset is needed in multiple pages, copy it into each page’s `img/` or `assets/` directory (do not create inter-page dependencies).
 
-## 付属ファイルのビルド前提（Nextra / Next.js のアセット読み込み）
+## Asset build assumptions (Nextra / Next.js)
 
-- `content/**/assets/` / `content/**/img/` 配下のファイルを `import` でURLとして扱えるようにするため、教材サイトは `@metyatech/course-docs-platform` の webpack ルール（`applyCourseAssetWebpackRules`）を有効化している前提で運用する。
-- 付属ファイルを追加したのにビルドで「loader がない / Module parse failed」等が出た場合は、まず当該教材サイトの `next.config.js` が `@metyatech/course-docs-platform/next` を使っていることを確認する。
+- The site assumes `@metyatech/course-docs-platform` webpack rules (`applyCourseAssetWebpackRules`) are enabled so `content/**/img` and `content/**/assets` can be imported as URLs.
+- If you add an asset and the build fails with loader errors, first check that `next.config.js` uses `@metyatech/course-docs-platform/next`.
 
-## CodePreview（@metyatech/code-preview）
+## CodePreview (`@metyatech/code-preview`)
 
-- **実行できるサンプルは CodePreview を優先**（単純な構文説明、非実行コードなどは通常のコードブロックでも可）。
-- CodePreview のスタイルはコンポーネント側で注入される前提のため、ページ側で `@metyatech/code-preview/styles.css` を import しない。
-- 初期コードは、**`<CodePreview>...</CodePreview>` の中（開始タグと終了タグの間）** にフェンスコードブロックで書く。
-  - 言語ラベルは `html` / `css` / `js` / `javascript` を使う（省略しない）。
-  - `html` ブロックは、原則 **`<body>` の中に置く内容だけ**を書く（`<!DOCTYPE html>` / `<html>` / `<head>` / `<body>` は書かない）。
-  - CSS/JS は、原則、それぞれ `css` / `js`（または `javascript`）の **別ブロック**に分ける（HTML に `<style>` / `<script>` を埋め込まない）。
-  - CSSは `{}` の前後を改行し、プロパティは `color: red;` のように `:` の後にスペースを入れる。
-- CodePreview 内で参照する画像は `images` マップで仮想パス→実パスを渡す（Markdown/MDX の相対パス参照とは別）。
-  - 仮想パスは `img/...` のようにページ内の `img/` 配下を基準にする。
-  - 実パスは `import ... from "./img/..."` した値を使う。
-- 複数プレビューで同じ初期コードを共有したい場合は `sourceId` を使う。
-  - `sourceId` は衝突を避けるため、ページ内で一意になる短い文字列を推奨（ASCIIでなくても可）。
-- 表示制御: `htmlVisible`, `cssVisible`, `jsVisible`, `previewVisible` で各パネルを切り替える。
-- 完成イメージ（動作プレビュー）は、原則としてコードパネルを非表示にしてプレビューだけ見せる（`htmlVisible={false}` / `cssVisible={false}` / `jsVisible={false}` / `previewVisible={true}`）。
-- 学習者が実装する CodePreview は、原則として共有を無効化する（`share={false}`）。
+- Prefer CodePreview for runnable samples; use normal code blocks for static syntax explanations.
+- Do not import `@metyatech/code-preview/styles.css` in pages (styles are injected by the component).
+- Put the initial code inside `<CodePreview>...</CodePreview>` as fenced blocks.
+  - Use `html` / `css` / `js` / `javascript` language labels (do not omit).
+  - HTML blocks contain only `<body>` content (no `<!DOCTYPE>`, `<html>`, `<head>`, `<body>`).
+  - Keep CSS and JS in separate blocks; do not inline `<style>` / `<script>` into HTML.
+  - CSS formatting: braces on their own lines; `property: value;` with a space after `:`.
+- For images referenced from CodePreview, use the `images` map (virtual path → imported URL).
+  - Use virtual paths like `img/...` for consistency with page-local images.
+- Use `sourceId` to share the same source across multiple previews (unique within the page).
+- Panel visibility is controlled via `htmlVisible`, `cssVisible`, `jsVisible`, `previewVisible`.
+- For “final demo” previews, show only the preview panel by default.
+- For learner-implemented previews, disable sharing (`share={false}`).
 
-## 演習（@metyatech/exercise）
+## Exercises (`@metyatech/exercise`)
 
-- `@metyatech/exercise/client` の `<Exercise>` と `<Solution>` を使用する。
-  - `<Solution>` は必ず同一 `<Exercise>` の末尾に配置する。
-- タイトル採番: `演習N` / `演習-発展N` を基本とし、後ろに括弧で説明を付けてよい（例: `演習1（?）`、`演習-発展1（?）`）。ページ内で重複や飛び番を作らない。
-- 問題文は曖昧さを避け、開始データ・手順・確認方法・完成イメージを明示する（短く書く）。
-- 問題文にヒントを入れるのは可。ただし解答に直結するコード/手順/値など「直接的な答え」は書かない（必要なら `<Solution>` 側へ移す）。
-- 解答コードは `<Solution>` 内に置き、説明は初学者向けに短く具体的に書く。
-- 見た目を作成する演習では、完成イメージを視覚的に提示する（プレビュー表示、提示コード内コメントなど、最も理解しやすい方法を選ぶ）。
+- Use `<Exercise>` and `<Solution>` from `@metyatech/exercise/client`.
+  - Place `<Solution>` at the end of the same `<Exercise>`.
+- Numbering:
+  - Use `演習N` / `演習-発展N` (N starts at 1) and keep numbering unique within the page.
+- Problem statements must be unambiguous:
+  - Provide starting data, steps, how to verify, and a clear target behavior/appearance.
+  - Hints are allowed, but do not include “direct answers” (put those in `<Solution>`).
+- For styling/visual exercises, show the expected final appearance (preview, image, or equivalent).
+- Avoid “essentially the same” exercises:
+  - Check already-covered exercises on the page and earlier pages.
+  - Prefer different angles (state, multiple events, conditions, accumulation, linked elements, etc.).
 
-### 演習・演習-発展の配置方針
+## Assessments (exam questions written in Markdown)
 
-- 各トピックごとに「演習」と「演習-発展」をこまめに配置し、学習直後に実践できるようにする（資料末尾にまとめて配置しない）。
-- 「演習」は最低限知っておくべき内容までを目安にし、必要なら複数配置してよい。
-- 「演習-発展」はより高いレベルの内容とし、全体を通して後半ほど難易度を上げる（複数配置してよい）。
-- 本質的に同じ内容の演習を繰り返さず、多角的な出題にする。
+- Write questions so there is a single interpretation and a single correct answer.
+- Avoid ambiguous verbs like “switch”; specify the exact state transition.
+- For UI behavior questions, include a visual target (GIF/image) when feasible.
+- For fill-in-the-blank questions, specify the expected answer format and any forbidden answers.
+- For external-system blanks, use `${answer}` (multiple answers: `${/regex/}`); do not convert to custom placeholders (e.g. `【1】`).
+- If multiple answers are allowed, describe the allowed range explicitly (e.g. `textContent` or `innerText`).
 
-### 演習問題の内容方針
+### Auto-grading compatible exam Markdown (minimum spec)
 
-- **演習**: 学習トピックの習得にのみフォーカスし、関係のない不要な要素を含めない。
-- **演習-発展**: より実践的でもよいが、学習トピックを中心に習得できる問題にする。
+The following constraints are the minimum required for reuse by the auto-grading tooling.
 
-### 演習作成時の既習事項確認と重複回避
+#### Frontmatter (file header)
 
-演習・演習-発展を作成する際は、必ず以下の手順を踏むこと:
+- Required keys: `examId`, `schemaVersion`, `timeLimitMinutes`, `totalPoints`, `questionCount`
+- `examId` must be globally unique and include year/term (e.g. `js2-2026-2-final-regular`)
+- `schemaVersion` is a fixed identifier (e.g. `exam-md@1`)
 
-1. **既習事項の確認**: 上記「既習事項の扱い」に従い、未習の API / 構文を使わない設計になっていることを確認する。
-2. **既出演習内容の確認**: 同一ページ内および過去ページで既に出題された演習内容を確認する。「表面的な違い」ではなく「本質的な違い（学習ポイント・解法パターン）」があるかで判断する。
-3. **本質的重複の判定**: 同じイベント・同じ操作パターン・同じ学習ポイントの組み合わせは「本質的に同じ」とみなす。異なる観点（状態管理、複数イベント、条件分岐、累積変化、複数要素連動など）を持つ問題を作る。
-4. **実現可能性確認**: 既習事項のみで解けることを確認する。未習事項が必要／冗長な繰り返しだけになる場合は再設計する。
+#### Question headings
 
-## 試験対策問題 / 小テスト（問題形式の統一）
+- Each question starts with `## 問N` (N = 1-based sequential index).
 
-- 試験対策問題・小テストの「原本」は、`markdown-to-qti` の `Markdown Question Format`（`docs/markdown-question-spec.md`）に準拠したプレーンな Markdown（`.md`）として管理する。
-  - 1問=1ファイル、frontmatter なし、見出し構成（`#` / `## Type` / `## Prompt` / ...）を崩さない。
-- 原本ファイルは、表示用ページ（`index.mdx`）とは分離し、ページ直下の `questions/` 配下に置く。
-  - 例: `content/exams/.../preparation/questions/q1.md`
-- 表示用ページ（`index.mdx`）では、`import Q1 from './questions/q1.md'` のように読み込み、`<Q1 />` で表示する。
-- サイト表示では `@metyatech/course-docs-platform` が `questions/` 配下の問題Markdownを `<Exercise>` / `<Solution>` に自動変換して表示する。
-  - `## Type` が `cloze` の場合、原本の `{{answer}}` は表示時に `${answer}` に変換され、穴埋め（`enableBlanks`）として扱われる（コードブロック内も含む）。
-  - 「本試験では」は `## Prompt` 内に `### 本試験では` を置いて書く（表示は `tip`）。
-  - 採点基準・配点は `## Scoring` に `- <points>: <criterion>` の箇条書きで書く（表示は `info`）。
-- `questions/` フォルダはサイドバーに出さない（同階層の `_meta.ts` で `questions: { display: 'hidden' }` を指定する）。
+#### Rubric must be a table
 
-## テスト・試験（評価問題）
+- Rubric tables are mandatory and must have these columns:
+  - `criterionId`, `points`, `description`, `gradingMode`
+- Allowed `gradingMode` values:
+  - `manual` (not auto-graded; treated as “needs review”)
+  - `fill` (auto-graded; expected value comes from `${...}` occurrences in the prompt)
+- The auto-grader:
+  - Auto-grades only `fill`.
+  - Treats `manual` and `fill`-NG as review targets.
+  - Maps rubric `fill` rows to `${...}` occurrences in order (1st row ↔ 1st placeholder, etc.).
+  - Errors if the number of `fill` rows and `${...}` placeholders differs.
 
-- 設問は1つの解釈・1つの正解になるように、初期状態・操作回数・期待結果を明示する。
-- 「切り替わる」など曖昧な語は、状態遷移（例: クリックのたびにトグル／1回目のみ変化）を文章で固定する。
-- UI操作を問う設問は、動作イメージ（GIF/静止画）を問題文内に提示して期待動作を固定する（可能なら解答デモを再現してキャプチャ）。
-- 穴埋め問題は、答えの形式（値/単位/セレクタ/プロパティ名など）と禁止事項を明示する。
-- 外部システムと連携する穴埋めは `${答え}`（複数解は `${/正規表現/}`）の形式で示し、別形式（例: `【1】`）へ置換しない。
-- 複数解を許容する場合は、許容範囲（例: `textContent`/`innerText` どちらでも可）を問題文に明記する。
+#### Rubric placement
 
-### 自動採点に対応した試験問題（Markdown で作成すること）
+- Place the rubric table under a “採点基準・配点” section inside each question.
+- Provide both “解答” and “解説” (students receive this document).
 
-以下の規約は「自動採点ツールがそのまま再利用できる最小限」に限定する。
-
-#### 1) 試験メタ（ファイル先頭の frontmatter）
-
-- 必須キー: `examId`, `schemaVersion`, `timeLimitMinutes`, `totalPoints`, `questionCount`
-- `examId` は年度や学期を含む一意なID（例: `js2-2026-2-final-regular`）
-- `schemaVersion` は `exam-md@1` など固定文字列
-
-#### 2) 設問の見出し
-
-- 各設問は `## 問N` で始める（Nは1始まりの連番）
-- CSVの `qN/answer` との対応は、この `N` を使って自動対応する（個別IDは付与しない）
-
-#### 3) 採点基準は必ず「表」で記載
-
-Rubric表は必須。列名は以下に固定する。
-
-- `criterionId`（設問内で一意）
-- `points`（数値）
-- `description`（学生向けの達成条件）
-- `gradingMode`（採点モード）
-
-`gradingMode` の許容値:
-
-- `manual`（手動採点。未採点として扱う）
-- `fill`（穴埋め自動採点。設問内の `${...}` から期待値を取得してOK/NG判定）
-
-このリポジトリの自動採点ツールは、言語依存の静的解析を前提にしない。
-そのため、**自動採点できるのは `fill` のみ** とし、`manual` は **未採点（要レビュー）** とする。
-
-`fill` の自動採点は、設問本文のどこかにある `${...}` を期待値として扱う（CSSに限らない）。
-`${/正規表現/}`（例: `${/transform|all/}`）の形式は正規表現一致、それ以外は文字列一致。
-Rubric表の `fill` 行の順序（1行目、2行目…）と、`${...}` の出現順（1個目、2個目…）を対応付ける。
-`fill` 行数と `${...}` 個数が一致しない場合はエラーとし、試験Markdownを修正する。
-
-#### 3-1) 禁止事項
-
-- `gradingMode` の許容値は `manual` / `fill` のみ（それ以外はエラー）。
-- 自動採点は `fill` のみ。`manual` を自動採点対象にしない。
-
-#### 3-2) 自動採点フロー（運用）
-
-- 自動採点は `fill` のみをOK/NG判定する。
-- `manual` および `fill` のNGはAIレビュー対象として抽出する。
-- AIレビュー結果は `decisions.csv` に保存し、人間が最終確認する。
-- 点数はRubricの `points` を唯一の参照元とし、`finalStatus` のみで確定する。
-
-#### 4) Rubric表の位置
-
-- 各設問内の「採点基準・配点」節にRubric表を置く（箇条書きは使わない）
-- 解答と解説は必須（学生に配布するため）
-
-#### 5) 書式例（テンプレート）
-
-以下の例を基準にする（最小構成）。
+#### Template (reference)
 
 ```markdown
 ---
@@ -640,37 +608,7 @@ CSS:
 ### 解説
 
 解説本文。
-
----
-
-## 問2
-
-問題文。
-
-### 採点基準・配点
-
-| criterionId     | points | description                          | gradingMode |
-| --------------- | ------ | ------------------------------------ | ----------- |
-| q2.title.get    | 3      | タイトル要素を取得できている         | manual      |
-| q2.content.get  | 3      | コンテンツ要素を取得できている       | manual      |
-| q2.event.click  | 5      | クリックイベントを設定する記述がある | manual      |
-| q2.class.toggle | 5      | クラスを付け外しする記述がある       | manual      |
-| q2.requirement  | 2      | 要件通り動作する                     | manual      |
-
-### 解答
-
-```js
-// 解答例
 ```
-
-### 解説
-
-解説本文。
-
-#### 6) 例外
-
-- ルールにない独自フォーマットを導入しない（解析不能になる）
-- ルール変更が必要な場合は、先に本ルールへ追記してから問題を作る
 
 Source: agent-rules-private/rules/course-site-repository-architecture.md
 
