@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -108,6 +109,7 @@ let restartQueued = false;
 let devProcess = null;
 let devExitExpected = false;
 let shuttingDown = false;
+let devRevision = crypto.randomUUID();
 
 const runSync = () =>
   new Promise((resolve) => {
@@ -120,12 +122,20 @@ const runSync = () =>
 const startDev = () => {
   devExitExpected = false;
   const devArgs = [...baseArgs, '--port', String(activePort)];
+  const childEnv = {
+    ...process.env,
+    COURSE_DOCS_SITE_DEV_REVISION: devRevision,
+  };
   if (devInnerMode === 'stub') {
     devProcess = spawn(process.execPath, ['scripts/dev-inner-stub.mjs', ...devArgs], {
       stdio: 'inherit',
+      env: childEnv,
     });
   } else {
-    devProcess = spawn(process.execPath, [nextBin, 'dev', ...devArgs], { stdio: 'inherit' });
+    devProcess = spawn(process.execPath, [nextBin, 'dev', ...devArgs], {
+      stdio: 'inherit',
+      env: childEnv,
+    });
   }
   devProcess.on('exit', (devCode) => {
     if (devExitExpected) {
@@ -278,6 +288,7 @@ const queueRestart = async () => {
     // Clear Next's dev cache to avoid cross-course stale artifacts.
     rmIfExists(path.join(projectRoot, '.next'));
 
+    devRevision = crypto.randomUUID();
     startDev();
   }
   restarting = false;

@@ -23,6 +23,7 @@ if (!Number.isFinite(port) || port <= 0) {
 
 const projectRoot = process.cwd();
 const docsRoot = path.join(projectRoot, 'content', 'docs');
+const revision = process.env.COURSE_DOCS_SITE_DEV_REVISION ?? '';
 
 const hasDoc = (slug) => {
   const dir = path.join(docsRoot, slug);
@@ -54,7 +55,7 @@ const server = http.createServer((req, res) => {
   if (pathname === '/healthz') {
     res.statusCode = 200;
     res.setHeader('content-type', 'text/plain; charset=utf-8');
-    res.end('course-docs-site-stub');
+    res.end(`course-docs-site-stub:${revision}`);
     return;
   }
 

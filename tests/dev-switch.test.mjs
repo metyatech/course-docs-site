@@ -89,13 +89,15 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
 
 const findStubPort = async ({ fromPort, toPort, timeoutMs }) => {
   let foundPort = null;
+  let foundHealthzText = null;
   await waitFor(
     async () => {
       for (let port = fromPort; port <= toPort; port += 1) {
         // eslint-disable-next-line no-await-in-loop
         const result = await tryFetchText(`http://127.0.0.1:${port}/healthz`);
-        if (result?.status === 200 && result.text.trim() === 'course-docs-site-stub') {
+        if (result?.status === 200 && result.text.trim().startsWith('course-docs-site-stub:')) {
           foundPort = port;
+          foundHealthzText = result.text.trim();
           return true;
         }
       }
@@ -107,7 +109,7 @@ const findStubPort = async ({ fromPort, toPort, timeoutMs }) => {
       onTimeoutMessage: `Could not find stub server port in range ${fromPort}-${toPort}.`,
     }
   );
-  return foundPort;
+  return { port: foundPort, healthzText: foundHealthzText };
 };
 
 const writeCourseRepo = async ({ rootDir, courseName, extraDocsFolder }) => {
@@ -352,7 +354,9 @@ test(
       await killProcessTree(dev);
     });
 
-    const chosenPort = await findStubPort({ fromPort: 3000, toPort: 3010, timeoutMs: 30_000 });
+    const found = await findStubPort({ fromPort: 3000, toPort: 3010, timeoutMs: 30_000 });
+    const chosenPort = found.port;
+    assert.ok(chosenPort, 'Expected a chosen port');
     const baseUrl = `http://127.0.0.1:${chosenPort}`;
 
     await waitFor(
@@ -384,5 +388,84 @@ test(
         onTimeoutMessage: 'Server did not switch to Course B content on the same port.',
       }
     );
+  }
+);
+
+test(
+  'dev restart changes revision (enables browser auto-reload)',
+  { timeout: 2 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-dev-switch-rev-'));
+    const courseA = path.join(tempRoot, 'course-a');
+    const courseB = path.join(tempRoot, 'course-b');
+
+    await writeCourseRepo({ rootDir: courseA, courseName: 'Course A', extraDocsFolder: 'a-only' });
+    await writeCourseRepo({ rootDir: courseB, courseName: 'Course B', extraDocsFolder: 'b-only' });
+
+    const envCourseBackup = await backupFile(envCoursePath);
+    const envCourseLocalBackup = await backupFile(envCourseLocalPath);
+
+    t.after(async () => {
+      await restoreFile(envCourseLocalPath, envCourseLocalBackup);
+      await restoreFile(envCoursePath, envCourseBackup);
+      await safeRm(path.join(projectRoot, 'content'));
+      await safeRm(path.join(projectRoot, 'public'));
+      await fs.mkdir(path.join(projectRoot, 'content'), { recursive: true });
+      await fs.mkdir(path.join(projectRoot, 'public'), { recursive: true });
+      await fs.writeFile(path.join(projectRoot, 'content', '.keep'), '', 'utf8');
+      await fs.writeFile(path.join(projectRoot, 'public', '.keep'), '', 'utf8');
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await fs.rm(envCoursePath, { force: true });
+    await fs.writeFile(envCourseLocalPath, `COURSE_CONTENT_DIR=${JSON.stringify(courseA)}\n`, 'utf8');
+
+    const dev = spawn(process.execPath, ['scripts/run-dev.mjs'], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        NEXT_TELEMETRY_DISABLED: '1',
+        COURSE_DOCS_SITE_DEV_INNER: 'stub',
+      },
+      stdio: 'inherit',
+    });
+    t.after(async () => {
+      await killProcessTree(dev);
+    });
+
+    const initial = await findStubPort({ fromPort: 3000, toPort: 3010, timeoutMs: 30_000 });
+    assert.ok(initial.port, 'Expected initial port');
+    assert.ok(initial.healthzText, 'Expected initial healthz text');
+    const initialRevision = initial.healthzText.split(':')[1] ?? '';
+    assert.ok(initialRevision, 'Expected initial revision');
+
+    await fs.writeFile(envCourseLocalPath, `COURSE_CONTENT_DIR=${JSON.stringify(courseB)}\n`, 'utf8');
+
+    let nextRevision = '';
+    await waitFor(
+      async () => {
+        const res = await tryFetchText(`http://127.0.0.1:${initial.port}/healthz`);
+        if (!res?.text) {
+          return false;
+        }
+        const text = res.text.trim();
+        if (!text.startsWith('course-docs-site-stub:')) {
+          return false;
+        }
+        const r = text.split(':')[1] ?? '';
+        if (!r || r === initialRevision) {
+          return false;
+        }
+        nextRevision = r;
+        return true;
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 200,
+        onTimeoutMessage: 'Revision did not change after restart.',
+      }
+    );
+
+    assert.notEqual(nextRevision, initialRevision);
   }
 );
