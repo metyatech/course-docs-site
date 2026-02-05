@@ -14,6 +14,45 @@ const isWindows = process.platform === 'win32';
 const require = createRequire(import.meta.url);
 const nextBin = require.resolve('next/dist/bin/next');
 
+const parsePortArg = (argv) => {
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === '--port' || a === '-p') {
+      const v = argv[i + 1];
+      if (typeof v === 'string' && v.trim()) {
+        const port = Number(v);
+        if (Number.isFinite(port) && port > 0) {
+          return port;
+        }
+      }
+    }
+    if (typeof a === 'string' && a.startsWith('--port=')) {
+      const v = a.slice('--port='.length);
+      const port = Number(v);
+      if (Number.isFinite(port) && port > 0) {
+        return port;
+      }
+    }
+  }
+  return null;
+};
+
+const stripPortArgs = (argv) => {
+  const out = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === '--port' || a === '-p') {
+      i += 1;
+      continue;
+    }
+    if (typeof a === 'string' && a.startsWith('--port=')) {
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+};
+
 const readEnvFile = (filename) => {
   const envPath = path.join(projectRoot, filename);
   if (!fs.existsSync(envPath)) {
@@ -58,19 +97,9 @@ const getCourseEnv = () => {
 };
 
 let lastCourseEnv = getCourseEnv();
-const desiredPort = (() => {
-  const idxLong = args.indexOf('--port');
-  if (idxLong !== -1 && typeof args[idxLong + 1] === 'string') {
-    const p = Number(args[idxLong + 1]);
-    return Number.isFinite(p) && p > 0 ? p : 3000;
-  }
-  const idxShort = args.indexOf('-p');
-  if (idxShort !== -1 && typeof args[idxShort + 1] === 'string') {
-    const p = Number(args[idxShort + 1]);
-    return Number.isFinite(p) && p > 0 ? p : 3000;
-  }
-  return 3000;
-})();
+const portPreference = parsePortArg(args) ?? 3000;
+const baseArgs = stripPortArgs(args);
+let activePort = null;
 
 let syncRunning = false;
 let syncQueued = false;
@@ -90,12 +119,13 @@ const runSync = () =>
 
 const startDev = () => {
   devExitExpected = false;
+  const devArgs = [...baseArgs, '--port', String(activePort)];
   if (devInnerMode === 'stub') {
-    devProcess = spawn(process.execPath, ['scripts/dev-inner-stub.mjs', ...args], {
+    devProcess = spawn(process.execPath, ['scripts/dev-inner-stub.mjs', ...devArgs], {
       stdio: 'inherit',
     });
   } else {
-    devProcess = spawn(process.execPath, [nextBin, 'dev', ...args], { stdio: 'inherit' });
+    devProcess = spawn(process.execPath, [nextBin, 'dev', ...devArgs], { stdio: 'inherit' });
   }
   devProcess.on('exit', (devCode) => {
     if (devExitExpected) {
@@ -201,6 +231,25 @@ const waitForPortFree = async (port, timeoutMs = 10_000) => {
   }
 };
 
+const findFirstFreePort = async (fromPort, maxAttempts = 20) => {
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const port = fromPort + i;
+    // eslint-disable-next-line no-await-in-loop
+    const canListen = await new Promise((resolve) => {
+      const server = net.createServer();
+      server.unref();
+      server.once('error', () => resolve(false));
+      server.listen(port, '127.0.0.1', () => {
+        server.close(() => resolve(true));
+      });
+    });
+    if (canListen) {
+      return port;
+    }
+  }
+  throw new Error(`No free port found starting from ${fromPort}.`);
+};
+
 const queueRestart = async () => {
   restartQueued = true;
   if (restarting) {
@@ -212,7 +261,17 @@ const queueRestart = async () => {
     restartQueued = false;
 
     await stopDev();
-    await waitForPortFree(desiredPort);
+    try {
+      await waitForPortFree(activePort);
+    } catch (error) {
+      // If something else grabbed the port, pick a new one rather than silently starting on a different port.
+      // This keeps restarts predictable and prevents two dev servers from racing for different ports.
+      const previousPort = activePort;
+      activePort = await findFirstFreePort(portPreference);
+      console.warn(
+        `Warning: could not reuse port ${previousPort}; restarting on port ${activePort}. (${error})`
+      );
+    }
     await queueSync();
 
     // Switching course content can change the MDX tree and page-map.
@@ -271,7 +330,8 @@ const createEnvWatcher = () => {
   };
 };
 
-queueSync().then(() => {
+queueSync().then(async () => {
+  activePort = await findFirstFreePort(portPreference);
   const envWatcher = createEnvWatcher();
   startDev();
 

@@ -54,7 +54,7 @@ const server = http.createServer((req, res) => {
   if (pathname === '/healthz') {
     res.statusCode = 200;
     res.setHeader('content-type', 'text/plain; charset=utf-8');
-    res.end('ok');
+    res.end('course-docs-site-stub');
     return;
   }
 

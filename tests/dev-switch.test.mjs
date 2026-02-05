@@ -87,6 +87,29 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   }
 };
 
+const findStubPort = async ({ fromPort, toPort, timeoutMs }) => {
+  let foundPort = null;
+  await waitFor(
+    async () => {
+      for (let port = fromPort; port <= toPort; port += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await tryFetchText(`http://127.0.0.1:${port}/healthz`);
+        if (result?.status === 200 && result.text.trim() === 'course-docs-site-stub') {
+          foundPort = port;
+          return true;
+        }
+      }
+      return false;
+    },
+    {
+      timeoutMs,
+      intervalMs: 200,
+      onTimeoutMessage: `Could not find stub server port in range ${fromPort}-${toPort}.`,
+    }
+  );
+  return foundPort;
+};
+
 const writeCourseRepo = async ({ rootDir, courseName, extraDocsFolder }) => {
   const siteConfig = `export const siteConfig = {
   logoText: ${JSON.stringify(courseName)},
@@ -266,3 +289,100 @@ test(
     }
   );
 });
+
+test(
+  'dev restart keeps the originally selected port when no port is specified',
+  { timeout: 2 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-dev-switch-port-'));
+    const courseA = path.join(tempRoot, 'course-a');
+    const courseB = path.join(tempRoot, 'course-b');
+
+    await writeCourseRepo({ rootDir: courseA, courseName: 'Course A', extraDocsFolder: 'a-only' });
+    await writeCourseRepo({ rootDir: courseB, courseName: 'Course B', extraDocsFolder: 'b-only' });
+
+    const envCourseBackup = await backupFile(envCoursePath);
+    const envCourseLocalBackup = await backupFile(envCourseLocalPath);
+
+    // Try to force the default port busy (best-effort).
+    let blocker = null;
+    try {
+      blocker = net.createServer();
+      blocker.unref();
+      await new Promise((resolve, reject) => {
+        blocker.once('error', () => resolve()); // already in use is fine
+        blocker.listen(3000, '127.0.0.1', () => resolve());
+      });
+    } catch {
+      // ignore
+    }
+
+    t.after(async () => {
+      if (blocker) {
+        try {
+          blocker.close();
+        } catch {
+          // ignore
+        }
+      }
+      await restoreFile(envCourseLocalPath, envCourseLocalBackup);
+      await restoreFile(envCoursePath, envCourseBackup);
+      await safeRm(path.join(projectRoot, 'content'));
+      await safeRm(path.join(projectRoot, 'public'));
+      await fs.mkdir(path.join(projectRoot, 'content'), { recursive: true });
+      await fs.mkdir(path.join(projectRoot, 'public'), { recursive: true });
+      await fs.writeFile(path.join(projectRoot, 'content', '.keep'), '', 'utf8');
+      await fs.writeFile(path.join(projectRoot, 'public', '.keep'), '', 'utf8');
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await fs.rm(envCoursePath, { force: true });
+    await fs.writeFile(envCourseLocalPath, `COURSE_CONTENT_DIR=${JSON.stringify(courseA)}\n`, 'utf8');
+
+    const dev = spawn(process.execPath, ['scripts/run-dev.mjs'], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        NEXT_TELEMETRY_DISABLED: '1',
+        COURSE_DOCS_SITE_DEV_INNER: 'stub',
+      },
+      stdio: 'inherit',
+    });
+    t.after(async () => {
+      await killProcessTree(dev);
+    });
+
+    const chosenPort = await findStubPort({ fromPort: 3000, toPort: 3010, timeoutMs: 30_000 });
+    const baseUrl = `http://127.0.0.1:${chosenPort}`;
+
+    await waitFor(
+      async () => {
+        const result = await tryFetchText(`${baseUrl}/docs/a-only/`);
+        return result?.status === 200;
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 200,
+        onTimeoutMessage: 'Server did not become ready with Course A content.',
+      }
+    );
+
+    await fs.writeFile(envCourseLocalPath, `COURSE_CONTENT_DIR=${JSON.stringify(courseB)}\n`, 'utf8');
+
+    await waitFor(
+      async () => {
+        const a = await tryFetchText(`${baseUrl}/docs/a-only/`);
+        const b = await tryFetchText(`${baseUrl}/docs/b-only/`);
+        if (!a || !b) {
+          return false;
+        }
+        return a.status === 404 && b.status === 200;
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 200,
+        onTimeoutMessage: 'Server did not switch to Course B content on the same port.',
+      }
+    );
+  }
+);
