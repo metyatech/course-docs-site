@@ -423,6 +423,28 @@ Source: agent-rules-private/rules/course-site-content-authoring.md
   - 必要なコンポーネントは frontmatter の直後で import する（MDX）。
 - ページを追加/分割した場合は、同階層の `_meta.ts` も更新し、既習事項（上記「既習事項の扱い」）と矛盾しない並びにする（迷う場合は末尾追加を基本とする）。
 
+## 試験資料（content/exams）の構成・命名
+
+- 年度で分ける: `content/exams/<year>/...`（`<year>` は `2026` のような数値のみ）。
+- 学期→試験→種別の順で固定する: `content/exams/<year>/<term>/<exam>/<kind>/index.mdx`
+- グルーピング用途のフォルダはページを持たせない（`index.mdx` を置かない）。表示名は `_meta.ts` で指定する。
+- 命名（日本語→スラッグ / 英語表現）:
+  - 前期 → `1semester` / first semester
+  - 後期 → `2semester` / second semester
+  - 中間試験 → `1midterm-exam` / midterm exam
+  - 期末試験 → `2final-exam` / final exam
+  - 概要 → `overview` / overview
+  - 試験対策 → `preparation` / preparation
+
+## 試験対策問題 / 小テスト（markdown-question-spec 原本）
+
+- 試験対策問題（将来的な小テスト含む）の**原本はプレーンな Markdown（`.md`）**で管理する。
+  - 形式は `markdown-to-qti/docs/markdown-question-spec.md` に準拠する（この仕様自体は変更しない）。
+  - 1問=1ファイルで、`content/exams/.../<kind>/questions/q1.md` のように `questions/` 配下へ置く。
+- Course Docs Site での表示は、原本 Markdown をそのまま出さず、サイト側の変換で `<Exercise>` / `<Solution>` に整形して表示する（原本は Markdown ツールチェーン互換のまま維持する）。
+- 「本試験では」などの見出しは **仕様の拡張ではなく表示側の慣習**として扱う。
+  - 表示上の扱いは `course-docs-platform/docs/markdown-question-spec-course-docs-rendering.md` を参照する。
+
 ## ページ資材（img / assets）
 
 - 画像・配布物などページに紐づく資材は「ページ単位」で管理する（共有置き場を作らない）。
@@ -708,3 +730,10 @@ The goal is to keep the system DRY and minimize duplicated “site runtime” co
 - Deploy via GitHub Actions using the Vercel CLI:
   - Secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
   - The workflow should checkout `metyatech/course-docs-site` and build/deploy it.
+
+### Specs vs. site rendering conventions
+
+- Keep generic, tool-agnostic specs in their dedicated repositories.
+  - Example: the plain Markdown question format lives in `markdown-to-qti` (`docs/markdown-question-spec.md`).
+- Do **not** add Course Docs Site-specific presentation concepts (e.g. “本試験では”) to generic specs.
+  - Document such items as **site rendering conventions** in `course-docs-platform` (and reference them from the course authoring rules).
