@@ -6,7 +6,7 @@ type RevisionResponse = {
   revision?: unknown;
 };
 
-const getRevision = async () => {
+const getRevisionOnce = async () => {
   const res = await fetch('/api/dev/revision', {
     cache: 'no-store',
     headers: {
@@ -25,30 +25,54 @@ export default function DevAutoReload() {
     let cancelled = false;
     let lastRevision = '';
 
-    const tick = async () => {
+    const applyRevision = (revision: string) => {
+      if (cancelled || !revision) {
+        return;
+      }
+      if (lastRevision && revision !== lastRevision) {
+        window.location.reload();
+        return;
+      }
+      lastRevision = revision;
+    };
+
+    // Prefer SSE to avoid spamming dev server logs with polling requests.
+    let eventSource: EventSource | null = null;
+    if (typeof window.EventSource === 'function') {
+      eventSource = new EventSource('/api/dev/revision/stream');
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as RevisionResponse;
+          if (typeof data.revision === 'string') {
+            applyRevision(data.revision);
+          }
+        } catch {
+          // ignore
+        }
+      };
+    }
+
+    const fallback = async () => {
       try {
-        const revision = await getRevision();
-        if (cancelled || !revision) {
-          return;
+        const revision = await getRevisionOnce();
+        if (typeof revision === 'string') {
+          applyRevision(revision);
         }
-        if (lastRevision && revision !== lastRevision) {
-          window.location.reload();
-          return;
-        }
-        lastRevision = revision;
       } catch {
-        // ignore (server restarting, transient network issues)
+        // ignore
       }
     };
 
-    void tick();
-    const interval = window.setInterval(() => void tick(), 1000);
+    void fallback();
+    const interval = window.setInterval(() => void fallback(), 30_000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      if (eventSource) {
+        eventSource.close();
+      }
     };
   }, []);
 
   return null;
 }
-
