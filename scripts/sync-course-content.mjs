@@ -211,3 +211,11 @@ if (fs.existsSync(publicFrom)) {
   fs.mkdirSync(publicTo, { recursive: true });
   writeKeepFileIfRealDir(publicTo);
 }
+
+const monacoSource = path.join(projectRoot, 'node_modules', 'monaco-editor', 'min', 'vs');
+const monacoTarget = path.join(publicTo, 'monaco-editor', 'min', 'vs');
+if (fs.existsSync(monacoSource)) {
+  fs.mkdirSync(path.dirname(monacoTarget), { recursive: true });
+  rmIfExists(monacoTarget);
+  copyDir(monacoSource, monacoTarget);
+}
