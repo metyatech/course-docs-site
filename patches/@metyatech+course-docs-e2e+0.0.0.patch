@@ -1,0 +1,11 @@
+diff --git a/node_modules/@metyatech/course-docs-e2e/tests/e2e/course-docs-smoke.spec.cjs b/node_modules/@metyatech/course-docs-e2e/tests/e2e/course-docs-smoke.spec.cjs
+index 233ede8..2b89821 100644
+--- a/node_modules/@metyatech/course-docs-e2e/tests/e2e/course-docs-smoke.spec.cjs
++++ b/node_modules/@metyatech/course-docs-e2e/tests/e2e/course-docs-smoke.spec.cjs
+@@ -19,4 +19,6 @@ test('submissions renders', async ({ page }) => {
+   expect(response).not.toBeNull();
+   expect(response.ok()).toBeTruthy();
+   await expect(page.locator('main').first()).toBeVisible();
++  await expect(page.locator('header').first()).toBeVisible();
++  await expect(page.locator('footer').first()).toBeVisible();
+ });
