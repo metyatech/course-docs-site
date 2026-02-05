@@ -440,7 +440,7 @@ Source: agent-rules-private/rules/course-site-content-authoring.md
 
 - 試験対策問題（将来的な小テスト含む）の**原本はプレーンな Markdown（`.md`）**で管理する。
   - 形式は `markdown-to-qti/docs/markdown-question-spec.md` に準拠する（この仕様自体は変更しない）。
-  - 1問=1ファイルで、`content/exams/.../<kind>/questions/q1.qspec.md` のように `questions/` 配下へ置く（拡張子で明示する）。
+  - 1問=1ファイルで、`q1.qspec.md` のように `.qspec.md` 拡張子で明示する（配置ディレクトリは任意）。
 - Course Docs Site での表示は、原本 Markdown をそのまま出さず、サイト側の変換で `<Exercise>` / `<Solution>` に整形して表示する（原本は Markdown ツールチェーン互換のまま維持する）。
 - `## Prompt` 内の `### Exam` などの見出しは **仕様の拡張ではなく表示側の慣習**として扱う。
   - 表示上の扱いは `course-docs-platform/docs/markdown-question-spec-course-docs-rendering.md` を参照する。
