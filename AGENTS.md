@@ -490,6 +490,19 @@ Source: agent-rules-private/rules/course-site-content-authoring.md
 3. **本質的重複の判定**: 同じイベント・同じ操作パターン・同じ学習ポイントの組み合わせは「本質的に同じ」とみなす。異なる観点（状態管理、複数イベント、条件分岐、累積変化、複数要素連動など）を持つ問題を作る。
 4. **実現可能性確認**: 既習事項のみで解けることを確認する。未習事項が必要／冗長な繰り返しだけになる場合は再設計する。
 
+## 試験対策問題 / 小テスト（問題形式の統一）
+
+- 試験対策問題・小テストの「原本」は、`markdown-to-qti` の `Markdown Question Format`（`docs/markdown-question-spec.md`）に準拠したプレーンな Markdown（`.md`）として管理する。
+  - 1問=1ファイル、frontmatter なし、見出し構成（`#` / `## Type` / `## Prompt` / ...）を崩さない。
+- 原本ファイルは、表示用ページ（`index.mdx`）とは分離し、ページ直下の `questions/` 配下に置く。
+  - 例: `content/exams/.../preparation/questions/q1.md`
+- 表示用ページ（`index.mdx`）では、`import Q1 from './questions/q1.md'` のように読み込み、`<Q1 />` で表示する。
+- サイト表示では `@metyatech/course-docs-platform` が `questions/` 配下の問題Markdownを `<Exercise>` / `<Solution>` に自動変換して表示する。
+  - `## Type` が `cloze` の場合、原本の `{{answer}}` は表示時に `${answer}` に変換され、穴埋め（`enableBlanks`）として扱われる（コードブロック内も含む）。
+  - 「本試験では」は `## Prompt` 内に `### 本試験では` を置いて書く（表示は `tip`）。
+  - 採点基準・配点は `## Scoring` に `- <points>: <criterion>` の箇条書きで書く（表示は `info`）。
+- `questions/` フォルダはサイドバーに出さない（同階層の `_meta.ts` で `questions: { display: 'hidden' }` を指定する）。
+
 ## テスト・試験（評価問題）
 
 - 設問は1つの解釈・1つの正解になるように、初期状態・操作回数・期待結果を明示する。
@@ -669,6 +682,17 @@ The goal is to keep the system DRY and minimize duplicated “site runtime” co
   - Do not keep framework boilerplate assets (e.g. Docusaurus logos) unless referenced by content.
 - Do not store secrets in a content repo:
   - `.env.local` is local-only and belongs in `course-docs-site` (and is gitignored).
+
+### Local development and switching courses
+
+- Always preview locally via `metyatech/course-docs-site` (never by adding app code to a content repo).
+- Prefer a local directory for course content while editing:
+  - Set `COURSE_CONTENT_DIR=../javascript-course-docs` (or `../programming-course-docs`) in `course-docs-site/.env.course.local`.
+  - Run `npm run dev` (or `npm run build`) in `course-docs-site`.
+- Switching `COURSE_CONTENT_DIR` is a supported workflow:
+  - The dev launcher restarts on env change and keeps the originally chosen port.
+  - `scripts/sync-course-content.mjs` clears `.next` automatically when the course source changes to prevent stale Next.js artifacts.
+  - Do not rely on manual “delete `.next`” instructions; treat stale artifacts as a runtime defect and fix the runtime.
 
 ### Student works hosting rules
 
