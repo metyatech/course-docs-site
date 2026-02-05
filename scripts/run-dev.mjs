@@ -1,15 +1,18 @@
 import { spawn } from 'node:child_process';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 
 const args = process.argv.slice(2);
 const projectRoot = process.cwd();
 
-const isWindows = process.platform === 'win32';
-const command = isWindows ? 'cmd.exe' : 'npm';
-const npmArgs = isWindows ? ['/c', 'npm', 'run'] : ['run'];
 const devInnerMode = (process.env.COURSE_DOCS_SITE_DEV_INNER ?? '').trim();
+const isWindows = process.platform === 'win32';
+
+const require = createRequire(import.meta.url);
+const nextBin = require.resolve('next/dist/bin/next');
 
 const readEnvFile = (filename) => {
   const envPath = path.join(projectRoot, filename);
@@ -55,6 +58,20 @@ const getCourseEnv = () => {
 };
 
 let lastCourseEnv = getCourseEnv();
+const desiredPort = (() => {
+  const idxLong = args.indexOf('--port');
+  if (idxLong !== -1 && typeof args[idxLong + 1] === 'string') {
+    const p = Number(args[idxLong + 1]);
+    return Number.isFinite(p) && p > 0 ? p : 3000;
+  }
+  const idxShort = args.indexOf('-p');
+  if (idxShort !== -1 && typeof args[idxShort + 1] === 'string') {
+    const p = Number(args[idxShort + 1]);
+    return Number.isFinite(p) && p > 0 ? p : 3000;
+  }
+  return 3000;
+})();
+
 let syncRunning = false;
 let syncQueued = false;
 let restarting = false;
@@ -65,7 +82,9 @@ let shuttingDown = false;
 
 const runSync = () =>
   new Promise((resolve) => {
-    const child = spawn(command, [...npmArgs, 'sync:content'], { stdio: 'inherit' });
+    const child = spawn(process.execPath, ['scripts/sync-course-content.mjs'], {
+      stdio: 'inherit',
+    });
     child.on('exit', (code) => resolve(code ?? 1));
   });
 
@@ -76,7 +95,7 @@ const startDev = () => {
       stdio: 'inherit',
     });
   } else {
-    devProcess = spawn(command, [...npmArgs, 'dev:inner', '--', ...args], { stdio: 'inherit' });
+    devProcess = spawn(process.execPath, [nextBin, 'dev', ...args], { stdio: 'inherit' });
   }
   devProcess.on('exit', (devCode) => {
     if (devExitExpected) {
@@ -102,18 +121,15 @@ const stopDev = async () => {
     // ignore
   }
 
-  let killTimer;
   if (isWindows) {
-    killTimer = setTimeout(() => {
-      try {
-        // Kill process tree (npm/cmd/next) on Windows.
-        spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
-      } catch {
-        // ignore
-      }
-    }, 1000);
+    try {
+      // Kill process tree (node/next workers) on Windows.
+      spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
+    } catch {
+      // ignore
+    }
   } else {
-    killTimer = setTimeout(() => {
+    setTimeout(() => {
       try {
         proc.kill('SIGKILL');
       } catch {
@@ -122,10 +138,7 @@ const stopDev = async () => {
     }, 5000);
   }
 
-  await exited;
-  if (killTimer) {
-    clearTimeout(killTimer);
-  }
+  await Promise.race([exited, new Promise((r) => setTimeout(r, 10_000))]);
 };
 
 const queueSync = async () => {
@@ -148,6 +161,46 @@ const queueSync = async () => {
   syncRunning = false;
 };
 
+const rmIfExists = (targetPath) => {
+  try {
+    const st = fs.lstatSync(targetPath);
+    if (st.isSymbolicLink()) {
+      fs.unlinkSync(targetPath);
+      return;
+    }
+  } catch {
+    // ignore
+  }
+  fs.rmSync(targetPath, { recursive: true, force: true });
+};
+
+const waitForPortFree = async (port, timeoutMs = 10_000) => {
+  const startedAt = Date.now();
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error(`Port ${port} is still in use after restart. Stop the old dev server and retry.`);
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const canListen = await new Promise((resolve) => {
+      const server = net.createServer();
+      server.unref();
+      server.once('error', () => resolve(false));
+      server.listen(port, '127.0.0.1', () => {
+        server.close(() => resolve(true));
+      });
+    });
+
+    if (canListen) {
+      return;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 250));
+  }
+};
+
 const queueRestart = async () => {
   restartQueued = true;
   if (restarting) {
@@ -159,7 +212,13 @@ const queueRestart = async () => {
     restartQueued = false;
 
     await stopDev();
+    await waitForPortFree(desiredPort);
     await queueSync();
+
+    // Switching course content can change the MDX tree and page-map.
+    // Clear Next's dev cache to avoid cross-course stale artifacts.
+    rmIfExists(path.join(projectRoot, '.next'));
+
     startDev();
   }
   restarting = false;

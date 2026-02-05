@@ -181,7 +181,7 @@ const safeRm = async (targetPath) => {
 
 test(
   'dev server switches course content when env file changes',
-  { timeout: 8 * 60_000 },
+  { timeout: 2 * 60_000 },
   async (t) => {
   const port = await getFreePort();
 
