@@ -112,6 +112,22 @@ const copyFile = (from, to) => {
   fs.copyFileSync(from, to);
 };
 
+const writeKeepFileIfRealDir = (dirPath) => {
+  try {
+    const st = fs.lstatSync(dirPath);
+    if (st.isSymbolicLink()) {
+      return;
+    }
+  } catch {
+    // ignore
+  }
+
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+  fs.writeFileSync(path.join(dirPath, '.keep'), '');
+};
+
 let sourceRoot = cloneDir;
 let activeSourceId = '';
 
@@ -170,7 +186,7 @@ if (courseDir && courseDir.trim()) {
 if (!fs.existsSync(contentTo)) {
   fs.mkdirSync(contentTo, { recursive: true });
 }
-fs.writeFileSync(path.join(contentTo, '.keep'), '');
+writeKeepFileIfRealDir(contentTo);
 
 const siteConfigFrom = path.join(sourceRoot, 'site.config.ts');
 const siteConfigTo = path.join(projectRoot, 'site.config.ts');
@@ -193,5 +209,5 @@ if (fs.existsSync(publicFrom)) {
     copyDir(publicFrom, publicTo);
   }
   fs.mkdirSync(publicTo, { recursive: true });
-  fs.writeFileSync(path.join(publicTo, '.keep'), '');
+  writeKeepFileIfRealDir(publicTo);
 }
