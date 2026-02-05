@@ -6,6 +6,7 @@ import path from 'node:path';
 const projectRoot = process.cwd();
 const workRoot = path.join(projectRoot, '.course-content');
 const cloneDir = path.join(workRoot, 'repo');
+const sourceStatePath = path.join(workRoot, 'active-source.txt');
 
 const readEnv = (filename) => {
   const envPath = path.join(projectRoot, filename);
@@ -67,6 +68,19 @@ const rmIfExists = (targetPath) => {
   fs.rmSync(targetPath, { recursive: true, force: true });
 };
 
+const readTextIfExists = (p) => {
+  try {
+    return fs.readFileSync(p, 'utf8').trim();
+  } catch {
+    return '';
+  }
+};
+
+const writeTextFile = (p, text) => {
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, text);
+};
+
 const tryLinkDir = (target, linkPath) => {
   rmIfExists(linkPath);
   fs.mkdirSync(path.dirname(linkPath), { recursive: true });
@@ -99,9 +113,11 @@ const copyFile = (from, to) => {
 };
 
 let sourceRoot = cloneDir;
+let activeSourceId = '';
 
 if (courseDir && courseDir.trim()) {
   sourceRoot = path.resolve(projectRoot, courseDir);
+  activeSourceId = `dir:${sourceRoot}`;
   if (!fs.existsSync(sourceRoot) || !fs.statSync(sourceRoot).isDirectory()) {
     throw new Error(`COURSE_CONTENT_DIR is not a directory: ${sourceRoot}`);
   }
@@ -111,7 +127,20 @@ if (courseDir && courseDir.trim()) {
 
   const repoUrl = `https://github.com/${courseRepo}.git`;
   run('git', ['clone', '--depth', '1', '--branch', courseRef, repoUrl, cloneDir]);
+  activeSourceId = `repo:${courseRepo}#${courseRef}`;
 }
+
+if (!activeSourceId) {
+  activeSourceId = sourceRoot ? `dir:${sourceRoot}` : 'unknown';
+}
+
+const previousSourceId = readTextIfExists(sourceStatePath);
+if (previousSourceId && previousSourceId !== activeSourceId) {
+  // Switching content can change the MDX tree and page-map.
+  // Clear Next build artifacts to avoid cross-course stale runtime chunks.
+  rmIfExists(path.join(projectRoot, '.next'));
+}
+writeTextFile(sourceStatePath, activeSourceId);
 
 for (const required of requiredPaths) {
   const resolved = path.join(sourceRoot, required.rel);
