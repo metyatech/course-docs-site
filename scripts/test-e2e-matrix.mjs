@@ -5,29 +5,30 @@ import dotenv from 'dotenv';
 import { formatContentSource, parseContentSource } from './content-source.mjs';
 
 const projectRoot = process.cwd();
+const suiteConfigPath = path.join(projectRoot, 'tests', 'e2e', '.suite-config.json');
 
 const courses = [
   {
     name: 'programming-course-docs',
     sourceEnv: 'E2E_PROGRAMMING_CONTENT_SOURCE',
     defaultSource: 'github:metyatech/programming-course-docs#master',
-    suiteEnv: {
-      E2E_ENABLE_SUBMISSIONS: 'true',
-      E2E_ENABLE_CODE_PREVIEW: 'true',
-      E2E_CODE_PREVIEW_PATH: '/docs/html-basics/introduction',
-      E2E_CODE_PREVIEW_EXPECT_TEXT: '<body>',
+    suiteConfig: {
+      enableSubmissions: true,
+      enableCodePreview: true,
+      codePreviewPath: '/docs/html-basics/introduction',
+      codePreviewExpectedText: '<body>',
     },
   },
   {
     name: 'javascript-course-docs',
     sourceEnv: 'E2E_JAVASCRIPT_CONTENT_SOURCE',
     defaultSource: 'github:metyatech/javascript-course-docs#master',
-    suiteEnv: {
+    suiteConfig: {
       // javascript-course-docs has no /submissions page.
-      E2E_ENABLE_SUBMISSIONS: 'false',
-      E2E_ENABLE_CODE_PREVIEW: 'true',
-      E2E_CODE_PREVIEW_PATH: '/docs/basics/array-intro',
-      E2E_CODE_PREVIEW_EXPECT_TEXT: 'schools',
+      enableSubmissions: false,
+      enableCodePreview: true,
+      codePreviewPath: '/docs/basics/array-intro',
+      codePreviewExpectedText: 'schools',
     },
   },
 ];
@@ -114,8 +115,24 @@ loadEnvDefaults();
 
 for (const course of courses) {
   const { env: sourceEnv, sourceLabel } = resolveCourseEnv(course);
-  const env = { ...sourceEnv, ...course.suiteEnv };
+  const env = { ...sourceEnv };
 
   console.log(`\n=== Running E2E for ${course.name} (${sourceLabel}) ===`);
-  await runNpm(['run', 'test:e2e'], env);
+
+  fs.mkdirSync(path.dirname(suiteConfigPath), { recursive: true });
+  fs.writeFileSync(
+    suiteConfigPath,
+    `${JSON.stringify(course.suiteConfig, null, 2)}\n`,
+    'utf8',
+  );
+
+  try {
+    await runNpm(['run', 'test:e2e'], env);
+  } finally {
+    try {
+      fs.unlinkSync(suiteConfigPath);
+    } catch {
+      // ignore
+    }
+  }
 }

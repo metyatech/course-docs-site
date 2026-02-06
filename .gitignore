@@ -24,6 +24,7 @@
 # Playwright
 /playwright-report
 /test-results
+/tests/e2e/.suite-config.json
 
 # TypeScript incremental
 *.tsbuildinfo

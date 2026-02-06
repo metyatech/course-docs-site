@@ -78,12 +78,12 @@ Behavior:
 
 - Runs E2E once with `programming-course-docs`
 - Runs E2E once with `javascript-course-docs`
-- Uses the same shared E2E suite in both runs
-- Injects course-specific behavior into the shared suite from `course-docs-site`:
-  - `E2E_ENABLE_SUBMISSIONS=true` for `programming-course-docs`
-  - `E2E_ENABLE_SUBMISSIONS=false` for `javascript-course-docs`
-  - `E2E_CODE_PREVIEW_PATH=/docs/html-basics/introduction` for `programming-course-docs`
-  - `E2E_CODE_PREVIEW_PATH=/docs/basics/array-intro` for `javascript-course-docs`
+- Uses the same E2E suite in both runs
+- Injects course-specific behavior by generating `tests/e2e/.suite-config.json` per course:
+  - `enableSubmissions=true` for `programming-course-docs`
+  - `enableSubmissions=false` for `javascript-course-docs`
+  - `codePreviewPath=/docs/html-basics/introduction` for `programming-course-docs`
+  - `codePreviewPath=/docs/basics/array-intro` for `javascript-course-docs`
 - Uses one source variable per course:
   - `E2E_PROGRAMMING_CONTENT_SOURCE`
   - `E2E_JAVASCRIPT_CONTENT_SOURCE`

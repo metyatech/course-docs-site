@@ -15,7 +15,7 @@
     "typecheck": "npm run sync:content && tsc --noEmit",
     "test": "node scripts/test-e2e-matrix.mjs",
     "test:dev-switch": "node --test --test-concurrency=1 tests/dev-switch.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs tests/e2e-content-source.test.mjs",
-    "test:e2e": "playwright test -c node_modules/@metyatech/course-docs-e2e/playwright.config.mjs"
+    "test:e2e": "playwright test -c tests/e2e/playwright.config.mjs"
   },
   "dependencies": {
     "@mdx-js/react": "^3.1.1",
@@ -28,7 +28,6 @@
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
-    "@metyatech/course-docs-e2e": "github:metyatech/course-docs-e2e#main",
     "@playwright/test": "^1.55.0",
     "@types/node": "^25.0.9",
     "@types/react": "^19.2.9",
