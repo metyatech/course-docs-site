@@ -77,5 +77,6 @@ test(
 
     assert.equal(await fileExists(path.join(courseA, 'content', '.keep')), false);
     assert.equal(await fileExists(path.join(courseA, 'public', '.keep')), false);
+    assert.equal(await fileExists(path.join(courseA, 'public', 'monaco-editor')), false);
   },
 );
