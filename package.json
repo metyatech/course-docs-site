@@ -14,12 +14,13 @@
     "lint": "npm run typecheck",
     "typecheck": "npm run sync:content && tsc --noEmit",
     "test": "npm run test:e2e",
-    "test:dev-switch": "node --test --test-concurrency=1 tests/dev-switch.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs",
+    "test:dev-switch": "node --test --test-concurrency=1 tests/dev-switch.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs",
     "test:e2e": "playwright test -c node_modules/@metyatech/course-docs-e2e/playwright.config.mjs"
   },
   "dependencies": {
     "@mdx-js/react": "^3.1.1",
     "@metyatech/course-docs-platform": "git+https://github.com/metyatech/course-docs-platform.git#main",
+    "@monaco-editor/loader": "^1.7.0",
     "dotenv": "^17.2.3",
     "next": "^15.5.11",
     "nextra": "^4.6.1",

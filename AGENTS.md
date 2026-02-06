@@ -1,8 +1,13 @@
 <!-- markdownlint-disable MD025 -->
 # Tool Rules (compose-agentsmd)
 - Before starting any work, run `compose-agentsmd` from the project root.
+- `compose-agentsmd` intentionally regenerates `AGENTS.md`; any resulting `AGENTS.md` diff is expected and must not be treated as an unexpected external change.
+- If `compose-agentsmd` is not available, install it via npm: `npm install -g compose-agentsmd`.
 - To update shared rules, run `compose-agentsmd edit-rules`, edit the workspace rules, then run `compose-agentsmd apply-rules`.
+- `compose-agentsmd apply-rules` pushes the rules workspace when `source` is GitHub (if the workspace is clean), then regenerates `AGENTS.md` with refreshed rules.
 - Do not edit `AGENTS.md` directly; update the source rules and regenerate.
+- `tools/tool-rules.md` is the shared rule source for all repositories that use compose-agentsmd.
+- Before applying any rule updates, present the planned changes first (prefer a colorized diff-style preview), ask for explicit approval, then make the edits.
 - These tool rules live in tools/tool-rules.md in the compose-agentsmd repository; do not duplicate them in global rule modules.
 - When updating rules, include a colorized diff-style summary in the final response. Use `git diff --stat` first, then include the raw ANSI-colored output of `git diff --color=always` (no sanitizing or reformatting), and limit the output to the rule files that changed.
 - Also provide a short, copy-pasteable command the user can run to view the diff in the same format. Use absolute paths so it works regardless of the current working directory, and scope it to the changed rule files.
@@ -45,6 +50,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/autonomous-operations.md
 - Do not preserve backward compatibility unless explicitly requested; avoid legacy aliases and compatibility shims by default.
 - When work reveals rule gaps, redundancy, or misplacement, proactively update rule modules/rulesets (including moves/renames) and regenerate AGENTS.md without waiting for explicit user requests.
 - After each task, run a brief retrospective; if you notice avoidable mistakes, missing checks, or recurring back-and-forth, encode the fix as a rule update and regenerate AGENTS.md.
+- Because session memory resets between tasks, treat rule files as persistent memory; when any issue or avoidable mistake occurs, update rules in the same task to prevent recurrence.
 - Treat these rules as the source of truth; do not override them with repository conventions. If a repo conflicts, update the repo to comply or update the rules to encode the exception; do not make undocumented exceptions.
 - When something is unclear, investigate to resolve it; do not proceed with unresolved material uncertainty. If still unclear, ask and include what you checked.
 - Do not proceed based on assumptions or guesses without explicit user approval; hypotheses may be discussed but must not drive action.
@@ -64,7 +70,14 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/command-execution.md
 - If elevated privileges are required, use sudo where available; otherwise run as Administrator.
 - Keep changes scoped to affected repositories; when shared modules change, update consumers and verify at least one.
 - If no branch is specified, work on the current branch; direct commits to main/master are allowed.
-- After addressing PR comments, resolve related conversations; after completing a PR, merge it, sync the target branch, and delete the PR branch locally and remotely.
+- After addressing PR review feedback, resolve the corresponding review thread(s) before concluding; if you lack permission, state it explicitly.
+- After pushing fixes for PR review feedback, always re-request review from the same reviewer(s) when possible; if there are no current reviewers, ask who should review.
+- When Codex and/or Copilot review bots are configured for the repo, always trigger a re-review after pushing fixes.
+- For Codex re-review: comment `@codex review` on the PR.
+- For Copilot re-review: use `gh api` to remove+re-request the bot reviewer `copilot-pull-request-reviewer[bot]` (do not rely on `gh pr edit --add-reviewer Copilot`).
+  - Remove: `gh api --method DELETE /repos/{owner}/{repo}/pulls/{pr}/requested_reviewers -f "reviewers[]=copilot-pull-request-reviewer[bot]"`
+  - Add: `gh api --method POST /repos/{owner}/{repo}/pulls/{pr}/requested_reviewers -f "reviewers[]=copilot-pull-request-reviewer[bot]"`
+- After completing a PR, merge it, sync the target branch, and delete the PR branch locally and remotely.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/implementation-and-coding-standards.md
 
@@ -80,6 +93,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/implementation-and-coding
 - Use clear, intention-revealing naming; avoid "Utils" dumping grounds.
 - Prefer configuration/constants over hardcoding; consolidate change points.
 - Keep everything DRY across code, specs, docs, tests, configs, and scripts; proactively refactor repeated procedures into shared configs/scripts with small, local overrides.
+- Persist durable runtime/domain data in a database with a fully normalized schema (3NF/BCNF target): store each fact once with keys/constraints, and compute derived statuses/views at read time instead of duplicating them.
 - Fix root causes; remove obsolete/unused code, branches, comments, and helpers.
 - Externalize large embedded strings/templates/rules when possible.
 - Do not commit build artifacts (follow the repo's .gitignore).
@@ -112,6 +126,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/linting-formatting-and-st
 ### JavaScript / TypeScript (incl. React/Next)
 
 - Format+lint: ESLint + Prettier.
+- When configuring Prettier, always add and maintain `.prettierignore` so generated/build outputs and composed files are not formatted/linted as source (e.g., `dist/`, build artifacts, and `AGENTS.md` when generated by compose-agentsmd).
 - Typecheck: `tsc` with strict settings for TS projects.
 - Dependency scan: `osv-scanner`. If unsupported, use the package manager's audit tooling.
 
@@ -238,14 +253,23 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/planning-and-approval-gat
 
 # Planning and approval gate
 
-- Default to a two-phase workflow: plan first, execute after explicit user approval.
-- Before any state-changing execution (writing or modifying files, running formatters/linters/tests/builds, installing dependencies, or running git commands beyond status/diff/log), do all of the following:
-  - Restate the request as concrete acceptance criteria.
-  - Ask blocking questions and list key assumptions/risks.
-  - Produce a written plan (use your planning tool, e.g., `update_plan`) including the intended file changes and the commands you plan to run.
-  - Ask for approval explicitly and wait for a clear “yes” before executing.
-- Allowed before approval: clarifying questions and read-only inspection (reading files, searching, and `git status` / `git diff` / `git log`).
-- Exception: if the user explicitly requests immediate execution (e.g., “skip planning”, “just do it”), proceed without this gate.
+- Default to a two-phase workflow: clarify goal + plan first, execute after explicit requester approval.
+- If a request may require any state-changing work, you MUST first dialogue with the requester to clarify details and make the goal explicit. Do not proceed while the goal is ambiguous.
+- Allowed before approval:
+  - Clarifying questions and read-only inspection (reading files, searching, and `git status` / `git diff` / `git log`).
+  - Any unavoidable automated work triggered as a side-effect of those read-only commands.
+  - Any command execution that must not adversely affect program behavior or external systems (including changes made by tooling), such as:
+    - Installing/restoring dependencies using repo-standard tooling (lockfile changes are allowed).
+    - Running formatters/linters/typecheck/tests/builds (including auto-fix/formatting that modifies files).
+    - Running code generation/build steps that are deterministic and repo-scoped.
+    - Running these from clean → dirty → clean is acceptable; publishing/deploying/migrating is not.
+- Before any other state-changing execution (e.g., writing or modifying files by hand, changing runtime behavior, or running git commands beyond status/diff/log), do all of the following:
+  - Restate the request as concrete acceptance criteria (explicit goal, success/failure conditions).
+  - Produce a written plan (use your planning tool when available) focused on the goal, approach, and verification checkpoints (do not enumerate per-file implementation details or exact commands unless the requester asks).
+  - Confirm the plan with the requester, ask for approval explicitly, and wait for a clear “yes” before executing.
+  - Do not treat the original task request as plan approval; approval must be an explicit response to the presented plan.
+- If state-changing execution starts without the required post-plan “yes”, stop immediately, report the gate miss, add/update a prevention rule, regenerate AGENTS.md, and then restart from the approval gate.
+- No other exceptions: even if the user requests immediate execution (e.g., “skip planning”, “just do it”), treat that as a request to move quickly through this gate, not to bypass it.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/quality-testing-and-errors.md
 
@@ -334,10 +358,10 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/writing-and-documentation
 
 ## README and docs
 
-- Every repository must include README.md covering overview/purpose, setup, dev commands (build/test/lint), required env/config, and release/deploy steps if applicable.
-- For any code change, assess README impact and update it in the same change set when needed.
-- If a README update is not needed, explain why in the final response.
-- CLI examples in docs must include required parameters.
+- Every repository must include README.md covering overview/purpose, supported environments/compatibility, install/setup, usage examples, dev commands (build/test/lint/format), required env/config, release/deploy steps if applicable, and links to SECURITY.md / CONTRIBUTING.md / LICENSE / CHANGELOG.md when they exist.
+- For any change, assess documentation impact and update all affected docs in the same change set so docs match behavior (README, docs/, examples, comments, templates, ADRs/specs, diagrams).
+- If no documentation updates are needed, explain why in the final response.
+- For CLIs, document every parameter (required and optional) with a description and at least one example; also include at least one end-to-end example command.
 - Do not include user-specific local paths, fixed workspace directories, drive letters, or personal data in doc examples. Prefer repo-relative paths and placeholders so instructions work in arbitrary environments.
 
 ## Markdown linking
@@ -548,6 +572,20 @@ The goal is to keep the system DRY and minimize duplicated “site runtime” co
 - `metyatech/programming-course-student-works` (student submissions, large binaries)
   - Student works hosting repository (GitHub Pages).
   - Generates and publishes `works-index.json` for the course site to render the works list.
+
+### Shared runtime boundary rules
+
+- Treat `course-docs-platform` as the source of truth for reusable runtime behavior.
+  - Put shared MDX components, shared UI behavior, and shared rendering/runtime integrations in `course-docs-platform`.
+- Keep `course-docs-site` as composition/wiring only.
+  - Do not add direct imports of shared runtime packages in `course-docs-site` when the behavior belongs in `course-docs-platform`.
+- When deciding where to implement a fix, use impact scope first.
+  - If the change should apply to multiple courses or any future course site, implement it in `course-docs-platform`.
+  - Use `course-docs-site` only for app-shell concerns (routing, layout wiring, middleware, local runtime orchestration, E2E wiring).
+- Do not ship temporary site-local duplication of platform behavior.
+  - If an urgent site-local patch is unavoidable, migrate it into `course-docs-platform` in the same change set before completion.
+- Keep shared dependency ownership aligned with architecture.
+  - Dependencies required by platform-owned runtime behavior must be declared in `course-docs-platform`, then consumed via platform exports/APIs from `course-docs-site`.
 
 ### Content repository rules (course docs repos)
 
