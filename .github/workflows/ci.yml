@@ -13,13 +13,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - courseRepo: metyatech/javascript-course-docs
+          - courseSource: "github:metyatech/javascript-course-docs#master"
             e2ePort: 3101
-          - courseRepo: metyatech/programming-course-docs
+          - courseSource: "github:metyatech/programming-course-docs#master"
             e2ePort: 3102
     env:
-      COURSE_CONTENT_REPO: ${{ matrix.courseRepo }}
-      COURSE_CONTENT_REF: master
+      COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
       E2E_PORT: ${{ matrix.e2ePort }}
       PLAYWRIGHT_MAX_FAILURES: "1"
     steps:
