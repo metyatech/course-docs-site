@@ -25,4 +25,8 @@ test('site package does not own code-preview dependency', async () => {
     Object.prototype.hasOwnProperty.call(deps, '@metyatech/code-preview'),
     false
   );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(deps, '@monaco-editor/loader'),
+    false
+  );
 });
