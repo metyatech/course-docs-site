@@ -5,6 +5,10 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import {
+  DEFAULT_COURSE_CONTENT_SOURCE,
+  parseContentSource,
+} from './content-source.mjs';
 
 const args = process.argv.slice(2);
 const projectRoot = process.cwd();
@@ -67,16 +71,17 @@ const readEnvFile = (filename) => {
 };
 
 const normalizeCourseEnv = (env) => {
-  const dirRaw = typeof env.COURSE_CONTENT_DIR === 'string' ? env.COURSE_CONTENT_DIR.trim() : '';
-  const dir = dirRaw ? path.resolve(projectRoot, dirRaw) : '';
-
-  const repo = typeof env.COURSE_CONTENT_REPO === 'string' ? env.COURSE_CONTENT_REPO.trim() : '';
-  const ref = typeof env.COURSE_CONTENT_REF === 'string' ? env.COURSE_CONTENT_REF.trim() : '';
+  const sourceRaw =
+    typeof env.COURSE_CONTENT_SOURCE === 'string' ? env.COURSE_CONTENT_SOURCE.trim() : '';
+  const sourceText = sourceRaw || DEFAULT_COURSE_CONTENT_SOURCE;
+  const source = parseContentSource(sourceText);
+  const sourceId =
+    source.kind === 'local'
+      ? `dir:${path.resolve(projectRoot, source.localDir)}`
+      : `repo:${source.repo}#${source.ref}`;
 
   return {
-    dir,
-    repo,
-    ref,
+    sourceId,
   };
 };
 
@@ -302,11 +307,8 @@ const createEnvWatcher = () => {
       clearTimeout(debounceTimer);
     }
     debounceTimer = setTimeout(async () => {
-      const nextCourseEnv = getCourseEnv();
-      const changed =
-        nextCourseEnv.dir !== lastCourseEnv.dir ||
-        nextCourseEnv.repo !== lastCourseEnv.repo ||
-        nextCourseEnv.ref !== lastCourseEnv.ref;
+    const nextCourseEnv = getCourseEnv();
+      const changed = nextCourseEnv.sourceId !== lastCourseEnv.sourceId;
       if (!changed) {
         return;
       }

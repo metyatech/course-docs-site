@@ -80,13 +80,13 @@ test(
     await fs.mkdir(path.join(projectRoot, '.next'), { recursive: true });
     await fs.writeFile(path.join(projectRoot, '.next', 'keep-a.txt'), 'a', 'utf8');
 
-    const aExit = await runSync({ COURSE_CONTENT_DIR: courseA });
+    const aExit = await runSync({ COURSE_CONTENT_SOURCE: courseA });
     assert.equal(aExit, 0);
     assert.equal(await fileExists(path.join(projectRoot, '.next', 'keep-a.txt')), true);
 
     await fs.writeFile(path.join(projectRoot, '.next', 'keep-b.txt'), 'b', 'utf8');
 
-    const bExit = await runSync({ COURSE_CONTENT_DIR: courseB });
+    const bExit = await runSync({ COURSE_CONTENT_SOURCE: courseB });
     assert.equal(bExit, 0);
     assert.equal(await fileExists(path.join(projectRoot, '.next')), false);
   },

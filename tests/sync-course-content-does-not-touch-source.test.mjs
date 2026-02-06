@@ -72,7 +72,7 @@ test(
 
     await fs.rm(path.join(projectRoot, '.course-content', 'active-source.txt'), { force: true });
 
-    const exitCode = await runSync({ COURSE_CONTENT_DIR: courseA });
+    const exitCode = await runSync({ COURSE_CONTENT_SOURCE: courseA });
     assert.equal(exitCode, 0);
 
     assert.equal(await fileExists(path.join(courseA, 'content', '.keep')), false);

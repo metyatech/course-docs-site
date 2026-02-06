@@ -234,7 +234,11 @@ test(
 
   // Keep secrets in `.env.local`. For switching content, use `.env.course.local`.
   await fs.rm(envCoursePath, { force: true });
-  await fs.writeFile(envCourseLocalPath, `COURSE_CONTENT_DIR=${JSON.stringify(courseA)}\n`, 'utf8');
+  await fs.writeFile(
+    envCourseLocalPath,
+    `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
+    'utf8'
+  );
 
   const dev = spawn(process.execPath, ['scripts/run-dev.mjs', '--port', String(port)], {
     cwd: projectRoot,
@@ -273,7 +277,11 @@ test(
 
   // Switch to Course B by writing .env.course.local.
   // This must trigger a restart + content resync.
-  await fs.writeFile(envCourseLocalPath, `COURSE_CONTENT_DIR=${JSON.stringify(courseB)}\n`, 'utf8');
+  await fs.writeFile(
+    envCourseLocalPath,
+    `COURSE_CONTENT_SOURCE=${JSON.stringify(courseB)}\n`,
+    'utf8'
+  );
 
   await waitFor(
     async () => {
@@ -339,7 +347,11 @@ test(
     });
 
     await fs.rm(envCoursePath, { force: true });
-    await fs.writeFile(envCourseLocalPath, `COURSE_CONTENT_DIR=${JSON.stringify(courseA)}\n`, 'utf8');
+    await fs.writeFile(
+      envCourseLocalPath,
+      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
+      'utf8'
+    );
 
     const dev = spawn(process.execPath, ['scripts/run-dev.mjs'], {
       cwd: projectRoot,
@@ -371,7 +383,11 @@ test(
       }
     );
 
-    await fs.writeFile(envCourseLocalPath, `COURSE_CONTENT_DIR=${JSON.stringify(courseB)}\n`, 'utf8');
+    await fs.writeFile(
+      envCourseLocalPath,
+      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseB)}\n`,
+      'utf8'
+    );
 
     await waitFor(
       async () => {
@@ -418,7 +434,11 @@ test(
     });
 
     await fs.rm(envCoursePath, { force: true });
-    await fs.writeFile(envCourseLocalPath, `COURSE_CONTENT_DIR=${JSON.stringify(courseA)}\n`, 'utf8');
+    await fs.writeFile(
+      envCourseLocalPath,
+      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
+      'utf8'
+    );
 
     const dev = spawn(process.execPath, ['scripts/run-dev.mjs'], {
       cwd: projectRoot,
@@ -439,7 +459,11 @@ test(
     const initialRevision = initial.healthzText.split(':')[1] ?? '';
     assert.ok(initialRevision, 'Expected initial revision');
 
-    await fs.writeFile(envCourseLocalPath, `COURSE_CONTENT_DIR=${JSON.stringify(courseB)}\n`, 'utf8');
+    await fs.writeFile(
+      envCourseLocalPath,
+      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseB)}\n`,
+      'utf8'
+    );
 
     let nextRevision = '';
     await waitFor(

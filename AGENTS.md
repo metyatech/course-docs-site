@@ -601,9 +601,9 @@ The goal is to keep the system DRY and minimize duplicated “site runtime” co
 
 - Always preview locally via `metyatech/course-docs-site` (never by adding app code to a content repo).
 - Prefer a local directory for course content while editing:
-  - Set `COURSE_CONTENT_DIR=../javascript-course-docs` (or `../programming-course-docs`) in `course-docs-site/.env.course.local`.
+  - Set `COURSE_CONTENT_SOURCE=../javascript-course-docs` (or `../programming-course-docs`) in `course-docs-site/.env.course.local`.
   - Run `npm run dev` (or `npm run build`) in `course-docs-site`.
-- Switching `COURSE_CONTENT_DIR` is a supported workflow:
+- Switching `COURSE_CONTENT_SOURCE` is a supported workflow:
   - The dev launcher restarts on env change and keeps the originally chosen port.
   - `scripts/sync-course-content.mjs` clears `.next` automatically when the course source changes to prevent stale Next.js artifacts.
   - Do not rely on manual “delete `.next`” instructions; treat stale artifacts as a runtime defect and fix the runtime.

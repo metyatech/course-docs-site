@@ -82,7 +82,7 @@ test('submissions route uses MDX page settings', async (t) => {
     await fs.rm(tempRoot, { recursive: true, force: true });
   });
 
-  const syncExitCode = await runSync({ COURSE_CONTENT_DIR: courseFixtureDir });
+  const syncExitCode = await runSync({ COURSE_CONTENT_SOURCE: courseFixtureDir });
   assert.equal(syncExitCode, 0);
 
   const submissionsAppRoutePath = path.join(projectRoot, 'src', 'app', 'submissions', 'page.tsx');

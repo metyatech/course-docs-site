@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
+import { DEFAULT_COURSE_CONTENT_SOURCE, parseContentSource } from './content-source.mjs';
 
 const projectRoot = process.cwd();
 const workRoot = path.join(projectRoot, '.course-content');
@@ -36,9 +37,9 @@ for (const [key, value] of Object.entries(fileEnv)) {
   }
 }
 
-const courseRepo = process.env.COURSE_CONTENT_REPO ?? 'metyatech/javascript-course-docs';
-const courseRef = process.env.COURSE_CONTENT_REF ?? 'master';
-const courseDir = process.env.COURSE_CONTENT_DIR;
+const courseSourceText =
+  process.env.COURSE_CONTENT_SOURCE?.trim() || DEFAULT_COURSE_CONTENT_SOURCE;
+const courseSource = parseContentSource(courseSourceText);
 
 const requiredPaths = [
   { label: 'content', rel: 'content' },
@@ -131,19 +132,19 @@ const writeKeepFileIfRealDir = (dirPath) => {
 let sourceRoot = cloneDir;
 let activeSourceId = '';
 
-if (courseDir && courseDir.trim()) {
-  sourceRoot = path.resolve(projectRoot, courseDir);
+if (courseSource.kind === 'local') {
+  sourceRoot = path.resolve(projectRoot, courseSource.localDir);
   activeSourceId = `dir:${sourceRoot}`;
   if (!fs.existsSync(sourceRoot) || !fs.statSync(sourceRoot).isDirectory()) {
-    throw new Error(`COURSE_CONTENT_DIR is not a directory: ${sourceRoot}`);
+    throw new Error(`COURSE_CONTENT_SOURCE points to a non-directory path: ${sourceRoot}`);
   }
 } else {
   fs.mkdirSync(workRoot, { recursive: true });
   rmIfExists(cloneDir);
 
-  const repoUrl = `https://github.com/${courseRepo}.git`;
-  run('git', ['clone', '--depth', '1', '--branch', courseRef, repoUrl, cloneDir]);
-  activeSourceId = `repo:${courseRepo}#${courseRef}`;
+  const repoUrl = `https://github.com/${courseSource.repo}.git`;
+  run('git', ['clone', '--depth', '1', '--branch', courseSource.ref, repoUrl, cloneDir]);
+  activeSourceId = `repo:${courseSource.repo}#${courseSource.ref}`;
 }
 
 if (!activeSourceId) {
@@ -170,7 +171,7 @@ for (const required of requiredPaths) {
 const contentFrom = path.join(sourceRoot, 'content');
 const contentTo = path.join(projectRoot, 'content');
 rmIfExists(contentTo);
-if (courseDir && courseDir.trim()) {
+if (courseSource.kind === 'local') {
   try {
     tryLinkDir(contentFrom, contentTo);
   } catch (error) {
@@ -196,7 +197,7 @@ const publicFrom = path.join(sourceRoot, 'public');
 const publicTo = path.join(projectRoot, 'public');
 if (fs.existsSync(publicFrom)) {
   rmIfExists(publicTo);
-  if (courseDir && courseDir.trim()) {
+  if (courseSource.kind === 'local') {
     try {
       tryLinkDir(publicFrom, publicTo);
     } catch (error) {

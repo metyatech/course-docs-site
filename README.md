@@ -11,12 +11,9 @@ at build/dev time.
 
 Required env vars (files or environment):
 
-- `COURSE_CONTENT_REPO` (e.g. `metyatech/javascript-course-docs`)
-- `COURSE_CONTENT_REF` (optional, default: `master`)
-
-Local development (optional):
-
-- `COURSE_CONTENT_DIR` (local path to a content repo; when set, the site links `content/` and `public/` from it for fast iteration)
+- `COURSE_CONTENT_SOURCE`
+  - GitHub format: `github:owner/repo#ref` (example: `"github:metyatech/javascript-course-docs#master"` in `.env` files)
+  - Local path format: `../path-to-content-repo`
 
 Optional env vars:
 
@@ -32,13 +29,13 @@ See `.env.example` for the full list.
 
 ```sh
 npm install
-COURSE_CONTENT_REPO=metyatech/javascript-course-docs npm run dev
+COURSE_CONTENT_SOURCE="github:metyatech/javascript-course-docs#master" npm run dev
 ```
 
 To preview local, unpushed content changes:
 
 ```sh
-COURSE_CONTENT_DIR=../javascript-course-docs npm run dev
+COURSE_CONTENT_SOURCE=../javascript-course-docs npm run dev
 ```
 
 ### Using `.env.course.local` (recommended)
@@ -50,7 +47,7 @@ selection changes.
 Example `.env.course.local`:
 
 ```dotenv
-COURSE_CONTENT_DIR=../programming-course-docs
+COURSE_CONTENT_SOURCE=../programming-course-docs
 ```
 
 Template: `.env.course.local.example`
@@ -59,14 +56,58 @@ PowerShell example:
 
 ```powershell
 Set-Location -LiteralPath .\course-docs-site
-$env:COURSE_CONTENT_DIR = '..\javascript-course-docs'
+$env:COURSE_CONTENT_SOURCE = '..\javascript-course-docs'
 npm run dev
 ```
 
 ## Build
 
 ```sh
-COURSE_CONTENT_REPO=metyatech/programming-course-docs npm run build
+COURSE_CONTENT_SOURCE="github:metyatech/programming-course-docs#master" npm run build
+```
+
+## E2E test matrix
+
+Run E2E against both course contents:
+
+```sh
+npm test
+```
+
+Behavior:
+
+- Runs E2E once with `programming-course-docs`
+- Runs E2E once with `javascript-course-docs`
+- Uses the same shared E2E suite in both runs
+- Injects course-specific behavior into the shared suite from `course-docs-site`:
+  - `E2E_ENABLE_SUBMISSIONS=true` for `programming-course-docs`
+  - `E2E_ENABLE_SUBMISSIONS=false` for `javascript-course-docs`
+  - `E2E_CODE_PREVIEW_PATH=/docs/html-basics/introduction` for `programming-course-docs`
+  - `E2E_CODE_PREVIEW_PATH=/docs/basics/array-intro` for `javascript-course-docs`
+- Uses one source variable per course:
+  - `E2E_PROGRAMMING_CONTENT_SOURCE`
+  - `E2E_JAVASCRIPT_CONTENT_SOURCE`
+- Source format:
+  - Remote GitHub: `github:owner/repo#ref`
+  - Local path: `../path-to-content-repo`
+
+Recommended files:
+
+- `.env.e2e`: default shared matrix settings (tracked)
+- `.env.e2e.example`: local-path example template
+
+Local example (`.env.e2e.example`):
+
+```dotenv
+E2E_PROGRAMMING_CONTENT_SOURCE=../programming-course-docs
+E2E_JAVASCRIPT_CONTENT_SOURCE=../javascript-course-docs
+```
+
+Remote example:
+
+```dotenv
+E2E_PROGRAMMING_CONTENT_SOURCE="github:metyatech/programming-course-docs#master"
+E2E_JAVASCRIPT_CONTENT_SOURCE="github:metyatech/javascript-course-docs#master"
 ```
 
 ## Notes
