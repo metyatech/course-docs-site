@@ -36,11 +36,8 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test
+      - name: Verify
+        run: npm run verify
 
       - name: Build
         run: npm run build
