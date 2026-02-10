@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Next output
+.next/
+out/
+
+# Generated content
+.course-content/
+content/
+public/
+site.config.ts
+
+# Misc
+.DS_Store
+.env*
+.vercel/
+
+# Playwright
+playwright-report/
+test-results/
+
+# Agents
+AGENTS.md

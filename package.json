@@ -3,7 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "description": "Shared site runtime for metyatech course documentation",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/metyatech/course-docs-site.git"
+  },
+  "bugs": {
+    "url": "https://github.com/metyatech/course-docs-site/issues"
+  },
+  "homepage": "https://github.com/metyatech/course-docs-site#readme",
   "scripts": {
+    "verify": "npm run format && npm run lint && npm run audit && npm run test",
     "sync:content": "node scripts/sync-course-content.mjs",
     "dev": "node scripts/run-dev.mjs",
     "dev:inner": "node scripts/dev-inner.mjs",
@@ -11,7 +21,9 @@
     "build": "npm run sync:content && next build",
     "postinstall": "patch-package",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
-    "lint": "npm run typecheck",
+    "lint": "npm run typecheck && eslint .",
+    "format": "prettier --check .",
+    "audit": "npm audit",
     "typecheck": "npm run sync:content && tsc --noEmit",
     "test": "npm run test:e2e",
     "test:dev-switch": "node --test tests/dev-switch.test.mjs",
@@ -34,8 +46,12 @@
     "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
     "cross-env": "^10.1.0",
+    "eslint": "^9.19.0",
+    "eslint-config-next": "^15.1.6",
+    "eslint-config-prettier": "^10.0.1",
     "pagefind": "^1.4.0",
     "patch-package": "^8.0.0",
+    "prettier": "^3.4.2",
     "typescript": "^5.9.3"
   },
   "engines": {

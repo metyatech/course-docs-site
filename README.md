@@ -67,6 +67,22 @@ npm run dev
 COURSE_CONTENT_REPO=metyatech/programming-course-docs npm run build
 ```
 
+## Verification
+
+Run the full verification suite (typecheck and tests):
+
+```sh
+npm run verify
+```
+
+## Documentation
+
+- [LICENSE](./LICENSE)
+- [SECURITY.md](./SECURITY.md)
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- [CHANGELOG.md](./CHANGELOG.md)
+
 ## Notes
 
 - This repo is intentionally framework-only. All course-specific text/content lives in the content repos.
