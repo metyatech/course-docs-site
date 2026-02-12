@@ -19,6 +19,12 @@ const nextConfig = {
   reactStrictMode: true,
   trailingSlash: true,
   transpilePackages: ['@metyatech/course-docs-platform'],
+  outputFileTracingIncludes: {
+    // Ensure /asset route can read synced course files in serverless runtimes.
+    '/asset/[...assetPath]': ['content/**/*'],
+    '/asset/[...assetPath]/route': ['content/**/*'],
+    '/asset': ['content/**/*'],
+  },
   env: {
     NEXT_PUBLIC_WORKS_BASE_URL: process.env.NEXT_PUBLIC_WORKS_BASE_URL ?? '',
   },
