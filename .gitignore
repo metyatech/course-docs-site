@@ -8,9 +8,7 @@
 # Generated content (synced from external repo)
 /.course-content
 /content/*
-!/content/.keep
 /public/*
-!/public/.keep
 /public/_pagefind
 /site.config.ts
 
