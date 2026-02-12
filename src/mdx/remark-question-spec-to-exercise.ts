@@ -1,3 +1,4 @@
+import path from 'path';
 import { visit } from 'unist-util-visit';
 
 const toMdxAttribute = (name: string, value: string) => ({
@@ -23,6 +24,79 @@ const getText = (node: any): string => {
 };
 
 const normalizeHeadingText = (node: any) => getText(node).trim();
+
+const ABSOLUTE_PROTOCOL_PATTERN = /^[a-zA-Z][a-zA-Z\d+.-]*:/;
+const CONTENT_ROOT_MARKER = '/content/';
+
+const splitUrlPathAndSuffix = (url: string) => {
+  const queryIndex = url.indexOf('?');
+  const hashIndex = url.indexOf('#');
+
+  let cutIndex = url.length;
+  if (queryIndex !== -1) cutIndex = Math.min(cutIndex, queryIndex);
+  if (hashIndex !== -1) cutIndex = Math.min(cutIndex, hashIndex);
+
+  return {
+    pathPart: url.slice(0, cutIndex),
+    suffix: url.slice(cutIndex),
+  };
+};
+
+const getContentRelativeDirectory = (filePath: string) => {
+  const normalizedPath = filePath.replaceAll('\\', '/');
+
+  let contentRelativePath = '';
+  const markerIndex = normalizedPath.lastIndexOf(CONTENT_ROOT_MARKER);
+  if (markerIndex !== -1) {
+    contentRelativePath = normalizedPath.slice(
+      markerIndex + CONTENT_ROOT_MARKER.length,
+    );
+  } else if (normalizedPath.startsWith('content/')) {
+    contentRelativePath = normalizedPath.slice('content/'.length);
+  } else {
+    return null;
+  }
+
+  const dirname = path.posix.dirname(contentRelativePath);
+  return dirname === '.' ? '' : dirname;
+};
+
+const resolveQuestionSpecRelativeUrl = (url: string, filePath: string) => {
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) return null;
+  if (trimmedUrl.startsWith('/') || trimmedUrl.startsWith('#')) return null;
+  if (trimmedUrl.startsWith('//')) return null;
+  if (ABSOLUTE_PROTOCOL_PATTERN.test(trimmedUrl)) return null;
+
+  const baseDir = getContentRelativeDirectory(filePath);
+  if (baseDir == null) return null;
+
+  const { pathPart, suffix } = splitUrlPathAndSuffix(trimmedUrl);
+  if (!pathPart) return null;
+
+  const resolvedRelativePath = path.posix.normalize(
+    path.posix.join(baseDir, pathPart),
+  );
+  if (
+    !resolvedRelativePath ||
+    resolvedRelativePath === '.' ||
+    resolvedRelativePath === '..' ||
+    resolvedRelativePath.startsWith('../')
+  ) {
+    return null;
+  }
+
+  return `/${resolvedRelativePath}${suffix}`;
+};
+
+const rewriteRelativeAssetUrls = (nodes: any[], filePath: string) => {
+  const root = { type: 'root', children: nodes };
+  visit(root, (node: any) => {
+    if (typeof node?.url !== 'string') return;
+    const resolved = resolveQuestionSpecRelativeUrl(node.url, filePath);
+    if (resolved) node.url = resolved;
+  });
+};
 
 const replaceClozeMarkers = (value: string) => {
   const escapedOpenPlaceholder = '__CLOZE_ESCAPED_OPEN__';
@@ -207,6 +281,11 @@ export default function remarkQuestionSpecToExercise() {
 
     const { promptNodes, examTipNodes } = splitExamTip(promptSection);
     const scoringItems = parseScoringLines(scoringSection);
+
+    rewriteRelativeAssetUrls(promptNodes, filePath);
+    rewriteRelativeAssetUrls(examTipNodes, filePath);
+    rewriteRelativeAssetUrls(optionsSection, filePath);
+    rewriteRelativeAssetUrls(explanationSection, filePath);
 
     if (isCloze) {
       applyClozeConversion(promptNodes);

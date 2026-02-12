@@ -185,3 +185,63 @@ test('non-qspec markdown under questions/ is not transformed', async () => {
   assert.equal(tree.children[0]?.type, 'heading');
   assert.equal(tree.children[0]?.depth, 1);
 });
+
+test('relative asset urls in qspec content resolve from qspec directory', async () => {
+  const { default: remarkQuestionSpecToExercise } = await import(pluginModulePath);
+
+  const tree = {
+    type: 'root',
+    children: [
+      { type: 'heading', depth: 1, children: [{ type: 'text', value: '問題（相対URL）' }] },
+      { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Type' }] },
+      { type: 'paragraph', children: [{ type: 'text', value: 'descriptive' }] },
+      { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Prompt' }] },
+      {
+        type: 'paragraph',
+        children: [
+          {
+            type: 'image',
+            url: '../img/js2-final-preparation-q2.gif',
+            alt: '問題2の期待動作',
+          },
+        ],
+      },
+      {
+        type: 'paragraph',
+        children: [
+          {
+            type: 'link',
+            url: '../assets/notes.pdf',
+            children: [{ type: 'text', value: 'note' }],
+          },
+        ],
+      },
+      {
+        type: 'paragraph',
+        children: [
+          { type: 'image', url: 'https://example.com/image.png', alt: 'external' },
+        ],
+      },
+      { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Explanation' }] },
+      { type: 'paragraph', children: [{ type: 'text', value: '解説' }] },
+    ],
+  };
+
+  const transform = remarkQuestionSpecToExercise();
+  transform(tree, {
+    path: '/content/exams/2025/2semester/2final-exam/preparation/questions/q2.qspec.md',
+  });
+
+  const exercise = tree.children[0];
+  const allText = JSON.stringify(exercise);
+
+  assert.match(
+    allText,
+    /"url":"\/exams\/2025\/2semester\/2final-exam\/preparation\/img\/js2-final-preparation-q2\.gif"/,
+  );
+  assert.match(
+    allText,
+    /"url":"\/exams\/2025\/2semester\/2final-exam\/preparation\/assets\/notes\.pdf"/,
+  );
+  assert.match(allText, /"url":"https:\/\/example\.com\/image\.png"/);
+});
