@@ -14,7 +14,7 @@
     "lint": "npm run typecheck",
     "typecheck": "npm run sync:content && tsc --noEmit",
     "test": "node scripts/test-e2e-matrix.mjs",
-    "test:dev-switch": "node --test --test-concurrency=1 tests/dev-switch.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs tests/e2e-content-source.test.mjs",
+    "test:dev-switch": "node --test --test-concurrency=1 tests/dev-switch.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs tests/e2e-content-source.test.mjs tests/intro-image-resolution.test.mjs",
     "test:e2e": "playwright test -c tests/e2e/playwright.config.mjs"
   },
   "dependencies": {

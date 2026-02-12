@@ -8,6 +8,7 @@ const withNextra = nextra({
   search: {
     codeblocks: false,
   },
+  staticImage: false,
   mdxOptions: {
     ...courseMdxOptions,
   },
