@@ -70,16 +70,6 @@
   border-color: #8fb3e6 !important;
 }
 
-.current-line.current-line-exact {
-  border-left: none !important;
-  background-color: rgba(148, 163, 184, 0.3) !important;
-}
-
-.dark .current-line.current-line-exact {
-  border-left: none !important;
-  background-color: rgba(96, 165, 250, 0.2) !important;
-}
-
 .rensyuBlock {
   border: 1px solid #64748b !important;
   background-color: #f8fafc !important;
@@ -88,24 +78,6 @@
 .dark .rensyuBlock {
   border-color: #93c5fd !important;
   background-color: rgba(15, 23, 42, 0.92) !important;
-}
-
-ul[class*='x:list-disc'],
-ol[class*='x:list-decimal'],
-[class*='x:[:is(ol,ul)_&]:my-[.75em]'] {
-  border-left: none !important;
-  background-color: transparent !important;
-  box-shadow: inset 0 0 0 1px #5f6f87 !important;
-  border-radius: 6px !important;
-  padding: 0.35rem 0.75rem !important;
-}
-
-.dark ul[class*='x:list-disc'],
-.dark ol[class*='x:list-decimal'],
-.dark [class*='x:[:is(ol,ul)_&]:my-[.75em]'] {
-  border-left: none !important;
-  background-color: transparent !important;
-  box-shadow: inset 0 0 0 1px #93c5fd !important;
 }
 
 [class*='course-admonition'] {

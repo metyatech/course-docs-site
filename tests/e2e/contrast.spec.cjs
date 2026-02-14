@@ -179,33 +179,58 @@ async function collectBoundaryIssues(page, path, theme) {
         return averageColors(colors);
       };
 
-      const resolveEdgeCueColors = (style) => {
+      const resolveEdgeCue = (style) => {
         const edgeColors = [];
-        const borderWidths = [
-          Number.parseFloat(style.borderTopWidth) || 0,
-          Number.parseFloat(style.borderRightWidth) || 0,
-          Number.parseFloat(style.borderBottomWidth) || 0,
-          Number.parseFloat(style.borderLeftWidth) || 0
+        const borderSides = [
+          {
+            width: Number.parseFloat(style.borderTopWidth) || 0,
+            style: style.borderTopStyle,
+            color: parseColor(style.borderTopColor)
+          },
+          {
+            width: Number.parseFloat(style.borderRightWidth) || 0,
+            style: style.borderRightStyle,
+            color: parseColor(style.borderRightColor)
+          },
+          {
+            width: Number.parseFloat(style.borderBottomWidth) || 0,
+            style: style.borderBottomStyle,
+            color: parseColor(style.borderBottomColor)
+          },
+          {
+            width: Number.parseFloat(style.borderLeftWidth) || 0,
+            style: style.borderLeftStyle,
+            color: parseColor(style.borderLeftColor)
+          }
         ];
-        const maxBorderWidth = Math.max(...borderWidths);
-        if (maxBorderWidth > 0) {
-          const borderColor = parseColor(style.borderTopColor);
-          if (borderColor && borderColor.alpha > 0) {
-            edgeColors.push(borderColor);
+
+        let visibleBorderSides = 0;
+        for (const border of borderSides) {
+          if (border.width <= 0 || border.style === 'none') {
+            continue;
+          }
+          if (border.color && border.color.alpha > 0) {
+            visibleBorderSides += 1;
+            edgeColors.push(border.color);
           }
         }
 
+        let hasOutlineCue = false;
         const outlineWidth = Number.parseFloat(style.outlineWidth) || 0;
         if (outlineWidth > 0 && style.outlineStyle !== 'none') {
           const outlineColor = parseColor(style.outlineColor);
           if (outlineColor && outlineColor.alpha > 0) {
+            hasOutlineCue = true;
             edgeColors.push(outlineColor);
           }
         }
 
         const shadowColors = parseColorList(extractColorTokens(style.boxShadow));
         edgeColors.push(...shadowColors);
-        return edgeColors;
+        return {
+          edgeColors,
+          hasContainerEdgeCue: visibleBorderSides >= 2 || hasOutlineCue || shadowColors.length > 0
+        };
       };
 
       const hasRoundedCorner = (style) => {
@@ -254,6 +279,18 @@ async function collectBoundaryIssues(page, path, theme) {
           continue;
         }
 
+        const candidateTagName = candidate.tagName.toLowerCase();
+        const candidateClassName = String(candidate.className || '');
+        const isLineHighlight = candidateClassName.includes('current-line');
+        const isProseList =
+          (candidateTagName === 'ul' || candidateTagName === 'ol') &&
+          (candidateClassName.includes('x:list-disc') ||
+            candidateClassName.includes('x:list-decimal') ||
+            candidateClassName.includes('x:list-none'));
+        if (isLineHighlight || isProseList) {
+          continue;
+        }
+
         const parent = candidate.parentElement;
         if (!parent) {
           continue;
@@ -261,11 +298,17 @@ async function collectBoundaryIssues(page, path, theme) {
 
         const parentBackgroundColor = resolveEffectiveBackgroundColor(parent);
         const backgroundCueColor = resolveRepresentativeBackgroundColor(candidateStyle);
-        const edgeCueColors = resolveEdgeCueColors(candidateStyle);
+        const edgeCue = resolveEdgeCue(candidateStyle);
+        const edgeCueColors = edgeCue.edgeColors;
         const hasBackgroundCue = Boolean(backgroundCueColor);
         const hasEdgeCue = edgeCueColors.length > 0;
+        const hasContainerEdgeCue = edgeCue.hasContainerEdgeCue;
 
         if (!hasBackgroundCue && !hasEdgeCue) {
+          continue;
+        }
+
+        if (!hasBackgroundCue && hasEdgeCue && !hasContainerEdgeCue) {
           continue;
         }
 
@@ -295,8 +338,8 @@ async function collectBoundaryIssues(page, path, theme) {
 
         if (!passesBoundaryContrast) {
           results.push({
-            tagName: candidate.tagName.toLowerCase(),
-            className: String(candidate.className || ''),
+            tagName: candidateTagName,
+            className: candidateClassName,
             backgroundContrast: Number(backgroundContrast.toFixed(2)),
             borderContrast: Number(borderContrast.toFixed(2))
           });
