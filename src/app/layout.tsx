@@ -1,6 +1,7 @@
 import { createRootLayout } from '@metyatech/course-docs-platform/next-app/create-root-layout';
 import { siteConfig } from '../../site.config';
 import DevAutoReload from '../components/dev-auto-reload';
+import './accessibility-overrides.css';
 
 const BaseRootLayout = createRootLayout({
   description: siteConfig.description ?? siteConfig.logoText,

@@ -13,9 +13,11 @@
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
     "lint": "npm run typecheck",
     "typecheck": "npm run sync:content && tsc --noEmit",
-    "test": "node scripts/test-e2e-matrix.mjs",
+    "test": "node scripts/test-e2e-matrix.mjs && npm run lint:contrast",
     "test:dev-switch": "node --test --test-concurrency=1 tests/dev-switch.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs tests/e2e-content-source.test.mjs tests/intro-image-resolution.test.mjs tests/qspec-relative-image-resolution.test.mjs tests/asset-route-trace-config.test.mjs",
-    "test:e2e": "playwright test -c tests/e2e/playwright.config.mjs"
+    "test:e2e": "playwright test -c tests/e2e/playwright.config.mjs",
+    "lint:contrast": "playwright test -c tests/e2e/playwright.config.mjs tests/e2e/contrast.spec.cjs",
+    "verify": "npm run lint && npm run test && npm run build"
   },
   "dependencies": {
     "@mdx-js/react": "^3.1.1",
@@ -28,6 +30,7 @@
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
     "@playwright/test": "^1.55.0",
     "@types/node": "^25.0.9",
     "@types/react": "^19.2.9",

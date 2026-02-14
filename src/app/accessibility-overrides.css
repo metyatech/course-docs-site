@@ -1,0 +1,154 @@
+.dark [class*='x:bg-red-100'] {
+  background-color: rgba(127, 29, 29, 0.88) !important;
+  border-color: rgba(248, 113, 113, 0.85) !important;
+  color: #fee2e2 !important;
+}
+
+.dark [class*='x:bg-red-100'] b,
+.dark [class*='x:bg-red-100'] strong,
+.dark [class*='x:bg-red-100'] [class*='x:leading-7'] {
+  color: #fff5f5 !important;
+}
+
+[class*='x:bg-nextra-bg'][class*='x:font-mono'][class*='nextra-border'] {
+  border-color: #64748b !important;
+}
+
+.dark [class*='x:bg-nextra-bg'][class*='x:font-mono'][class*='nextra-border'] {
+  border-color: #93c5fd !important;
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+[class*='x:bg-primary-100'][class*='x:text-primary-800'] {
+  background-color: #dbeafe !important;
+  border-color: #60a5fa !important;
+}
+
+.dark [class*='x:dark:bg-primary-400/10'],
+.dark [class*='x:bg-primary-100'][class*='x:text-primary-800'] {
+  background-color: rgba(96, 165, 250, 0.22) !important;
+  border-color: rgba(147, 197, 253, 0.72) !important;
+  color: #dbeafe !important;
+}
+
+[class*='submissions_controls__'],
+[class*='submissions_card__'] {
+  border-color: #4b5563 !important;
+}
+
+.dark [class*='submissions_controls__'],
+.dark [class*='submissions_card__'] {
+  border-color: #93c5fd !important;
+  background-color: rgba(15, 23, 42, 0.85) !important;
+}
+
+[class*='x:group'][class*='x:overflow-x-auto'][class*='x:bg-white'] {
+  border: 1px solid #64748b !important;
+}
+
+.dark [class*='x:group'][class*='x:overflow-x-auto'][class*='x:dark:bg-black'] {
+  border: 1px solid #93c5fd !important;
+}
+
+[class*='styles-module__codePreviewContainer__'] {
+  border-color: #5f7da8 !important;
+}
+
+.dark [class*='styles-module__codePreviewContainer__'] {
+  border-color: #8fb3e6 !important;
+}
+
+[class*='styles-module__sectionHeader__'] {
+  color: #1e293b !important;
+  border-color: #5f7da8 !important;
+}
+
+.dark [class*='styles-module__sectionHeader__'] {
+  color: #e2e8f0 !important;
+  background-color: #16233a !important;
+  border-color: #8fb3e6 !important;
+}
+
+.current-line.current-line-exact {
+  border-left: 2px solid #64748b !important;
+  background-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+.dark .current-line.current-line-exact {
+  border-left-color: #93c5fd !important;
+  background-color: rgba(96, 165, 250, 0.24) !important;
+}
+
+.rensyuBlock {
+  border: 1px solid #64748b !important;
+  background-color: #f8fafc !important;
+}
+
+.dark .rensyuBlock {
+  border-color: #93c5fd !important;
+  background-color: rgba(15, 23, 42, 0.92) !important;
+}
+
+.nextra-content ul,
+[class*='x:list-disc'][class*='x:ms-[1.5em]'],
+[class*='x:[:is(ol,ul)_&]:my-[.75em]'] {
+  border-left: 1px solid #94a3b8 !important;
+  padding-left: 0.75rem !important;
+}
+
+main article ul {
+  border-left: 1px solid #94a3b8 !important;
+  padding-left: 0.75rem !important;
+}
+
+ul {
+  border-left: 1px solid #94a3b8 !important;
+  background-color: transparent !important;
+}
+
+ol {
+  border-left: 1px solid #94a3b8 !important;
+  background-color: transparent !important;
+}
+
+.dark .nextra-content ul,
+.dark [class*='x:list-disc'][class*='x:ms-[1.5em]'],
+.dark [class*='x:[:is(ol,ul)_&]:my-[.75em]'] {
+  border-left-color: #93c5fd !important;
+}
+
+.dark main article ul {
+  border-left-color: #93c5fd !important;
+}
+
+.dark ul {
+  border-left-color: #93c5fd !important;
+}
+
+.dark ol {
+  border-left-color: #93c5fd !important;
+}
+
+[class*='course-admonition'] {
+  border: 1px solid #64748b !important;
+  background-color: #eef2ff !important;
+}
+
+.dark [class*='course-admonition'] {
+  border-color: #93c5fd !important;
+  background-color: rgba(30, 41, 59, 0.92) !important;
+}
+
+[class*='styles-module__consoleSection__'] {
+  border-top-color: #5f7da8 !important;
+}
+
+.dark [class*='styles-module__consoleSection__'] {
+  border-top-color: #1f2a44 !important;
+}
+
+.dark [class*='styles-module__editorContainer__'] section > div:first-child {
+  color: #e2e8f0 !important;
+  background-color: #1f2937 !important;
+}
