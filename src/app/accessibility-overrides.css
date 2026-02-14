@@ -71,13 +71,13 @@
 }
 
 .current-line.current-line-exact {
-  border-left: 2px solid #64748b !important;
-  background-color: rgba(148, 163, 184, 0.22) !important;
+  border-left: none !important;
+  background-color: rgba(148, 163, 184, 0.3) !important;
 }
 
 .dark .current-line.current-line-exact {
-  border-left-color: #93c5fd !important;
-  background-color: rgba(96, 165, 250, 0.24) !important;
+  border-left: none !important;
+  background-color: rgba(96, 165, 250, 0.2) !important;
 }
 
 .rensyuBlock {
@@ -90,44 +90,22 @@
   background-color: rgba(15, 23, 42, 0.92) !important;
 }
 
-.nextra-content ul,
-[class*='x:list-disc'][class*='x:ms-[1.5em]'],
+ul[class*='x:list-disc'],
+ol[class*='x:list-decimal'],
 [class*='x:[:is(ol,ul)_&]:my-[.75em]'] {
-  border-left: 1px solid #94a3b8 !important;
-  padding-left: 0.75rem !important;
-}
-
-main article ul {
-  border-left: 1px solid #94a3b8 !important;
-  padding-left: 0.75rem !important;
-}
-
-ul {
-  border-left: 1px solid #94a3b8 !important;
+  border-left: none !important;
   background-color: transparent !important;
+  box-shadow: inset 0 0 0 1px #5f6f87 !important;
+  border-radius: 6px !important;
+  padding: 0.35rem 0.75rem !important;
 }
 
-ol {
-  border-left: 1px solid #94a3b8 !important;
-  background-color: transparent !important;
-}
-
-.dark .nextra-content ul,
-.dark [class*='x:list-disc'][class*='x:ms-[1.5em]'],
+.dark ul[class*='x:list-disc'],
+.dark ol[class*='x:list-decimal'],
 .dark [class*='x:[:is(ol,ul)_&]:my-[.75em]'] {
-  border-left-color: #93c5fd !important;
-}
-
-.dark main article ul {
-  border-left-color: #93c5fd !important;
-}
-
-.dark ul {
-  border-left-color: #93c5fd !important;
-}
-
-.dark ol {
-  border-left-color: #93c5fd !important;
+  border-left: none !important;
+  background-color: transparent !important;
+  box-shadow: inset 0 0 0 1px #93c5fd !important;
 }
 
 [class*='course-admonition'] {
@@ -146,6 +124,7 @@ ol {
 
 .dark [class*='styles-module__consoleSection__'] {
   border-top-color: #1f2a44 !important;
+  background-color: #1f2937 !important;
 }
 
 .dark [class*='styles-module__editorContainer__'] section > div:first-child {
