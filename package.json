@@ -3,6 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "description": "Shared site runtime for metyatech course documentation",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/metyatech/course-docs-site.git"
+  },
+  "bugs": {
+    "url": "https://github.com/metyatech/course-docs-site/issues"
+  },
+  "homepage": "https://github.com/metyatech/course-docs-site#readme",
   "scripts": {
     "sync:content": "node scripts/sync-course-content.mjs",
     "dev": "node scripts/run-dev.mjs",
@@ -11,7 +20,9 @@
     "build": "npm run sync:content && next build",
     "postinstall": "patch-package",
     "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
-    "lint": "npm run typecheck",
+    "lint": "npm run typecheck && eslint .",
+    "format": "prettier --check .",
+    "audit": "npm audit",
     "typecheck": "npm run sync:content && tsc --noEmit",
     "test": "node scripts/test-e2e-matrix.mjs && npm run lint:contrast",
     "test:dev-switch": "node --test --test-concurrency=1 tests/dev-switch.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs tests/e2e-content-source.test.mjs tests/intro-image-resolution.test.mjs tests/qspec-relative-image-resolution.test.mjs tests/asset-route-trace-config.test.mjs",
@@ -36,8 +47,12 @@
     "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
     "cross-env": "^10.1.0",
+    "eslint": "^9.19.0",
+    "eslint-config-next": "^15.1.6",
+    "eslint-config-prettier": "^10.0.1",
     "pagefind": "^1.4.0",
     "patch-package": "^8.0.0",
+    "prettier": "^3.4.2",
     "typescript": "^5.9.3"
   },
   "engines": {

@@ -110,6 +110,22 @@ E2E_PROGRAMMING_CONTENT_SOURCE="github:metyatech/programming-course-docs#master"
 E2E_JAVASCRIPT_CONTENT_SOURCE="github:metyatech/javascript-course-docs#master"
 ```
 
+## Verification
+
+Run the full verification suite (typecheck and tests):
+
+```sh
+npm run verify
+```
+
+## Documentation
+
+- [LICENSE](./LICENSE)
+- [SECURITY.md](./SECURITY.md)
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- [CHANGELOG.md](./CHANGELOG.md)
+
 ## Notes
 
 - This repo is intentionally framework-only. All course-specific text/content lives in the content repos.
