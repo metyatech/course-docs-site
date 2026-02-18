@@ -13,7 +13,6 @@
   },
   "homepage": "https://github.com/metyatech/course-docs-site#readme",
   "scripts": {
-    "verify": "npm run format && npm run lint && npm run audit && npm run test",
     "sync:content": "node scripts/sync-course-content.mjs",
     "dev": "node scripts/run-dev.mjs",
     "dev:inner": "node scripts/dev-inner.mjs",
