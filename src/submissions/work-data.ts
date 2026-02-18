@@ -140,7 +140,9 @@ const coerceStudentWorksData = (value: unknown): StudentWorksData | null => {
   return { years };
 };
 
-const getStudentWorksDataFromRemoteIndex = async (indexUrl: string): Promise<StudentWorksData | null> => {
+const getStudentWorksDataFromRemoteIndex = async (
+  indexUrl: string,
+): Promise<StudentWorksData | null> => {
   try {
     const res = await fetch(indexUrl, { cache: 'no-store' });
     if (!res.ok) {
@@ -160,7 +162,9 @@ const getStudentWorksDataFromRemoteIndex = async (indexUrl: string): Promise<Stu
   }
 };
 
-export const getStudentWorksData = async (basePath = studentWorksBasePath): Promise<StudentWorksData> => {
+export const getStudentWorksData = async (
+  basePath = studentWorksBasePath,
+): Promise<StudentWorksData> => {
   if (fs.existsSync(basePath)) {
     return getStudentWorksDataFromFs(basePath);
   }

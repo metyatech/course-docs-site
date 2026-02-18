@@ -9,7 +9,7 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 test('platform mdx components own server CodePreview binding', async () => {
   const source = await fs.readFile(
     path.join(projectRoot, 'src', 'mdx', 'create-use-mdx-components.tsx'),
-    'utf8'
+    'utf8',
   );
 
   assert.match(source, /@metyatech\/code-preview\/server/);

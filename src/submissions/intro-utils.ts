@@ -6,4 +6,3 @@ export const normalizeIntroInput = (value: string) => {
 
   return trimmed.replace(/\r\n/g, '\n');
 };
-

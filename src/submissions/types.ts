@@ -6,4 +6,3 @@ export type StudentWorkEntry = {
 export type StudentWorksData = {
   years: Record<string, StudentWorkEntry[]>;
 };
-

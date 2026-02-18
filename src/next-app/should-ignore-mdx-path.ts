@@ -82,4 +82,3 @@ export const shouldIgnoreMdxPath = (mdxPath: string[] | undefined) => {
 
   return isStaticAssetLike(mdxPath[mdxPath.length - 1] ?? '');
 };
-

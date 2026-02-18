@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { ShowMore } from '@re-dev/react-truncate';
 import { Info, Trash2 } from 'lucide-react';
@@ -30,9 +30,7 @@ export default function WorkComments({
   const [message, setMessage] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [expandedComments, setExpandedComments] = useState<
-    Record<string, boolean>
-  >({});
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -73,9 +71,7 @@ export default function WorkComments({
       return;
     }
     window.localStorage.setItem(NAME_STORAGE_KEY, nextName);
-    window.dispatchEvent(
-      new CustomEvent(NAME_EVENT, { detail: { name: nextName } })
-    );
+    window.dispatchEvent(new CustomEvent(NAME_EVENT, { detail: { name: nextName } }));
   };
 
   const handleDelete = async (commentId: string, studentId: string) => {
@@ -135,11 +131,7 @@ export default function WorkComments({
               <input
                 type="text"
                 value={name}
-                onChange={(event) =>
-                  handleNameChange(
-                    event.target.value.slice(0, MAX_NAME_LENGTH)
-                  )
-                }
+                onChange={(event) => handleNameChange(event.target.value.slice(0, MAX_NAME_LENGTH))}
                 className={styles.commentNameInput}
                 placeholder="例: たろう"
                 maxLength={MAX_NAME_LENGTH}
@@ -150,9 +142,7 @@ export default function WorkComments({
           </div>
           <textarea
             value={message}
-            onChange={(event) =>
-              setMessage(event.target.value.slice(0, MAX_COMMENT_LENGTH))
-            }
+            onChange={(event) => setMessage(event.target.value.slice(0, MAX_COMMENT_LENGTH))}
             className={styles.commentTextarea}
             placeholder="良かったところや感想を書いてください"
             maxLength={MAX_COMMENT_LENGTH}
@@ -161,15 +151,9 @@ export default function WorkComments({
             data-testid="comment-message"
           />
           {formError && <p className={styles.formError}>{formError}</p>}
-          {isDisabled && (
-            <p className={styles.formError}>
-              コメント機能がまだ設定されていません。
-            </p>
-          )}
+          {isDisabled && <p className={styles.formError}>コメント機能がまだ設定されていません。</p>}
           <div className={styles.commentComposerActions}>
-            <span className={styles.commentCounter}>
-              {MAX_COMMENT_LENGTH - message.length}
-            </span>
+            <span className={styles.commentCounter}>{MAX_COMMENT_LENGTH - message.length}</span>
             <button
               type="submit"
               className={styles.commentButton}
@@ -189,8 +173,7 @@ export default function WorkComments({
           <ul className={styles.commentList} data-testid="comment-list">
             {comments.map((comment) => {
               const shouldClamp =
-                comment.message.length > 160 ||
-                comment.message.split('\n').length > 3;
+                comment.message.length > 160 || comment.message.split('\n').length > 3;
               const isExpanded = expandedComments[comment.id] ?? false;
 
               return (
@@ -220,10 +203,7 @@ export default function WorkComments({
                       data-testid="comment-author-toggle"
                     >
                       <span className={styles.visuallyHidden}>表示名</span>
-                      <Info
-                        className={styles.commentAuthorIcon}
-                        aria-hidden="true"
-                      />
+                      <Info className={styles.commentAuthorIcon} aria-hidden="true" />
                     </button>
                     {isAdmin ? (
                       <button
@@ -234,16 +214,10 @@ export default function WorkComments({
                         data-testid="comment-delete"
                       >
                         <span className={styles.visuallyHidden}>削除</span>
-                        <Trash2
-                          className={styles.commentDeleteIcon}
-                          aria-hidden="true"
-                        />
+                        <Trash2 className={styles.commentDeleteIcon} aria-hidden="true" />
                       </button>
                     ) : null}
-                    <span
-                      className={styles.commentAuthorName}
-                      data-testid="comment-author"
-                    >
+                    <span className={styles.commentAuthorName} data-testid="comment-author">
                       {comment.authorName}
                     </span>
                   </div>

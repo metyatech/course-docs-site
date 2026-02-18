@@ -36,8 +36,7 @@ export default async function Page(props: PageProps) {
   if (shouldIgnoreMdxPath(params.mdxPath)) {
     notFound();
   }
-  const { default: MDXContent, toc, metadata, sourceCode } =
-    await importPage(params.mdxPath);
+  const { default: MDXContent, toc, metadata, sourceCode } = await importPage(params.mdxPath);
 
   return (
     <Wrapper toc={toc} metadata={metadata} sourceCode={sourceCode}>
@@ -45,4 +44,3 @@ export default async function Page(props: PageProps) {
     </Wrapper>
   );
 }
-

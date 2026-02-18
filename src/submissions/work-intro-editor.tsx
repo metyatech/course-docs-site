@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useEffect, useState } from 'react';
 import styles from './submissions.module.css';
@@ -12,11 +12,7 @@ type WorkIntroEditorProps = {
 
 const MAX_INTRO_LENGTH = 400;
 
-export default function WorkIntroEditor({
-  intro,
-  isDisabled,
-  onSave,
-}: WorkIntroEditorProps) {
+export default function WorkIntroEditor({ intro, isDisabled, onSave }: WorkIntroEditorProps) {
   const [draft, setDraft] = useState(intro ?? '');
   const [isSaving, setIsSaving] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -92,9 +88,7 @@ export default function WorkIntroEditor({
             紹介文を編集
             <textarea
               value={draft}
-              onChange={(event) =>
-                setDraft(event.target.value.slice(0, MAX_INTRO_LENGTH))
-              }
+              onChange={(event) => setDraft(event.target.value.slice(0, MAX_INTRO_LENGTH))}
               className={styles.commentTextarea}
               placeholder="作品の説明や頑張ったところを書いてください"
               maxLength={MAX_INTRO_LENGTH}
@@ -105,9 +99,7 @@ export default function WorkIntroEditor({
           {formError && <p className={styles.formError}>{formError}</p>}
           {formSuccess && <p className={styles.formSuccess}>{formSuccess}</p>}
           {isDisabled && (
-            <p className={styles.formError}>
-              紹介文の編集機能がまだ設定されていません。
-            </p>
+            <p className={styles.formError}>紹介文の編集機能がまだ設定されていません。</p>
           )}
           <div className={styles.inlineActions}>
             <button

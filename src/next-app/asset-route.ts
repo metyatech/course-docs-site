@@ -56,7 +56,7 @@ const allowedRoots = new Set(['docs', 'exams', 'layout-preview', 'submissions'])
 
 export const GET = async (
   request: Request,
-  context: { params: Promise<{ assetPath: string[] }> }
+  context: { params: Promise<{ assetPath: string[] }> },
 ) => {
   const { assetPath } = await context.params;
 
@@ -100,7 +100,7 @@ export const GET = async (
     const filename = path.basename(resolvedPath);
     headers.set(
       'Content-Disposition',
-      `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`
+      `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
     );
   }
 

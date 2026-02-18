@@ -24,9 +24,7 @@ const baseComponents: MDXComponents = {
 };
 
 export function createUseMDXComponents(extra: MDXComponents = {}) {
-  return function useMDXComponents(
-    components: MDXComponents = {}
-  ): NextraMDXComponents {
+  return function useMDXComponents(components: MDXComponents = {}): NextraMDXComponents {
     return getThemeComponents({
       ...components,
       ...baseComponents,

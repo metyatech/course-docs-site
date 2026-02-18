@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-const supabaseUrl =
-  process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
 const adminToken = process.env.ADMIN_DELETE_TOKEN ?? '';
 
@@ -16,10 +15,7 @@ const getAdminSupabase = () => {
   });
 };
 
-export async function DELETE(
-  request: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   const resolvedParams = await context.params;
   const commentId = resolvedParams.id;
   const headerToken = request.headers.get('x-admin-token') ?? '';
@@ -41,4 +37,3 @@ export async function DELETE(
 
   return NextResponse.json({ ok: true });
 }
-

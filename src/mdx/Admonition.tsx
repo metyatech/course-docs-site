@@ -25,4 +25,3 @@ export default function Admonition({ type, title, children }: AdmonitionProps) {
     </div>
   );
 }
-

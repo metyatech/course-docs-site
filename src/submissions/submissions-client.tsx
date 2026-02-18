@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -58,17 +58,13 @@ const buildWorkUrl = (baseUrl: string, workPath: string | null) => {
   return `${trimmedBase}/${workPath}`;
 };
 
-export default function SubmissionsClient({
-  studentWorks,
-}: SubmissionsClientProps) {
+export default function SubmissionsClient({ studentWorks }: SubmissionsClientProps) {
   const studentWorksData = studentWorks.years;
   const availableYears = useMemo(
     () => Object.keys(studentWorksData).sort().reverse(),
-    [studentWorksData]
+    [studentWorksData],
   );
-  const [selectedYear, setSelectedYear] = useState<string>(
-    availableYears[0] ?? ''
-  );
+  const [selectedYear, setSelectedYear] = useState<string>(availableYears[0] ?? '');
 
   useEffect(() => {
     if (typeof window === 'undefined' || availableYears.length === 0) {
@@ -96,27 +92,25 @@ export default function SubmissionsClient({
     }
   };
 
-  const studentWorksInYear = selectedYear
-    ? studentWorksData[selectedYear] || []
-    : [];
+  const studentWorksInYear = useMemo(
+    () => (selectedYear ? studentWorksData[selectedYear] || [] : []),
+    [selectedYear, studentWorksData],
+  );
   const worksBaseUrl =
-    process.env.NEXT_PUBLIC_WORKS_BASE_URL ??
-    'https://metyatech.github.io/programming-course-docs';
+    process.env.NEXT_PUBLIC_WORKS_BASE_URL ?? 'https://metyatech.github.io/programming-course-docs';
   const supabase = useMemo(() => getBrowserSupabaseClient(), []);
   const [introMap, setIntroMap] = useState<WorkIntroMap>({});
   const [commentMap, setCommentMap] = useState<WorkCommentMap>({});
   const [dataError, setDataError] = useState<string | null>(null);
   const supabaseMissing = !supabase;
   const [adminToken, setAdminToken] = useState('');
-  const [activeCommentStudentId, setActiveCommentStudentId] = useState<
-    string | null
-  >(null);
+  const [activeCommentStudentId, setActiveCommentStudentId] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerTheme, setDrawerTheme] = useState<'light' | 'dark'>('light');
   const studentIds = useMemo(
     () => studentWorksInYear.map((work) => work.studentId),
-    [studentWorksInYear]
+    [studentWorksInYear],
   );
 
   const fetchIntros = useCallback(async () => {
@@ -186,7 +180,7 @@ export default function SubmissionsClient({
         },
         () => {
           fetchIntros();
-        }
+        },
       )
       .subscribe();
 
@@ -202,7 +196,7 @@ export default function SubmissionsClient({
         },
         () => {
           fetchComments();
-        }
+        },
       )
       .subscribe();
 
@@ -275,7 +269,7 @@ export default function SubmissionsClient({
         }));
       }
     },
-    [selectedYear, supabase]
+    [selectedYear, supabase],
   );
 
   const deleteComment = useCallback(
@@ -298,13 +292,11 @@ export default function SubmissionsClient({
 
       setCommentMap((prev) => ({
         ...prev,
-        [studentId]: (prev[studentId] ?? []).filter(
-          (comment) => comment.id !== commentId
-        ),
+        [studentId]: (prev[studentId] ?? []).filter((comment) => comment.id !== commentId),
       }));
       await fetchComments();
     },
-    [adminToken, fetchComments]
+    [adminToken, fetchComments],
   );
 
   const saveIntro = useCallback(
@@ -335,7 +327,7 @@ export default function SubmissionsClient({
         }));
       }
     },
-    [selectedYear, supabase]
+    [selectedYear, supabase],
   );
 
   useEffect(() => {
@@ -360,13 +352,9 @@ export default function SubmissionsClient({
   }, []);
 
   const activeCommentWork = activeCommentStudentId
-    ? studentWorksInYear.find(
-        (work) => work.studentId === activeCommentStudentId
-      )
+    ? studentWorksInYear.find((work) => work.studentId === activeCommentStudentId)
     : null;
-  const activeComments = activeCommentWork
-    ? commentMap[activeCommentWork.studentId] ?? []
-    : [];
+  const activeComments = activeCommentWork ? (commentMap[activeCommentWork.studentId] ?? []) : [];
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -424,8 +412,7 @@ export default function SubmissionsClient({
     const resolveTheme = () => {
       const html = document.documentElement;
       const body = document.body;
-      const dataTheme =
-        html.getAttribute('data-theme') ?? body.getAttribute('data-theme');
+      const dataTheme = html.getAttribute('data-theme') ?? body.getAttribute('data-theme');
 
       if (dataTheme === 'dark' || dataTheme === 'light') {
         return dataTheme;
@@ -439,9 +426,7 @@ export default function SubmissionsClient({
         return 'light';
       }
 
-      return window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     };
 
     const updateTheme = () => {
@@ -506,9 +491,7 @@ export default function SubmissionsClient({
                   </option>
                 ))}
               </select>
-              <span className={styles.count}>
-                ({studentWorksInYear.length}件の提出)
-              </span>
+              <span className={styles.count}>({studentWorksInYear.length}件の提出)</span>
             </div>
 
             {studentWorksInYear.length === 0 ? (
@@ -535,16 +518,10 @@ export default function SubmissionsClient({
                         className={`${styles.iframeWrapper} ${
                           workUrl ? '' : styles.iframeWrapperDisabled
                         }`}
-                        onClick={
-                          workUrl
-                            ? () => window.open(workUrl, '_blank')
-                            : undefined
-                        }
+                        onClick={workUrl ? () => window.open(workUrl, '_blank') : undefined}
                         style={{ cursor: workUrl ? 'pointer' : 'default' }}
                         title={
-                          workUrl
-                            ? 'クリックして新しいタブで開く'
-                            : 'index.html が見つかりません'
+                          workUrl ? 'クリックして新しいタブで開く' : 'index.html が見つかりません'
                         }
                         data-testid={`work-preview-${work.studentId}`}
                       >
@@ -572,17 +549,11 @@ export default function SubmissionsClient({
                                 Supabaseのanon keyが未設定のため表示できません。
                               </p>
                             ) : intro ? (
-                              <p
-                                className={styles.introText}
-                                data-testid="work-intro-text"
-                              >
+                              <p className={styles.introText} data-testid="work-intro-text">
                                 {intro}
                               </p>
                             ) : (
-                              <p
-                                className={styles.placeholder}
-                                data-testid="work-intro-empty"
-                              >
+                              <p className={styles.placeholder} data-testid="work-intro-empty">
                                 作者からの紹介文はまだありません。
                               </p>
                             )}
@@ -590,26 +561,20 @@ export default function SubmissionsClient({
                           <WorkIntroEditor
                             intro={intro}
                             isDisabled={supabaseMissing}
-                            onSave={(nextIntro) =>
-                              saveIntro(work.studentId, nextIntro)
-                            }
+                            onSave={(nextIntro) => saveIntro(work.studentId, nextIntro)}
                           />
                         </section>
                         <div className={styles.commentEntry}>
                           <button
                             type="button"
                             className={styles.commentToggleButton}
-                            onClick={() =>
-                              setActiveCommentStudentId(work.studentId)
-                            }
+                            onClick={() => setActiveCommentStudentId(work.studentId)}
                             data-testid="comment-open"
                           >
                             コメントを見る ({comments.length})
                           </button>
                         </div>
-                        {dataError && (
-                          <p className={styles.dataError}>{dataError}</p>
-                        )}
+                        {dataError && <p className={styles.dataError}>{dataError}</p>}
                       </div>
                     </div>
                   );
@@ -669,7 +634,7 @@ export default function SubmissionsClient({
                 />
               </aside>
             </div>,
-            document.body
+            document.body,
           )
         : null}
     </main>

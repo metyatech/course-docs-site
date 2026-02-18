@@ -13,4 +13,3 @@ export function createDocsLayout(themeConfig: Record<string, unknown>) {
     );
   };
 }
-

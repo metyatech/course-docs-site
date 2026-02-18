@@ -47,9 +47,7 @@ test('cloze replaces {{answer}} with ${answer} (and keeps escaped \\\\{{)', asyn
       { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Prompt' }] },
       {
         type: 'paragraph',
-        children: [
-          { type: 'text', value: 'A={{a}} / literal=\\{{b}} / C={{c}}' },
-        ],
+        children: [{ type: 'text', value: 'A={{a}} / literal=\\{{b}} / C={{c}}' }],
       },
       { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Explanation' }] },
       { type: 'paragraph', children: [{ type: 'text', value: 'X={{x}}' }] },
@@ -175,7 +173,10 @@ test('non-qspec markdown under questions/ is not transformed', async () => {
     children: [
       { type: 'heading', depth: 1, children: [{ type: 'text', value: 'Not a question spec' }] },
       { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Prompt' }] },
-      { type: 'paragraph', children: [{ type: 'text', value: 'Looks similar but should not transform.' }] },
+      {
+        type: 'paragraph',
+        children: [{ type: 'text', value: 'Looks similar but should not transform.' }],
+      },
     ],
   };
 

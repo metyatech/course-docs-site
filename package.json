@@ -30,7 +30,11 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
     "test": "node scripts/test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "npm run typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "npm run lint && npm run typecheck && npm run build && npm test",
     "prepare": "npm run build"
   },
   "dependencies": {
@@ -50,14 +54,25 @@
     "react": "*"
   },
   "devDependencies": {
-    "next": "^15.5.9",
+    "@eslint/js": "^9.39.2",
     "@types/node": "^25.0.9",
     "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.55.0",
+    "@typescript-eslint/parser": "^8.55.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^17.3.0",
+    "next": "^15.5.9",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
+    "prettier": "^3.8.1",
     "react": "^19.2.3",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.55.0"
   },
   "engines": {
     "node": ">=20.0"
