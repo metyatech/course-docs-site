@@ -23,6 +23,11 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/agent-rules-composition.m
 - Place AGENTS.md at the project root; only add another AGENTS.md for nested independent projects.
 - Before doing any work in a repository that contains `agent-ruleset.json`, run `compose-agentsmd` in that repository to refresh its AGENTS.md and ensure rules are current.
 
+## AGENTS.md freshness
+
+- Pre-commit hooks should run `compose-agentsmd --compose` and stage any AGENTS.md changes automatically. Do not fail the commit on AGENTS.md drift; let the updated file be included in the commit.
+- Do not add AGENTS.md freshness checks to CI. AGENTS.md is generated from external rule sources; checking it in CI creates cross-repo coupling. Pre-commit hooks are sufficient.
+
 ## Update policy
 
 - Never edit AGENTS.md directly; update source rules and regenerate AGENTS.md.
@@ -41,6 +46,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/agent-rules-composition.m
 - Prefer the most general applicable rule to avoid duplication.
 - Write rules as clear directives that prescribe specific behavior ("do X", "always Y", "never Z"). Do not use hedging language ("may", "might", "could", "consider") — if a behavior is required, state it as a requirement; if it is not required, omit it.
 - Do not use numeric filename prefixes (e.g., `00-...`) to impose ordering; treat rule modules as a flat set. If ordering matters, encode it explicitly in composition/tooling rather than filenames.
+- Before presenting a rule change proposal, verify it against all editing standards and rule placement criteria. Confirm: (1) placed at the correct level (global vs domain), (2) written at the broadest applicable scope without unnecessary ecosystem qualifiers, (3) action-oriented without hedging, (4) non-redundant with existing rules. Fix violations before presenting; do not rely on the requester for quality review.
 
 ## Rule placement (global vs domain)
 
@@ -91,6 +97,10 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/autonomous-operations.md
 ## GitHub notifications
 
 - After addressing a GitHub notification (CI failure fixed, PR reviewed, issue resolved), mark it as done so the user's inbox stays clean.
+- To mark notifications as done, use the GraphQL `markNotificationsAsDone` mutation. The REST API `PATCH /notifications/threads/{id}` only marks as read, not done.
+  - Get notification IDs: `gh api graphql -f query='{ viewer { notificationThreads(first: 50, query: "is:read") { nodes { id } } } }' --jq '[.data.viewer.notificationThreads.nodes[].id]'`
+  - Mark as done: `gh api graphql -f query="mutation { markNotificationsAsDone(input: {ids: $ids}) { success } }"`
+  - Paginate with `first`/`after` if more than 50 notifications exist.
 - If the gh token lacks the required scope, request the user to add it before proceeding.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/cli-standards.md
@@ -102,6 +112,12 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/cli-standards.md
 Source: github:metyatech/agent-rules@HEAD/rules/global/command-execution.md
 
 # Workflow and command execution
+
+## MCP server setup verification
+
+- After adding or modifying an MCP server configuration, immediately verify connectivity using the platform's MCP health check and confirm the server is connected.
+- If a configured MCP server fails to connect, diagnose and fix before proceeding. Do not silently fall back to alternative tools without reporting the degradation.
+- At session start, if expected MCP tools are absent from the available tool set, verify MCP server health and report/fix connection failures before continuing.
 
 - Do not add wrappers or pipes to commands unless the user explicitly asks.
 - Prefer repository-standard scripts/commands (package.json scripts, README instructions).
@@ -127,6 +143,7 @@ These are non-negotiable completion gates for any state-changing work and for an
 
 ## Evidence and verification
 
+- Do not run `git commit` until the repo's full verification command has passed in the current working tree. This applies to every commit, not only the final delivery.
 - For each AC, define verification evidence (automated test preferred; otherwise a deterministic manual procedure).
 - Maintain an explicit mapping: `AC -> evidence (tests/commands/manual steps)`.
 - The mapping may be presented in a compact per-item form (one line per AC including evidence + outcome) to reduce verbosity.
@@ -178,6 +195,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/implementation-and-coding
 - Do not assume machine-specific environments (fixed workspace directories, drive letters, per-PC paths). Prefer repo-relative paths and explicit configuration so workflows work in arbitrary clone locations.
 - Temporary files/directories created by the agent MUST be placed only under the OS temp directory (e.g., `%TEMP%` / `$env:TEMP`). Do not create ad-hoc temp folders in repos/workspaces unless the requester explicitly approves.
 - When building tools, CLIs, or services intended for agent use, design for cross-agent compatibility. Do not rely on features specific to a single agent platform (Claude Code, Codex, Gemini CLI, Copilot). Use standard interfaces (CLI, HTTP, stdin/stdout, MCP) that any agent can invoke.
+- After modifying dependency manifests (package.json, pyproject.toml, Cargo.toml, etc.), regenerate lock files (run `npm install`, `pip freeze`, `cargo generate-lockfile`, etc.) and include the updated lock file in the same commit. Never commit a manifest change without the corresponding lock file update.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/linting-formatting-and-static-analysis.md
 
@@ -471,6 +489,7 @@ For AC definition, verification evidence, regression tests, and final reporting 
 - If the execution environment restricts test execution (no network, no database, sandboxed), run the available subset, document what was skipped, and ensure CI covers the remainder.
 - When delivering a user-facing tool or GUI, perform end-to-end manual verification (start the service, exercise each feature, confirm correct behavior) in addition to automated tests. Do not rely solely on unit tests for user-facing deliverables.
 - When manual testing reveals issues or unexpected behavior, convert those findings into automated tests before fixing; the test must fail before the fix and pass after.
+- The verify script must include a lock-file integrity check that catches manifest/lock-file drift locally, before CI. Verify that every dependency declared in the manifest has a corresponding entry in the lock file.
 
 ## Tests
 
