@@ -219,9 +219,7 @@ test('relative asset urls in qspec content resolve from qspec directory', async 
       },
       {
         type: 'paragraph',
-        children: [
-          { type: 'image', url: 'https://example.com/image.png', alt: 'external' },
-        ],
+        children: [{ type: 'image', url: 'https://example.com/image.png', alt: 'external' }],
       },
       { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Explanation' }] },
       { type: 'paragraph', children: [{ type: 'text', value: '解説' }] },

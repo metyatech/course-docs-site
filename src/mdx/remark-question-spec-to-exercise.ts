@@ -48,9 +48,7 @@ const getContentRelativeDirectory = (filePath: string) => {
   let contentRelativePath = '';
   const markerIndex = normalizedPath.lastIndexOf(CONTENT_ROOT_MARKER);
   if (markerIndex !== -1) {
-    contentRelativePath = normalizedPath.slice(
-      markerIndex + CONTENT_ROOT_MARKER.length,
-    );
+    contentRelativePath = normalizedPath.slice(markerIndex + CONTENT_ROOT_MARKER.length);
   } else if (normalizedPath.startsWith('content/')) {
     contentRelativePath = normalizedPath.slice('content/'.length);
   } else {
@@ -74,9 +72,7 @@ const resolveQuestionSpecRelativeUrl = (url: string, filePath: string) => {
   const { pathPart, suffix } = splitUrlPathAndSuffix(trimmedUrl);
   if (!pathPart) return null;
 
-  const resolvedRelativePath = path.posix.normalize(
-    path.posix.join(baseDir, pathPart),
-  );
+  const resolvedRelativePath = path.posix.normalize(path.posix.join(baseDir, pathPart));
   if (
     !resolvedRelativePath ||
     resolvedRelativePath === '.' ||
