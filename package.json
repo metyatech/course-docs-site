@@ -35,7 +35,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "verify": "npm run lint && npm run typecheck && npm run build && npm test",
-    "prepare": "npm run build"
+    "prepare": "husky && npm run build"
   },
   "dependencies": {
     "@metyatech/code-preview": "github:metyatech/code-preview#main",
@@ -66,6 +66,8 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^17.3.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "next": "^15.5.9",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
@@ -73,6 +75,15 @@
     "react": "^19.2.3",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.55.0"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "prettier --check",
+      "eslint"
+    ],
+    "*.{json,md}": [
+      "prettier --check"
+    ]
   },
   "engines": {
     "node": ">=20.0"
