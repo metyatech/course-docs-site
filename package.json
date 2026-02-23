@@ -28,7 +28,8 @@
     "test:dev-switch": "node --test --test-concurrency=1 tests/dev-switch.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs tests/e2e-content-source.test.mjs tests/intro-image-resolution.test.mjs tests/qspec-relative-image-resolution.test.mjs tests/asset-route-trace-config.test.mjs",
     "test:e2e": "playwright test -c tests/e2e/playwright.config.mjs",
     "lint:contrast": "playwright test -c tests/e2e/playwright.config.mjs tests/e2e/contrast.spec.cjs",
-    "verify": "npm run lint && npm run test && npm run build"
+    "verify": "npm run lint && npm run test && npm run build",
+    "prepare": "husky"
   },
   "dependencies": {
     "@mdx-js/react": "^3.1.1",
@@ -50,10 +51,21 @@
     "eslint": "^9.19.0",
     "eslint-config-next": "^15.1.6",
     "eslint-config-prettier": "^10.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "pagefind": "^1.4.0",
     "patch-package": "^8.0.0",
     "prettier": "^3.4.2",
     "typescript": "^5.9.3"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx,mjs}": [
+      "prettier --check",
+      "eslint"
+    ],
+    "*.{json,md}": [
+      "prettier --check"
+    ]
   },
   "engines": {
     "node": ">=20.0"
