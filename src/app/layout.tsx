@@ -4,7 +4,7 @@ import DevAutoReload from '../components/dev-auto-reload';
 import './accessibility-overrides.css';
 
 const BaseRootLayout = createRootLayout({
-  description: siteConfig.description ?? siteConfig.logoText,
+  description: siteConfig.description ?? siteConfig.title,
   faviconHref: siteConfig.faviconHref ?? '/favicon.ico',
 });
 
