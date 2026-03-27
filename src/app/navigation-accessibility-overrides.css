@@ -1,0 +1,19 @@
+html:not(.dark) [class*="x:bg-primary-100"][class*="x:text-primary-800"] {
+  background-color: #bfdbfe !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) [class*="x:hover:bg-gray-100"]:hover,
+html:not(.dark) [class*="x:hover:bg-gray-100"]:focus-visible {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) [class*="x:subpixel-antialiased"][href*="#"] {
+  color: #334155 !important;
+}
+
+html:not(.dark) [class*="x:subpixel-antialiased"][href*="#"]:hover,
+html:not(.dark) [class*="x:subpixel-antialiased"][href*="#"]:focus-visible {
+  color: #0f172a !important;
+}

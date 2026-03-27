@@ -2,3 +2,4 @@
 {"id":"UbhhHD9t","description":"Make COURSE_CONTENT_SOURCE mandatory and fail when omitted","stage":"committed","createdAt":"2026-03-27T00:53:01.101Z","updatedAt":"2026-03-27T01:03:32.412Z","committedEventId":"X8-Q865Rhm0c10Dl"}
 {"id":"g6eswx8V","description":"Commit optional Supabase env documentation clarifications as a separate change","stage":"committed","createdAt":"2026-03-27T01:13:47.350Z","updatedAt":"2026-03-27T01:16:50.288Z","committedEventId":"cPNDBIUbONR-A_2_"}
 {"id":"yjUlJOvR","description":"Fix anonymous default export lint warning in course-docs-site eslint config","stage":"committed","createdAt":"2026-03-27T04:45:42.883Z","updatedAt":"2026-03-27T04:49:13.192Z","committedEventId":"K0MK9q4MKyPzoVaq"}
+{"id":"j_RDK587","description":"Fix programming-course-docs verify paths and contrast issues in course-docs-site","stage":"committed","createdAt":"2026-03-27T05:39:57.218Z","updatedAt":"2026-03-27T05:53:57.944Z","committedEventId":"EN55hDv0c36hz5sR"}
