@@ -134,3 +134,8 @@ npm run verify
 
 - This repo is intentionally framework-only. All course-specific text/content lives in the content repos.
 - The Vercel deployment workflows live in the content repos and call the Vercel CLI against this repo.
+- After a successful `CI` run on `main`, GitHub Actions in this repo automatically triggers `deploy-vercel.yml`
+  in the content repos so production sites pick up the latest shared runtime.
+- Cross-repo workflow dispatch uses the `COURSE_CONTENT_REDEPLOY_TOKEN` Actions secret in this repository.
+- `@metyatech/course-docs-platform` is pinned in `package.json` / `package-lock.json`, so platform-only changes
+  do not reach production until this repo updates the pinned commit and `main` passes `CI`.

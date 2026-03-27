@@ -1,0 +1,56 @@
+name: Redeploy content sites
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repo: metyatech/course-common-docs
+            ref: main
+          - repo: metyatech/javascript-course-docs
+            ref: master
+          - repo: metyatech/programming-course-docs
+            ref: master
+          - repo: metyatech/open-campus-unreal-90min
+            ref: main
+          - repo: metyatech/teacher-profile-docs
+            ref: main
+    name: Dispatch ${{ matrix.repo }}
+    steps:
+      - name: Validate dispatch token
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_REDEPLOY_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "Missing required secret: COURSE_CONTENT_REDEPLOY_TOKEN"
+            exit 1
+          fi
+
+      - name: Trigger content deploy workflow
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_REDEPLOY_TOKEN }}
+        run: |
+          echo "Dispatching deploy-vercel.yml for ${{ matrix.repo }} @ ${{ matrix.ref }}"
+          gh workflow run deploy-vercel.yml --repo "${{ matrix.repo }}" --ref "${{ matrix.ref }}"
