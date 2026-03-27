@@ -6,7 +6,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import {
-  DEFAULT_COURSE_CONTENT_SOURCE,
+  getRequiredContentSourceText,
   parseContentSource,
 } from './content-source.mjs';
 
@@ -71,9 +71,7 @@ const readEnvFile = (filename) => {
 };
 
 const normalizeCourseEnv = (env) => {
-  const sourceRaw =
-    typeof env.COURSE_CONTENT_SOURCE === 'string' ? env.COURSE_CONTENT_SOURCE.trim() : '';
-  const sourceText = sourceRaw || DEFAULT_COURSE_CONTENT_SOURCE;
+  const sourceText = getRequiredContentSourceText(env);
   const source = parseContentSource(sourceText);
   const sourceId =
     source.kind === 'local'

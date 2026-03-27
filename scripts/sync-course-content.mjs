@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_COURSE_CONTENT_SOURCE, parseContentSource } from './content-source.mjs';
+import { getRequiredContentSourceText, parseContentSource } from './content-source.mjs';
 
 const projectRoot = process.cwd();
 const workRoot = path.join(projectRoot, '.course-content');
@@ -37,8 +37,7 @@ for (const [key, value] of Object.entries(fileEnv)) {
   }
 }
 
-const courseSourceText =
-  process.env.COURSE_CONTENT_SOURCE?.trim() || DEFAULT_COURSE_CONTENT_SOURCE;
+const courseSourceText = getRequiredContentSourceText(process.env);
 const courseSource = parseContentSource(courseSourceText);
 
 const requiredPaths = [

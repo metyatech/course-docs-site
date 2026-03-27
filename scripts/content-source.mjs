@@ -1,6 +1,6 @@
 export const DEFAULT_GITHUB_REF = 'main';
-export const DEFAULT_COURSE_CONTENT_SOURCE =
-  'github:metyatech/javascript-course-docs#master';
+export const COURSE_CONTENT_SOURCE_REQUIRED_MESSAGE =
+  'COURSE_CONTENT_SOURCE is required. Set it in the environment or in .env/.env.local/.env.course/.env.course.local.';
 
 const isLocalPathLike = (value) =>
   value.startsWith('.') ||
@@ -36,6 +36,17 @@ export const parseContentSource = (rawValue) => {
   }
 
   return { kind: 'remote', repo, ref };
+};
+
+export const getRequiredContentSourceText = (env) => {
+  const sourceText =
+    typeof env.COURSE_CONTENT_SOURCE === 'string' ? env.COURSE_CONTENT_SOURCE.trim() : '';
+
+  if (!sourceText) {
+    throw new Error(COURSE_CONTENT_SOURCE_REQUIRED_MESSAGE);
+  }
+
+  return sourceText;
 };
 
 export const formatContentSource = (source) => {

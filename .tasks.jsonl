@@ -1,1 +1,2 @@
 {"id":"Hy-RjEhU","description":"Fix root redirect to use the active content repo's first docs entry","stage":"committed","createdAt":"2026-03-27T00:22:24.549Z","updatedAt":"2026-03-27T00:37:13.421Z","committedEventId":"L7Pf23SDfRj5je1t"}
+{"id":"UbhhHD9t","description":"Make COURSE_CONTENT_SOURCE mandatory and fail when omitted","stage":"committed","createdAt":"2026-03-27T00:53:01.101Z","updatedAt":"2026-03-27T01:03:32.412Z","committedEventId":"X8-Q865Rhm0c10Dl"}
