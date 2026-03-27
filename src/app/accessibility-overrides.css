@@ -80,16 +80,6 @@
   background-color: rgba(15, 23, 42, 0.92) !important;
 }
 
-[class*='course-admonition'] {
-  border: 1px solid #64748b !important;
-  background-color: #eef2ff !important;
-}
-
-.dark [class*='course-admonition'] {
-  border-color: #93c5fd !important;
-  background-color: rgba(30, 41, 59, 0.92) !important;
-}
-
 [class*='styles-module__consoleSection__'] {
   border-top-color: #5f7da8 !important;
 }

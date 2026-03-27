@@ -143,9 +143,14 @@ Write these rules in a way that keeps learning outcomes (clarity, sequencing, re
 - Course Docs Site renders question-spec Markdown via `@metyatech/course-docs-platform`:
   - `Type: cloze` converts `{{answer}}` to `${answer}` and enables blanks (including inside code blocks).
   - Inside `## Prompt`, `### Exam` is treated as a presentation convention (rendered as a tip callout titled `本試験では`).
-  - `## Scoring` is rendered as an info callout titled `採点基準・配点`.
+  - `## Scoring` is rendered as a note callout titled `採点基準・配点`.
   - `## Explanation` is rendered inside `<Solution>`.
   - Details: `course-docs-platform/docs/markdown-question-spec-course-docs-rendering.md`.
+
+## Admonitions in course pages
+
+- For admonitions in course pages, use only `tip`, `note`, `warning`, `caution`, `important`.
+- Unsupported admonition types are authoring errors; fix the source instead of relying on fallback rendering.
 
 ## Page assets (images / downloads)
 
