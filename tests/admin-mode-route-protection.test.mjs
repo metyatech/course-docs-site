@@ -185,7 +185,7 @@ test(
         ...process.env,
         NEXT_TELEMETRY_DISABLED: '1',
         COURSE_CONTENT_SOURCE: fixtureCourse,
-        ADMIN_DELETE_TOKEN: 'teacher-secret',
+        ADMIN_MODE_TOKEN: 'teacher-secret',
       },
       stdio: 'inherit',
     });
@@ -297,7 +297,7 @@ test(
 );
 
 test(
-  'legacy ADMIN_MODE_TOKEN alone does not enable admin mode anymore',
+  'legacy ADMIN_DELETE_TOKEN alone does not enable admin mode anymore',
   { timeout: 3 * 60_000 },
   async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-admin-mode-legacy-'));
@@ -313,8 +313,8 @@ test(
         ...process.env,
         NEXT_TELEMETRY_DISABLED: '1',
         COURSE_CONTENT_SOURCE: fixtureCourse,
-        ADMIN_DELETE_TOKEN: '',
-        ADMIN_MODE_TOKEN: 'legacy-secret',
+        ADMIN_MODE_TOKEN: '',
+        ADMIN_DELETE_TOKEN: 'legacy-secret',
       },
       stdio: 'inherit',
     });

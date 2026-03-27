@@ -21,14 +21,14 @@ Optional env vars:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-- `ADMIN_DELETE_TOKEN` (server-only, shared admin token for comment deletion and admin-mode unlock)
+- `ADMIN_MODE_TOKEN` (server-only, shared admin token for comment deletion and admin-mode unlock)
 - `COURSE_DOCS_LOCAL_SOURCE_MODE` (`copy` or `link`; default auto)
 
 The Supabase variables are only needed when the selected course enables the `/submissions` experience backed by
 `@metyatech/course-docs-platform`. At the moment, that means `programming-course-docs`. They are not required for
 `javascript-course-docs`.
 
-If the synced `site.config.ts` defines `adminMode.protectedLinks`, `ADMIN_DELETE_TOKEN` is the single shared
+If the synced `site.config.ts` defines `adminMode.protectedLinks`, `ADMIN_MODE_TOKEN` is the single shared
 admin code for both protected pages and admin comment deletion.
 
 See `.env.example` for the full list.
