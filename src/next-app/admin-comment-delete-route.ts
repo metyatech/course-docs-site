@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-const adminToken = process.env.ADMIN_DELETE_TOKEN ?? '';
+const adminToken = process.env.ADMIN_MODE_TOKEN ?? '';
 
 const getAdminSupabase = () => {
   if (!supabaseUrl || !serviceRoleKey) {

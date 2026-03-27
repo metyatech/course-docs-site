@@ -26,6 +26,7 @@ const runNpm = async (args) => {
 await runNpm(['run', 'build']);
 await run(process.execPath, [
   '--test',
+  'tests/admin-comment-delete-route-env.test.mjs',
   'tests/admonition-render.test.mjs',
   'tests/mdx-code-preview-boundary.test.mjs',
   'tests/remark-admonitions-to-mdx.test.mjs',
