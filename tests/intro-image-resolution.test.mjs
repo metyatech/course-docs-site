@@ -30,17 +30,14 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   const startedAt = Date.now();
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
       throw new Error(onTimeoutMessage ?? 'Timed out');
     }
-    // eslint-disable-next-line no-await-in-loop
     const result = await fn();
     if (result) {
       return;
     }
-    // eslint-disable-next-line no-await-in-loop
     await sleep(intervalMs);
   }
 };

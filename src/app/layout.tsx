@@ -1,12 +1,12 @@
 import { createRootLayout } from "@metyatech/course-docs-platform/next-app/create-root-layout";
-import { siteConfig } from "../../site.config";
 import DevAutoReload from "../components/dev-auto-reload";
+import { getSiteDescription, getSiteFaviconHref } from "../lib/site-config";
 import "./accessibility-overrides.css";
 import "./navigation-accessibility-overrides.css";
 
 const BaseRootLayout = createRootLayout({
-  description: siteConfig.description ?? siteConfig.title,
-  faviconHref: siteConfig.faviconHref ?? "/favicon.ico",
+  description: getSiteDescription(),
+  faviconHref: getSiteFaviconHref(),
 });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,0 +1,92 @@
+.trigger {
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.45rem 0.9rem;
+}
+
+.triggerActive {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.panel {
+  margin-top: 0.75rem;
+  width: min(22rem, 100%);
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 0.9rem;
+  padding: 0.9rem;
+  background: color-mix(in srgb, var(--x-color-neutral-1) 96%, white 4%);
+}
+
+.heading {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.copy {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 0.7rem;
+  background: var(--x-color-neutral-1);
+  color: inherit;
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.action {
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.45rem 0.9rem;
+}
+
+.primary {
+  background: color-mix(in srgb, currentColor 90%, transparent);
+  color: var(--x-color-neutral-1);
+}
+
+.status {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.links {
+  margin: 0.75rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.linkItem + .linkItem {
+  margin-top: 0.35rem;
+}
+
+.link {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}

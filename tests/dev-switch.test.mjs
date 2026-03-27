@@ -71,18 +71,15 @@ const tryFetchText = async (url) => {
 
 const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   const startedAt = Date.now();
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const now = Date.now();
     if (now - startedAt > timeoutMs) {
       throw new Error(onTimeoutMessage ?? 'Timed out');
     }
-    // eslint-disable-next-line no-await-in-loop
     const result = await fn();
     if (result) {
       return;
     }
-    // eslint-disable-next-line no-await-in-loop
     await sleep(intervalMs);
   }
 };
@@ -93,7 +90,6 @@ const findStubPort = async ({ fromPort, toPort, timeoutMs }) => {
   await waitFor(
     async () => {
       for (let port = fromPort; port <= toPort; port += 1) {
-        // eslint-disable-next-line no-await-in-loop
         const result = await tryFetchText(`http://127.0.0.1:${port}/healthz`);
         if (result?.status === 200 && result.text.trim().startsWith('course-docs-site-stub:')) {
           foundPort = port;

@@ -1,5 +1,32 @@
+import type { ReactNode } from 'react';
+import { cookies } from 'next/headers';
+import { Layout } from 'nextra-theme-docs';
+import { getPageMap } from 'nextra/page-map';
 import themeConfig from '../../../theme.config';
-import { createDocsLayout } from '@metyatech/course-docs-platform/next-app/create-docs-layout';
+import {
+  filterProtectedPageMap,
+  getAdminModeCookieName,
+  hasProtectedAdminRoutes,
+  isAdminModeCookieEnabled,
+} from '../../lib/admin-mode';
 
-export default createDocsLayout(themeConfig as Record<string, unknown>);
+export default async function DocsLayout({ children }: { children: ReactNode }) {
+  const pageMap = await getPageMap();
 
+  let visiblePageMap = pageMap;
+  if (hasProtectedAdminRoutes()) {
+    const cookieStore = await cookies();
+    const enabled = isAdminModeCookieEnabled(
+      cookieStore.get(getAdminModeCookieName())?.value
+    );
+    if (!enabled) {
+      visiblePageMap = filterProtectedPageMap(pageMap);
+    }
+  }
+
+  return (
+    <Layout {...(themeConfig as Record<string, unknown>)} pageMap={visiblePageMap}>
+      {children}
+    </Layout>
+  );
+}

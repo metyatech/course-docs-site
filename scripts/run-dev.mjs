@@ -219,13 +219,11 @@ const rmIfExists = (targetPath) => {
 
 const waitForPortFree = async (port, timeoutMs = 10_000) => {
   const startedAt = Date.now();
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
       throw new Error(`Port ${port} is still in use after restart. Stop the old dev server and retry.`);
     }
 
-    // eslint-disable-next-line no-await-in-loop
     const canListen = await new Promise((resolve) => {
       const server = net.createServer();
       server.unref();
@@ -239,7 +237,6 @@ const waitForPortFree = async (port, timeoutMs = 10_000) => {
       return;
     }
 
-    // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, 250));
   }
 };
@@ -247,7 +244,6 @@ const waitForPortFree = async (port, timeoutMs = 10_000) => {
 const findFirstFreePort = async (fromPort, maxAttempts = 20) => {
   for (let i = 0; i < maxAttempts; i += 1) {
     const port = fromPort + i;
-    // eslint-disable-next-line no-await-in-loop
     const canListen = await new Promise((resolve) => {
       const server = net.createServer();
       server.unref();

@@ -21,11 +21,14 @@ Optional env vars:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-- `ADMIN_DELETE_TOKEN` (server-only)
+- `ADMIN_DELETE_TOKEN` (server-only, used for comment deletion and optional admin-mode unlock)
 
 The Supabase variables are only needed when the selected course enables the `/submissions` experience backed by
 `@metyatech/course-docs-platform`. At the moment, that means `programming-course-docs`. They are not required for
 `javascript-course-docs`.
+
+If the synced `site.config.ts` defines `adminMode.protectedLinks`, the same `ADMIN_DELETE_TOKEN` can also unlock
+those protected pages from the site footer's admin panel.
 
 See `.env.example` for the full list.
 

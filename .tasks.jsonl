@@ -4,3 +4,4 @@
 {"id":"yjUlJOvR","description":"Fix anonymous default export lint warning in course-docs-site eslint config","stage":"committed","createdAt":"2026-03-27T04:45:42.883Z","updatedAt":"2026-03-27T04:49:13.192Z","committedEventId":"K0MK9q4MKyPzoVaq"}
 {"id":"j_RDK587","description":"Fix programming-course-docs verify paths and contrast issues in course-docs-site","stage":"committed","createdAt":"2026-03-27T05:39:57.218Z","updatedAt":"2026-03-27T05:53:57.944Z","committedEventId":"EN55hDv0c36hz5sR"}
 {"id":"OByHqHKS","description":"Upgrade course-docs-site GitHub Actions to v6","stage":"committed","createdAt":"2026-03-27T06:17:54.236Z","updatedAt":"2026-03-27T06:31:50.042Z","committedEventId":"41O7DqCPT8jzq5Fz"}
+{"id":"hSthTckR","description":"Root-fix local lint/type generation and add admin-only page access control for course-docs-site","stage":"committed","createdAt":"2026-03-27T08:08:32.110Z","updatedAt":"2026-03-27T09:20:39.927Z","committedEventId":"dwVVh3QRrCIVgFY7"}

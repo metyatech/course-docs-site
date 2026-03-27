@@ -58,11 +58,9 @@ const tryFetchRedirect = async (url) => {
   }
 };
 
-const writeFixtureCourseRepo = async ({ rootDir, docsMeta, pages }) => {
+const writeFixtureCourseRepo = async ({ rootDir, rootMeta, docsMeta, examsMeta, pages }) => {
   const siteConfig = `export const siteConfig = {
-  title: "Redirect Fixture",
   logoText: "Redirect Fixture",
-  githubRepo: "metyatech/redirect-fixture",
   projectLink: "https://example.invalid",
   docsRepositoryBase: "https://example.invalid",
   description: "root redirect regression fixture",
@@ -70,41 +68,93 @@ const writeFixtureCourseRepo = async ({ rootDir, docsMeta, pages }) => {
 } as const;
 `;
 
-  const rootMeta = `const meta = {
-  "*": {
-    type: "page",
-    theme: {
-      timestamp: false
-    }
-  },
-  index: {
-    display: "hidden"
-  },
-  docs: "Docs",
-};
+  const rootMetaSource = `const meta = ${JSON.stringify(
+    {
+      '*': {
+        type: 'page',
+        theme: {
+          timestamp: false,
+        },
+      },
+      index: {
+        display: 'hidden',
+      },
+      ...rootMeta,
+    },
+    null,
+    2
+  )};
 
 export default meta;
 `;
 
-  const docsMetaSource = `const meta = ${JSON.stringify(docsMeta, null, 2)};
-
-export default meta;
-`;
-
-  await fs.mkdir(path.join(rootDir, 'content', 'docs'), { recursive: true });
+  await fs.mkdir(path.join(rootDir, 'content'), { recursive: true });
   await fs.mkdir(path.join(rootDir, 'public', 'img'), { recursive: true });
 
   await fs.writeFile(path.join(rootDir, 'site.config.ts'), siteConfig, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', '_meta.ts'), rootMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', '_meta.ts'), docsMetaSource, 'utf8');
+  await fs.writeFile(path.join(rootDir, 'content', '_meta.ts'), rootMetaSource, 'utf8');
   await fs.writeFile(path.join(rootDir, 'public', 'img', 'favicon.ico'), '', 'utf8');
 
-  for (const page of pages) {
-    const pageDir = path.join(rootDir, 'content', 'docs', page.slug);
-    await fs.mkdir(pageDir, { recursive: true });
+  if (docsMeta) {
+    const docsMetaSource = `const meta = ${JSON.stringify(docsMeta, null, 2)};
+
+export default meta;
+`;
+
+    await fs.mkdir(path.join(rootDir, 'content', 'docs'), { recursive: true });
+    await fs.writeFile(path.join(rootDir, 'content', 'docs', '_meta.ts'), docsMetaSource, 'utf8');
+
+    for (const page of pages) {
+      const pageDir = path.join(rootDir, 'content', 'docs', page.slug);
+      await fs.mkdir(pageDir, { recursive: true });
+      await fs.writeFile(
+        path.join(pageDir, 'index.mdx'),
+        `---\ntitle: ${JSON.stringify(page.title)}\n---\n\n${page.title}\n`,
+        'utf8'
+      );
+    }
+  }
+
+  if (examsMeta) {
+    const examDir = path.join(
+      rootDir,
+      'content',
+      'exams',
+      '2025',
+      '2semester',
+      '2final-exam',
+      'preparation'
+    );
+
+    await fs.mkdir(examDir, { recursive: true });
     await fs.writeFile(
-      path.join(pageDir, 'index.mdx'),
-      `---\ntitle: ${JSON.stringify(page.title)}\n---\n\n${page.title}\n`,
+      path.join(rootDir, 'content', 'exams', '_meta.ts'),
+      'const meta = {\n  "2025": "2025"\n};\n\nexport default meta;\n',
+      'utf8'
+    );
+    await fs.writeFile(
+      path.join(rootDir, 'content', 'exams', '2025', '_meta.ts'),
+      'const meta = {\n  "2semester": "2semester"\n};\n\nexport default meta;\n',
+      'utf8'
+    );
+    await fs.writeFile(
+      path.join(rootDir, 'content', 'exams', '2025', '2semester', '_meta.ts'),
+      'const meta = {\n  "2final-exam": "2final-exam"\n};\n\nexport default meta;\n',
+      'utf8'
+    );
+    await fs.writeFile(
+      path.join(rootDir, 'content', 'exams', '2025', '2semester', '2final-exam', '_meta.ts'),
+      'const meta = {\n  preparation: "Preparation"\n};\n\nexport default meta;\n',
+      'utf8'
+    );
+    await fs.writeFile(
+      path.join(examDir, '_meta.ts'),
+      `const meta = ${JSON.stringify(examsMeta, null, 2)};\n\nexport default meta;\n`,
+      'utf8'
+    );
+    await fs.writeFile(
+      path.join(examDir, 'index.mdx'),
+      '---\ntitle: Preparation\n---\n\nPreparation\n',
       'utf8'
     );
   }
@@ -131,12 +181,13 @@ const killProcessTree = async (child) => {
 };
 
 test(
-  'root redirect follows the first docs entry from the active content repo',
+  'root redirect follows the first visible content entry from the active content repo',
   { timeout: 2 * 60_000 },
   async (t) => {
     const scenarios = [
       {
         name: 'intro-first',
+        rootMeta: { docs: 'Docs' },
         docsMeta: { intro: {}, basics: 'Basics' },
         pages: [
           { slug: 'intro', title: 'Intro' },
@@ -146,12 +197,20 @@ test(
       },
       {
         name: 'overview-first',
+        rootMeta: { docs: 'Docs' },
         docsMeta: { '01-overview': 'Overview', basics: 'Basics' },
         pages: [
           { slug: '01-overview', title: 'Overview' },
           { slug: 'basics', title: 'Basics' },
         ],
         expectedLocation: '/docs/01-overview',
+      },
+      {
+        name: 'exams-only',
+        rootMeta: { exams: 'Exams' },
+        examsMeta: { index: { title: 'Preparation' } },
+        pages: [],
+        expectedLocation: '/exams/2025/2semester/2final-exam/preparation',
       },
     ];
 
@@ -167,6 +226,8 @@ test(
         rootDir: fixtureCourse,
         docsMeta: scenario.docsMeta,
         pages: scenario.pages,
+        rootMeta: scenario.rootMeta,
+        examsMeta: scenario.examsMeta,
       });
 
       const dev = spawn(process.execPath, ['scripts/run-dev.mjs', '--port', String(port)], {

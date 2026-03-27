@@ -1,4 +1,11 @@
+import { NextResponse } from 'next/server';
 import { middleware as platformMiddleware } from '@metyatech/course-docs-platform/next-app/middleware';
+import {
+  getAdminModeCookieName,
+  getAdminModePublicFallbackPath,
+  isAdminModeCookieEnabled,
+  isProtectedRoute,
+} from './lib/admin-mode';
 
 export const config = {
   matcher: [
@@ -9,6 +16,18 @@ export const config = {
   ],
 };
 export function middleware(request: Parameters<typeof platformMiddleware>[0]) {
+  if (isProtectedRoute(request.nextUrl.pathname)) {
+    const enabled = isAdminModeCookieEnabled(
+      request.cookies.get(getAdminModeCookieName())?.value
+    );
+
+    if (!enabled) {
+      const url = request.nextUrl.clone();
+      url.pathname = getAdminModePublicFallbackPath();
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
+  }
+
   return platformMiddleware(request);
 }
-
