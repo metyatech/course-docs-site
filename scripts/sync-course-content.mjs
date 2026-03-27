@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getRequiredContentSourceText, parseContentSource } from './content-source.mjs';
+import { shouldLinkLocalSource } from './sync-course-content-mode.mjs';
 
 const projectRoot = process.cwd();
 const workRoot = path.join(projectRoot, '.course-content');
@@ -169,8 +170,12 @@ for (const required of requiredPaths) {
 
 const contentFrom = path.join(sourceRoot, 'content');
 const contentTo = path.join(projectRoot, 'content');
+const shouldLinkLocalContent = courseSource.kind === 'local' && shouldLinkLocalSource({
+  projectRoot,
+  env: process.env,
+});
 rmIfExists(contentTo);
-if (courseSource.kind === 'local') {
+if (shouldLinkLocalContent) {
   try {
     tryLinkDir(contentFrom, contentTo);
   } catch (error) {
@@ -196,7 +201,7 @@ const publicFrom = path.join(sourceRoot, 'public');
 const publicTo = path.join(projectRoot, 'public');
 if (fs.existsSync(publicFrom)) {
   rmIfExists(publicTo);
-  if (courseSource.kind === 'local') {
+  if (shouldLinkLocalContent) {
     try {
       tryLinkDir(publicFrom, publicTo);
     } catch (error) {

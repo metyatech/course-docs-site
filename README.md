@@ -22,6 +22,7 @@ Optional env vars:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
 - `ADMIN_DELETE_TOKEN` (server-only, used for comment deletion and optional admin-mode unlock)
+- `COURSE_DOCS_LOCAL_SOURCE_MODE` (`copy` or `link`; default auto)
 
 The Supabase variables are only needed when the selected course enables the `/submissions` experience backed by
 `@metyatech/course-docs-platform`. At the moment, that means `programming-course-docs`. They are not required for
@@ -97,6 +98,7 @@ Behavior:
 - Source format:
   - Remote GitHub: `github:owner/repo#ref`
   - Local path: `../path-to-content-repo`
+- Playwright copies local content sources instead of linking them, so switching course repos inside the E2E matrix does not reuse stale symlinked content.
 
 Recommended files:
 

@@ -24,9 +24,12 @@ export default defineConfig({
   webServer: {
     command: `npm run dev -- --port ${port}`,
     cwd: process.cwd(),
+    env: {
+      ...process.env,
+      COURSE_DOCS_LOCAL_SOURCE_MODE: 'copy',
+    },
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,
   },
 });
-
