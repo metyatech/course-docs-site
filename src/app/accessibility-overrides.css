@@ -103,3 +103,12 @@
   color: #e2e8f0 !important;
   background-color: #1f2937 !important;
 }
+
+.subheading-anchor {
+  border: 1px solid #64748b !important;
+  border-radius: 9999px;
+}
+
+.dark .subheading-anchor {
+  border-color: #93c5fd !important;
+}
