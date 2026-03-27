@@ -295,3 +295,61 @@ test(
     assertRedirectToIntro(teacherGuideAfterDisable.location);
   },
 );
+
+test(
+  'legacy ADMIN_MODE_TOKEN alone does not enable admin mode anymore',
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-admin-mode-legacy-'));
+    const fixtureCourse = path.join(tempRoot, 'course');
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+
+    const dev = spawn(process.execPath, ['scripts/run-dev.mjs', '--port', String(port)], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        NEXT_TELEMETRY_DISABLED: '1',
+        COURSE_CONTENT_SOURCE: fixtureCourse,
+        ADMIN_DELETE_TOKEN: '',
+        ADMIN_MODE_TOKEN: 'legacy-secret',
+      },
+      stdio: 'inherit',
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const introResult = await tryFetchResponse(`${baseUrl}/docs/intro/`);
+        return introResult?.status === 200;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: 'Public intro page did not become ready for legacy admin token test.',
+      },
+    );
+
+    const enableAdmin = await fetchResponse(`${baseUrl}/api/admin/mode/`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ token: 'legacy-secret' }),
+    });
+    assert.equal(enableAdmin.status, 200);
+    assert.equal(enableAdmin.setCookie, null);
+    assert.match(enableAdmin.text, /"configured":false/);
+    assert.match(enableAdmin.text, /"enabled":false/);
+
+    const teacherGuide = await fetchResponse(`${baseUrl}/docs/teacher-guide/`);
+    assert.equal(teacherGuide.status, 307);
+    assertRedirectToIntro(teacherGuide.location);
+  },
+);

@@ -82,8 +82,7 @@ export const getAdminModePublicFallbackPath = () => {
   return configured ? normalizeRoute(configured) : DEFAULT_PUBLIC_FALLBACK_PATH;
 };
 
-export const getAdminModeSecret = () =>
-  (process.env.ADMIN_MODE_TOKEN ?? process.env.ADMIN_DELETE_TOKEN ?? '').trim();
+export const getAdminModeSecret = () => (process.env.ADMIN_DELETE_TOKEN ?? '').trim();
 
 export const getProtectedAdminLinks = () => protectedLinks;
 
