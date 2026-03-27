@@ -23,6 +23,10 @@ Optional env vars:
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
 - `ADMIN_DELETE_TOKEN` (server-only)
 
+The Supabase variables are only needed when the selected course enables the `/submissions` experience backed by
+`@metyatech/course-docs-platform`. At the moment, that means `programming-course-docs`. They are not required for
+`javascript-course-docs`.
+
 See `.env.example` for the full list.
 
 ## Local development

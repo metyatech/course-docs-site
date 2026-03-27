@@ -13,3 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `verify` command in `package.json`.
 - Standard repository metadata in `package.json`.
 - Pull Request and Issue templates.
+
+### Changed
+
+- Clarified that Supabase environment variables are only needed for course selections that enable the submissions flow, such as `programming-course-docs`, and are not required for `javascript-course-docs`.
