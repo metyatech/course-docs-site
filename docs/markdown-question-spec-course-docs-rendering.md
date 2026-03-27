@@ -7,6 +7,7 @@ These conventions:
 - **Do not change** the underlying `markdown-question-spec` format.
 - Are applied only by the Course Docs Site renderer (implemented in this repository).
 - Keep the source Markdown compatible with Markdown tooling (linters, parsers, schema validation) and with QTI conversion.
+- General admonition authoring rules are documented in `docs/admonition-authoring.md`.
 
 ## Conventions
 
@@ -26,7 +27,7 @@ Use it to describe “in the real exam…” notes (e.g., identifiers/values wil
 
 ### `## Scoring`
 
-`## Scoring` is rendered as an **Info-style callout** titled `採点基準・配点`.
+`## Scoring` is rendered as a **Note-style callout** titled `採点基準・配点`.
 
 The contents remain plain Markdown (typically a bullet list or a table).
 

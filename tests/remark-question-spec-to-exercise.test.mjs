@@ -165,6 +165,40 @@ test('### Exam under Prompt becomes a tip admonition', async () => {
   assert.equal(title, '本試験では');
 });
 
+test('## Scoring becomes a note admonition titled 採点基準・配点', async () => {
+  const { default: remarkQuestionSpecToExercise } = await import(pluginModulePath);
+
+  const tree = {
+    type: 'root',
+    children: [
+      { type: 'heading', depth: 1, children: [{ type: 'text', value: '問題（採点）' }] },
+      { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Type' }] },
+      { type: 'paragraph', children: [{ type: 'text', value: 'descriptive' }] },
+      { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Prompt' }] },
+      { type: 'paragraph', children: [{ type: 'text', value: 'prompt body' }] },
+      { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Scoring' }] },
+      { type: 'paragraph', children: [{ type: 'text', value: '4: 条件を満たす' }] },
+      { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Explanation' }] },
+      { type: 'paragraph', children: [{ type: 'text', value: 'answer' }] },
+    ],
+  };
+
+  const transform = remarkQuestionSpecToExercise();
+  transform(tree, { path: '/content/exams/x/prep/questions/q2.qspec.md' });
+
+  const exercise = tree.children[0];
+  const admonitions = (exercise.children ?? []).filter(
+    (child) => child?.type === 'mdxJsxFlowElement' && child?.name === 'Admonition',
+  );
+
+  assert.equal(admonitions.length, 1);
+  const note = admonitions[0];
+  const title = (note.attributes ?? []).find((attr) => attr?.name === 'title')?.value;
+  const type = (note.attributes ?? []).find((attr) => attr?.name === 'type')?.value;
+  assert.equal(type, 'note');
+  assert.equal(title, '採点基準・配点');
+});
+
 test('non-qspec markdown under questions/ is not transformed', async () => {
   const { default: remarkQuestionSpecToExercise } = await import(pluginModulePath);
 

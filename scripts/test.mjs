@@ -26,7 +26,9 @@ const runNpm = async (args) => {
 await runNpm(['run', 'build']);
 await run(process.execPath, [
   '--test',
+  'tests/admonition-render.test.mjs',
   'tests/mdx-code-preview-boundary.test.mjs',
+  'tests/remark-admonitions-to-mdx.test.mjs',
   'tests/remark-question-spec-to-exercise.test.mjs',
   'tests/submissions-ui-regression.test.mjs',
 ]);

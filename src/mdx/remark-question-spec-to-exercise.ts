@@ -1,5 +1,6 @@
 import path from 'path';
 import { visit } from 'unist-util-visit';
+import type { AdmonitionType } from './admonition-types.js';
 
 const toMdxAttribute = (name: string, value: string) => ({
   type: 'mdxJsxAttribute',
@@ -193,7 +194,11 @@ const createMdxFlowElement = (name: string, attributes: any[], children: any[]) 
   children,
 });
 
-const createAdmonition = (type: 'tip' | 'info', title: string, children: any[]) =>
+const createAdmonition = (
+  type: Extract<AdmonitionType, 'tip' | 'note'>,
+  title: string,
+  children: any[],
+) =>
   createMdxFlowElement(
     'Admonition',
     [toMdxAttribute('type', type), toMdxAttribute('title', title)],
@@ -291,7 +296,7 @@ export default function remarkQuestionSpecToExercise() {
       ...(examTipNodes.length > 0 ? [createAdmonition('tip', '本試験では', examTipNodes)] : []),
       ...(scoringItems.length > 0
         ? [
-            createAdmonition('info', '採点基準・配点', [
+            createAdmonition('note', '採点基準・配点', [
               {
                 type: 'list',
                 ordered: false,

@@ -1,39 +1,8 @@
-.course-admonition {
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(0, 0, 0, 0.02);
-  padding: 0.9rem 1rem;
-  margin: 1.25rem 0;
-}
-
-.dark .course-admonition {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.course-admonition__title {
+.course-callout__title {
   font-weight: 700;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
-.course-admonition__content :first-child {
+.course-callout__content > :first-child {
   margin-top: 0;
 }
-
-.course-admonition--tip {
-  border-left: 6px solid #2e8555;
-}
-
-.course-admonition--info,
-.course-admonition--note {
-  border-left: 6px solid #226d9c;
-}
-
-.course-admonition--caution {
-  border-left: 6px solid #c48a00;
-}
-
-.course-admonition--danger {
-  border-left: 6px solid #b00020;
-}
-
