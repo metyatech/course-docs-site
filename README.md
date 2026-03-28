@@ -1,27 +1,52 @@
 # course-docs-platform
 
-Shared, DRY building blocks for metyatech course documentation sites.
+Reusable platform package for metyatech course documentation sites.
 
-This repository is intended to be consumed by:
+## Purpose
+
+`course-docs-platform` holds the shared runtime and authoring building blocks that are reused across course sites.
+Use this repository when a change should apply to multiple course sites instead of a single content repository.
+
+Primary consumers:
 
 - `course-docs-site` (direct)
-- `javascript-course-docs` and `programming-course-docs` (indirect via `course-docs-site`)
+- Course content repositories such as `javascript-course-docs` and `programming-course-docs` (indirect via `course-docs-site`)
 
 ## What this provides
 
-- Shared Next/Nextra config helpers (MDX remark plugins, webpack asset rules).
-- Shared MDX components wiring for course sites.
-- Course site features (e.g. submissions page components and API routes).
-- Rendering conventions for question Markdown (see `docs/markdown-question-spec-course-docs-rendering.md`).
+- Shared Next/Nextra integration helpers, including MDX remark plugins and webpack asset rules
+- Shared MDX and runtime features, such as exercise rendering, code preview wiring, submissions UI, and admin routes
+- Course Docs Site rendering conventions for question-spec Markdown in [docs/markdown-question-spec-course-docs-rendering.md](./docs/markdown-question-spec-course-docs-rendering.md)
 
 ## Requirements
 
-- Node.js: `>=20`
-- Package manager: npm
+- Node.js `>=20`
+- npm
 
 ## Development
 
+Install dependencies:
+
 ```bash
 npm install
-npm run build
 ```
+
+Run the full verification suite:
+
+```bash
+npm run verify
+```
+
+Useful commands:
+
+- `npm run build`
+- `npm run test`
+- `npm run lint`
+- `npm run typecheck`
+
+## Documentation
+
+- [LICENSE](./LICENSE)
+- [SECURITY.md](./SECURITY.md)
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [CHANGELOG.md](./CHANGELOG.md)

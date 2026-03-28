@@ -1,6 +1,18 @@
 {
   "name": "@metyatech/course-docs-platform",
   "version": "0.0.0",
+  "description": "Reusable platform package for metyatech course documentation sites.",
+  "author": "metyatech",
+  "license": "MIT",
+  "keywords": [
+    "education",
+    "course-docs",
+    "course-platform",
+    "mdx",
+    "nextra",
+    "qti",
+    "code-preview"
+  ],
   "private": true,
   "type": "module",
   "files": [
