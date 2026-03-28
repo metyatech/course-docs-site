@@ -6,6 +6,29 @@ type ApplyOptions = {
   projectRoot: string;
 };
 
+type RuleExclude = RegExp | ((resourcePath: string) => boolean) | RuleExclude[] | undefined;
+
+type WebpackRule = {
+  exclude?: RuleExclude;
+  generator?: {
+    filename?: string;
+    outputPath?: string;
+    publicPath?: string;
+  };
+  oneOf?: WebpackRule[];
+  test?: RegExp;
+  type?: string;
+};
+
+type WebpackConfigLike = {
+  module: {
+    rules: WebpackRule[];
+  };
+  output: {
+    path: string;
+  };
+};
+
 const normalizeBasePath = (basePath: string | undefined) => {
   if (!basePath) return '';
   const trimmed = basePath.trim();
@@ -13,7 +36,7 @@ const normalizeBasePath = (basePath: string | undefined) => {
   return trimmed.startsWith('/') ? trimmed.replace(/\/+$/, '') : `/${trimmed.replace(/\/+$/, '')}`;
 };
 
-export function applyCourseAssetWebpackRules(config: any, options: ApplyOptions) {
+export function applyCourseAssetWebpackRules(config: WebpackConfigLike, options: ApplyOptions) {
   const basePath = normalizeBasePath(options.basePath);
   const assetCssPattern = /[\\/]content[\\/].*[\\/]assets[\\/].*\.css$/i;
   const staticMediaFilename = 'static/media/[name].[hash][ext]';
@@ -33,7 +56,7 @@ export function applyCourseAssetWebpackRules(config: any, options: ApplyOptions)
     },
   });
 
-  const matchesExclude = (exclude: any, resourcePath: string) => {
+  const matchesExclude = (exclude: RuleExclude, resourcePath: string) => {
     if (!exclude) return false;
     if (exclude instanceof RegExp) return exclude.test(resourcePath);
     if (typeof exclude === 'function') return exclude(resourcePath);

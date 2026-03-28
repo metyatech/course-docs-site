@@ -1,4 +1,5 @@
 import { visit } from 'unist-util-visit';
+import type { Node } from 'unist';
 import { buildUnsupportedAdmonitionMessage, resolveAdmonitionType } from './admonition-types.js';
 
 const toMdxAttribute = (name: string, value: string) => ({
@@ -7,10 +8,26 @@ const toMdxAttribute = (name: string, value: string) => ({
   value,
 });
 
+type MdxAttribute = ReturnType<typeof toMdxAttribute>;
+
+type DirectiveNode = Node & {
+  type: string;
+  name?: string;
+  label?: string;
+  attributes?: MdxAttribute[];
+  children?: Node[];
+};
+
+type TransformFile = {
+  fail?: (message: string, node?: unknown) => unknown;
+};
+
+const isDirectiveNode = (node: Node): node is DirectiveNode => node.type === 'containerDirective';
+
 export default function remarkAdmonitionsToMdx() {
-  return function transform(tree: any, file: any) {
-    visit(tree, (node: any) => {
-      if (node.type !== 'containerDirective') return;
+  return function transform(tree: Node, file: TransformFile) {
+    visit(tree, (node: Node) => {
+      if (!isDirectiveNode(node)) return;
       if (typeof node.name !== 'string') return;
 
       const admonitionType = resolveAdmonitionType(node.name.trim());

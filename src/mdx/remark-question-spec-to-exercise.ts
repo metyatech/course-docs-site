@@ -1,5 +1,6 @@
 import path from 'path';
 import { visit } from 'unist-util-visit';
+import type { Node } from 'unist';
 import type { AdmonitionType } from './admonition-types.js';
 
 const toMdxAttribute = (name: string, value: string) => ({
@@ -14,17 +15,46 @@ const toMdxBooleanAttribute = (name: string) => ({
   value: null,
 });
 
-const isHeading = (node: any, depth?: number) =>
+type MdxAttribute = ReturnType<typeof toMdxAttribute> | ReturnType<typeof toMdxBooleanAttribute>;
+
+type AstNode = Node & {
+  depth?: number;
+  value?: string;
+  url?: string;
+  name?: string;
+  label?: string;
+  ordered?: boolean;
+  spread?: boolean;
+  attributes?: MdxAttribute[];
+  children?: AstNode[];
+  data?: Node['data'] & {
+    hProperties?: Record<string, string>;
+  };
+};
+
+type AstRoot = Node & {
+  type: 'root';
+  children: AstNode[];
+};
+
+type TransformFile = {
+  path?: string;
+};
+
+const isHeading = (
+  node: AstNode | undefined,
+  depth?: number,
+): node is AstNode & { depth: number } =>
   node?.type === 'heading' && (depth == null || node.depth === depth);
 
-const getText = (node: any): string => {
+const getText = (node: AstNode | undefined): string => {
   if (!node) return '';
   if (typeof node.value === 'string') return node.value;
   if (Array.isArray(node.children)) return node.children.map(getText).join('');
   return '';
 };
 
-const normalizeHeadingText = (node: any) => getText(node).trim();
+const normalizeHeadingText = (node: AstNode) => getText(node).trim();
 
 const ABSOLUTE_PROTOCOL_PATTERN = /^[a-zA-Z][a-zA-Z\d+.-]*:/;
 const CONTENT_ROOT_MARKER = '/content/';
@@ -86,9 +116,9 @@ const resolveQuestionSpecRelativeUrl = (url: string, filePath: string) => {
   return `/${resolvedRelativePath}${suffix}`;
 };
 
-const rewriteRelativeAssetUrls = (nodes: any[], filePath: string) => {
-  const root = { type: 'root', children: nodes };
-  visit(root, (node: any) => {
+const rewriteRelativeAssetUrls = (nodes: AstNode[], filePath: string) => {
+  const root: AstRoot = { type: 'root', children: nodes };
+  visit(root, (node: AstNode) => {
     if (typeof node?.url !== 'string') return;
     const resolved = resolveQuestionSpecRelativeUrl(node.url, filePath);
     if (resolved) node.url = resolved;
@@ -105,9 +135,9 @@ const replaceClozeMarkers = (value: string) => {
   return withClozeConverted.replaceAll(escapedOpenPlaceholder, '{{');
 };
 
-const applyClozeConversion = (nodes: any[]) => {
-  const root = { type: 'root', children: nodes };
-  visit(root, (node: any) => {
+const applyClozeConversion = (nodes: AstNode[]) => {
+  const root: AstRoot = { type: 'root', children: nodes };
+  visit(root, (node: AstNode) => {
     if (!['text', 'code', 'inlineCode'].includes(node.type)) return;
     if (typeof node.value !== 'string') return;
     node.value = replaceClozeMarkers(node.value);
@@ -120,11 +150,11 @@ const sanitizeIdPart = (value: string) => {
   return trimmed.replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '');
 };
 
-const applyHeadingIdPrefix = (nodes: any[], idPrefix: string) => {
-  const root = { type: 'root', children: nodes };
+const applyHeadingIdPrefix = (nodes: AstNode[], idPrefix: string) => {
+  const root: AstRoot = { type: 'root', children: nodes };
   const counts = new Map<string, number>();
 
-  visit(root, (node: any) => {
+  visit(root, (node: AstNode) => {
     if (!isHeading(node)) return;
     if (typeof node.depth !== 'number' || node.depth < 3) return;
 
@@ -144,7 +174,7 @@ const applyHeadingIdPrefix = (nodes: any[], idPrefix: string) => {
   });
 };
 
-const parseScoringLines = (nodes: any[]) => {
+const parseScoringLines = (nodes: AstNode[]) => {
   const raw = nodes
     .map((node) => getText(node))
     .join('\n')
@@ -161,9 +191,9 @@ const parseScoringLines = (nodes: any[]) => {
   return items;
 };
 
-const splitExamTip = (promptNodes: any[]) => {
-  const remaining: any[] = [];
-  const tipChildren: any[] = [];
+const splitExamTip = (promptNodes: AstNode[]) => {
+  const remaining: AstNode[] = [];
+  const tipChildren: AstNode[] = [];
 
   let i = 0;
   while (i < promptNodes.length) {
@@ -187,7 +217,11 @@ const splitExamTip = (promptNodes: any[]) => {
   return { promptNodes: remaining, examTipNodes: tipChildren };
 };
 
-const createMdxFlowElement = (name: string, attributes: any[], children: any[]) => ({
+const createMdxFlowElement = (
+  name: string,
+  attributes: MdxAttribute[],
+  children: AstNode[],
+): AstNode => ({
   type: 'mdxJsxFlowElement',
   name,
   attributes,
@@ -197,7 +231,7 @@ const createMdxFlowElement = (name: string, attributes: any[], children: any[]) 
 const createAdmonition = (
   type: Extract<AdmonitionType, 'tip' | 'note'>,
   title: string,
-  children: any[],
+  children: AstNode[],
 ) =>
   createMdxFlowElement(
     'Admonition',
@@ -206,12 +240,12 @@ const createAdmonition = (
   );
 
 export default function remarkQuestionSpecToExercise() {
-  return function transform(tree: any, file: any) {
+  return function transform(tree: AstRoot, file: TransformFile) {
     const filePath = typeof file?.path === 'string' ? file.path.replaceAll('\\', '/') : '';
     const isQuestionSpec = filePath.endsWith('.qspec.md');
     if (!isQuestionSpec) return;
 
-    const children: any[] = Array.isArray(tree?.children) ? tree.children : [];
+    const children: AstNode[] = Array.isArray(tree?.children) ? tree.children : [];
     if (children.length === 0) return;
 
     if (children[0]?.type === 'yaml' || children[0]?.type === 'toml') {
@@ -227,7 +261,7 @@ export default function remarkQuestionSpecToExercise() {
       throw new Error(`Question spec title must not be empty: ${filePath}`);
     }
 
-    const sections = new Map<string, any[]>();
+    const sections = new Map<string, AstNode[]>();
     let currentSection: string | null = null;
 
     for (const node of children.slice(1)) {
@@ -290,7 +324,7 @@ export default function remarkQuestionSpecToExercise() {
     applyHeadingIdPrefix(optionsSection, idPrefix);
     applyHeadingIdPrefix(explanationSection, idPrefix);
 
-    const exerciseChildren: any[] = [
+    const exerciseChildren: AstNode[] = [
       ...promptNodes,
       ...(optionsSection.length > 0 ? optionsSection : []),
       ...(examTipNodes.length > 0 ? [createAdmonition('tip', '本試験では', examTipNodes)] : []),
