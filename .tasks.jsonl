@@ -1,3 +1,4 @@
 {"id":"pOi2kv_d","description":"Switch course-docs-platform shared admin token to ADMIN_MODE_TOKEN","stage":"committed","createdAt":"2026-03-27T11:40:06.677Z","updatedAt":"2026-03-27T11:44:27.175Z","committedEventId":"gLatFLWZbcIeKch1"}
 {"id":"4GTdGEl8","description":"Curate pending course-docs-platform README and package metadata changes","stage":"committed","createdAt":"2026-03-28T02:21:16.936Z","updatedAt":"2026-03-28T02:23:12.124Z","committedEventId":"mDbzb5ivkQT5Xjg3"}
 {"id":"I5rRGuBR","description":"Fix remaining course-docs-platform lint warnings and GitHub Actions deprecation warnings","stage":"committed","createdAt":"2026-03-28T07:30:08.957Z","updatedAt":"2026-03-28T07:35:16.624Z","committedEventId":"q2n3YJvM5M1GAHMY"}
+{"id":"p4l8okRd","description":"Investigate and fix course-docs-platform dependency vulnerabilities","stage":"committed","createdAt":"2026-03-28T07:37:51.922Z","updatedAt":"2026-03-28T07:40:39.152Z","committedEventId":"qZr9v_7O5IArJupA"}
