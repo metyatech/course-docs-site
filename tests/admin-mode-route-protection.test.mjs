@@ -1,24 +1,24 @@
-import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
-import net from 'node:net';
-import os from 'node:os';
-import path from 'node:path';
-import process from 'node:process';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const getFreePort = () =>
   new Promise((resolve, reject) => {
     const server = net.createServer();
     server.unref();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
       const address = server.address();
-      if (!address || typeof address === 'string') {
-        server.close(() => reject(new Error('Failed to allocate free port')));
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate free port")));
         return;
       }
       const { port } = address;
@@ -32,7 +32,7 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   const startedAt = Date.now();
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
-      throw new Error(onTimeoutMessage ?? 'Timed out');
+      throw new Error(onTimeoutMessage ?? "Timed out");
     }
     const result = await fn();
     if (result) {
@@ -44,15 +44,15 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
 
 const fetchResponse = async (url, init) => {
   const response = await fetch(url, {
-    redirect: 'manual',
+    redirect: "manual",
     signal: AbortSignal.timeout(20_000),
     ...init,
   });
   return {
     status: response.status,
     text: await response.text(),
-    location: response.headers.get('location'),
-    setCookie: response.headers.get('set-cookie'),
+    location: response.headers.get("location"),
+    setCookie: response.headers.get("set-cookie"),
   };
 };
 
@@ -66,7 +66,7 @@ const tryFetchResponse = async (url, init) => {
 
 const assertRedirectToIntro = (actualLocation) => {
   assert.ok(
-    actualLocation === '/docs/intro' || actualLocation === '/docs/intro/',
+    actualLocation === "/docs/intro" || actualLocation === "/docs/intro/",
     `Expected redirect to /docs/intro or /docs/intro/, got: ${actualLocation}`,
   );
 };
@@ -119,33 +119,32 @@ export default meta;
 export default meta;
 `;
 
-  await fs.mkdir(path.join(rootDir, 'content', 'docs', 'intro'), { recursive: true });
-  await fs.mkdir(path.join(rootDir, 'content', 'docs', 'teacher-guide'), { recursive: true });
-  await fs.mkdir(
-    path.join(rootDir, 'content', 'docs', 'setup-and-troubleshooting'),
-    { recursive: true },
-  );
-  await fs.mkdir(path.join(rootDir, 'public', 'img'), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "content", "docs", "intro"), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "content", "docs", "teacher-guide"), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "content", "docs", "setup-and-troubleshooting"), {
+    recursive: true,
+  });
+  await fs.mkdir(path.join(rootDir, "public", "img"), { recursive: true });
 
-  await fs.writeFile(path.join(rootDir, 'site.config.ts'), siteConfig, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', '_meta.ts'), rootMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', '_meta.ts'), docsMeta, 'utf8');
+  await fs.writeFile(path.join(rootDir, "site.config.ts"), siteConfig, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "_meta.ts"), rootMeta, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "docs", "_meta.ts"), docsMeta, "utf8");
   await fs.writeFile(
-    path.join(rootDir, 'content', 'docs', 'intro', 'index.mdx'),
-    '---\ntitle: Intro\n---\n\nPublic intro page.\n',
-    'utf8',
+    path.join(rootDir, "content", "docs", "intro", "index.mdx"),
+    "---\ntitle: Intro\n---\n\nPublic intro page.\n",
+    "utf8",
   );
   await fs.writeFile(
-    path.join(rootDir, 'content', 'docs', 'teacher-guide', 'index.mdx'),
-    '---\ntitle: Teacher Guide\n---\n\nTeacher Guide\n',
-    'utf8',
+    path.join(rootDir, "content", "docs", "teacher-guide", "index.mdx"),
+    "---\ntitle: Teacher Guide\n---\n\nTeacher Guide\n",
+    "utf8",
   );
   await fs.writeFile(
-    path.join(rootDir, 'content', 'docs', 'setup-and-troubleshooting', 'index.mdx'),
-    '---\ntitle: Setup\n---\n\nSetup page\n',
-    'utf8',
+    path.join(rootDir, "content", "docs", "setup-and-troubleshooting", "index.mdx"),
+    "---\ntitle: Setup\n---\n\nSetup page\n",
+    "utf8",
   );
-  await fs.writeFile(path.join(rootDir, 'public', 'img', 'favicon.ico'), '', 'utf8');
+  await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
 const killProcessTree = async (child) => {
@@ -158,36 +157,36 @@ const killProcessTree = async (child) => {
     // ignore
   }
 
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     try {
-      spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
     } catch {
       // ignore
     }
   }
-  await Promise.race([new Promise((resolve) => child.on('exit', () => resolve())), sleep(10_000)]);
+  await Promise.race([new Promise((resolve) => child.on("exit", () => resolve())), sleep(10_000)]);
 };
 
 test(
-  'admin-only docs stay hidden from public and open with admin mode enabled',
+  "admin-only docs stay hidden from public and open with admin mode enabled",
   { timeout: 3 * 60_000 },
   async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-admin-mode-'));
-    const fixtureCourse = path.join(tempRoot, 'course');
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-admin-mode-"));
+    const fixtureCourse = path.join(tempRoot, "course");
     const port = await getFreePort();
     const baseUrl = `http://127.0.0.1:${port}`;
 
     await writeFixtureCourseRepo(fixtureCourse);
 
-    const dev = spawn(process.execPath, ['scripts/run-dev.mjs', '--port', String(port)], {
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       cwd: projectRoot,
       env: {
         ...process.env,
-        NEXT_TELEMETRY_DISABLED: '1',
+        NEXT_TELEMETRY_DISABLED: "1",
         COURSE_CONTENT_SOURCE: fixtureCourse,
-        ADMIN_MODE_TOKEN: 'teacher-secret',
+        ADMIN_MODE_TOKEN: "teacher-secret",
       },
-      stdio: 'inherit',
+      stdio: "inherit",
     });
 
     t.after(async () => {
@@ -203,7 +202,7 @@ test(
       {
         timeoutMs: 60_000,
         intervalMs: 500,
-        onTimeoutMessage: 'Server did not become ready for admin-mode route protection test.',
+        onTimeoutMessage: "Server did not become ready for admin-mode route protection test.",
       },
     );
 
@@ -219,7 +218,7 @@ test(
       {
         timeoutMs: 60_000,
         intervalMs: 500,
-        onTimeoutMessage: 'Public teacher guide route did not start redirecting.',
+        onTimeoutMessage: "Public teacher guide route did not start redirecting.",
       },
     );
 
@@ -235,28 +234,28 @@ test(
       {
         timeoutMs: 60_000,
         intervalMs: 500,
-        onTimeoutMessage: 'Public intro page did not become ready.',
+        onTimeoutMessage: "Public intro page did not become ready.",
       },
     );
 
     const publicIntro = await fetchResponse(`${baseUrl}/docs/intro/`);
     assert.equal(publicIntro.status, 200);
     assert.ok(
-      !publicIntro.text.includes('/docs/teacher-guide'),
-      'Public intro page should not expose teacher-guide links.',
+      !publicIntro.text.includes("/docs/teacher-guide"),
+      "Public intro page should not expose teacher-guide links.",
     );
 
     const enableAdmin = await fetchResponse(`${baseUrl}/api/admin/mode/`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'content-type': 'application/json',
+        "content-type": "application/json",
       },
-      body: JSON.stringify({ token: 'teacher-secret' }),
+      body: JSON.stringify({ token: "teacher-secret" }),
     });
     assert.equal(enableAdmin.status, 200);
-    assert.ok(enableAdmin.setCookie, 'Expected admin mode API to set a cookie.');
+    assert.ok(enableAdmin.setCookie, "Expected admin mode API to set a cookie.");
 
-    const cookieHeader = enableAdmin.setCookie.split(';', 1)[0];
+    const cookieHeader = enableAdmin.setCookie.split(";", 1)[0];
 
     await waitFor(
       async () => {
@@ -270,7 +269,7 @@ test(
       {
         timeoutMs: 60_000,
         intervalMs: 500,
-        onTimeoutMessage: 'Teacher guide did not open after enabling admin mode.',
+        onTimeoutMessage: "Teacher guide did not open after enabling admin mode.",
       },
     );
 
@@ -283,7 +282,7 @@ test(
     assert.match(adminTeacherGuide.text, /Teacher Guide/);
 
     const disableAdmin = await fetchResponse(`${baseUrl}/api/admin/mode/`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
         cookie: cookieHeader,
       },
@@ -297,26 +296,26 @@ test(
 );
 
 test(
-  'legacy ADMIN_DELETE_TOKEN alone does not enable admin mode anymore',
+  "legacy ADMIN_DELETE_TOKEN alone does not enable admin mode anymore",
   { timeout: 3 * 60_000 },
   async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-admin-mode-legacy-'));
-    const fixtureCourse = path.join(tempRoot, 'course');
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-admin-mode-legacy-"));
+    const fixtureCourse = path.join(tempRoot, "course");
     const port = await getFreePort();
     const baseUrl = `http://127.0.0.1:${port}`;
 
     await writeFixtureCourseRepo(fixtureCourse);
 
-    const dev = spawn(process.execPath, ['scripts/run-dev.mjs', '--port', String(port)], {
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       cwd: projectRoot,
       env: {
         ...process.env,
-        NEXT_TELEMETRY_DISABLED: '1',
+        NEXT_TELEMETRY_DISABLED: "1",
         COURSE_CONTENT_SOURCE: fixtureCourse,
-        ADMIN_MODE_TOKEN: '',
-        ADMIN_DELETE_TOKEN: 'legacy-secret',
+        ADMIN_MODE_TOKEN: "",
+        ADMIN_DELETE_TOKEN: "legacy-secret",
       },
-      stdio: 'inherit',
+      stdio: "inherit",
     });
 
     t.after(async () => {
@@ -332,24 +331,40 @@ test(
       {
         timeoutMs: 60_000,
         intervalMs: 500,
-        onTimeoutMessage: 'Public intro page did not become ready for legacy admin token test.',
+        onTimeoutMessage: "Public intro page did not become ready for legacy admin token test.",
       },
     );
 
+    const status = await fetchResponse(`${baseUrl}/api/admin/mode/`);
+    assert.equal(status.status, 200);
+    assert.match(status.text, /"configured":false/);
+    assert.match(status.text, /"tokenConfigured":false/);
+    assert.match(status.text, /"unavailableReason":"missing-admin-mode-token"/);
+    assert.match(status.text, /ADMIN_MODE_TOKEN/);
+
     const enableAdmin = await fetchResponse(`${baseUrl}/api/admin/mode/`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'content-type': 'application/json',
+        "content-type": "application/json",
       },
-      body: JSON.stringify({ token: 'legacy-secret' }),
+      body: JSON.stringify({ token: "legacy-secret" }),
     });
     assert.equal(enableAdmin.status, 200);
     assert.equal(enableAdmin.setCookie, null);
     assert.match(enableAdmin.text, /"configured":false/);
     assert.match(enableAdmin.text, /"enabled":false/);
+    assert.match(enableAdmin.text, /"unavailableReason":"missing-admin-mode-token"/);
 
     const teacherGuide = await fetchResponse(`${baseUrl}/docs/teacher-guide/`);
     assert.equal(teacherGuide.status, 307);
     assertRedirectToIntro(teacherGuide.location);
+
+    const teacherGuideWithManualCookie = await fetchResponse(`${baseUrl}/docs/teacher-guide/`, {
+      headers: {
+        cookie: "course-docs-admin-mode=1",
+      },
+    });
+    assert.equal(teacherGuideWithManualCookie.status, 307);
+    assertRedirectToIntro(teacherGuideWithManualCookie.location);
   },
 );

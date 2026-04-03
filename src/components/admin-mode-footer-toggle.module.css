@@ -73,8 +73,12 @@
 
 .status {
   margin: 0.75rem 0 0;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, currentColor 6%, transparent);
   font-size: 0.85rem;
   line-height: 1.5;
+  padding: 0.65rem 0.75rem;
 }
 
 .links {

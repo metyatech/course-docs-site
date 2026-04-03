@@ -10,3 +10,4 @@
 {"id":"bzEGaNvu","description":"Switch course-docs-site single shared admin token to ADMIN_MODE_TOKEN","stage":"committed","createdAt":"2026-03-27T11:39:23.320Z","updatedAt":"2026-03-27T11:50:50.009Z","committedEventId":"Gb95WAI36b3pKK89"}
 {"id":"aZcZuLg_","description":"Update course-docs-site to consume platform fix for remote student works index fetch","stage":"committed","createdAt":"2026-04-03T02:34:33.358Z","updatedAt":"2026-04-03T03:02:08.628Z","committedEventId":"Pleygqkq8IhcDNNx"}
 {"id":"SyM7uBlr","description":"Fix remaining dependency vulnerabilities in course-docs-site","stage":"committed","createdAt":"2026-04-03T03:17:40.767Z","updatedAt":"2026-04-03T03:34:01.738Z","committedEventId":"ymuv5X6eTzzPcVhb"}
+{"id":"MJikhAgf","description":"Fix local admin-mode setup and make missing ADMIN_MODE_TOKEN behavior explicit in course-docs-site","stage":"done","createdAt":"2026-04-03T04:17:06.119Z","updatedAt":"2026-04-03T04:30:41.911Z"}

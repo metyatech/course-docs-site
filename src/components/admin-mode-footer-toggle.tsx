@@ -1,30 +1,38 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import styles from './admin-mode-footer-toggle.module.css';
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import styles from "./admin-mode-footer-toggle.module.css";
 
-const STORAGE_KEY = 'admin-comment-token';
-const TOKEN_EVENT = 'admin-token';
-const STATUS_PATH = '/api/admin/mode/';
+const STORAGE_KEY = "admin-comment-token";
+const TOKEN_EVENT = "admin-token";
+const STATUS_PATH = "/api/admin/mode/";
 
 type ProtectedLink = {
   href: string;
   label: string;
 };
 
+type AdminModeUnavailableReason = "missing-admin-mode-token" | "no-protected-links" | null;
+
 type AdminModeStatus = {
   configured: boolean;
   enabled: boolean;
   protectedLinks: ProtectedLink[];
   publicFallbackPath: string;
+  tokenConfigured: boolean;
+  unavailableReason: AdminModeUnavailableReason;
+  setupHint: string | null;
 };
 
 const defaultStatus: AdminModeStatus = {
   configured: false,
   enabled: false,
   protectedLinks: [],
-  publicFallbackPath: '/docs/intro',
+  publicFallbackPath: "/docs/intro",
+  tokenConfigured: false,
+  unavailableReason: null,
+  setupHint: null,
 };
 
 const dispatchAdminToken = (token: string) => {
@@ -49,14 +57,15 @@ const readJson = async <T,>(response: Response, fallback: T) => {
 };
 
 const matchesProtectedPath = (pathname: string, protectedLinks: ProtectedLink[]) =>
-  protectedLinks.some(
-    (link) => pathname === link.href || pathname.startsWith(`${link.href}/`)
-  );
+  protectedLinks.some((link) => pathname === link.href || pathname.startsWith(`${link.href}/`));
+
+const getMissingTokenMessage = (status: AdminModeStatus) =>
+  status.unavailableReason === "missing-admin-mode-token" ? status.setupHint : null;
 
 export default function AdminModeFooterToggle() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [token, setToken] = useState('');
+  const [token, setToken] = useState("");
   const [status, setStatus] = useState<AdminModeStatus>(defaultStatus);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -68,10 +77,11 @@ export default function AdminModeFooterToggle() {
     }
 
     const loadStatus = async () => {
-      const response = await fetch(STATUS_PATH, { cache: 'no-store' });
+      const response = await fetch(STATUS_PATH, { cache: "no-store" });
       const nextStatus = await readJson<AdminModeStatus>(response, defaultStatus);
       if (response.ok) {
         setStatus(nextStatus);
+        setMessage(getMissingTokenMessage(nextStatus));
       }
     };
 
@@ -79,9 +89,8 @@ export default function AdminModeFooterToggle() {
   }, []);
 
   const triggerClassName = useMemo(
-    () =>
-      status.enabled ? `${styles.trigger} ${styles.triggerActive}` : styles.trigger,
-    [status.enabled]
+    () => (status.enabled ? `${styles.trigger} ${styles.triggerActive}` : styles.trigger),
+    [status.enabled],
   );
 
   const handleSave = async (nextToken = token) => {
@@ -93,10 +102,11 @@ export default function AdminModeFooterToggle() {
 
     try {
       if (!trimmed) {
-        const response = await fetch(STATUS_PATH, { method: 'DELETE' });
+        const response = await fetch(STATUS_PATH, { method: "DELETE" });
         const nextStatus = await readJson<AdminModeStatus>(response, defaultStatus);
         setStatus(nextStatus);
         setOpen(false);
+        setMessage(getMissingTokenMessage(nextStatus));
 
         if (
           matchesProtectedPath(window.location.pathname, nextStatus.protectedLinks) &&
@@ -111,9 +121,9 @@ export default function AdminModeFooterToggle() {
       }
 
       const response = await fetch(STATUS_PATH, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'content-type': 'application/json',
+          "content-type": "application/json",
         },
         body: JSON.stringify({ token: trimmed }),
       });
@@ -121,20 +131,26 @@ export default function AdminModeFooterToggle() {
 
       if (response.status === 401) {
         setStatus(nextStatus);
-        setMessage('管理者モードは有効化できませんでした。コードを確認してください。');
+        setMessage("管理者モードは有効化できませんでした。コードを確認してください。");
         return;
       }
 
       setStatus(nextStatus);
-      setOpen(false);
 
       if (nextStatus.enabled) {
+        setOpen(false);
         router.refresh();
         return;
       }
 
+      const missingTokenMessage = getMissingTokenMessage(nextStatus);
+      if (missingTokenMessage) {
+        setMessage(missingTokenMessage);
+        return;
+      }
+
       if (!nextStatus.configured) {
-        setMessage('コードは保存しました。管理者モード対象ページはこのサイトでは未設定です。');
+        setMessage("コードは保存しました。管理者モード対象ページはこのサイトでは未設定です。");
       }
     } finally {
       setPending(false);
@@ -148,7 +164,7 @@ export default function AdminModeFooterToggle() {
         className={triggerClassName}
         onClick={() => setOpen((current) => !current)}
       >
-        {status.enabled ? '管理者モード中' : '管理者'}
+        {status.enabled ? "管理者モード中" : "管理者"}
       </button>
 
       {open ? (
@@ -157,6 +173,7 @@ export default function AdminModeFooterToggle() {
           <p className={styles.copy}>
             管理者コードを保存すると、管理者向けページの閲覧とコメント管理に使えます。
           </p>
+          {message ? <p className={styles.status}>{message}</p> : null}
           <label className={styles.label}>
             管理者コード
             <input
@@ -166,7 +183,7 @@ export default function AdminModeFooterToggle() {
               className={styles.input}
               placeholder="管理者コードを入力"
               onKeyDown={(event) => {
-                if (event.key === 'Enter') {
+                if (event.key === "Enter") {
                   event.preventDefault();
                   void handleSave();
                 }
@@ -180,21 +197,20 @@ export default function AdminModeFooterToggle() {
               onClick={() => void handleSave()}
               disabled={pending}
             >
-              {pending ? '処理中...' : '保存'}
+              {pending ? "処理中..." : "保存"}
             </button>
             <button
               type="button"
               className={styles.action}
               onClick={() => {
-                setToken('');
-                void handleSave('');
+                setToken("");
+                void handleSave("");
               }}
               disabled={pending}
             >
               解除
             </button>
           </div>
-          {message ? <p className={styles.status}>{message}</p> : null}
           {status.enabled && status.protectedLinks.length > 0 ? (
             <ul className={styles.links}>
               {status.protectedLinks.map((link) => (

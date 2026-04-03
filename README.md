@@ -30,6 +30,8 @@ The Supabase variables are only needed when the selected course enables the `/su
 
 If the synced `site.config.ts` defines `adminMode.protectedLinks`, `ADMIN_MODE_TOKEN` is the single shared
 admin code for both protected pages and admin comment deletion.
+Local preview of those protected pages also requires `ADMIN_MODE_TOKEN` in `.env.local`; otherwise the footer
+can accept a code input, but the protected routes will remain locked and show a setup hint.
 
 See `.env.example` for the full list.
 
@@ -59,6 +61,9 @@ COURSE_CONTENT_SOURCE=../programming-course-docs
 ```
 
 Template: `.env.course.local.example`
+
+If your selected course defines `siteConfig.adminMode.protectedLinks`, also set `ADMIN_MODE_TOKEN` in
+`.env.local` before `npm run dev`.
 
 PowerShell example:
 
