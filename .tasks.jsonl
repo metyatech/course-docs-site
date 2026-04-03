@@ -8,3 +8,4 @@
 {"id":"WsCcZIm-","description":"Fix Vercel build local-content symlink conflict for content-site deploys","stage":"committed","createdAt":"2026-03-27T09:42:45.194Z","updatedAt":"2026-03-27T09:47:06.425Z","committedEventId":"t-Wk0ChGlH2DIGGB"}
 {"id":"fRHZxQsu","description":"Unify course-docs-site admin access to a single token configuration","stage":"committed","createdAt":"2026-03-27T10:55:09.574Z","updatedAt":"2026-03-27T11:12:48.329Z","committedEventId":"QdHLM41KVKYkXZH7"}
 {"id":"bzEGaNvu","description":"Switch course-docs-site single shared admin token to ADMIN_MODE_TOKEN","stage":"committed","createdAt":"2026-03-27T11:39:23.320Z","updatedAt":"2026-03-27T11:50:50.009Z","committedEventId":"Gb95WAI36b3pKK89"}
+{"id":"aZcZuLg_","description":"Update course-docs-site to consume platform fix for remote student works index fetch","stage":"committed","createdAt":"2026-04-03T02:34:33.358Z","updatedAt":"2026-04-03T03:02:08.628Z","committedEventId":"Pleygqkq8IhcDNNx"}
