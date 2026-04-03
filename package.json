@@ -80,7 +80,7 @@
     "globals": "^17.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "next": "^15.5.9",
+    "next": "^15.5.14",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
     "prettier": "^3.8.1",
@@ -101,10 +101,21 @@
     "node": ">=20.0"
   },
   "overrides": {
+    "@chevrotain/cst-dts-gen": "11.1.2",
+    "@chevrotain/gast": "11.1.2",
+    "@chevrotain/regexp-to-ast": "11.1.2",
+    "@chevrotain/types": "11.1.2",
+    "@chevrotain/utils": "11.1.2",
+    "@mermaid-js/parser": "1.1.0",
+    "@xmldom/xmldom": "0.9.9",
+    "chevrotain": "11.1.2",
     "dompurify": "3.3.3",
+    "lodash": "4.18.1",
+    "lodash-es": "4.18.1",
+    "mermaid": "11.14.0",
+    "minimatch": "10.2.5",
+    "qs": ">=6.14.2",
     "serialize-javascript": "7.0.5",
-    "minimatch": ">=9.0.4",
-    "lodash-es": ">=4.17.21",
-    "qs": ">=6.14.2"
+    "speech-rule-engine": "4.1.3"
   }
 }
