@@ -4,6 +4,13 @@ import type { StudentWorkEntry, StudentWorksData } from './types.js';
 
 const studentWorksBasePath = path.join(process.cwd(), 'public', 'student-works');
 const ignoredDirectories = new Set(['.git', 'node_modules']);
+const worksIndexRevalidateSeconds = 300;
+
+type NextFetchRequestInit = RequestInit & {
+  next?: {
+    revalidate?: number;
+  };
+};
 
 const normalizePath = (value: string) => value.split(path.sep).join('/');
 
@@ -144,7 +151,10 @@ const getStudentWorksDataFromRemoteIndex = async (
   indexUrl: string,
 ): Promise<StudentWorksData | null> => {
   try {
-    const res = await fetch(indexUrl, { cache: 'no-store' });
+    // Allow ISR-friendly caching so submissions pages can remain statically renderable.
+    const res = await fetch(indexUrl, {
+      next: { revalidate: worksIndexRevalidateSeconds },
+    } satisfies NextFetchRequestInit);
     if (!res.ok) {
       console.warn(`Failed to fetch works index: ${indexUrl} (${res.status})`);
       return null;

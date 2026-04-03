@@ -31,5 +31,6 @@ await run(process.execPath, [
   'tests/mdx-code-preview-boundary.test.mjs',
   'tests/remark-admonitions-to-mdx.test.mjs',
   'tests/remark-question-spec-to-exercise.test.mjs',
+  'tests/submissions-work-data.test.mjs',
   'tests/submissions-ui-regression.test.mjs',
 ]);
