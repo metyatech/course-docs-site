@@ -43,6 +43,11 @@ const nextDistDirPath = resolveNextDistDirPath({ projectRoot, env: process.env }
 
 const courseSourceText = getRequiredContentSourceText(process.env);
 const courseSource = parseContentSource(courseSourceText);
+const gitCommand = process.env.COURSE_DOCS_GIT_COMMAND || "git";
+const gitCommandPrefix = process.env.COURSE_DOCS_GIT_SCRIPT ? [process.env.COURSE_DOCS_GIT_SCRIPT] : [];
+
+const runGit = (args, options = {}) =>
+  spawnSync(gitCommand, [...gitCommandPrefix, ...args], options);
 
 const requiredPaths = [
   { label: "content", rel: "content" },
@@ -50,13 +55,30 @@ const requiredPaths = [
 ];
 
 const run = (command, args) => {
-  const result = spawnSync(command, args, { stdio: "inherit" });
+  const result =
+    command === gitCommand
+      ? runGit(args, { stdio: "inherit" })
+      : spawnSync(command, args, { stdio: "inherit" });
   if (result.error) {
     throw result.error;
   }
   if (typeof result.status === "number" && result.status !== 0) {
     throw new Error(`${command} exited with code ${result.status}`);
   }
+};
+
+const runCapture = (command, args) => {
+  const result =
+    command === gitCommand
+      ? runGit(args, { encoding: "utf8" })
+      : spawnSync(command, args, { encoding: "utf8" });
+  if (result.error) {
+    throw result.error;
+  }
+  if (typeof result.status === "number" && result.status !== 0) {
+    throw new Error(`${command} exited with code ${result.status}`);
+  }
+  return result.stdout ?? "";
 };
 
 const rmIfExists = (targetPath) => {
@@ -132,8 +154,30 @@ const writeKeepFileIfRealDir = (dirPath) => {
   fs.writeFileSync(path.join(dirPath, ".keep"), "");
 };
 
+const resolveRemoteHeadSha = ({ repoUrl, ref }) => {
+  const stdout = runCapture(gitCommand, ["ls-remote", repoUrl, ref]);
+  const line = stdout
+    .split(/\r?\n/u)
+    .map((entry) => entry.trim())
+    .find(Boolean);
+
+  if (!line) {
+    throw new Error(`Unable to resolve remote ref ${ref} from ${repoUrl}`);
+  }
+
+  const [sha] = line.split(/\s+/u);
+  if (!sha) {
+    throw new Error(`Unable to parse remote ref ${ref} from ${repoUrl}`);
+  }
+  return sha;
+};
+
+const hasGitClone = (dirPath) => fs.existsSync(path.join(dirPath, ".git"));
+
 let sourceRoot = cloneDir;
 let activeSourceId = "";
+
+const previousSourceId = readTextIfExists(sourceStatePath);
 
 if (courseSource.kind === "local") {
   sourceRoot = path.resolve(projectRoot, courseSource.localDir);
@@ -143,18 +187,20 @@ if (courseSource.kind === "local") {
   }
 } else {
   fs.mkdirSync(workRoot, { recursive: true });
-  rmIfExists(cloneDir);
-
   const repoUrl = `https://github.com/${courseSource.repo}.git`;
-  run("git", ["clone", "--depth", "1", "--branch", courseSource.ref, repoUrl, cloneDir]);
-  activeSourceId = `repo:${courseSource.repo}#${courseSource.ref}`;
+  const headSha = resolveRemoteHeadSha({ repoUrl, ref: courseSource.ref });
+  activeSourceId = `repo:${courseSource.repo}#${courseSource.ref}@${headSha}`;
+
+  if (previousSourceId !== activeSourceId || !hasGitClone(cloneDir)) {
+    rmIfExists(cloneDir);
+    run(gitCommand, ["clone", "--depth", "1", "--branch", courseSource.ref, repoUrl, cloneDir]);
+  }
 }
 
 if (!activeSourceId) {
   activeSourceId = sourceRoot ? `dir:${sourceRoot}` : "unknown";
 }
 
-const previousSourceId = readTextIfExists(sourceStatePath);
 if (previousSourceId && previousSourceId !== activeSourceId) {
   // Switching content can change the MDX tree and page-map.
   // Clear Next build artifacts to avoid cross-course stale runtime chunks.

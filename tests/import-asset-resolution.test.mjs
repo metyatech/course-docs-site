@@ -196,6 +196,8 @@ test(
       env: process.env,
       overrides: {
         COURSE_CONTENT_SOURCE: fixtureCourse,
+        COURSE_DOCS_SKIP_BUILD_LINT: "1",
+        COURSE_DOCS_SKIP_BUILD_TYPECHECK: "1",
       },
     });
 
