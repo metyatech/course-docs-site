@@ -4,6 +4,7 @@ import { CodePreview } from '@metyatech/code-preview/server';
 import Exercise, { Solution } from '@metyatech/exercise/client';
 import { useMDXComponents as getThemeComponents } from 'nextra-theme-docs';
 import Admonition from './Admonition.js';
+import DownloadLink from './DownloadLink.js';
 
 type WrapperProps = {
   toc: unknown;
@@ -21,6 +22,7 @@ const baseComponents: MDXComponents = {
   Exercise,
   Solution,
   Admonition,
+  DownloadLink,
 };
 
 export function createUseMDXComponents(extra: MDXComponents = {}) {

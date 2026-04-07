@@ -14,4 +14,5 @@ test('platform mdx components own server CodePreview binding', async () => {
 
   assert.match(source, /@metyatech\/code-preview\/server/);
   assert.doesNotMatch(source, /@metyatech\/code-preview\/client/);
+  assert.match(source, /DownloadLink/);
 });

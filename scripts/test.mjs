@@ -29,6 +29,7 @@ await run(process.execPath, [
   'tests/admin-comment-delete-route-env.test.mjs',
   'tests/admonition-render.test.mjs',
   'tests/course-asset-config.test.mjs',
+  'tests/download-link-render.test.mjs',
   'tests/mdx-code-preview-boundary.test.mjs',
   'tests/remark-admonitions-to-mdx.test.mjs',
   'tests/remark-question-spec-to-exercise.test.mjs',
