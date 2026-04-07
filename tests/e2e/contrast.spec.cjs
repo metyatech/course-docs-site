@@ -281,13 +281,16 @@ async function collectBoundaryIssues(page, path, theme) {
 
         const candidateTagName = candidate.tagName.toLowerCase();
         const candidateClassName = String(candidate.className || '');
+        const isNextDevToolsButton =
+          candidateTagName === 'button' &&
+          (candidate.id === 'next-logo' || candidate.hasAttribute('data-nextjs-dev-tools-button'));
         const isLineHighlight = candidateClassName.includes('current-line');
         const isProseList =
           (candidateTagName === 'ul' || candidateTagName === 'ol') &&
           (candidateClassName.includes('x:list-disc') ||
             candidateClassName.includes('x:list-decimal') ||
             candidateClassName.includes('x:list-none'));
-        if (isLineHighlight || isProseList) {
+        if (isNextDevToolsButton || isLineHighlight || isProseList) {
           continue;
         }
 

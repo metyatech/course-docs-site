@@ -1,0 +1,199 @@
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
+import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
+import process from 'node:process';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+const getFreePort = () =>
+  new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        server.close(() => reject(new Error('Failed to allocate free port')));
+        return;
+      }
+      const { port } = address;
+      server.close(() => resolve(port));
+    });
+  });
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
+  const startedAt = Date.now();
+  while (true) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error(onTimeoutMessage ?? 'Timed out');
+    }
+    const result = await fn();
+    if (result) {
+      return;
+    }
+    await sleep(intervalMs);
+  }
+};
+
+const fetchResponse = async (url) =>
+  fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+
+const tryFetchText = async (url) => {
+  try {
+    const response = await fetchResponse(url);
+    return { status: response.status, text: await response.text() };
+  } catch {
+    return null;
+  }
+};
+
+const writeFixtureCourseRepo = async (rootDir) => {
+  const siteConfig = `export const siteConfig = {
+  logoText: "Import Asset Resolution",
+  projectLink: "https://example.invalid",
+  docsRepositoryBase: "https://example.invalid",
+  description: "import asset resolution fixture",
+  faviconHref: "/img/favicon.ico",
+} as const;
+`;
+
+  const rootMeta = `const meta = {
+  "*": {
+    type: "page",
+    theme: {
+      timestamp: false
+    }
+  },
+  index: {
+    display: "hidden"
+  },
+  docs: "Docs",
+};
+
+export default meta;
+`;
+
+  const docsMeta = `const meta = {
+  imports: {},
+};
+
+export default meta;
+`;
+
+  const importsMdx = `---
+title: Import Assets
+---
+
+import archiveUrl from './assets/packet.zip';
+import handoutUrl from './assets/handout.pdf';
+import demoVideoUrl from './assets/demo.mp4';
+
+<a href={archiveUrl} download="packet.zip">packet.zip</a>
+<a href={handoutUrl} download="handout.pdf">handout.pdf</a>
+
+<video controls width="100%">
+  <source src={demoVideoUrl} type="video/mp4" />
+</video>
+`;
+
+  const tinyZip = Buffer.from('504b050600000000000000000000000000000000', 'hex');
+  const tinyPdf = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n', 'utf8');
+  const tinyMp4 = Buffer.from('000000206674797069736f6d0000020069736f6d69736f32617663316d703431', 'hex');
+
+  await fs.mkdir(path.join(rootDir, 'content', 'docs', 'imports', 'assets'), { recursive: true });
+  await fs.mkdir(path.join(rootDir, 'public', 'img'), { recursive: true });
+
+  await fs.writeFile(path.join(rootDir, 'site.config.ts'), siteConfig, 'utf8');
+  await fs.writeFile(path.join(rootDir, 'content', '_meta.ts'), rootMeta, 'utf8');
+  await fs.writeFile(path.join(rootDir, 'content', 'docs', '_meta.ts'), docsMeta, 'utf8');
+  await fs.writeFile(path.join(rootDir, 'content', 'docs', 'imports', 'index.mdx'), importsMdx, 'utf8');
+  await fs.writeFile(path.join(rootDir, 'content', 'docs', 'imports', 'assets', 'packet.zip'), tinyZip);
+  await fs.writeFile(path.join(rootDir, 'content', 'docs', 'imports', 'assets', 'handout.pdf'), tinyPdf);
+  await fs.writeFile(path.join(rootDir, 'content', 'docs', 'imports', 'assets', 'demo.mp4'), tinyMp4);
+  await fs.writeFile(path.join(rootDir, 'public', 'img', 'favicon.ico'), '', 'utf8');
+};
+
+const killProcessTree = async (child) => {
+  if (!child || child.killed) {
+    return;
+  }
+  try {
+    child.kill();
+  } catch {
+    // ignore
+  }
+
+  if (process.platform === 'win32') {
+    try {
+      spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    } catch {
+      // ignore
+    }
+  }
+  await Promise.race([new Promise((resolve) => child.on('exit', () => resolve())), sleep(10_000)]);
+};
+
+test(
+  'imported pdf and mp4 assets resolve to fetchable URLs',
+  { timeout: 2 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-import-assets-'));
+    const fixtureCourse = path.join(tempRoot, 'course');
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+
+    const dev = spawn(process.execPath, ['scripts/run-dev.mjs', '--port', String(port)], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        NEXT_TELEMETRY_DISABLED: '1',
+        COURSE_CONTENT_SOURCE: fixtureCourse,
+      },
+      stdio: 'inherit',
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const result = await tryFetchText(`${baseUrl}/docs/imports/`);
+        return result?.status === 200;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: 'Server did not become ready for /docs/imports/.',
+      },
+    );
+
+    const pageResponse = await fetchResponse(`${baseUrl}/docs/imports/`);
+    const pageHtml = await pageResponse.text();
+    assert.equal(pageResponse.status, 200);
+
+    const pdfMatch = pageHtml.match(/<a[^>]*href="([^"]*handout[^"]*)"[^>]*>handout\.pdf<\/a>/i);
+    assert.ok(pdfMatch, 'Could not find imported PDF link in /docs/imports/ HTML.');
+    const pdfUrl = new URL(pdfMatch[1], `${baseUrl}/docs/imports/`).toString();
+    const pdfResponse = await fetchResponse(pdfUrl);
+    assert.equal(pdfResponse.status, 200);
+    assert.equal(pdfResponse.headers.get('content-type'), 'application/pdf');
+
+    const videoMatch = pageHtml.match(/<source[^>]*src="([^"]*demo[^"]*)"[^>]*type="video\/mp4"/i);
+    assert.ok(videoMatch, 'Could not find imported MP4 source in /docs/imports/ HTML.');
+    const videoUrl = new URL(videoMatch[1], `${baseUrl}/docs/imports/`).toString();
+    const videoResponse = await fetchResponse(videoUrl);
+    assert.equal(videoResponse.status, 200);
+    assert.equal(videoResponse.headers.get('content-type'), 'video/mp4');
+  },
+);
