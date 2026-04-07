@@ -209,8 +209,9 @@ Write these rules in a way that keeps learning outcomes (clarity, sequencing, re
   - When an image must be loaded in MDX code: `import exampleUrl from './img/example.png'`
 - Downloadable files live in `content/**/<slug>/assets/...`:
   - `import fileUrl from './assets/<name>';`
-  - Import `createCourseDownloadUrl` from `@metyatech/course-docs-platform/mdx`.
-  - Use `<a href={createCourseDownloadUrl(fileUrl, '<name>')} download="<name>">...</a>` (always set `download`, and route downloads through the helper so production keeps the original filename instead of the hashed asset name).
+  - Use `<DownloadLink file={fileUrl} filename="<name>">...</DownloadLink>`.
+  - `DownloadLink` is globally available in MDX pages via `course-docs-platform`; do not wrap imported asset URLs in raw `<a>` tags for downloads.
+  - `DownloadLink` routes production downloads through the stable-filename helper automatically and also sets `download="<name>"`.
   - Treat imports as URL strings (do not use `.default`).
 - When the same asset is needed in multiple pages, copy it into each page’s `img/` or `assets/` directory (do not create inter-page dependencies).
 

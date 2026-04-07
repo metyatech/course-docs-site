@@ -108,13 +108,12 @@ export default meta;
 title: Import Assets
 ---
 
-import { createCourseDownloadUrl } from '@metyatech/course-docs-platform/mdx';
 import archiveUrl from './assets/packet.zip';
 import handoutUrl from './assets/handout.pdf';
 import demoVideoUrl from './assets/demo.mp4';
 
-<a href={createCourseDownloadUrl(archiveUrl, 'packet.zip')} download="packet.zip">packet.zip</a>
-<a href={createCourseDownloadUrl(handoutUrl, 'handout.pdf')} download="handout.pdf">handout.pdf</a>
+<DownloadLink file={archiveUrl} filename="packet.zip" />
+<DownloadLink file={handoutUrl} filename="handout.pdf" />
 
 <video controls width="100%">
   <source src={demoVideoUrl} type="video/mp4" />
