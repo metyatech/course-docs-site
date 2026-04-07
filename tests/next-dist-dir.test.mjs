@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   createIsolatedNextDistDir,
   DEFAULT_NEXT_DIST_DIR,
@@ -14,7 +14,7 @@ import {
 } from "../scripts/next-dist-dir.mjs";
 import { createPlaywrightWebServerEnv, createRunDevTestEnv } from "./test-harness-env.mjs";
 
-const projectRoot = "D:\\ghws\\course-docs-site";
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const playwrightConfigUrl = pathToFileURL(
   path.join(projectRoot, "tests", "e2e", "playwright.config.mjs"),
 );
