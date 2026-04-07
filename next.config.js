@@ -37,6 +37,7 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+    disableStaticImages: true,
   },
   pageExtensions: ["ts", "tsx", "js", "jsx", "md", "mdx"],
   webpack: (config, { isServer }) => {

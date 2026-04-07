@@ -82,7 +82,7 @@ test("playwright helper preserves explicit dist dir overrides", () => {
   assert.equal(env.COURSE_DOCS_NEXT_DIST_DIR, TEST_NEXT_DIST_DIR);
 });
 
-test("normalizeNextEnvDts restores the default typed-route reference", () => {
+test("normalizeNextEnvDts restores the canonical typed-route header", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "course-docs-next-env-"));
   const nextEnvPath = path.join(tempRoot, "next-env.d.ts");
 
@@ -104,7 +104,6 @@ test("normalizeNextEnvDts restores the default typed-route reference", () => {
       fs.readFileSync(nextEnvPath, "utf8"),
       [
         '/// <reference types="next" />',
-        '/// <reference types="next/image-types/global" />',
         '/// <reference path="./.next/types/routes.d.ts" />',
         "",
       ].join("\n"),

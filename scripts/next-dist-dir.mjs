@@ -45,10 +45,12 @@ export const normalizeNextEnvDts = ({ projectRoot }) => {
   }
 
   const current = fs.readFileSync(nextEnvPath, "utf8");
-  const normalized = current.replace(
-    /\/\/\/ <reference path="\.\/[^"]+\/types\/routes\.d\.ts" \/>/,
-    `/// <reference path="./${DEFAULT_NEXT_DIST_DIR}/types/routes.d.ts" />`,
-  );
+  const normalized = current
+    .replace(/\/\/\/ <reference types="next\/image-types\/global" \/>\r?\n/, "")
+    .replace(
+      /\/\/\/ <reference path="\.\/[^"]+\/types\/routes\.d\.ts" \/>/,
+      `/// <reference path="./${DEFAULT_NEXT_DIST_DIR}/types/routes.d.ts" />`,
+    );
 
   if (normalized !== current) {
     fs.writeFileSync(nextEnvPath, normalized, "utf8");

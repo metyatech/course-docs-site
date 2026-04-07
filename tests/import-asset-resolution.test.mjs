@@ -7,9 +7,11 @@ import path from "node:path";
 import process from "node:process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { normalizeNextEnvDts } from "../scripts/next-dist-dir.mjs";
 import { createRunDevTestEnv } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const nextBinPath = path.join(projectRoot, "node_modules", "next", "dist", "bin", "next");
 
 const getFreePort = () =>
   new Promise((resolve, reject) => {
@@ -56,6 +58,18 @@ const tryFetchText = async (url) => {
 };
 
 const decodeHtmlAttribute = (value) => value.replaceAll("&amp;", "&");
+
+const waitForProcessExit = (child, label) =>
+  new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`${label} exited with code ${code ?? "null"}`));
+    });
+  });
 
 const writeFixtureCourseRepo = async (rootDir) => {
   const siteConfig = `export const siteConfig = {
@@ -168,24 +182,42 @@ test(
     const fixtureCourse = path.join(tempRoot, "course");
     const port = await getFreePort();
     const baseUrl = `http://127.0.0.1:${port}`;
+    let server = null;
+
+    t.after(async () => {
+      await killProcessTree(server);
+      normalizeNextEnvDts({ projectRoot });
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
 
     await writeFixtureCourseRepo(fixtureCourse);
 
-    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
-      cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: "import-asset-resolution",
-        env: process.env,
-        overrides: {
-          COURSE_CONTENT_SOURCE: fixtureCourse,
-        },
-      }),
-      stdio: "inherit",
+    const env = createRunDevTestEnv({
+      label: "import-asset-resolution",
+      env: process.env,
+      overrides: {
+        COURSE_CONTENT_SOURCE: fixtureCourse,
+      },
     });
 
-    t.after(async () => {
-      await killProcessTree(dev);
-      await fs.rm(tempRoot, { recursive: true, force: true });
+    const sync = spawn(process.execPath, ["scripts/sync-course-content.mjs"], {
+      cwd: projectRoot,
+      env,
+      stdio: "inherit",
+    });
+    await waitForProcessExit(sync, "sync-course-content");
+
+    const build = spawn(process.execPath, [nextBinPath, "build"], {
+      cwd: projectRoot,
+      env,
+      stdio: "inherit",
+    });
+    await waitForProcessExit(build, "next build");
+
+    server = spawn(process.execPath, [nextBinPath, "start", "--port", String(port)], {
+      cwd: projectRoot,
+      env,
+      stdio: "inherit",
     });
 
     await waitFor(

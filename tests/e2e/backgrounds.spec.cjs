@@ -11,6 +11,24 @@ const parseCssUrl = (cssUrl) => {
   return match[2];
 };
 
+const expectServedImageBytes = async (response, expectedKind) => {
+  expect(response.ok()).toBeTruthy();
+  expect(response.headers()['content-type']).toContain('image/');
+
+  const body = await response.body();
+  const utf8Prefix = body.subarray(0, 32).toString('utf8');
+  expect(utf8Prefix.startsWith('export default')).toBeFalsy();
+
+  if (expectedKind === 'png') {
+    expect(Array.from(body.subarray(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    return;
+  }
+
+  if (expectedKind === 'jpeg') {
+    expect(Array.from(body.subarray(0, 3))).toEqual([0xff, 0xd8, 0xff]);
+  }
+};
+
 const findBackgroundImageInPreview = async (page, expectedText, selector) => {
   const handle = await page.waitForFunction(
     ({ frameText, targetSelector }) => {
@@ -60,8 +78,7 @@ test('backgrounds page keeps background images visible in code previews', async 
   const backgroundAssetUrl = parseCssUrl(backgroundImage);
   expect(backgroundAssetUrl).toContain('/_next/static/media/background-sample');
   const backgroundAssetResponse = await page.request.get(backgroundAssetUrl);
-  expect(backgroundAssetResponse.ok()).toBeTruthy();
-  expect(backgroundAssetResponse.headers()['content-type']).toContain('image/');
+  await expectServedImageBytes(backgroundAssetResponse, 'png');
 
   const parallaxImage = await findBackgroundImageInPreview(
     page,
@@ -72,6 +89,5 @@ test('backgrounds page keeps background images visible in code previews', async 
   const parallaxAssetUrl = parseCssUrl(parallaxImage);
   expect(parallaxAssetUrl).toContain('/_next/static/media/parallax1');
   const parallaxAssetResponse = await page.request.get(parallaxAssetUrl);
-  expect(parallaxAssetResponse.ok()).toBeTruthy();
-  expect(parallaxAssetResponse.headers()['content-type']).toContain('image/');
+  await expectServedImageBytes(parallaxAssetResponse, 'jpeg');
 });
