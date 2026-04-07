@@ -32,6 +32,7 @@
     "./next-app/mdx-page": "./dist/next-app/mdx-page.js",
     "./next-app/middleware": "./dist/next-app/middleware.js",
     "./next-app/asset-route": "./dist/next-app/asset-route.js",
+    "./next-app/download-asset-route": "./dist/next-app/download-asset-route.js",
     "./next-app/admin-comment-delete-route": "./dist/next-app/admin-comment-delete-route.js",
     "./submissions": "./dist/submissions/index.js",
     "./submissions/submissions-page": "./dist/submissions/submissions-page.js",
