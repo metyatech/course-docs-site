@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
@@ -6,6 +8,7 @@ import {
   createIsolatedNextDistDir,
   DEFAULT_NEXT_DIST_DIR,
   TEST_NEXT_DIST_DIR,
+  normalizeNextEnvDts,
   resolveNextDistDir,
   resolveNextDistDirPath,
 } from "../scripts/next-dist-dir.mjs";
@@ -77,4 +80,36 @@ test("playwright helper preserves explicit dist dir overrides", () => {
     env: { COURSE_DOCS_NEXT_DIST_DIR: TEST_NEXT_DIST_DIR },
   });
   assert.equal(env.COURSE_DOCS_NEXT_DIST_DIR, TEST_NEXT_DIST_DIR);
+});
+
+test("normalizeNextEnvDts restores the default typed-route reference", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "course-docs-next-env-"));
+  const nextEnvPath = path.join(tempRoot, "next-env.d.ts");
+
+  try {
+    fs.writeFileSync(
+      nextEnvPath,
+      [
+        '/// <reference types="next" />',
+        '/// <reference types="next/image-types/global" />',
+        '/// <reference path="./.next-test/types/routes.d.ts" />',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    normalizeNextEnvDts({ projectRoot: tempRoot });
+
+    assert.equal(
+      fs.readFileSync(nextEnvPath, "utf8"),
+      [
+        '/// <reference types="next" />',
+        '/// <reference types="next/image-types/global" />',
+        '/// <reference path="./.next/types/routes.d.ts" />',
+        "",
+      ].join("\n"),
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
