@@ -7,6 +7,7 @@ import path from "node:path";
 import process from "node:process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { createRunDevTestEnv } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -180,12 +181,14 @@ test(
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       cwd: projectRoot,
-      env: {
-        ...process.env,
-        NEXT_TELEMETRY_DISABLED: "1",
-        COURSE_CONTENT_SOURCE: fixtureCourse,
-        ADMIN_MODE_TOKEN: "teacher-secret",
-      },
+      env: createRunDevTestEnv({
+        label: "admin-mode-route-protection",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+          ADMIN_MODE_TOKEN: "teacher-secret",
+        },
+      }),
       stdio: "inherit",
     });
 
@@ -308,13 +311,15 @@ test(
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       cwd: projectRoot,
-      env: {
-        ...process.env,
-        NEXT_TELEMETRY_DISABLED: "1",
-        COURSE_CONTENT_SOURCE: fixtureCourse,
-        ADMIN_MODE_TOKEN: "",
-        ADMIN_DELETE_TOKEN: "legacy-secret",
-      },
+      env: createRunDevTestEnv({
+        label: "admin-mode-route-protection-legacy",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+          ADMIN_MODE_TOKEN: "",
+          ADMIN_DELETE_TOKEN: "legacy-secret",
+        },
+      }),
       stdio: "inherit",
     });
 

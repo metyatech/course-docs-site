@@ -1,24 +1,25 @@
-import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
-import net from 'node:net';
-import os from 'node:os';
-import path from 'node:path';
-import process from 'node:process';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { createRunDevTestEnv } from "./test-harness-env.mjs";
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const getFreePort = () =>
   new Promise((resolve, reject) => {
     const server = net.createServer();
     server.unref();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
       const address = server.address();
-      if (!address || typeof address === 'string') {
-        server.close(() => reject(new Error('Failed to allocate free port')));
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate free port")));
         return;
       }
       const { port } = address;
@@ -32,7 +33,7 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   const startedAt = Date.now();
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
-      throw new Error(onTimeoutMessage ?? 'Timed out');
+      throw new Error(onTimeoutMessage ?? "Timed out");
     }
     const result = await fn();
     if (result) {
@@ -43,7 +44,7 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
 };
 
 const fetchText = async (url) => {
-  const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+  const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(20_000) });
   const text = await response.text();
   return { status: response.status, text };
 };
@@ -143,64 +144,109 @@ descriptive
 done
 `;
 
-  const tinyGifBase64 = 'R0lGODlhAQABAIABAP///wAAACwAAAAAAQABAAACAkQBADs=';
-  const tinyGif = Buffer.from(tinyGifBase64, 'base64');
+  const tinyGifBase64 = "R0lGODlhAQABAIABAP///wAAACwAAAAAAQABAAACAkQBADs=";
+  const tinyGif = Buffer.from(tinyGifBase64, "base64");
 
   await fs.mkdir(
     path.join(
       rootDir,
-      'content',
-      'exams',
-      '2025',
-      '2semester',
-      '2final-exam',
-      'preparation',
-      'questions',
+      "content",
+      "exams",
+      "2025",
+      "2semester",
+      "2final-exam",
+      "preparation",
+      "questions",
     ),
     { recursive: true },
   );
   await fs.mkdir(
-    path.join(rootDir, 'content', 'exams', '2025', '2semester', '2final-exam', 'preparation', 'img'),
+    path.join(
+      rootDir,
+      "content",
+      "exams",
+      "2025",
+      "2semester",
+      "2final-exam",
+      "preparation",
+      "img",
+    ),
     { recursive: true },
   );
-  await fs.mkdir(path.join(rootDir, 'public', 'img'), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "public", "img"), { recursive: true });
 
-  await fs.writeFile(path.join(rootDir, 'site.config.ts'), siteConfig, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', '_meta.ts'), rootMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'exams', '_meta.ts'), examsMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'exams', '2025', '_meta.ts'), yearMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'exams', '2025', '2semester', '_meta.ts'), semesterMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'exams', '2025', '2semester', '2final-exam', '_meta.ts'), examMeta, 'utf8');
+  await fs.writeFile(path.join(rootDir, "site.config.ts"), siteConfig, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "_meta.ts"), rootMeta, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "exams", "_meta.ts"), examsMeta, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "exams", "2025", "_meta.ts"), yearMeta, "utf8");
   await fs.writeFile(
-    path.join(rootDir, 'content', 'exams', '2025', '2semester', '2final-exam', 'preparation', '_meta.ts'),
-    preparationMeta,
-    'utf8',
+    path.join(rootDir, "content", "exams", "2025", "2semester", "_meta.ts"),
+    semesterMeta,
+    "utf8",
   );
   await fs.writeFile(
-    path.join(rootDir, 'content', 'exams', '2025', '2semester', '2final-exam', 'preparation', 'index.mdx'),
-    preparationIndexMdx,
-    'utf8',
+    path.join(rootDir, "content", "exams", "2025", "2semester", "2final-exam", "_meta.ts"),
+    examMeta,
+    "utf8",
   );
   await fs.writeFile(
     path.join(
       rootDir,
-      'content',
-      'exams',
-      '2025',
-      '2semester',
-      '2final-exam',
-      'preparation',
-      'questions',
-      'q1.qspec.md',
+      "content",
+      "exams",
+      "2025",
+      "2semester",
+      "2final-exam",
+      "preparation",
+      "_meta.ts",
+    ),
+    preparationMeta,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(
+      rootDir,
+      "content",
+      "exams",
+      "2025",
+      "2semester",
+      "2final-exam",
+      "preparation",
+      "index.mdx",
+    ),
+    preparationIndexMdx,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(
+      rootDir,
+      "content",
+      "exams",
+      "2025",
+      "2semester",
+      "2final-exam",
+      "preparation",
+      "questions",
+      "q1.qspec.md",
     ),
     questionSpec,
-    'utf8',
+    "utf8",
   );
   await fs.writeFile(
-    path.join(rootDir, 'content', 'exams', '2025', '2semester', '2final-exam', 'preparation', 'img', 'pixel.gif'),
+    path.join(
+      rootDir,
+      "content",
+      "exams",
+      "2025",
+      "2semester",
+      "2final-exam",
+      "preparation",
+      "img",
+      "pixel.gif",
+    ),
     tinyGif,
   );
-  await fs.writeFile(path.join(rootDir, 'public', 'img', 'favicon.ico'), '', 'utf8');
+  await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
 const killProcessTree = async (child) => {
@@ -213,35 +259,37 @@ const killProcessTree = async (child) => {
     // ignore
   }
 
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     try {
-      spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
     } catch {
       // ignore
     }
   }
-  await Promise.race([new Promise((resolve) => child.on('exit', () => resolve())), sleep(10_000)]);
+  await Promise.race([new Promise((resolve) => child.on("exit", () => resolve())), sleep(10_000)]);
 };
 
 test(
-  'qspec markdown image resolves relative path from qspec directory',
+  "qspec markdown image resolves relative path from qspec directory",
   { timeout: 2 * 60_000 },
   async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-qspec-image-'));
-    const fixtureCourse = path.join(tempRoot, 'course');
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-qspec-image-"));
+    const fixtureCourse = path.join(tempRoot, "course");
     const port = await getFreePort();
     const baseUrl = `http://127.0.0.1:${port}`;
 
     await writeFixtureCourseRepo(fixtureCourse);
 
-    const dev = spawn(process.execPath, ['scripts/run-dev.mjs', '--port', String(port)], {
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       cwd: projectRoot,
-      env: {
-        ...process.env,
-        NEXT_TELEMETRY_DISABLED: '1',
-        COURSE_CONTENT_SOURCE: fixtureCourse,
-      },
-      stdio: 'inherit',
+      env: createRunDevTestEnv({
+        label: "qspec-relative-image-resolution",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
     });
 
     t.after(async () => {
@@ -260,30 +308,31 @@ test(
         timeoutMs: 60_000,
         intervalMs: 500,
         onTimeoutMessage:
-          'Server did not become ready for /exams/2025/2semester/2final-exam/preparation/.',
+          "Server did not become ready for /exams/2025/2semester/2final-exam/preparation/.",
       },
     );
 
-    const page = await fetchText(
-      `${baseUrl}/exams/2025/2semester/2final-exam/preparation/`,
-    );
+    const page = await fetchText(`${baseUrl}/exams/2025/2semester/2final-exam/preparation/`);
     assert.equal(page.status, 200);
 
     const imageTagMatch = page.text.match(/<img[^>]*alt="qspec image"[^>]*>/i);
-    assert.ok(imageTagMatch, 'Could not find qspec image in preparation page HTML.');
+    assert.ok(imageTagMatch, "Could not find qspec image in preparation page HTML.");
     const srcMatch = imageTagMatch[0].match(/\ssrc="([^"]+)"/i);
-    assert.ok(srcMatch, 'Could not read qspec image src attribute.');
+    assert.ok(srcMatch, "Could not read qspec image src attribute.");
     const src = srcMatch[1];
 
     assert.equal(
       src,
-      '/exams/2025/2semester/2final-exam/preparation/img/pixel.gif',
+      "/exams/2025/2semester/2final-exam/preparation/img/pixel.gif",
       `Expected qspec image src to resolve from question file directory, got: ${src}`,
     );
 
-    const imageUrl = new URL(src, `${baseUrl}/exams/2025/2semester/2final-exam/preparation/`).toString();
+    const imageUrl = new URL(
+      src,
+      `${baseUrl}/exams/2025/2semester/2final-exam/preparation/`,
+    ).toString();
     const imageResponse = await fetch(imageUrl, {
-      redirect: 'manual',
+      redirect: "manual",
       signal: AbortSignal.timeout(20_000),
     });
     assert.equal(imageResponse.status, 200);

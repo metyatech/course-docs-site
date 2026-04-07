@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
 import { formatContentSource, parseContentSource } from "./content-source.mjs";
+import { createIsolatedNextDistDir } from "./next-dist-dir.mjs";
 
 const require = createRequire(import.meta.url);
 const { resolveCourseSuiteConfig } = require("../tests/e2e/course-defaults.cjs");
@@ -105,6 +106,7 @@ loadEnvDefaults();
 for (const course of courses) {
   const { env: sourceEnv, sourceLabel } = resolveCourseEnv(course);
   const env = { ...sourceEnv };
+  env.COURSE_DOCS_NEXT_DIST_DIR = createIsolatedNextDistDir(`playwright-${course.name}`);
   const suiteConfig = resolveCourseSuiteConfig(env.COURSE_CONTENT_SOURCE);
 
   console.log(`\n=== Running E2E for ${course.name} (${sourceLabel}) ===`);

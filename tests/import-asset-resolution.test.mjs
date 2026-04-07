@@ -1,24 +1,25 @@
-import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
-import net from 'node:net';
-import os from 'node:os';
-import path from 'node:path';
-import process from 'node:process';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { createRunDevTestEnv } from "./test-harness-env.mjs";
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const getFreePort = () =>
   new Promise((resolve, reject) => {
     const server = net.createServer();
     server.unref();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
       const address = server.address();
-      if (!address || typeof address === 'string') {
-        server.close(() => reject(new Error('Failed to allocate free port')));
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate free port")));
         return;
       }
       const { port } = address;
@@ -32,7 +33,7 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   const startedAt = Date.now();
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
-      throw new Error(onTimeoutMessage ?? 'Timed out');
+      throw new Error(onTimeoutMessage ?? "Timed out");
     }
     const result = await fn();
     if (result) {
@@ -42,8 +43,8 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   }
 };
 
-const fetchResponse = async (url) =>
-  fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+const fetchResponse = async (url, timeoutMs = 60_000) =>
+  fetch(url, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
 
 const tryFetchText = async (url) => {
   try {
@@ -54,7 +55,7 @@ const tryFetchText = async (url) => {
   }
 };
 
-const decodeHtmlAttribute = (value) => value.replaceAll('&amp;', '&');
+const decodeHtmlAttribute = (value) => value.replaceAll("&amp;", "&");
 
 const writeFixtureCourseRepo = async (rootDir) => {
   const siteConfig = `export const siteConfig = {
@@ -89,7 +90,7 @@ export default meta;
 export default meta;
 `;
 
-const importsMdx = `---
+  const importsMdx = `---
 title: Import Assets
 ---
 
@@ -106,21 +107,37 @@ import demoVideoUrl from './assets/demo.mp4';
 </video>
 `;
 
-  const tinyZip = Buffer.from('504b050600000000000000000000000000000000', 'hex');
-  const tinyPdf = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n', 'utf8');
-  const tinyMp4 = Buffer.from('000000206674797069736f6d0000020069736f6d69736f32617663316d703431', 'hex');
+  const tinyZip = Buffer.from("504b050600000000000000000000000000000000", "hex");
+  const tinyPdf = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n", "utf8");
+  const tinyMp4 = Buffer.from(
+    "000000206674797069736f6d0000020069736f6d69736f32617663316d703431",
+    "hex",
+  );
 
-  await fs.mkdir(path.join(rootDir, 'content', 'docs', 'imports', 'assets'), { recursive: true });
-  await fs.mkdir(path.join(rootDir, 'public', 'img'), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "content", "docs", "imports", "assets"), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "public", "img"), { recursive: true });
 
-  await fs.writeFile(path.join(rootDir, 'site.config.ts'), siteConfig, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', '_meta.ts'), rootMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', '_meta.ts'), docsMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', 'imports', 'index.mdx'), importsMdx, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', 'imports', 'assets', 'packet.zip'), tinyZip);
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', 'imports', 'assets', 'handout.pdf'), tinyPdf);
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', 'imports', 'assets', 'demo.mp4'), tinyMp4);
-  await fs.writeFile(path.join(rootDir, 'public', 'img', 'favicon.ico'), '', 'utf8');
+  await fs.writeFile(path.join(rootDir, "site.config.ts"), siteConfig, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "_meta.ts"), rootMeta, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "docs", "_meta.ts"), docsMeta, "utf8");
+  await fs.writeFile(
+    path.join(rootDir, "content", "docs", "imports", "index.mdx"),
+    importsMdx,
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(rootDir, "content", "docs", "imports", "assets", "packet.zip"),
+    tinyZip,
+  );
+  await fs.writeFile(
+    path.join(rootDir, "content", "docs", "imports", "assets", "handout.pdf"),
+    tinyPdf,
+  );
+  await fs.writeFile(
+    path.join(rootDir, "content", "docs", "imports", "assets", "demo.mp4"),
+    tinyMp4,
+  );
+  await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
 const killProcessTree = async (child) => {
@@ -133,35 +150,37 @@ const killProcessTree = async (child) => {
     // ignore
   }
 
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     try {
-      spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
     } catch {
       // ignore
     }
   }
-  await Promise.race([new Promise((resolve) => child.on('exit', () => resolve())), sleep(10_000)]);
+  await Promise.race([new Promise((resolve) => child.on("exit", () => resolve())), sleep(10_000)]);
 };
 
 test(
-  'imported download assets resolve through stable-filename URLs',
+  "imported download assets resolve through stable-filename URLs",
   { timeout: 2 * 60_000 },
   async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-import-assets-'));
-    const fixtureCourse = path.join(tempRoot, 'course');
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-import-assets-"));
+    const fixtureCourse = path.join(tempRoot, "course");
     const port = await getFreePort();
     const baseUrl = `http://127.0.0.1:${port}`;
 
     await writeFixtureCourseRepo(fixtureCourse);
 
-    const dev = spawn(process.execPath, ['scripts/run-dev.mjs', '--port', String(port)], {
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       cwd: projectRoot,
-      env: {
-        ...process.env,
-        NEXT_TELEMETRY_DISABLED: '1',
-        COURSE_CONTENT_SOURCE: fixtureCourse,
-      },
-      stdio: 'inherit',
+      env: createRunDevTestEnv({
+        label: "import-asset-resolution",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
     });
 
     t.after(async () => {
@@ -177,7 +196,7 @@ test(
       {
         timeoutMs: 60_000,
         intervalMs: 500,
-        onTimeoutMessage: 'Server did not become ready for /docs/imports/.',
+        onTimeoutMessage: "Server did not become ready for /docs/imports/.",
       },
     );
 
@@ -188,34 +207,34 @@ test(
     const pdfMatch = pageHtml.match(
       /<a[^>]*href="([^"]*download-asset[^"]*filename=handout\.pdf[^"]*)"[^>]*>handout\.pdf<\/a>/i,
     );
-    assert.ok(pdfMatch, 'Could not find imported PDF link in /docs/imports/ HTML.');
+    assert.ok(pdfMatch, "Could not find imported PDF link in /docs/imports/ HTML.");
     const pdfUrl = new URL(decodeHtmlAttribute(pdfMatch[1]), `${baseUrl}/docs/imports/`).toString();
     const pdfResponse = await fetchResponse(pdfUrl);
     assert.equal(pdfResponse.status, 200);
-    assert.equal(pdfResponse.headers.get('content-type'), 'application/pdf');
+    assert.equal(pdfResponse.headers.get("content-type"), "application/pdf");
     assert.match(
-      pdfResponse.headers.get('content-disposition') ?? '',
+      pdfResponse.headers.get("content-disposition") ?? "",
       /filename\*=UTF-8''handout\.pdf/i,
     );
 
     const zipMatch = pageHtml.match(
       /<a[^>]*href="([^"]*download-asset[^"]*filename=packet\.zip[^"]*)"[^>]*>packet\.zip<\/a>/i,
     );
-    assert.ok(zipMatch, 'Could not find imported ZIP link in /docs/imports/ HTML.');
+    assert.ok(zipMatch, "Could not find imported ZIP link in /docs/imports/ HTML.");
     const zipUrl = new URL(decodeHtmlAttribute(zipMatch[1]), `${baseUrl}/docs/imports/`).toString();
     const zipResponse = await fetchResponse(zipUrl);
     assert.equal(zipResponse.status, 200);
-    assert.equal(zipResponse.headers.get('content-type'), 'application/zip');
+    assert.equal(zipResponse.headers.get("content-type"), "application/zip");
     assert.match(
-      zipResponse.headers.get('content-disposition') ?? '',
+      zipResponse.headers.get("content-disposition") ?? "",
       /filename\*=UTF-8''packet\.zip/i,
     );
 
     const videoMatch = pageHtml.match(/<source[^>]*src="([^"]*demo[^"]*)"[^>]*type="video\/mp4"/i);
-    assert.ok(videoMatch, 'Could not find imported MP4 source in /docs/imports/ HTML.');
+    assert.ok(videoMatch, "Could not find imported MP4 source in /docs/imports/ HTML.");
     const videoUrl = new URL(videoMatch[1], `${baseUrl}/docs/imports/`).toString();
     const videoResponse = await fetchResponse(videoUrl);
     assert.equal(videoResponse.status, 200);
-    assert.equal(videoResponse.headers.get('content-type'), 'video/mp4');
+    assert.equal(videoResponse.headers.get("content-type"), "video/mp4");
   },
 );

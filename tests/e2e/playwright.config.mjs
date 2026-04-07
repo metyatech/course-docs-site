@@ -1,7 +1,8 @@
-import { fileURLToPath } from 'node:url';
-import { defineConfig } from '@playwright/test';
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "@playwright/test";
+import { createPlaywrightWebServerEnv } from "../test-harness-env.mjs";
 
-const host = process.env.E2E_HOST ?? 'localhost';
+const host = process.env.E2E_HOST ?? "localhost";
 const portFromEnv = process.env.E2E_PORT ? Number(process.env.E2E_PORT) : 3101;
 const port = Number.isFinite(portFromEnv) ? portFromEnv : 3101;
 
@@ -11,7 +12,7 @@ const maxFailures =
   maxFailuresEnv && Number.isFinite(Number(maxFailuresEnv)) ? Number(maxFailuresEnv) : 1;
 
 export default defineConfig({
-  testDir: fileURLToPath(new URL('.', import.meta.url)),
+  testDir: fileURLToPath(new URL(".", import.meta.url)),
   timeout: 60_000,
   maxFailures,
   expect: {
@@ -19,15 +20,12 @@ export default defineConfig({
   },
   use: {
     baseURL,
-    trace: 'retain-on-failure',
+    trace: "retain-on-failure",
   },
   webServer: {
     command: `npm run dev -- --port ${port}`,
     cwd: process.cwd(),
-    env: {
-      ...process.env,
-      COURSE_DOCS_LOCAL_SOURCE_MODE: 'copy',
-    },
+    env: createPlaywrightWebServerEnv({ label: "playwright-webserver", env: process.env }),
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,

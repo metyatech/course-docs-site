@@ -1,38 +1,36 @@
-import { spawn } from 'node:child_process';
-import crypto from 'node:crypto';
-import dotenv from 'dotenv';
-import fs from 'node:fs';
-import net from 'node:net';
-import path from 'node:path';
-import { createRequire } from 'node:module';
-import {
-  getRequiredContentSourceText,
-  parseContentSource,
-} from './content-source.mjs';
+import { spawn } from "node:child_process";
+import crypto from "node:crypto";
+import dotenv from "dotenv";
+import fs from "node:fs";
+import net from "node:net";
+import path from "node:path";
+import { createRequire } from "node:module";
+import { getRequiredContentSourceText, parseContentSource } from "./content-source.mjs";
+import { isCustomNextDistDir, resolveNextDistDirPath } from "./next-dist-dir.mjs";
 
 const args = process.argv.slice(2);
 const projectRoot = process.cwd();
 
-const devInnerMode = (process.env.COURSE_DOCS_SITE_DEV_INNER ?? '').trim();
-const isWindows = process.platform === 'win32';
+const devInnerMode = (process.env.COURSE_DOCS_SITE_DEV_INNER ?? "").trim();
+const isWindows = process.platform === "win32";
 
 const require = createRequire(import.meta.url);
-const nextBin = require.resolve('next/dist/bin/next');
+const nextBin = require.resolve("next/dist/bin/next");
 
 const parsePortArg = (argv) => {
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === '--port' || a === '-p') {
+    if (a === "--port" || a === "-p") {
       const v = argv[i + 1];
-      if (typeof v === 'string' && v.trim()) {
+      if (typeof v === "string" && v.trim()) {
         const port = Number(v);
         if (Number.isFinite(port) && port > 0) {
           return port;
         }
       }
     }
-    if (typeof a === 'string' && a.startsWith('--port=')) {
-      const v = a.slice('--port='.length);
+    if (typeof a === "string" && a.startsWith("--port=")) {
+      const v = a.slice("--port=".length);
       const port = Number(v);
       if (Number.isFinite(port) && port > 0) {
         return port;
@@ -46,11 +44,11 @@ const stripPortArgs = (argv) => {
   const out = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === '--port' || a === '-p') {
+    if (a === "--port" || a === "-p") {
       i += 1;
       continue;
     }
-    if (typeof a === 'string' && a.startsWith('--port=')) {
+    if (typeof a === "string" && a.startsWith("--port=")) {
       continue;
     }
     out.push(a);
@@ -70,11 +68,19 @@ const readEnvFile = (filename) => {
   }
 };
 
+const getRuntimeEnv = () => ({
+  ...readEnvFile(".env"),
+  ...readEnvFile(".env.local"),
+  ...readEnvFile(".env.course"),
+  ...readEnvFile(".env.course.local"),
+  ...process.env,
+});
+
 const normalizeCourseEnv = (env) => {
   const sourceText = getRequiredContentSourceText(env);
   const source = parseContentSource(sourceText);
   const sourceId =
-    source.kind === 'local'
+    source.kind === "local"
       ? `dir:${path.resolve(projectRoot, source.localDir)}`
       : `repo:${source.repo}#${source.ref}`;
 
@@ -84,21 +90,12 @@ const normalizeCourseEnv = (env) => {
 };
 
 const getCourseEnv = () => {
-  const fromDotEnv = readEnvFile('.env');
-  const fromDotEnvLocal = readEnvFile('.env.local');
-  const fromCourseEnv = readEnvFile('.env.course');
-  const fromCourseEnvLocal = readEnvFile('.env.course.local');
-  const fromEnv = { ...process.env };
-
-  // process.env wins over files
-  return normalizeCourseEnv({
-    ...fromDotEnv,
-    ...fromDotEnvLocal,
-    ...fromCourseEnv,
-    ...fromCourseEnvLocal,
-    ...fromEnv,
-  });
+  return normalizeCourseEnv(getRuntimeEnv());
 };
+
+const getNextDistDirPath = () => resolveNextDistDirPath({ projectRoot, env: getRuntimeEnv() });
+const shouldResetNextDistDirOnStart = () =>
+  isCustomNextDistDir({ projectRoot, env: getRuntimeEnv() });
 
 let lastCourseEnv = getCourseEnv();
 const portPreference = parsePortArg(args) ?? 3000;
@@ -116,31 +113,31 @@ let devRevision = crypto.randomUUID();
 
 const runSync = () =>
   new Promise((resolve) => {
-    const child = spawn(process.execPath, ['scripts/sync-course-content.mjs'], {
-      stdio: 'inherit',
+    const child = spawn(process.execPath, ["scripts/sync-course-content.mjs"], {
+      stdio: "inherit",
     });
-    child.on('exit', (code) => resolve(code ?? 1));
+    child.on("exit", (code) => resolve(code ?? 1));
   });
 
 const startDev = () => {
   devExitExpected = false;
-  const devArgs = [...baseArgs, '--port', String(activePort)];
+  const devArgs = [...baseArgs, "--port", String(activePort)];
   const childEnv = {
     ...process.env,
     COURSE_DOCS_SITE_DEV_REVISION: devRevision,
   };
-  if (devInnerMode === 'stub') {
-    devProcess = spawn(process.execPath, ['scripts/dev-inner-stub.mjs', ...devArgs], {
-      stdio: 'inherit',
+  if (devInnerMode === "stub") {
+    devProcess = spawn(process.execPath, ["scripts/dev-inner-stub.mjs", ...devArgs], {
+      stdio: "inherit",
       env: childEnv,
     });
   } else {
-    devProcess = spawn(process.execPath, [nextBin, 'dev', ...devArgs], {
-      stdio: 'inherit',
+    devProcess = spawn(process.execPath, [nextBin, "dev", ...devArgs], {
+      stdio: "inherit",
       env: childEnv,
     });
   }
-  devProcess.on('exit', (devCode) => {
+  devProcess.on("exit", (devCode) => {
     if (devExitExpected) {
       return;
     }
@@ -157,7 +154,7 @@ const stopDev = async () => {
   devProcess = null;
   devExitExpected = true;
 
-  const exited = new Promise((resolve) => proc.on('exit', () => resolve()));
+  const exited = new Promise((resolve) => proc.on("exit", () => resolve()));
   try {
     proc.kill();
   } catch {
@@ -167,14 +164,14 @@ const stopDev = async () => {
   if (isWindows) {
     try {
       // Kill process tree (node/next workers) on Windows.
-      spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
+      spawn("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
     } catch {
       // ignore
     }
   } else {
     setTimeout(() => {
       try {
-        proc.kill('SIGKILL');
+        proc.kill("SIGKILL");
       } catch {
         // ignore
       }
@@ -221,14 +218,16 @@ const waitForPortFree = async (port, timeoutMs = 10_000) => {
   const startedAt = Date.now();
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
-      throw new Error(`Port ${port} is still in use after restart. Stop the old dev server and retry.`);
+      throw new Error(
+        `Port ${port} is still in use after restart. Stop the old dev server and retry.`,
+      );
     }
 
     const canListen = await new Promise((resolve) => {
       const server = net.createServer();
       server.unref();
-      server.once('error', () => resolve(false));
-      server.listen(port, '127.0.0.1', () => {
+      server.once("error", () => resolve(false));
+      server.listen(port, "127.0.0.1", () => {
         server.close(() => resolve(true));
       });
     });
@@ -247,8 +246,8 @@ const findFirstFreePort = async (fromPort, maxAttempts = 20) => {
     const canListen = await new Promise((resolve) => {
       const server = net.createServer();
       server.unref();
-      server.once('error', () => resolve(false));
-      server.listen(port, '127.0.0.1', () => {
+      server.once("error", () => resolve(false));
+      server.listen(port, "127.0.0.1", () => {
         server.close(() => resolve(true));
       });
     });
@@ -278,14 +277,14 @@ const queueRestart = async () => {
       const previousPort = activePort;
       activePort = await findFirstFreePort(portPreference);
       console.warn(
-        `Warning: could not reuse port ${previousPort}; restarting on port ${activePort}. (${error})`
+        `Warning: could not reuse port ${previousPort}; restarting on port ${activePort}. (${error})`,
       );
     }
     await queueSync();
 
     // Switching course content can change the MDX tree and page-map.
     // Clear Next's dev cache to avoid cross-course stale artifacts.
-    rmIfExists(path.join(projectRoot, '.next'));
+    rmIfExists(getNextDistDirPath());
 
     devRevision = crypto.randomUUID();
     startDev();
@@ -301,7 +300,7 @@ const createEnvWatcher = () => {
       clearTimeout(debounceTimer);
     }
     debounceTimer = setTimeout(async () => {
-    const nextCourseEnv = getCourseEnv();
+      const nextCourseEnv = getCourseEnv();
       const changed = nextCourseEnv.sourceId !== lastCourseEnv.sourceId;
       if (!changed) {
         return;
@@ -310,8 +309,8 @@ const createEnvWatcher = () => {
     }, 250);
   };
 
-  const watchFiles = ['.env', '.env.local', '.env.course', '.env.course.local'].map((f) =>
-    path.join(projectRoot, f)
+  const watchFiles = [".env", ".env.local", ".env.course", ".env.course.local"].map((f) =>
+    path.join(projectRoot, f),
   );
 
   // `fs.watch()` is not reliable with atomic save patterns (common on Windows).
@@ -340,6 +339,9 @@ const createEnvWatcher = () => {
 queueSync().then(async () => {
   activePort = await findFirstFreePort(portPreference);
   const envWatcher = createEnvWatcher();
+  if (shouldResetNextDistDirOnStart()) {
+    rmIfExists(getNextDistDirPath());
+  }
   startDev();
 
   const closeAll = async () => {
@@ -352,6 +354,6 @@ queueSync().then(async () => {
     process.exit(0);
   };
 
-  process.on('SIGINT', () => void closeAll());
-  process.on('SIGTERM', () => void closeAll());
+  process.on("SIGINT", () => void closeAll());
+  process.on("SIGTERM", () => void closeAll());
 });

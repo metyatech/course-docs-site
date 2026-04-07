@@ -1,14 +1,15 @@
-import { spawnSync } from 'node:child_process';
-import dotenv from 'dotenv';
-import fs from 'node:fs';
-import path from 'node:path';
-import { getRequiredContentSourceText, parseContentSource } from './content-source.mjs';
-import { shouldLinkLocalSource } from './sync-course-content-mode.mjs';
+import { spawnSync } from "node:child_process";
+import dotenv from "dotenv";
+import fs from "node:fs";
+import path from "node:path";
+import { getRequiredContentSourceText, parseContentSource } from "./content-source.mjs";
+import { resolveNextDistDirPath } from "./next-dist-dir.mjs";
+import { shouldLinkLocalSource } from "./sync-course-content-mode.mjs";
 
 const projectRoot = process.cwd();
-const workRoot = path.join(projectRoot, '.course-content');
-const cloneDir = path.join(workRoot, 'repo');
-const sourceStatePath = path.join(workRoot, 'active-source.txt');
+const workRoot = path.join(projectRoot, ".course-content");
+const cloneDir = path.join(workRoot, "repo");
+const sourceStatePath = path.join(workRoot, "active-source.txt");
 
 const readEnv = (filename) => {
   const envPath = path.join(projectRoot, filename);
@@ -27,10 +28,10 @@ const readEnv = (filename) => {
 // - later files override earlier files
 const explicitEnvKeys = new Set(Object.keys(process.env));
 const fileEnv = {
-  ...readEnv('.env'),
-  ...readEnv('.env.local'),
-  ...readEnv('.env.course'),
-  ...readEnv('.env.course.local'),
+  ...readEnv(".env"),
+  ...readEnv(".env.local"),
+  ...readEnv(".env.course"),
+  ...readEnv(".env.course.local"),
 };
 for (const [key, value] of Object.entries(fileEnv)) {
   if (!explicitEnvKeys.has(key)) {
@@ -38,20 +39,22 @@ for (const [key, value] of Object.entries(fileEnv)) {
   }
 }
 
+const nextDistDirPath = resolveNextDistDirPath({ projectRoot, env: process.env });
+
 const courseSourceText = getRequiredContentSourceText(process.env);
 const courseSource = parseContentSource(courseSourceText);
 
 const requiredPaths = [
-  { label: 'content', rel: 'content' },
-  { label: 'site.config.ts', rel: 'site.config.ts' },
+  { label: "content", rel: "content" },
+  { label: "site.config.ts", rel: "site.config.ts" },
 ];
 
 const run = (command, args) => {
-  const result = spawnSync(command, args, { stdio: 'inherit' });
+  const result = spawnSync(command, args, { stdio: "inherit" });
   if (result.error) {
     throw result.error;
   }
-  if (typeof result.status === 'number' && result.status !== 0) {
+  if (typeof result.status === "number" && result.status !== 0) {
     throw new Error(`${command} exited with code ${result.status}`);
   }
 };
@@ -71,9 +74,9 @@ const rmIfExists = (targetPath) => {
 
 const readTextIfExists = (p) => {
   try {
-    return fs.readFileSync(p, 'utf8').trim();
+    return fs.readFileSync(p, "utf8").trim();
   } catch {
-    return '';
+    return "";
   }
 };
 
@@ -85,16 +88,16 @@ const writeTextFile = (p, text) => {
 const tryLinkDir = (target, linkPath) => {
   rmIfExists(linkPath);
   fs.mkdirSync(path.dirname(linkPath), { recursive: true });
-  fs.symlinkSync(target, linkPath, 'junction');
+  fs.symlinkSync(target, linkPath, "junction");
 };
 
 const copyDir = (from, to) => {
   fs.mkdirSync(to, { recursive: true });
   for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
-    if (entry.name === '_pagefind') {
+    if (entry.name === "_pagefind") {
       continue;
     }
-    if (to.endsWith(`${path.sep}public`) && entry.name === 'student-works') {
+    if (to.endsWith(`${path.sep}public`) && entry.name === "student-works") {
       continue;
     }
     const src = path.join(from, entry.name);
@@ -126,13 +129,13 @@ const writeKeepFileIfRealDir = (dirPath) => {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
-  fs.writeFileSync(path.join(dirPath, '.keep'), '');
+  fs.writeFileSync(path.join(dirPath, ".keep"), "");
 };
 
 let sourceRoot = cloneDir;
-let activeSourceId = '';
+let activeSourceId = "";
 
-if (courseSource.kind === 'local') {
+if (courseSource.kind === "local") {
   sourceRoot = path.resolve(projectRoot, courseSource.localDir);
   activeSourceId = `dir:${sourceRoot}`;
   if (!fs.existsSync(sourceRoot) || !fs.statSync(sourceRoot).isDirectory()) {
@@ -143,45 +146,43 @@ if (courseSource.kind === 'local') {
   rmIfExists(cloneDir);
 
   const repoUrl = `https://github.com/${courseSource.repo}.git`;
-  run('git', ['clone', '--depth', '1', '--branch', courseSource.ref, repoUrl, cloneDir]);
+  run("git", ["clone", "--depth", "1", "--branch", courseSource.ref, repoUrl, cloneDir]);
   activeSourceId = `repo:${courseSource.repo}#${courseSource.ref}`;
 }
 
 if (!activeSourceId) {
-  activeSourceId = sourceRoot ? `dir:${sourceRoot}` : 'unknown';
+  activeSourceId = sourceRoot ? `dir:${sourceRoot}` : "unknown";
 }
 
 const previousSourceId = readTextIfExists(sourceStatePath);
 if (previousSourceId && previousSourceId !== activeSourceId) {
   // Switching content can change the MDX tree and page-map.
   // Clear Next build artifacts to avoid cross-course stale runtime chunks.
-  rmIfExists(path.join(projectRoot, '.next'));
+  rmIfExists(nextDistDirPath);
 }
 writeTextFile(sourceStatePath, activeSourceId);
 
 for (const required of requiredPaths) {
   const resolved = path.join(sourceRoot, required.rel);
   if (!fs.existsSync(resolved)) {
-    throw new Error(
-      `Missing required path in content repo: ${required.label} (${required.rel})`
-    );
+    throw new Error(`Missing required path in content repo: ${required.label} (${required.rel})`);
   }
 }
 
-const contentFrom = path.join(sourceRoot, 'content');
-const contentTo = path.join(projectRoot, 'content');
-const shouldLinkLocalContent = courseSource.kind === 'local' && shouldLinkLocalSource({
-  projectRoot,
-  env: process.env,
-});
+const contentFrom = path.join(sourceRoot, "content");
+const contentTo = path.join(projectRoot, "content");
+const shouldLinkLocalContent =
+  courseSource.kind === "local" &&
+  shouldLinkLocalSource({
+    projectRoot,
+    env: process.env,
+  });
 rmIfExists(contentTo);
 if (shouldLinkLocalContent) {
   try {
     tryLinkDir(contentFrom, contentTo);
   } catch (error) {
-    console.warn(
-      `Warning: failed to link content directory, falling back to copy. (${error})`
-    );
+    console.warn(`Warning: failed to link content directory, falling back to copy. (${error})`);
     copyDir(contentFrom, contentTo);
   }
 } else {
@@ -193,21 +194,19 @@ if (!fs.existsSync(contentTo)) {
 }
 writeKeepFileIfRealDir(contentTo);
 
-const siteConfigFrom = path.join(sourceRoot, 'site.config.ts');
-const siteConfigTo = path.join(projectRoot, 'site.config.ts');
+const siteConfigFrom = path.join(sourceRoot, "site.config.ts");
+const siteConfigTo = path.join(projectRoot, "site.config.ts");
 copyFile(siteConfigFrom, siteConfigTo);
 
-const publicFrom = path.join(sourceRoot, 'public');
-const publicTo = path.join(projectRoot, 'public');
+const publicFrom = path.join(sourceRoot, "public");
+const publicTo = path.join(projectRoot, "public");
 if (fs.existsSync(publicFrom)) {
   rmIfExists(publicTo);
   if (shouldLinkLocalContent) {
     try {
       tryLinkDir(publicFrom, publicTo);
     } catch (error) {
-      console.warn(
-        `Warning: failed to link public directory, falling back to copy. (${error})`
-      );
+      console.warn(`Warning: failed to link public directory, falling back to copy. (${error})`);
       copyDir(publicFrom, publicTo);
     }
   } else {

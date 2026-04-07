@@ -1,12 +1,13 @@
-import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { createIsolatedNextDistDir, DEFAULT_NEXT_DIST_DIR } from "../scripts/next-dist-dir.mjs";
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const fileExists = async (p) => {
   try {
@@ -32,62 +33,74 @@ const writeCourseRepo = async ({ rootDir, courseName }) => {
 
   const intro = `---\ntitle: ${JSON.stringify(courseName)}\n---\n\n${courseName}\n`;
 
-  await fs.mkdir(path.join(rootDir, 'content', 'docs', 'intro'), { recursive: true });
-  await fs.mkdir(path.join(rootDir, 'public', 'img'), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "content", "docs", "intro"), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "public", "img"), { recursive: true });
 
-  await fs.writeFile(path.join(rootDir, 'site.config.ts'), siteConfig, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', '_meta.ts'), rootMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', '_meta.ts'), docsMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', 'intro', 'index.mdx'), intro, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'public', 'img', 'favicon.ico'), '', 'utf8');
+  await fs.writeFile(path.join(rootDir, "site.config.ts"), siteConfig, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "_meta.ts"), rootMeta, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "docs", "_meta.ts"), docsMeta, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "docs", "intro", "index.mdx"), intro, "utf8");
+  await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
 const runSync = (env) =>
   new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['scripts/sync-course-content.mjs'], {
+    const child = spawn(process.execPath, ["scripts/sync-course-content.mjs"], {
       cwd: projectRoot,
       env: { ...process.env, ...env },
-      stdio: 'inherit',
+      stdio: "inherit",
     });
-    child.on('error', reject);
-    child.on('exit', (code) => resolve(code ?? 1));
+    child.on("error", reject);
+    child.on("exit", (code) => resolve(code ?? 1));
   });
 
-test(
-  'sync clears .next when course source changes (prevents stale build artifacts)',
-  { timeout: 60_000 },
-  async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-sync-next-'));
-    const courseA = path.join(tempRoot, 'course-a');
-    const courseB = path.join(tempRoot, 'course-b');
+for (const distDir of [
+  DEFAULT_NEXT_DIST_DIR,
+  createIsolatedNextDistDir("sync-course-content-clears-next"),
+]) {
+  test(
+    `sync clears ${distDir} when course source changes (prevents stale build artifacts)`,
+    { timeout: 60_000 },
+    async (t) => {
+      const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-next-"));
+      const courseA = path.join(tempRoot, "course-a");
+      const courseB = path.join(tempRoot, "course-b");
+      const distDirPath = path.join(projectRoot, ...distDir.split("/"));
 
-    await writeCourseRepo({ rootDir: courseA, courseName: 'Course A' });
-    await writeCourseRepo({ rootDir: courseB, courseName: 'Course B' });
+      await writeCourseRepo({ rootDir: courseA, courseName: "Course A" });
+      await writeCourseRepo({ rootDir: courseB, courseName: "Course B" });
 
-    t.after(async () => {
-      await safeRm(path.join(projectRoot, 'content'));
-      await safeRm(path.join(projectRoot, 'public'));
-      await safeRm(path.join(projectRoot, '.next'));
-      await fs.mkdir(path.join(projectRoot, 'content'), { recursive: true });
-      await fs.mkdir(path.join(projectRoot, 'public'), { recursive: true });
-      await fs.writeFile(path.join(projectRoot, 'content', '.keep'), '', 'utf8');
-      await fs.writeFile(path.join(projectRoot, 'public', '.keep'), '', 'utf8');
-      await safeRm(tempRoot);
-    });
+      t.after(async () => {
+        await safeRm(path.join(projectRoot, "content"));
+        await safeRm(path.join(projectRoot, "public"));
+        await safeRm(distDirPath);
+        await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
+        await fs.mkdir(path.join(projectRoot, "public"), { recursive: true });
+        await fs.writeFile(path.join(projectRoot, "content", ".keep"), "", "utf8");
+        await fs.writeFile(path.join(projectRoot, "public", ".keep"), "", "utf8");
+        await safeRm(tempRoot);
+      });
 
-    await fs.rm(path.join(projectRoot, '.course-content', 'active-source.txt'), { force: true });
+      await fs.rm(path.join(projectRoot, ".course-content", "active-source.txt"), { force: true });
 
-    await fs.mkdir(path.join(projectRoot, '.next'), { recursive: true });
-    await fs.writeFile(path.join(projectRoot, '.next', 'keep-a.txt'), 'a', 'utf8');
+      await fs.mkdir(distDirPath, { recursive: true });
+      await fs.writeFile(path.join(distDirPath, "keep-a.txt"), "a", "utf8");
 
-    const aExit = await runSync({ COURSE_CONTENT_SOURCE: courseA });
-    assert.equal(aExit, 0);
-    assert.equal(await fileExists(path.join(projectRoot, '.next', 'keep-a.txt')), true);
+      const aExit = await runSync({
+        COURSE_CONTENT_SOURCE: courseA,
+        COURSE_DOCS_NEXT_DIST_DIR: distDir,
+      });
+      assert.equal(aExit, 0);
+      assert.equal(await fileExists(path.join(distDirPath, "keep-a.txt")), true);
 
-    await fs.writeFile(path.join(projectRoot, '.next', 'keep-b.txt'), 'b', 'utf8');
+      await fs.writeFile(path.join(distDirPath, "keep-b.txt"), "b", "utf8");
 
-    const bExit = await runSync({ COURSE_CONTENT_SOURCE: courseB });
-    assert.equal(bExit, 0);
-    assert.equal(await fileExists(path.join(projectRoot, '.next')), false);
-  },
-);
+      const bExit = await runSync({
+        COURSE_CONTENT_SOURCE: courseB,
+        COURSE_DOCS_NEXT_DIST_DIR: distDir,
+      });
+      assert.equal(bExit, 0);
+      assert.equal(await fileExists(distDirPath), false);
+    },
+  );
+}

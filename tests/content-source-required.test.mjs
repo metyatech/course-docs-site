@@ -1,19 +1,15 @@
-import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import process from 'node:process';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import path from "node:path";
+import process from "node:process";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { createRunDevTestEnv } from "./test-harness-env.mjs";
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const envFiles = [
-  '.env',
-  '.env.local',
-  '.env.course',
-  '.env.course.local',
-];
+const envFiles = [".env", ".env.local", ".env.course", ".env.course.local"];
 
 const fileExists = async (targetPath) => {
   try {
@@ -28,7 +24,7 @@ const backupFile = async (targetPath) => {
   if (!(await fileExists(targetPath))) {
     return null;
   }
-  return fs.readFile(targetPath, 'utf8');
+  return fs.readFile(targetPath, "utf8");
 };
 
 const restoreFile = async (targetPath, contentsOrNull) => {
@@ -36,30 +32,33 @@ const restoreFile = async (targetPath, contentsOrNull) => {
     await fs.rm(targetPath, { force: true });
     return;
   }
-  await fs.writeFile(targetPath, contentsOrNull, 'utf8');
+  await fs.writeFile(targetPath, contentsOrNull, "utf8");
 };
 
 const runNodeScript = (scriptPath, args = []) =>
   new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [scriptPath, ...args], {
       cwd: projectRoot,
-      env: {
-        ...process.env,
-        COURSE_DOCS_SITE_DEV_INNER: 'stub',
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      env: createRunDevTestEnv({
+        label: `content-source-required-${path.basename(scriptPath, ".mjs")}`,
+        env: process.env,
+        overrides: {
+          COURSE_DOCS_SITE_DEV_INNER: "stub",
+        },
+      }),
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => {
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
       stdout += String(chunk);
     });
-    child.stderr.on('data', (chunk) => {
+    child.stderr.on("data", (chunk) => {
       stderr += String(chunk);
     });
-    child.on('error', reject);
-    child.on('exit', (code) => {
+    child.on("error", reject);
+    child.on("exit", (code) => {
       resolve({
         code: code ?? 1,
         stdout,
@@ -69,7 +68,7 @@ const runNodeScript = (scriptPath, args = []) =>
   });
 
 test(
-  'sync and dev fail fast when COURSE_CONTENT_SOURCE is omitted',
+  "sync and dev fail fast when COURSE_CONTENT_SOURCE is omitted",
   { timeout: 60_000 },
   async (t) => {
     const backups = new Map();
@@ -87,21 +86,21 @@ test(
         await restoreFile(targetPath, contents);
       }
 
-      if (typeof originalCourseContentSource === 'string') {
+      if (typeof originalCourseContentSource === "string") {
         process.env.COURSE_CONTENT_SOURCE = originalCourseContentSource;
       } else {
         delete process.env.COURSE_CONTENT_SOURCE;
       }
     });
 
-    const expectedMessage = 'COURSE_CONTENT_SOURCE is required.';
+    const expectedMessage = "COURSE_CONTENT_SOURCE is required.";
 
-    const syncResult = await runNodeScript('scripts/sync-course-content.mjs');
+    const syncResult = await runNodeScript("scripts/sync-course-content.mjs");
     assert.notEqual(syncResult.code, 0);
     assert.match(`${syncResult.stdout}\n${syncResult.stderr}`, new RegExp(expectedMessage));
 
-    const devResult = await runNodeScript('scripts/run-dev.mjs', ['--port', '3060']);
+    const devResult = await runNodeScript("scripts/run-dev.mjs", ["--port", "3060"]);
     assert.notEqual(devResult.code, 0);
     assert.match(`${devResult.stdout}\n${devResult.stderr}`, new RegExp(expectedMessage));
-  }
+  },
 );

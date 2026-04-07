@@ -1,24 +1,25 @@
-import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
-import net from 'node:net';
-import os from 'node:os';
-import path from 'node:path';
-import process from 'node:process';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { createRunDevTestEnv } from "./test-harness-env.mjs";
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const getFreePort = () =>
   new Promise((resolve, reject) => {
     const server = net.createServer();
     server.unref();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
       const address = server.address();
-      if (!address || typeof address === 'string') {
-        server.close(() => reject(new Error('Failed to allocate free port')));
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate free port")));
         return;
       }
       const { port } = address;
@@ -32,7 +33,7 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   const startedAt = Date.now();
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
-      throw new Error(onTimeoutMessage ?? 'Timed out');
+      throw new Error(onTimeoutMessage ?? "Timed out");
     }
     const result = await fn();
     if (result) {
@@ -43,10 +44,10 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
 };
 
 const fetchRedirect = async (url) => {
-  const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+  const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(20_000) });
   return {
     status: response.status,
-    location: response.headers.get('location'),
+    location: response.headers.get("location"),
   };
 };
 
@@ -70,30 +71,30 @@ const writeFixtureCourseRepo = async ({ rootDir, rootMeta, docsMeta, examsMeta, 
 
   const rootMetaSource = `const meta = ${JSON.stringify(
     {
-      '*': {
-        type: 'page',
+      "*": {
+        type: "page",
         theme: {
           timestamp: false,
         },
       },
       index: {
-        display: 'hidden',
+        display: "hidden",
       },
       ...rootMeta,
     },
     null,
-    2
+    2,
   )};
 
 export default meta;
 `;
 
-  await fs.mkdir(path.join(rootDir, 'content'), { recursive: true });
-  await fs.mkdir(path.join(rootDir, 'public', 'img'), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "content"), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "public", "img"), { recursive: true });
 
-  await fs.writeFile(path.join(rootDir, 'site.config.ts'), siteConfig, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', '_meta.ts'), rootMetaSource, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'public', 'img', 'favicon.ico'), '', 'utf8');
+  await fs.writeFile(path.join(rootDir, "site.config.ts"), siteConfig, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "_meta.ts"), rootMetaSource, "utf8");
+  await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 
   if (docsMeta) {
     const docsMetaSource = `const meta = ${JSON.stringify(docsMeta, null, 2)};
@@ -101,16 +102,16 @@ export default meta;
 export default meta;
 `;
 
-    await fs.mkdir(path.join(rootDir, 'content', 'docs'), { recursive: true });
-    await fs.writeFile(path.join(rootDir, 'content', 'docs', '_meta.ts'), docsMetaSource, 'utf8');
+    await fs.mkdir(path.join(rootDir, "content", "docs"), { recursive: true });
+    await fs.writeFile(path.join(rootDir, "content", "docs", "_meta.ts"), docsMetaSource, "utf8");
 
     for (const page of pages) {
-      const pageDir = path.join(rootDir, 'content', 'docs', page.slug);
+      const pageDir = path.join(rootDir, "content", "docs", page.slug);
       await fs.mkdir(pageDir, { recursive: true });
       await fs.writeFile(
-        path.join(pageDir, 'index.mdx'),
+        path.join(pageDir, "index.mdx"),
         `---\ntitle: ${JSON.stringify(page.title)}\n---\n\n${page.title}\n`,
-        'utf8'
+        "utf8",
       );
     }
   }
@@ -118,44 +119,44 @@ export default meta;
   if (examsMeta) {
     const examDir = path.join(
       rootDir,
-      'content',
-      'exams',
-      '2025',
-      '2semester',
-      '2final-exam',
-      'preparation'
+      "content",
+      "exams",
+      "2025",
+      "2semester",
+      "2final-exam",
+      "preparation",
     );
 
     await fs.mkdir(examDir, { recursive: true });
     await fs.writeFile(
-      path.join(rootDir, 'content', 'exams', '_meta.ts'),
+      path.join(rootDir, "content", "exams", "_meta.ts"),
       'const meta = {\n  "2025": "2025"\n};\n\nexport default meta;\n',
-      'utf8'
+      "utf8",
     );
     await fs.writeFile(
-      path.join(rootDir, 'content', 'exams', '2025', '_meta.ts'),
+      path.join(rootDir, "content", "exams", "2025", "_meta.ts"),
       'const meta = {\n  "2semester": "2semester"\n};\n\nexport default meta;\n',
-      'utf8'
+      "utf8",
     );
     await fs.writeFile(
-      path.join(rootDir, 'content', 'exams', '2025', '2semester', '_meta.ts'),
+      path.join(rootDir, "content", "exams", "2025", "2semester", "_meta.ts"),
       'const meta = {\n  "2final-exam": "2final-exam"\n};\n\nexport default meta;\n',
-      'utf8'
+      "utf8",
     );
     await fs.writeFile(
-      path.join(rootDir, 'content', 'exams', '2025', '2semester', '2final-exam', '_meta.ts'),
+      path.join(rootDir, "content", "exams", "2025", "2semester", "2final-exam", "_meta.ts"),
       'const meta = {\n  preparation: "Preparation"\n};\n\nexport default meta;\n',
-      'utf8'
+      "utf8",
     );
     await fs.writeFile(
-      path.join(examDir, '_meta.ts'),
+      path.join(examDir, "_meta.ts"),
       `const meta = ${JSON.stringify(examsMeta, null, 2)};\n\nexport default meta;\n`,
-      'utf8'
+      "utf8",
     );
     await fs.writeFile(
-      path.join(examDir, 'index.mdx'),
-      '---\ntitle: Preparation\n---\n\nPreparation\n',
-      'utf8'
+      path.join(examDir, "index.mdx"),
+      "---\ntitle: Preparation\n---\n\nPreparation\n",
+      "utf8",
     );
   }
 };
@@ -170,55 +171,55 @@ const killProcessTree = async (child) => {
     // ignore
   }
 
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     try {
-      spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
     } catch {
       // ignore
     }
   }
-  await Promise.race([new Promise((resolve) => child.on('exit', () => resolve())), sleep(10_000)]);
+  await Promise.race([new Promise((resolve) => child.on("exit", () => resolve())), sleep(10_000)]);
 };
 
 test(
-  'root redirect follows the first visible content entry from the active content repo',
+  "root redirect follows the first visible content entry from the active content repo",
   { timeout: 2 * 60_000 },
   async (t) => {
     const scenarios = [
       {
-        name: 'intro-first',
-        rootMeta: { docs: 'Docs' },
-        docsMeta: { intro: {}, basics: 'Basics' },
+        name: "intro-first",
+        rootMeta: { docs: "Docs" },
+        docsMeta: { intro: {}, basics: "Basics" },
         pages: [
-          { slug: 'intro', title: 'Intro' },
-          { slug: 'basics', title: 'Basics' },
+          { slug: "intro", title: "Intro" },
+          { slug: "basics", title: "Basics" },
         ],
-        expectedLocation: '/docs/intro',
+        expectedLocation: "/docs/intro",
       },
       {
-        name: 'overview-first',
-        rootMeta: { docs: 'Docs' },
-        docsMeta: { '01-overview': 'Overview', basics: 'Basics' },
+        name: "overview-first",
+        rootMeta: { docs: "Docs" },
+        docsMeta: { "01-overview": "Overview", basics: "Basics" },
         pages: [
-          { slug: '01-overview', title: 'Overview' },
-          { slug: 'basics', title: 'Basics' },
+          { slug: "01-overview", title: "Overview" },
+          { slug: "basics", title: "Basics" },
         ],
-        expectedLocation: '/docs/01-overview',
+        expectedLocation: "/docs/01-overview",
       },
       {
-        name: 'exams-only',
-        rootMeta: { exams: 'Exams' },
-        examsMeta: { index: { title: 'Preparation' } },
+        name: "exams-only",
+        rootMeta: { exams: "Exams" },
+        examsMeta: { index: { title: "Preparation" } },
         pages: [],
-        expectedLocation: '/exams/2025/2semester/2final-exam/preparation',
+        expectedLocation: "/exams/2025/2semester/2final-exam/preparation",
       },
     ];
 
     for (const scenario of scenarios) {
       const tempRoot = await fs.mkdtemp(
-        path.join(os.tmpdir(), `course-root-redirect-${scenario.name}-`)
+        path.join(os.tmpdir(), `course-root-redirect-${scenario.name}-`),
       );
-      const fixtureCourse = path.join(tempRoot, 'course');
+      const fixtureCourse = path.join(tempRoot, "course");
       const port = await getFreePort();
       const baseUrl = `http://127.0.0.1:${port}`;
 
@@ -230,14 +231,16 @@ test(
         examsMeta: scenario.examsMeta,
       });
 
-      const dev = spawn(process.execPath, ['scripts/run-dev.mjs', '--port', String(port)], {
+      const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
         cwd: projectRoot,
-        env: {
-          ...process.env,
-          NEXT_TELEMETRY_DISABLED: '1',
-          COURSE_CONTENT_SOURCE: fixtureCourse,
-        },
-        stdio: 'inherit',
+        env: createRunDevTestEnv({
+          label: `root-redirect-${scenario.name}`,
+          env: process.env,
+          overrides: {
+            COURSE_CONTENT_SOURCE: fixtureCourse,
+          },
+        }),
+        stdio: "inherit",
       });
 
       await t.test(scenario.name, async () => {
@@ -250,7 +253,7 @@ test(
             timeoutMs: 60_000,
             intervalMs: 500,
             onTimeoutMessage: `Server did not become ready for ${scenario.name}.`,
-          }
+          },
         );
 
         const root = await fetchRedirect(`${baseUrl}/`);
@@ -261,5 +264,5 @@ test(
       await killProcessTree(dev);
       await fs.rm(tempRoot, { recursive: true, force: true });
     }
-  }
+  },
 );

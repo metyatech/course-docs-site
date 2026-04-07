@@ -1,17 +1,18 @@
-import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
-import net from 'node:net';
-import os from 'node:os';
-import path from 'node:path';
-import process from 'node:process';
-import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { createRunDevTestEnv } from "./test-harness-env.mjs";
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const envCourseLocalPath = path.join(projectRoot, '.env.course.local');
-const envCoursePath = path.join(projectRoot, '.env.course');
+const envCourseLocalPath = path.join(projectRoot, ".env.course.local");
+const envCoursePath = path.join(projectRoot, ".env.course");
 
 const fileExists = async (p) => {
   try {
@@ -26,7 +27,7 @@ const backupFile = async (p) => {
   if (!(await fileExists(p))) {
     return null;
   }
-  return fs.readFile(p, 'utf8');
+  return fs.readFile(p, "utf8");
 };
 
 const restoreFile = async (p, contentsOrNull) => {
@@ -34,18 +35,18 @@ const restoreFile = async (p, contentsOrNull) => {
     await fs.rm(p, { force: true });
     return;
   }
-  await fs.writeFile(p, contentsOrNull, 'utf8');
+  await fs.writeFile(p, contentsOrNull, "utf8");
 };
 
 const getFreePort = () =>
   new Promise((resolve, reject) => {
     const server = net.createServer();
     server.unref();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
       const address = server.address();
-      if (!address || typeof address === 'string') {
-        server.close(() => reject(new Error('Failed to allocate free port')));
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate free port")));
         return;
       }
       const { port } = address;
@@ -56,7 +57,7 @@ const getFreePort = () =>
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const fetchText = async (url) => {
-  const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+  const res = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(20_000) });
   const text = await res.text();
   return { status: res.status, text };
 };
@@ -74,7 +75,7 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   while (true) {
     const now = Date.now();
     if (now - startedAt > timeoutMs) {
-      throw new Error(onTimeoutMessage ?? 'Timed out');
+      throw new Error(onTimeoutMessage ?? "Timed out");
     }
     const result = await fn();
     if (result) {
@@ -91,7 +92,7 @@ const findStubPort = async ({ fromPort, toPort, timeoutMs }) => {
     async () => {
       for (let port = fromPort; port <= toPort; port += 1) {
         const result = await tryFetchText(`http://127.0.0.1:${port}/healthz`);
-        if (result?.status === 200 && result.text.trim().startsWith('course-docs-site-stub:')) {
+        if (result?.status === 200 && result.text.trim().startsWith("course-docs-site-stub:")) {
           foundPort = port;
           foundHealthzText = result.text.trim();
           return true;
@@ -103,7 +104,7 @@ const findStubPort = async ({ fromPort, toPort, timeoutMs }) => {
       timeoutMs,
       intervalMs: 200,
       onTimeoutMessage: `Could not find stub server port in range ${fromPort}-${toPort}.`,
-    }
+    },
   );
   return { port: foundPort, healthzText: foundHealthzText };
 };
@@ -151,20 +152,24 @@ import { Admonition } from "@metyatech/course-docs-platform/mdx";
 ${courseName}
 `;
 
-  await fs.mkdir(path.join(rootDir, 'content', 'docs', 'intro'), { recursive: true });
-  await fs.mkdir(path.join(rootDir, 'content', 'docs', extraDocsFolder), { recursive: true });
-  await fs.mkdir(path.join(rootDir, 'public', 'img'), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "content", "docs", "intro"), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "content", "docs", extraDocsFolder), { recursive: true });
+  await fs.mkdir(path.join(rootDir, "public", "img"), { recursive: true });
 
-  await fs.writeFile(path.join(rootDir, 'site.config.ts'), siteConfig, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', '_meta.ts'), rootMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', '_meta.ts'), docsMeta, 'utf8');
-  await fs.writeFile(path.join(rootDir, 'content', 'docs', 'intro', 'index.mdx'), mdxCommon, 'utf8');
+  await fs.writeFile(path.join(rootDir, "site.config.ts"), siteConfig, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "_meta.ts"), rootMeta, "utf8");
+  await fs.writeFile(path.join(rootDir, "content", "docs", "_meta.ts"), docsMeta, "utf8");
   await fs.writeFile(
-    path.join(rootDir, 'content', 'docs', extraDocsFolder, 'index.mdx'),
+    path.join(rootDir, "content", "docs", "intro", "index.mdx"),
     mdxCommon,
-    'utf8'
+    "utf8",
   );
-  await fs.writeFile(path.join(rootDir, 'public', 'img', 'favicon.ico'), '', 'utf8');
+  await fs.writeFile(
+    path.join(rootDir, "content", "docs", extraDocsFolder, "index.mdx"),
+    mdxCommon,
+    "utf8",
+  );
+  await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
 const killProcessTree = async (child) => {
@@ -177,14 +182,14 @@ const killProcessTree = async (child) => {
     // ignore
   }
 
-  if (process.platform === 'win32') {
+  if (process.platform === "win32") {
     try {
-      spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
     } catch {
       // ignore
     }
   }
-  await Promise.race([new Promise((resolve) => child.on('exit', () => resolve())), sleep(5000)]);
+  await Promise.race([new Promise((resolve) => child.on("exit", () => resolve())), sleep(5000)]);
 };
 
 const safeRm = async (targetPath) => {
@@ -201,111 +206,114 @@ const safeRm = async (targetPath) => {
 };
 
 test(
-  'dev server switches course content when env file changes',
+  "dev server switches course content when env file changes",
   { timeout: 2 * 60_000 },
   async (t) => {
-  const port = await getFreePort();
+    const port = await getFreePort();
 
-  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-dev-switch-'));
-  const courseA = path.join(tempRoot, 'course-a');
-  const courseB = path.join(tempRoot, 'course-b');
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-dev-switch-"));
+    const courseA = path.join(tempRoot, "course-a");
+    const courseB = path.join(tempRoot, "course-b");
 
-  await writeCourseRepo({ rootDir: courseA, courseName: 'Course A', extraDocsFolder: 'a-only' });
-  await writeCourseRepo({ rootDir: courseB, courseName: 'Course B', extraDocsFolder: 'b-only' });
+    await writeCourseRepo({ rootDir: courseA, courseName: "Course A", extraDocsFolder: "a-only" });
+    await writeCourseRepo({ rootDir: courseB, courseName: "Course B", extraDocsFolder: "b-only" });
 
-  const envCourseBackup = await backupFile(envCoursePath);
-  const envCourseLocalBackup = await backupFile(envCourseLocalPath);
+    const envCourseBackup = await backupFile(envCoursePath);
+    const envCourseLocalBackup = await backupFile(envCourseLocalPath);
 
-  t.after(async () => {
-    await restoreFile(envCourseLocalPath, envCourseLocalBackup);
-    await restoreFile(envCoursePath, envCourseBackup);
-    await safeRm(path.join(projectRoot, 'content'));
-    await safeRm(path.join(projectRoot, 'public'));
-    await fs.mkdir(path.join(projectRoot, 'content'), { recursive: true });
-    await fs.mkdir(path.join(projectRoot, 'public'), { recursive: true });
-    await fs.writeFile(path.join(projectRoot, 'content', '.keep'), '', 'utf8');
-    await fs.writeFile(path.join(projectRoot, 'public', '.keep'), '', 'utf8');
-    await fs.rm(tempRoot, { recursive: true, force: true });
-  });
+    t.after(async () => {
+      await restoreFile(envCourseLocalPath, envCourseLocalBackup);
+      await restoreFile(envCoursePath, envCourseBackup);
+      await safeRm(path.join(projectRoot, "content"));
+      await safeRm(path.join(projectRoot, "public"));
+      await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
+      await fs.mkdir(path.join(projectRoot, "public"), { recursive: true });
+      await fs.writeFile(path.join(projectRoot, "content", ".keep"), "", "utf8");
+      await fs.writeFile(path.join(projectRoot, "public", ".keep"), "", "utf8");
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
 
-  // Keep secrets in `.env.local`. For switching content, use `.env.course.local`.
-  await fs.rm(envCoursePath, { force: true });
-  await fs.writeFile(
-    envCourseLocalPath,
-    `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
-    'utf8'
-  );
+    // Keep secrets in `.env.local`. For switching content, use `.env.course.local`.
+    await fs.rm(envCoursePath, { force: true });
+    await fs.writeFile(
+      envCourseLocalPath,
+      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
+      "utf8",
+    );
 
-  const dev = spawn(process.execPath, ['scripts/run-dev.mjs', '--port', String(port)], {
-    cwd: projectRoot,
-    env: {
-      ...process.env,
-      NEXT_TELEMETRY_DISABLED: '1',
-      COURSE_DOCS_SITE_DEV_INNER: 'stub',
-    },
-    stdio: 'inherit',
-  });
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "dev-switch-course-content",
+        env: process.env,
+        overrides: {
+          COURSE_DOCS_SITE_DEV_INNER: "stub",
+        },
+      }),
+      stdio: "inherit",
+    });
 
-  t.after(async () => {
-    await killProcessTree(dev);
-  });
+    t.after(async () => {
+      await killProcessTree(dev);
+    });
 
-  const baseUrl = `http://127.0.0.1:${port}`;
+    const baseUrl = `http://127.0.0.1:${port}`;
 
-  await waitFor(
-    async () => {
-      const result = await tryFetchText(`${baseUrl}/docs/a-only/`);
-      return result?.status === 200;
-    },
+    await waitFor(
+      async () => {
+        const result = await tryFetchText(`${baseUrl}/docs/a-only/`);
+        return result?.status === 200;
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 200,
+        onTimeoutMessage: "Server did not become ready with Course A content.",
+      },
+    );
+
     {
-      timeoutMs: 30_000,
-      intervalMs: 200,
-      onTimeoutMessage: 'Server did not become ready with Course A content.',
+      const a = await fetchText(`${baseUrl}/docs/a-only/`);
+      const b = await fetchText(`${baseUrl}/docs/b-only/`);
+      assert.equal(a.status, 200);
+      assert.equal(b.status, 404);
     }
-  );
 
-  {
-    const a = await fetchText(`${baseUrl}/docs/a-only/`);
-    const b = await fetchText(`${baseUrl}/docs/b-only/`);
-    assert.equal(a.status, 200);
-    assert.equal(b.status, 404);
-  }
+    // Switch to Course B by writing .env.course.local.
+    // This must trigger a restart + content resync.
+    await fs.writeFile(
+      envCourseLocalPath,
+      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseB)}\n`,
+      "utf8",
+    );
 
-  // Switch to Course B by writing .env.course.local.
-  // This must trigger a restart + content resync.
-  await fs.writeFile(
-    envCourseLocalPath,
-    `COURSE_CONTENT_SOURCE=${JSON.stringify(courseB)}\n`,
-    'utf8'
-  );
-
-  await waitFor(
-    async () => {
-      const a = await tryFetchText(`${baseUrl}/docs/a-only/`);
-      const b = await tryFetchText(`${baseUrl}/docs/b-only/`);
-      if (!a || !b) {
-        return false;
-      }
-      return a.status === 404 && b.status === 200;
-    },
-    {
-      timeoutMs: 30_000,
-      intervalMs: 200,
-      onTimeoutMessage: 'Server did not switch to Course B content.',
-    }
-  );
-});
+    await waitFor(
+      async () => {
+        const a = await tryFetchText(`${baseUrl}/docs/a-only/`);
+        const b = await tryFetchText(`${baseUrl}/docs/b-only/`);
+        if (!a || !b) {
+          return false;
+        }
+        return a.status === 404 && b.status === 200;
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 200,
+        onTimeoutMessage: "Server did not switch to Course B content.",
+      },
+    );
+  },
+);
 
 test(
-  'dev restart keeps the originally selected port when no port is specified',
+  "dev restart keeps the originally selected port when no port is specified",
   { timeout: 2 * 60_000 },
   async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-dev-switch-port-'));
-    const courseA = path.join(tempRoot, 'course-a');
-    const courseB = path.join(tempRoot, 'course-b');
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-dev-switch-port-"));
+    const courseA = path.join(tempRoot, "course-a");
+    const courseB = path.join(tempRoot, "course-b");
 
-    await writeCourseRepo({ rootDir: courseA, courseName: 'Course A', extraDocsFolder: 'a-only' });
-    await writeCourseRepo({ rootDir: courseB, courseName: 'Course B', extraDocsFolder: 'b-only' });
+    await writeCourseRepo({ rootDir: courseA, courseName: "Course A", extraDocsFolder: "a-only" });
+    await writeCourseRepo({ rootDir: courseB, courseName: "Course B", extraDocsFolder: "b-only" });
 
     const envCourseBackup = await backupFile(envCoursePath);
     const envCourseLocalBackup = await backupFile(envCourseLocalPath);
@@ -316,8 +324,8 @@ test(
       blocker = net.createServer();
       blocker.unref();
       await new Promise((resolve, reject) => {
-        blocker.once('error', () => resolve()); // already in use is fine
-        blocker.listen(3000, '127.0.0.1', () => resolve());
+        blocker.once("error", () => resolve()); // already in use is fine
+        blocker.listen(3000, "127.0.0.1", () => resolve());
       });
     } catch {
       // ignore
@@ -333,12 +341,12 @@ test(
       }
       await restoreFile(envCourseLocalPath, envCourseLocalBackup);
       await restoreFile(envCoursePath, envCourseBackup);
-      await safeRm(path.join(projectRoot, 'content'));
-      await safeRm(path.join(projectRoot, 'public'));
-      await fs.mkdir(path.join(projectRoot, 'content'), { recursive: true });
-      await fs.mkdir(path.join(projectRoot, 'public'), { recursive: true });
-      await fs.writeFile(path.join(projectRoot, 'content', '.keep'), '', 'utf8');
-      await fs.writeFile(path.join(projectRoot, 'public', '.keep'), '', 'utf8');
+      await safeRm(path.join(projectRoot, "content"));
+      await safeRm(path.join(projectRoot, "public"));
+      await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
+      await fs.mkdir(path.join(projectRoot, "public"), { recursive: true });
+      await fs.writeFile(path.join(projectRoot, "content", ".keep"), "", "utf8");
+      await fs.writeFile(path.join(projectRoot, "public", ".keep"), "", "utf8");
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
@@ -346,17 +354,19 @@ test(
     await fs.writeFile(
       envCourseLocalPath,
       `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
-      'utf8'
+      "utf8",
     );
 
-    const dev = spawn(process.execPath, ['scripts/run-dev.mjs'], {
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs"], {
       cwd: projectRoot,
-      env: {
-        ...process.env,
-        NEXT_TELEMETRY_DISABLED: '1',
-        COURSE_DOCS_SITE_DEV_INNER: 'stub',
-      },
-      stdio: 'inherit',
+      env: createRunDevTestEnv({
+        label: "dev-switch-port-selection",
+        env: process.env,
+        overrides: {
+          COURSE_DOCS_SITE_DEV_INNER: "stub",
+        },
+      }),
+      stdio: "inherit",
     });
     t.after(async () => {
       await killProcessTree(dev);
@@ -364,7 +374,7 @@ test(
 
     const found = await findStubPort({ fromPort: 3000, toPort: 3010, timeoutMs: 30_000 });
     const chosenPort = found.port;
-    assert.ok(chosenPort, 'Expected a chosen port');
+    assert.ok(chosenPort, "Expected a chosen port");
     const baseUrl = `http://127.0.0.1:${chosenPort}`;
 
     await waitFor(
@@ -375,14 +385,14 @@ test(
       {
         timeoutMs: 30_000,
         intervalMs: 200,
-        onTimeoutMessage: 'Server did not become ready with Course A content.',
-      }
+        onTimeoutMessage: "Server did not become ready with Course A content.",
+      },
     );
 
     await fs.writeFile(
       envCourseLocalPath,
       `COURSE_CONTENT_SOURCE=${JSON.stringify(courseB)}\n`,
-      'utf8'
+      "utf8",
     );
 
     await waitFor(
@@ -397,22 +407,22 @@ test(
       {
         timeoutMs: 30_000,
         intervalMs: 200,
-        onTimeoutMessage: 'Server did not switch to Course B content on the same port.',
-      }
+        onTimeoutMessage: "Server did not switch to Course B content on the same port.",
+      },
     );
-  }
+  },
 );
 
 test(
-  'dev restart changes revision (enables browser auto-reload)',
+  "dev restart changes revision (enables browser auto-reload)",
   { timeout: 2 * 60_000 },
   async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-dev-switch-rev-'));
-    const courseA = path.join(tempRoot, 'course-a');
-    const courseB = path.join(tempRoot, 'course-b');
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-dev-switch-rev-"));
+    const courseA = path.join(tempRoot, "course-a");
+    const courseB = path.join(tempRoot, "course-b");
 
-    await writeCourseRepo({ rootDir: courseA, courseName: 'Course A', extraDocsFolder: 'a-only' });
-    await writeCourseRepo({ rootDir: courseB, courseName: 'Course B', extraDocsFolder: 'b-only' });
+    await writeCourseRepo({ rootDir: courseA, courseName: "Course A", extraDocsFolder: "a-only" });
+    await writeCourseRepo({ rootDir: courseB, courseName: "Course B", extraDocsFolder: "b-only" });
 
     const envCourseBackup = await backupFile(envCoursePath);
     const envCourseLocalBackup = await backupFile(envCourseLocalPath);
@@ -420,12 +430,12 @@ test(
     t.after(async () => {
       await restoreFile(envCourseLocalPath, envCourseLocalBackup);
       await restoreFile(envCoursePath, envCourseBackup);
-      await safeRm(path.join(projectRoot, 'content'));
-      await safeRm(path.join(projectRoot, 'public'));
-      await fs.mkdir(path.join(projectRoot, 'content'), { recursive: true });
-      await fs.mkdir(path.join(projectRoot, 'public'), { recursive: true });
-      await fs.writeFile(path.join(projectRoot, 'content', '.keep'), '', 'utf8');
-      await fs.writeFile(path.join(projectRoot, 'public', '.keep'), '', 'utf8');
+      await safeRm(path.join(projectRoot, "content"));
+      await safeRm(path.join(projectRoot, "public"));
+      await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
+      await fs.mkdir(path.join(projectRoot, "public"), { recursive: true });
+      await fs.writeFile(path.join(projectRoot, "content", ".keep"), "", "utf8");
+      await fs.writeFile(path.join(projectRoot, "public", ".keep"), "", "utf8");
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
@@ -433,35 +443,37 @@ test(
     await fs.writeFile(
       envCourseLocalPath,
       `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
-      'utf8'
+      "utf8",
     );
 
-    const dev = spawn(process.execPath, ['scripts/run-dev.mjs'], {
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs"], {
       cwd: projectRoot,
-      env: {
-        ...process.env,
-        NEXT_TELEMETRY_DISABLED: '1',
-        COURSE_DOCS_SITE_DEV_INNER: 'stub',
-      },
-      stdio: 'inherit',
+      env: createRunDevTestEnv({
+        label: "dev-switch-revision",
+        env: process.env,
+        overrides: {
+          COURSE_DOCS_SITE_DEV_INNER: "stub",
+        },
+      }),
+      stdio: "inherit",
     });
     t.after(async () => {
       await killProcessTree(dev);
     });
 
     const initial = await findStubPort({ fromPort: 3000, toPort: 3010, timeoutMs: 30_000 });
-    assert.ok(initial.port, 'Expected initial port');
-    assert.ok(initial.healthzText, 'Expected initial healthz text');
-    const initialRevision = initial.healthzText.split(':')[1] ?? '';
-    assert.ok(initialRevision, 'Expected initial revision');
+    assert.ok(initial.port, "Expected initial port");
+    assert.ok(initial.healthzText, "Expected initial healthz text");
+    const initialRevision = initial.healthzText.split(":")[1] ?? "";
+    assert.ok(initialRevision, "Expected initial revision");
 
     await fs.writeFile(
       envCourseLocalPath,
       `COURSE_CONTENT_SOURCE=${JSON.stringify(courseB)}\n`,
-      'utf8'
+      "utf8",
     );
 
-    let nextRevision = '';
+    let nextRevision = "";
     await waitFor(
       async () => {
         const res = await tryFetchText(`http://127.0.0.1:${initial.port}/healthz`);
@@ -469,10 +481,10 @@ test(
           return false;
         }
         const text = res.text.trim();
-        if (!text.startsWith('course-docs-site-stub:')) {
+        if (!text.startsWith("course-docs-site-stub:")) {
           return false;
         }
-        const r = text.split(':')[1] ?? '';
+        const r = text.split(":")[1] ?? "";
         if (!r || r === initialRevision) {
           return false;
         }
@@ -482,10 +494,10 @@ test(
       {
         timeoutMs: 30_000,
         intervalMs: 200,
-        onTimeoutMessage: 'Revision did not change after restart.',
-      }
+        onTimeoutMessage: "Revision did not change after restart.",
+      },
     );
 
     assert.notEqual(nextRevision, initialRevision);
-  }
+  },
 );
