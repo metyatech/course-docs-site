@@ -2,47 +2,16 @@ import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import path from 'path';
 import { Readable } from 'stream';
+import {
+  DOWNLOAD_ROUTE_ASSET_EXTENSION_SET,
+  getCourseAssetContentType,
+} from '../shared/course-asset-config.js';
 
 export const runtime = 'nodejs';
 
 const contentRoot = path.join(process.cwd(), 'content');
 
-const getContentType = (ext: string) => {
-  switch (ext) {
-    case '.png':
-      return 'image/png';
-    case '.jpg':
-    case '.jpeg':
-      return 'image/jpeg';
-    case '.gif':
-      return 'image/gif';
-    case '.webp':
-      return 'image/webp';
-    case '.svg':
-      return 'image/svg+xml';
-    case '.ico':
-      return 'image/x-icon';
-    case '.css':
-      return 'text/css; charset=utf-8';
-    case '.js':
-      return 'text/javascript; charset=utf-8';
-    case '.json':
-      return 'application/json; charset=utf-8';
-    case '.txt':
-      return 'text/plain; charset=utf-8';
-    case '.pdf':
-      return 'application/pdf';
-    case '.zip':
-      return 'application/zip';
-    case '.html':
-      return 'text/html; charset=utf-8';
-    default:
-      return 'application/octet-stream';
-  }
-};
-
-const isDownloadExtension = (ext: string) =>
-  ext === '.zip' || ext === '.pdf' || ext === '.html' || ext === '.txt';
+const isDownloadExtension = (ext: string) => DOWNLOAD_ROUTE_ASSET_EXTENSION_SET.has(ext);
 
 const safeDecodeSegment = (segment: string) => {
   try {
@@ -86,7 +55,7 @@ export const GET = async (
 
   const ext = path.extname(resolvedPath).toLowerCase();
   const headers = new Headers();
-  headers.set('Content-Type', getContentType(ext));
+  headers.set('Content-Type', getCourseAssetContentType(ext));
   const etag = `"${fileStat.size}-${fileStat.mtimeMs}"`;
   headers.set('ETag', etag);
   headers.set('Cache-Control', 'public, max-age=0, must-revalidate');

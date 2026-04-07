@@ -15,6 +15,15 @@
   max-width: min(600px, 100%);
 }
 
+/* Ensure the image zoom controls keep a clear boundary in dark themes. */
+[data-rmiz-btn-zoom],
+[data-rmiz-btn-unzoom] {
+  border: 2px solid rgb(255 255 255 / 0.95);
+  box-shadow:
+    0 0 0 1px rgb(15 23 42 / 0.55),
+    0 6px 18px rgb(15 23 42 / 0.22);
+}
+
 .course-footer-row {
   display: flex;
   align-items: center;
@@ -22,4 +31,3 @@
   gap: 1rem;
   width: 100%;
 }
-

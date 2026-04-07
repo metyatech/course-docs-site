@@ -1,21 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-
-const assetExtensions = new Set([
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.svg',
-  '.ico',
-  '.css',
-  '.js',
-  '.json',
-  '.txt',
-  '.pdf',
-  '.zip',
-  '.html',
-]);
+import { DIRECT_ROUTE_ASSET_EXTENSION_SET } from '../shared/course-asset-config.js';
 
 const getExtension = (pathname: string) => {
   const lastSlash = pathname.lastIndexOf('/');
@@ -42,7 +26,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!assetExtensions.has(ext)) {
+  if (!DIRECT_ROUTE_ASSET_EXTENSION_SET.has(ext)) {
     return NextResponse.next();
   }
 
