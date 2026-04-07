@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
+import process from 'node:process';
 import test from 'node:test';
 
 const configModulePath = '../dist/shared/course-asset-config.js';
@@ -65,6 +67,42 @@ test('webpack asset rule matches pdf and video assets', async () => {
   assert.match('clip.mov', assetRule.test);
   assert.match('preview.webm', assetRule.test);
   assert.doesNotMatch('script.js', assetRule.test);
+});
+
+test('webpack asset rule honors custom Next dist dirs for server output', async () => {
+  const { applyCourseAssetWebpackRules } = await import(webpackModulePath);
+  const originalDistDir = process.env.COURSE_DOCS_NEXT_DIST_DIR;
+  const projectRoot = '/tmp/project';
+  const distDir = '.next-test/custom-server';
+  const config = {
+    module: {
+      rules: [{ oneOf: [{ test: /\.css$/i }] }],
+    },
+    output: {
+      path: path.join(projectRoot, '.next-test', 'custom-server', 'server', 'app'),
+    },
+  };
+
+  process.env.COURSE_DOCS_NEXT_DIST_DIR = distDir;
+
+  try {
+    const updated = applyCourseAssetWebpackRules(config, {
+      isServer: true,
+      projectRoot,
+    });
+
+    const assetRule = updated.module.rules.at(-1);
+    assert.equal(
+      assetRule?.generator?.outputPath,
+      path.relative(config.output.path, path.join(projectRoot, '.next-test', 'custom-server')),
+    );
+  } finally {
+    if (typeof originalDistDir === 'string') {
+      process.env.COURSE_DOCS_NEXT_DIST_DIR = originalDistDir;
+    } else {
+      delete process.env.COURSE_DOCS_NEXT_DIST_DIR;
+    }
+  }
 });
 
 test('mdx routing ignores pdf and video files as static assets', async () => {

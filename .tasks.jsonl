@@ -5,3 +5,4 @@
 {"id":"NzbiJm4b","description":"Close completed pushed tracker tasks","stage":"done","createdAt":"2026-03-28T14:58:52.288Z","updatedAt":"2026-03-28T14:59:03.014Z"}
 {"id":"SFt-H2wB","description":"Root-fix remote student works index fetch to avoid Next dynamic server usage in course-docs-platform","stage":"committed","createdAt":"2026-04-03T02:34:33.338Z","updatedAt":"2026-04-03T02:45:08.337Z","committedEventId":"plybwDprUbWAqPoc"}
 {"id":"HkZGPM32","description":"Fix remaining dependency vulnerabilities in course-docs-platform","stage":"committed","createdAt":"2026-04-03T03:17:40.623Z","updatedAt":"2026-04-03T03:22:38.388Z","committedEventId":"xJ0H3DphSNJaUqNY"}
+{"id":"lyAeHrV4","description":"Honor configurable Next dist dirs in course-docs-platform asset webpack output","stage":"committed","createdAt":"2026-04-07T07:44:08.947Z","updatedAt":"2026-04-07T07:45:24.142Z","committedEventId":"_aQfiqTgmHI1ij0d"}

@@ -3,6 +3,7 @@ import {
   IMPORTABLE_STATIC_ASSET_EXTENSIONS,
   createAssetExtensionRegex,
 } from '../shared/course-asset-config.js';
+import { resolveNextDistDirPath } from '../shared/next-dist-dir.js';
 
 type ApplyOptions = {
   basePath?: string;
@@ -46,7 +47,7 @@ export function applyCourseAssetWebpackRules(config: WebpackConfigLike, options:
   const importableAssetPattern = createAssetExtensionRegex(IMPORTABLE_STATIC_ASSET_EXTENSIONS);
   const staticMediaFilename = 'static/media/[name].[hash][ext]';
   const staticMediaPublicPath = `${basePath}/_next/`;
-  const nextOutputRoot = path.join(options.projectRoot, '.next');
+  const nextOutputRoot = resolveNextDistDirPath({ projectRoot: options.projectRoot });
   const staticMediaOutputPath = options.isServer
     ? path.relative(config.output.path, nextOutputRoot)
     : undefined;
