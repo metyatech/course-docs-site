@@ -8,6 +8,8 @@ import {
 import { resolveNextDistDir } from "./scripts/next-dist-dir.mjs";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
+const skipBuildLint = process.env.COURSE_DOCS_SKIP_BUILD_LINT === "1";
+const skipBuildTypecheck = process.env.COURSE_DOCS_SKIP_BUILD_TYPECHECK === "1";
 
 const withNextra = nextra({
   defaultShowCopyCode: true,
@@ -26,6 +28,12 @@ const nextConfig = {
   reactStrictMode: true,
   trailingSlash: true,
   transpilePackages: ["@metyatech/course-docs-platform"],
+  eslint: {
+    ignoreDuringBuilds: skipBuildLint,
+  },
+  typescript: {
+    ignoreBuildErrors: skipBuildTypecheck,
+  },
   outputFileTracingIncludes: {
     // Ensure /asset route can read synced course files in serverless runtimes.
     "/asset/[...assetPath]": ["content/**/*"],
