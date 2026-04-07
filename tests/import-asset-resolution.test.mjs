@@ -54,6 +54,8 @@ const tryFetchText = async (url) => {
   }
 };
 
+const decodeHtmlAttribute = (value) => value.replaceAll('&amp;', '&');
+
 const writeFixtureCourseRepo = async (rootDir) => {
   const siteConfig = `export const siteConfig = {
   logoText: "Import Asset Resolution",
@@ -87,16 +89,17 @@ export default meta;
 export default meta;
 `;
 
-  const importsMdx = `---
+const importsMdx = `---
 title: Import Assets
 ---
 
+import { createCourseDownloadUrl } from '@metyatech/course-docs-platform/mdx';
 import archiveUrl from './assets/packet.zip';
 import handoutUrl from './assets/handout.pdf';
 import demoVideoUrl from './assets/demo.mp4';
 
-<a href={archiveUrl} download="packet.zip">packet.zip</a>
-<a href={handoutUrl} download="handout.pdf">handout.pdf</a>
+<a href={createCourseDownloadUrl(archiveUrl, 'packet.zip')} download="packet.zip">packet.zip</a>
+<a href={createCourseDownloadUrl(handoutUrl, 'handout.pdf')} download="handout.pdf">handout.pdf</a>
 
 <video controls width="100%">
   <source src={demoVideoUrl} type="video/mp4" />
@@ -141,7 +144,7 @@ const killProcessTree = async (child) => {
 };
 
 test(
-  'imported pdf and mp4 assets resolve to fetchable URLs',
+  'imported download assets resolve through stable-filename URLs',
   { timeout: 2 * 60_000 },
   async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'course-import-assets-'));
@@ -182,12 +185,31 @@ test(
     const pageHtml = await pageResponse.text();
     assert.equal(pageResponse.status, 200);
 
-    const pdfMatch = pageHtml.match(/<a[^>]*href="([^"]*handout[^"]*)"[^>]*>handout\.pdf<\/a>/i);
+    const pdfMatch = pageHtml.match(
+      /<a[^>]*href="([^"]*download-asset[^"]*filename=handout\.pdf[^"]*)"[^>]*>handout\.pdf<\/a>/i,
+    );
     assert.ok(pdfMatch, 'Could not find imported PDF link in /docs/imports/ HTML.');
-    const pdfUrl = new URL(pdfMatch[1], `${baseUrl}/docs/imports/`).toString();
+    const pdfUrl = new URL(decodeHtmlAttribute(pdfMatch[1]), `${baseUrl}/docs/imports/`).toString();
     const pdfResponse = await fetchResponse(pdfUrl);
     assert.equal(pdfResponse.status, 200);
     assert.equal(pdfResponse.headers.get('content-type'), 'application/pdf');
+    assert.match(
+      pdfResponse.headers.get('content-disposition') ?? '',
+      /filename\*=UTF-8''handout\.pdf/i,
+    );
+
+    const zipMatch = pageHtml.match(
+      /<a[^>]*href="([^"]*download-asset[^"]*filename=packet\.zip[^"]*)"[^>]*>packet\.zip<\/a>/i,
+    );
+    assert.ok(zipMatch, 'Could not find imported ZIP link in /docs/imports/ HTML.');
+    const zipUrl = new URL(decodeHtmlAttribute(zipMatch[1]), `${baseUrl}/docs/imports/`).toString();
+    const zipResponse = await fetchResponse(zipUrl);
+    assert.equal(zipResponse.status, 200);
+    assert.equal(zipResponse.headers.get('content-type'), 'application/zip');
+    assert.match(
+      zipResponse.headers.get('content-disposition') ?? '',
+      /filename\*=UTF-8''packet\.zip/i,
+    );
 
     const videoMatch = pageHtml.match(/<source[^>]*src="([^"]*demo[^"]*)"[^>]*type="video\/mp4"/i);
     assert.ok(videoMatch, 'Could not find imported MP4 source in /docs/imports/ HTML.');
