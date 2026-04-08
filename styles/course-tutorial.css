@@ -1,0 +1,221 @@
+/* ==========================================================================
+   Tutorial components – visual layer
+   All structural rules are enforced by the React components themselves.
+   This file controls only appearance and can be changed without touching
+   content or component logic.
+   ========================================================================== */
+
+/* --- Step ---------------------------------------------------------------- */
+
+.tutorial-step {
+    margin: 2rem 0 3rem;
+}
+
+.tutorial-step__goal {
+    background: hsl(var(--nextra-primary-hue) var(--nextra-primary-saturation) 95%);
+    border-left: 4px solid hsl(var(--nextra-primary-hue) var(--nextra-primary-saturation) var(--nextra-primary-lightness));
+    border-radius: 0 8px 8px 0;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.dark .tutorial-step__goal {
+    background: hsl(var(--nextra-primary-hue) 30% 18%);
+}
+
+/* --- Procedure ----------------------------------------------------------- */
+
+.tutorial-procedure {
+    margin: 1.25rem 0;
+}
+
+.tutorial-procedure__why {
+    color: hsl(0 0% 40%);
+    font-size: 0.925rem;
+    margin-bottom: 0.5rem;
+}
+
+.dark .tutorial-procedure__why {
+    color: hsl(0 0% 65%);
+}
+
+.tutorial-procedure__actions {
+    list-style: decimal;
+    padding-left: 1.5rem;
+    margin: 0;
+}
+
+/* --- Action -------------------------------------------------------------- */
+
+.tutorial-action {
+    margin: 1rem 0;
+}
+
+.tutorial-action__img {
+    display: block;
+    max-width: min(600px, 100%);
+    border-radius: 8px;
+    margin: 0.5rem 0;
+}
+
+.tutorial-action__text {
+    margin-top: 0.25rem;
+}
+
+/* --- Verify -------------------------------------------------------------- */
+
+.tutorial-verify {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-weight: 600;
+    margin: 0.75rem 0;
+    padding: 0.5rem 0.75rem;
+    background: hsl(145 60% 95%);
+    border-radius: 6px;
+}
+
+.dark .tutorial-verify {
+    background: hsl(145 30% 15%);
+}
+
+.tutorial-verify__arrow {
+    color: hsl(145 60% 40%);
+    font-size: 1.15em;
+    flex-shrink: 0;
+}
+
+.dark .tutorial-verify__arrow {
+    color: hsl(145 60% 60%);
+}
+
+/* --- Concept ------------------------------------------------------------- */
+
+.tutorial-concept {
+    margin: 0.75rem 0;
+    border: 1px solid hsl(45 60% 80%);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.dark .tutorial-concept {
+    border-color: hsl(45 30% 30%);
+}
+
+.tutorial-concept__summary {
+    cursor: pointer;
+    padding: 0.6rem 1rem;
+    font-weight: 500;
+    background: hsl(45 60% 96%);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+}
+
+.dark .tutorial-concept__summary {
+    background: hsl(45 20% 16%);
+}
+
+.tutorial-concept__summary:hover {
+    background: hsl(45 60% 92%);
+}
+
+.dark .tutorial-concept__summary:hover {
+    background: hsl(45 20% 20%);
+}
+
+.tutorial-concept__icon {
+    flex-shrink: 0;
+}
+
+.tutorial-concept__body {
+    padding: 0.75rem 1rem;
+}
+
+/* --- Reference ----------------------------------------------------------- */
+
+.tutorial-reference {
+    margin: 0.75rem 0;
+    border: 1px solid hsl(210 20% 82%);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.dark .tutorial-reference {
+    border-color: hsl(210 15% 30%);
+}
+
+.tutorial-reference__summary {
+    cursor: pointer;
+    padding: 0.6rem 1rem;
+    font-weight: 500;
+    background: hsl(210 20% 96%);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+}
+
+.dark .tutorial-reference__summary {
+    background: hsl(210 15% 16%);
+}
+
+.tutorial-reference__summary:hover {
+    background: hsl(210 20% 92%);
+}
+
+.dark .tutorial-reference__summary:hover {
+    background: hsl(210 15% 20%);
+}
+
+.tutorial-reference__icon {
+    flex-shrink: 0;
+}
+
+.tutorial-reference__body {
+    padding: 0.75rem 1rem;
+}
+
+/* --- Checkpoint ---------------------------------------------------------- */
+
+.tutorial-checkpoint {
+    margin: 1.5rem 0;
+    border: 2px solid hsl(145 50% 55%);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.dark .tutorial-checkpoint {
+    border-color: hsl(145 40% 40%);
+}
+
+.tutorial-checkpoint__title {
+    background: hsl(145 50% 55%);
+    color: white;
+    padding: 0.4rem 1rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.dark .tutorial-checkpoint__title {
+    background: hsl(145 40% 35%);
+}
+
+.tutorial-checkpoint__body {
+    padding: 0.75rem 1rem;
+}
+
+.tutorial-checkpoint__body ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.tutorial-checkpoint__body li {
+    padding: 0.15rem 0;
+}
+
+.tutorial-checkpoint__body li::before {
+    content: "✅ ";
+}

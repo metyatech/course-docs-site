@@ -35,4 +35,5 @@ await run(process.execPath, [
   'tests/remark-question-spec-to-exercise.test.mjs',
   'tests/submissions-work-data.test.mjs',
   'tests/submissions-ui-regression.test.mjs',
+  'tests/tutorial-action-render.test.mjs',
 ]);

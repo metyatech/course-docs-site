@@ -5,6 +5,15 @@ import Exercise, { Solution } from '@metyatech/exercise/client';
 import { useMDXComponents as getThemeComponents } from 'nextra-theme-docs';
 import Admonition from './Admonition.js';
 import DownloadLink from './DownloadLink.js';
+import {
+  Step,
+  Procedure,
+  Action,
+  Verify,
+  Concept,
+  Reference,
+  Checkpoint,
+} from './tutorial/index.js';
 
 type WrapperProps = {
   toc: unknown;
@@ -23,6 +32,13 @@ const baseComponents: MDXComponents = {
   Solution,
   Admonition,
   DownloadLink,
+  Step,
+  Procedure,
+  Action,
+  Verify,
+  Concept,
+  Reference,
+  Checkpoint,
 };
 
 export function createUseMDXComponents(extra: MDXComponents = {}) {
