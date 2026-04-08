@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@mdx-js/react": "^3.1.1",
-    "@metyatech/course-docs-platform": "github:metyatech/course-docs-platform#58d6f04",
+    "@metyatech/course-docs-platform": "github:metyatech/course-docs-platform#5b34b97",
     "dotenv": "^17.2.3",
     "next": "^15.5.14",
     "nextra": "^4.6.1",
@@ -77,6 +77,8 @@
     "node": ">=20.0"
   },
   "overrides": {
+    "entities": "^6.0.1",
+    "micromark-util-symbol": "^2.0.1",
     "@chevrotain/cst-dts-gen": "11.1.2",
     "@chevrotain/gast": "11.1.2",
     "@chevrotain/regexp-to-ast": "11.1.2",
