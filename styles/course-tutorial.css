@@ -5,58 +5,88 @@
    content or component logic.
    ========================================================================== */
 
-/* --- Step ---------------------------------------------------------------- */
+/* --- Section ------------------------------------------------------------- */
+/* Recursive container that replaces both Step and Procedure.
+   Depth is exposed via data-section-depth so styles can adapt without
+   needing separate component types. */
 
-.tutorial-step {
-    margin: 2rem 0 3rem;
+.tutorial-section {
+    margin: 1.5rem 0 2rem;
+    counter-reset: tutorial-action;
 }
 
-.tutorial-step__goal {
+/* Top-level section: more breathing room. */
+.tutorial-section[data-section-depth="0"] {
+    margin: 2.5rem 0 3rem;
+}
+
+/* Goal banner: prominent at depth 0, lighter at deeper depths. */
+.tutorial-section__goal {
     background: hsl(var(--nextra-primary-hue) var(--nextra-primary-saturation) 95%);
     border-left: 4px solid hsl(var(--nextra-primary-hue) var(--nextra-primary-saturation) var(--nextra-primary-lightness));
     border-radius: 0 8px 8px 0;
     padding: 0.75rem 1rem;
     font-weight: 600;
-    margin-bottom: 1.5rem;
+    margin: 0.75rem 0 1.25rem;
 }
 
-.dark .tutorial-step__goal {
+.tutorial-section__goal[data-section-depth="0"] {
+    padding: 1rem 1.25rem;
+    font-size: 1.05rem;
+}
+
+.tutorial-section__goal[data-section-depth="1"] {
+    padding: 0.6rem 0.9rem;
+    font-size: 0.975rem;
+}
+
+.tutorial-section__goal[data-section-depth="2"],
+.tutorial-section__goal[data-section-depth="3"],
+.tutorial-section__goal[data-section-depth="4"] {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.925rem;
+    font-weight: 500;
+}
+
+.dark .tutorial-section__goal {
     background: hsl(var(--nextra-primary-hue) 30% 18%);
 }
 
-/* --- Procedure ----------------------------------------------------------- */
-
-.tutorial-procedure {
-    margin: 1.25rem 0;
-}
-
-.tutorial-procedure__why {
-    color: hsl(0 0% 40%);
-    font-size: 0.925rem;
-    margin-bottom: 0.5rem;
-}
-
-.dark .tutorial-procedure__why {
-    color: hsl(0 0% 65%);
-}
-
-.tutorial-procedure__actions {
-    list-style: decimal;
-    padding-left: 1.5rem;
-    margin: 0;
+.tutorial-section__body {
+    /* No special styling; child components manage their own spacing. */
 }
 
 /* --- Action -------------------------------------------------------------- */
+/* Atomic unit. Auto-numbered via CSS counter scoped to nearest Section.
+   Renders as a div, no longer a list item. */
 
 .tutorial-action {
-    margin: 1rem 0;
+    counter-increment: tutorial-action;
+    position: relative;
+    margin: 1.25rem 0 1.5rem;
+    padding-left: 2.25rem;
+}
+
+.tutorial-action::before {
+    content: counter(tutorial-action) ".";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1.75rem;
+    font-weight: 700;
+    color: hsl(var(--nextra-primary-hue) var(--nextra-primary-saturation) var(--nextra-primary-lightness));
+    font-variant-numeric: tabular-nums;
+}
+
+.dark .tutorial-action::before {
+    color: hsl(var(--nextra-primary-hue) 60% 70%);
 }
 
 .tutorial-action__img {
     display: block;
     max-width: min(600px, 100%);
     border-radius: 8px;
-    margin: 0.5rem 0;
+    margin: 0.25rem 0 0.5rem;
 }
 
 .tutorial-action__text {
@@ -70,7 +100,7 @@
     align-items: baseline;
     gap: 0.5rem;
     font-weight: 600;
-    margin: 0.75rem 0;
+    margin: 0.75rem 0 1.25rem;
     padding: 0.5rem 0.75rem;
     background: hsl(145 60% 95%);
     border-radius: 6px;
@@ -176,6 +206,54 @@
 
 .tutorial-reference__body {
     padding: 0.75rem 1rem;
+}
+
+/* --- Recovery ------------------------------------------------------------ */
+/* Inline fallback for an Action that can fail. Always visible (not
+   collapsible) so learners on the failure path find it without extra
+   interaction, but visually subordinate to the main path. */
+
+.tutorial-recovery {
+    margin: 0.5rem 0 1.25rem 2.25rem;
+    border-left: 3px solid hsl(35 85% 55%);
+    background: hsl(35 90% 97%);
+    border-radius: 0 6px 6px 0;
+    padding: 0.6rem 0.9rem;
+}
+
+.dark .tutorial-recovery {
+    background: hsl(35 30% 14%);
+    border-left-color: hsl(35 70% 55%);
+}
+
+.tutorial-recovery__title {
+    font-weight: 600;
+    color: hsl(35 70% 35%);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.35rem;
+    font-size: 0.95rem;
+}
+
+.dark .tutorial-recovery__title {
+    color: hsl(35 80% 70%);
+}
+
+.tutorial-recovery__icon {
+    flex-shrink: 0;
+}
+
+.tutorial-recovery__body {
+    font-size: 0.95rem;
+}
+
+.tutorial-recovery__body > :first-child {
+    margin-top: 0;
+}
+
+.tutorial-recovery__body > :last-child {
+    margin-bottom: 0;
 }
 
 /* --- Checkpoint ---------------------------------------------------------- */

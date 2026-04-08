@@ -6,12 +6,12 @@ import { useMDXComponents as getThemeComponents } from 'nextra-theme-docs';
 import Admonition from './Admonition.js';
 import DownloadLink from './DownloadLink.js';
 import {
-  Step,
-  Procedure,
+  Section,
   Action,
   Verify,
   Concept,
   Reference,
+  Recovery,
   Checkpoint,
 } from './tutorial/index.js';
 
@@ -32,12 +32,12 @@ const baseComponents: MDXComponents = {
   Solution,
   Admonition,
   DownloadLink,
-  Step,
-  Procedure,
+  Section,
   Action,
   Verify,
   Concept,
   Reference,
+  Recovery,
   Checkpoint,
 };
 
