@@ -28,3 +28,4 @@
 {"id":"E98plD-k","description":"Optimize remote content sync reuse and remaining CI/workflow concurrency in course-docs-site","stage":"committed","createdAt":"2026-04-07T14:05:23.906Z","updatedAt":"2026-04-07T14:16:54.717Z","committedEventId":"oE6PTJ8tDFGD-oJd"}
 {"id":"QvxK5tjH","description":"Force GitHub Actions workflows onto Node 24 action runtime to remove deprecation warnings","stage":"committed","createdAt":"2026-04-07T14:44:51.898Z","updatedAt":"2026-04-07T14:46:25.624Z","committedEventId":"726Wnii_5Pi5a2tf"}
 {"id":"VALdMtTv","description":"Upgrade actions/cache to v5 and remove temporary Node 24 forcing env","stage":"committed","createdAt":"2026-04-07T14:55:58.327Z","updatedAt":"2026-04-07T14:57:34.886Z","committedEventId":"MTGeBJSwnH5XFqj0"}
+{"id":"ZEqWXbGt","description":"Add E2E coverage for tutorial Action image zoom in open-campus course preview","stage":"in-progress","createdAt":"2026-04-08T10:18:57.146Z","updatedAt":"2026-04-08T10:26:57.856Z"}

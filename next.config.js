@@ -53,11 +53,14 @@ const nextConfig = {
     config.resolve.symlinks = false;
 
     // Course content may live outside the project root (linked into `content/`).
-    // Ensure webpack can still resolve packages from this app's node_modules.
+    // Also ensures that when course-docs-platform is linked locally (npm link),
+    // its devDependencies (peerDeps like nextra-theme-docs, react) resolve from
+    // this project's node_modules rather than the linked package's own node_modules,
+    // preventing duplicate React Context singleton issues.
     const rootNodeModules = path.join(projectRoot, "node_modules");
     config.resolve.modules = [...(config.resolve.modules ?? [])];
     if (!config.resolve.modules.includes(rootNodeModules)) {
-      config.resolve.modules.push(rootNodeModules);
+      config.resolve.modules.unshift(rootNodeModules);
     }
 
     return applyCourseAssetWebpackRules(config, { isServer, projectRoot });
