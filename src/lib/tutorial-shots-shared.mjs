@@ -221,7 +221,7 @@ export const getTutorialShotWarnings = (manifest) => {
 
   if (annotations.length > MAX_TUTORIAL_ANNOTATION_COUNT) {
     warnings.push(
-      `Annotations exceed ${MAX_TUTORIAL_ANNOTATION_COUNT}. Reduce markers to keep the screenshot focused.`,
+      `注釈が ${MAX_TUTORIAL_ANNOTATION_COUNT} 個を超えています。画像を見やすくするため、注釈数を減らしてください。`,
     );
   }
 
@@ -232,7 +232,7 @@ export const getTutorialShotWarnings = (manifest) => {
 
     if (annotation.text.length > MAX_TUTORIAL_LABEL_LENGTH) {
       warnings.push(
-        `Label "${annotation.text}" is too long for an annotated screenshot. Keep labels short and move instructions into Action text.`,
+        `ラベル「${annotation.text}」が長すぎます。ラベルは短く保ち、手順文は Action 本文に移してください。`,
       );
     }
 
@@ -242,7 +242,7 @@ export const getTutorialShotWarnings = (manifest) => {
         SENTENCE_PUNCTUATION_PATTERN.test(annotation.text))
     ) {
       warnings.push(
-        `Label "${annotation.text}" looks like an instruction sentence. Per tutorial-authoring, screenshots should show WHERE, while Action text should explain WHAT.`,
+        `ラベル「${annotation.text}」は手順文に見えます。画像は WHERE を示し、WHAT は Action 本文で説明してください。`,
       );
     }
   }

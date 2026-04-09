@@ -249,24 +249,24 @@ test(
     const page = await browser.newPage({ baseURL: baseUrl });
 
     await page.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { name: "Tutorial Shot Editor" }).waitFor();
-    await page.getByText("Editing local repo:").waitFor();
+    await page.getByRole("heading", { name: "チュートリアル画像エディタ" }).waitFor();
+    await page.getByText("編集対象のローカル repo:").waitFor();
     await page.getByPlaceholder("../open-campus-unreal-90min").fill(overrideCourseRelativePath);
-    await page.getByRole("button", { name: "Switch Local Repo" }).click();
+    await page.getByRole("button", { name: "ローカル repo を切り替える" }).click();
     await page.getByRole("button", { name: /override-startup/i }).waitFor();
 
-    await page.getByLabel("Alt").fill("起動画面");
-    await page.getByRole("button", { name: "Add Label" }).click();
-    await page.getByLabel("Label text").fill("Play");
-    await page.getByRole("button", { name: "Save Shot" }).click();
-    await page.getByText("Saved tutorial shot.").waitFor();
+    await page.getByLabel("Alt テキスト").fill("起動画面");
+    await page.getByRole("button", { name: "ラベルを追加" }).click();
+    await page.getByLabel("ラベル").fill("Play");
+    await page.getByRole("button", { name: "保存" }).click();
+    await page.getByText("保存しました。").waitFor();
 
     await page.getByRole("button", { name: /override-missing-output/i }).click();
-    await page.getByText("Upload a raw screenshot to start editing this Action image.").waitFor();
-    await page.getByRole("button", { name: "Save Shot" }).click();
+    await page.getByText("この Action 画像を編集するには、まず元画像をアップロードしてください。").waitFor();
+    await page.getByRole("button", { name: "保存" }).click();
     await page
       .getByText(
-        "Cannot save this Action image because no raw screenshot is available yet. Upload a raw screenshot first.",
+        "元画像がまだ無いため、この Action 画像は保存できません。先に元画像をアップロードしてください。",
       )
       .waitFor();
 

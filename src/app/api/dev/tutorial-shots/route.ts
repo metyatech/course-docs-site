@@ -43,7 +43,8 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         enabled: false,
-        reason: error instanceof Error ? error.message : "Failed to scan tutorial shots.",
+        reason:
+          error instanceof Error ? error.message : "チュートリアル画像一覧を読み込めませんでした。",
       },
       {
         status: 500,

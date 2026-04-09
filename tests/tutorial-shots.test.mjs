@@ -102,9 +102,9 @@ test("getTutorialShotWarnings flags redundant screenshot text and overly dense a
   });
 
   assert.equal(warnings.length, 3);
-  assert.ok(warnings.some((warning) => /Annotations exceed 4/i.test(warning)));
-  assert.ok(warnings.some((warning) => /too long/i.test(warning)));
-  assert.ok(warnings.some((warning) => /instruction sentence/i.test(warning)));
+  assert.ok(warnings.some((warning) => /注釈が 4 個を超えています/u.test(warning)));
+  assert.ok(warnings.some((warning) => /長すぎます/u.test(warning)));
+  assert.ok(warnings.some((warning) => /手順文に見えます/u.test(warning)));
 });
 
 test("scanTutorialShots and saveTutorialShot keep Action img output paths stable", async (t) => {

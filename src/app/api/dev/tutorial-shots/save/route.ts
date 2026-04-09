@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     if (!body || typeof body !== "object" || !("manifest" in body)) {
-      return NextResponse.json({ error: "Missing manifest payload." }, { status: 400 });
+      return NextResponse.json({ error: "manifest がありません。" }, { status: 400 });
     }
     const requestedSource =
       typeof body.source === "string" && body.source.trim() ? body.source.trim() : null;
@@ -42,7 +42,8 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to save tutorial shot.",
+        error:
+          error instanceof Error ? error.message : "チュートリアル画像を保存できませんでした。",
       },
       {
         status: 500,

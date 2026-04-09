@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
     const imagePath = searchParams.get("path");
     if (!imagePath) {
-      return NextResponse.json({ error: "Missing image path." }, { status: 400 });
+      return NextResponse.json({ error: "画像パスがありません。" }, { status: 400 });
     }
 
     const image = await readTutorialShotImage({
@@ -35,7 +35,8 @@ export async function GET(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to read tutorial shot image.",
+        error:
+          error instanceof Error ? error.message : "チュートリアル画像を読み込めませんでした。",
       },
       {
         status: 500,

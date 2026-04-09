@@ -171,7 +171,7 @@ const prepareManifestForSave = (manifestInput) => ({
 const parseDataUrl = (value) => {
   const match = /^data:([^;,]+)?;base64,(.+)$/u.exec(value ?? "");
   if (!match) {
-    throw new Error("Expected a base64 data URL.");
+    throw new Error("アップロード画像の形式が不正です。");
   }
 
   return {
@@ -225,7 +225,7 @@ export const getTutorialShotAuthoringContext = async ({
       return {
         enabled: false,
         reason:
-          "Tutorial shot editor could not open that local content repository. Choose a local repo path that contains content/ and site.config.ts.",
+          "そのローカル教材 repo は開けませんでした。content/ と site.config.ts があるパスを指定してください。",
         configuredSource: configuredSource || null,
         suggestedLocalSources,
         overrideSource,
@@ -248,8 +248,8 @@ export const getTutorialShotAuthoringContext = async ({
   });
   if (!resolvedConfiguredSource) {
     const reason = configuredSource
-      ? "Tutorial shot editor needs a writable local content repository. The current COURSE_CONTENT_SOURCE is not a local repo path."
-      : "Tutorial shot editor needs a writable local content repository. COURSE_CONTENT_SOURCE is not set to a local repo path.";
+      ? "チュートリアル画像エディタを使うには、書き込み可能なローカル教材 repo が必要です。現在の COURSE_CONTENT_SOURCE はローカルパスではありません。"
+      : "チュートリアル画像エディタを使うには、書き込み可能なローカル教材 repo が必要です。COURSE_CONTENT_SOURCE にローカルパスが設定されていません。";
 
     return {
       enabled: false,
@@ -352,7 +352,7 @@ export const saveTutorialShot = async ({
   const manifest = prepareManifestForSave(manifestInput);
 
   if (!PAGE_PATH_PATTERN.test(manifest.pagePath)) {
-    throw new Error(`Invalid tutorial shot page path: ${manifest.pagePath}`);
+    throw new Error(`不正なチュートリアル画像ページパスです: ${manifest.pagePath}`);
   }
 
   const outputAbsPath = resolveSourcePath({
@@ -386,7 +386,7 @@ export const saveTutorialShot = async ({
       .catch(() => false);
     if (!outputExists) {
       throw new Error(
-        "Cannot bootstrap the raw screenshot because the current output image is missing. Upload a raw screenshot first.",
+        "現在の出力画像が無いため、そこから元画像を初期作成できません。先に元画像をアップロードしてください。",
       );
     }
     await ensureParentDir(rawAbsPath);
@@ -399,7 +399,7 @@ export const saveTutorialShot = async ({
     .catch(() => false);
   if (!rawExists) {
     throw new Error(
-      "Cannot save this Action image because no raw screenshot is available yet. Upload a raw screenshot first.",
+      "元画像がまだ無いため、この Action 画像は保存できません。先に元画像をアップロードしてください。",
     );
   }
 
@@ -408,7 +408,7 @@ export const saveTutorialShot = async ({
   const metadata = await rawImage.metadata();
 
   if (!metadata.width || !metadata.height) {
-    throw new Error(`Could not determine source image dimensions for ${manifest.rawImagePath}`);
+    throw new Error(`元画像のサイズを取得できませんでした: ${manifest.rawImagePath}`);
   }
 
   const crop = normalizeCrop({
