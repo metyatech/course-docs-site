@@ -13,9 +13,9 @@ import type {
   TutorialShotAnnotation,
   TutorialShotArrowAnnotation,
   TutorialShotBoxAnnotation,
-  TutorialShotItem,
   TutorialShotLabelAnnotation,
   TutorialShotManifest,
+  TutorialShotItem,
   TutorialShotResponse,
 } from "../../../lib/tutorial-shots-types";
 import styles from "./tutorial-shot-editor.module.css";
@@ -47,7 +47,7 @@ const buildImageUrl = (contentRelativePath: string, revision: number, sourceOver
 };
 
 const formatConfiguredSource = (configuredSource: string | null) =>
-  configuredSource && configuredSource.trim() ? configuredSource : "（未設定）";
+  configuredSource && configuredSource.trim() ? configuredSource : "未設定";
 
 const getAnnotationTypeLabel = (type: TutorialShotAnnotation["type"]) => {
   if (type === "box") {
@@ -59,36 +59,42 @@ const getAnnotationTypeLabel = (type: TutorialShotAnnotation["type"]) => {
   return "ラベル";
 };
 
-const getNextStepMessage = ({
-  bootstrapFromOutput,
-  manifest,
-  sourceImageSrc,
-  warnings,
-}: {
-  bootstrapFromOutput: boolean;
-  manifest: TutorialShotManifest;
-  sourceImageSrc: string | null;
-  warnings: string[];
-}) => {
-  if (!sourceImageSrc) {
-    return bootstrapFromOutput
-      ? "元画像をアップロードするか、このまま保存して現在の出力画像から元画像を初期作成してください。"
-      : "まず元画像をアップロードしてください。";
+const getShotFlags = (shot: TutorialShotItem) => {
+  const flags: Array<{
+    className: string;
+    label: string;
+    title: string;
+  }> = [];
+
+  if (!shot.hasRawImage) {
+    flags.push({
+      className: styles.flagMuted,
+      label: shot.hasOutputImage ? "編集元を追加" : "元画像を追加",
+      title: shot.hasOutputImage
+        ? "今は公開中の画像だけがあります。編集しやすいように編集元の画像を追加できます。"
+        : "まだこの Action 用の元画像がありません。元画像をアップロードすると編集できます。",
+    });
   }
 
-  if (!manifest.alt.trim()) {
-    return "Alt テキストを入れて、この画像が何を示すかを短く伝えてください。";
+  if (shot.warnings.length > 0) {
+    flags.push({
+      className: styles.flagWarn,
+      label: `要確認 ${shot.warnings.length}件`,
+      title: `確認したいことが ${shot.warnings.length} 件あります。`,
+    });
   }
 
-  if (manifest.annotations.length === 0) {
-    return "必要なら枠・矢印・短いラベルを追加して、見る場所だけを示してください。注釈が不要ならそのまま保存できます。";
+  if (!shot.hasManifest) {
+    flags.push({
+      className: styles.flagMuted,
+      label: shot.hasOutputImage ? "このエディタでは未編集" : "まだ画像を作成していません",
+      title: shot.hasOutputImage
+        ? "今の公開画像はありますが、このエディタ用の切り抜き・注釈設定はまだ保存していません。"
+        : "まだこの Action 用の出力画像と設定がありません。",
+    });
   }
 
-  if (warnings.length > 0) {
-    return `保存できますが、先に警告 ${warnings.length} 件を確認してください。`;
-  }
-
-  return "保存できます。保存後は資料ページを開いて、見た目と読みやすさを確認してください。";
+  return flags;
 };
 
 const loadImageElement = (src: string) =>
@@ -191,6 +197,7 @@ export default function TutorialShotEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [pendingRawDataUrl, setPendingRawDataUrl] = useState<string | null>(null);
   const [bootstrapFromOutput, setBootstrapFromOutput] = useState(false);
+  const [isSourceEditorOpen, setIsSourceEditorOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const shots = useMemo(() => (response && response.enabled ? response.shots : []), [response]);
@@ -236,7 +243,7 @@ export default function TutorialShotEditor() {
       setResponse({
         enabled: false,
         reason:
-          error instanceof Error ? error.message : "チュートリアル画像一覧を読み込めませんでした。",
+          error instanceof Error ? error.message : "編集できる画像の一覧を読み込めませんでした。",
         configuredSource: null,
         suggestedLocalSources: [],
         overrideSource: sourceOverride,
@@ -371,7 +378,7 @@ export default function TutorialShotEditor() {
     }
 
     setIsSaving(true);
-    setStatusText("画像を保存しています...");
+    setStatusText("保存しています…");
 
     const manifestToSave = normalizeTutorialShotManifest({
       ...draftManifest,
@@ -400,15 +407,15 @@ export default function TutorialShotEditor() {
 
     const saveData = await saveResponse.json();
     if (!saveResponse.ok) {
-      setStatusText(saveData.error ?? "チュートリアル画像を保存できませんでした。");
+      setStatusText(saveData.error ?? "保存できませんでした。");
       setIsSaving(false);
       return;
     }
 
     setStatusText(
       saveData.warnings?.length
-        ? `保存しました（警告 ${saveData.warnings.length} 件）。`
-        : "保存しました。",
+        ? `保存しました（確認したいこと ${saveData.warnings.length} 件）`
+        : "保存しました",
     );
     setPendingRawDataUrl(null);
     setSourceImageRevision((value) => value + 1);
@@ -433,6 +440,7 @@ export default function TutorialShotEditor() {
     setSelectedKey("");
     setSourceOverride(trimmed);
     setStatusText("");
+    setIsSourceEditorOpen(false);
   };
 
   const handleRawUpload = async (file: File | null) => {
@@ -445,21 +453,37 @@ export default function TutorialShotEditor() {
       reader.onload = () =>
         typeof reader.result === "string"
           ? resolve(reader.result)
-          : reject(new Error("アップロードした画像を読み込めませんでした。"));
-      reader.onerror = () => reject(new Error("アップロードした画像を読み込めませんでした。"));
+          : reject(new Error("画像ファイルを読み込めませんでした。"));
+      reader.onerror = () => reject(new Error("画像ファイルを読み込めませんでした。"));
       reader.readAsDataURL(file);
     });
 
     setPendingRawDataUrl(dataUrl);
     setSourceImageSrc(dataUrl);
     setBootstrapFromOutput(false);
-    setStatusText(`元画像を読み込みました: ${file.name}`);
+    setStatusText(`新しい元画像を読み込みました（${file.name}）`);
+  };
+
+  const resetCropToFull = () => {
+    if (!sourceImageElement) {
+      return;
+    }
+    const image = sourceImageElement;
+    const fullCrop: PixelCrop = {
+      unit: "px",
+      x: 0,
+      y: 0,
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    };
+    setCrop(fullCrop);
+    setCompletedCrop(fullCrop);
   };
 
   if (!response) {
     return (
       <main className={styles.page}>
-        <div className={styles.empty}>チュートリアル画像エディタを読み込み中です...</div>
+        <div className={styles.loading}>読み込み中です…</div>
       </main>
     );
   }
@@ -467,57 +491,52 @@ export default function TutorialShotEditor() {
   if (!response.enabled) {
     return (
       <main className={styles.page}>
-        <div className={styles.setupCard}>
-          <div className={styles.panelHeader}>
-            <h1>チュートリアル画像エディタの設定</h1>
+        <section className={styles.setupCard}>
+          <header className={styles.setupHeader}>
+            <h1>編集する教材リポジトリを選んでください</h1>
             <p>
-              この画面では、教材 repo の Action 画像を 1 枚ずつ編集します。最初に、保存先として使う
-              書き込み可能なローカル教材 repo を選んでください。
+              ローカルにある教材リポジトリのパスを指定すると、その中の画像を 1 枚ずつ編集できます。
             </p>
-          </div>
-          <div className={styles.panelBody}>
-            <div className={styles.guideCard}>
-              <div className={styles.guideIntro}>
-                <h2>最初にやること</h2>
-                <p>保存先のローカル教材 repo を指定すると、Action 画像一覧が開きます。</p>
-              </div>
-              <ol className={styles.stepList}>
-                <li>現在の COURSE_CONTENT_SOURCE を確認する</li>
-                <li>保存先にしたいローカル教材 repo を入力する</li>
-                <li>「ローカル repo を開く」で編集画面へ進む</li>
-              </ol>
-            </div>
-            <div className={styles.warningList}>
-              <div className={styles.warningItem}>{response.reason}</div>
-            </div>
-            <div className={styles.grid}>
-              <div className={styles.field}>
-                <label htmlFor="configured-source">現在の COURSE_CONTENT_SOURCE</label>
+          </header>
+
+          <div className={styles.setupBody}>
+            <label className={styles.fieldBlock} htmlFor="local-source">
+              <span className={styles.fieldLabel}>リポジトリのパス</span>
+              <span className={styles.fieldHint}>
+                例: <code>../open-campus-unreal-90min</code>
+              </span>
+              <div className={styles.fieldRow}>
                 <input
-                  id="configured-source"
-                  readOnly
-                  value={formatConfiguredSource(response.configuredSource)}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="local-source">ローカル教材 repo</label>
-                <input
+                  className={styles.textInput}
                   id="local-source"
                   onChange={(event) => setSourceInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      applySourceOverride(sourceInput);
+                    }
+                  }}
                   placeholder="../open-campus-unreal-90min"
                   value={sourceInput}
                 />
+                <button
+                  className={styles.primaryButton}
+                  onClick={() => applySourceOverride(sourceInput)}
+                  type="button"
+                >
+                  開く
+                </button>
               </div>
-            </div>
+            </label>
+
             {response.suggestedLocalSources.length > 0 ? (
-              <div className={styles.suggestedSources}>
-                <div className={styles.status}>見つかったローカル repo 候補:</div>
-                <div className={styles.badgeRow}>
+              <div className={styles.suggestList}>
+                <div className={styles.suggestLabel}>見つかった候補</div>
+                <div className={styles.suggestRow}>
                   {response.suggestedLocalSources.map((candidate) => (
                     <button
-                      className={styles.secondaryButton}
+                      className={styles.suggestChip}
                       key={candidate}
-                      onClick={() => setSourceInput(candidate)}
+                      onClick={() => applySourceOverride(candidate)}
                       type="button"
                     >
                       {candidate}
@@ -526,466 +545,424 @@ export default function TutorialShotEditor() {
                 </div>
               </div>
             ) : null}
-            <div className={styles.actions}>
-              <button onClick={() => applySourceOverride(sourceInput)} type="button">
-                ローカル repo を開く
-              </button>
+
+            <div className={styles.setupReason}>{response.reason}</div>
+
+            <div className={styles.setupFootnote}>
+              現在の <code>COURSE_CONTENT_SOURCE</code>:{" "}
+              <code>{formatConfiguredSource(response.configuredSource)}</code>
               {response.overrideSource ? (
-                <button
-                  className={styles.secondaryButton}
-                  onClick={() => applySourceOverride("")}
-                  type="button"
-                >
-                  保存した上書きを解除
-                </button>
+                <>
+                  {" "}
+                  ・{" "}
+                  <button
+                    className={styles.linkButton}
+                    onClick={() => applySourceOverride("")}
+                    type="button"
+                  >
+                    保存した上書きを解除
+                  </button>
+                </>
               ) : null}
             </div>
           </div>
-        </div>
+        </section>
       </main>
     );
   }
 
+  const sourceLabel = response.activeSourcePath;
+  const isOverridden = response.sourceKind === "override";
+
   return (
     <main className={styles.page}>
-      <div className={styles.header}>
-        <h1>チュートリアル画像エディタ</h1>
-        <p>
-          Action 画像を 1 枚ずつ選び、元画像の準備、切り抜き、注釈、保存までをこの画面で進めます。
-          既存の <code>Action img=&quot;./img/...png&quot;</code> はそのまま保たれます。
-        </p>
-        <div className={styles.guideCard}>
-          <div className={styles.guideIntro}>
-            <h2>この画面でやること</h2>
-            <p>初見でも順番に辿れるように、作業は 4 段階に分けています。</p>
-          </div>
-          <ol className={styles.stepList}>
-            <li>編集する Action 画像を選ぶ</li>
-            <li>元画像と Alt テキストを整える</li>
-            <li>見せたい範囲を切り抜き、見る場所だけ注釈する</li>
-            <li>警告を確認して保存し、資料ページで見た目を確認する</li>
-          </ol>
-        </div>
-        <div className={styles.sourceBanner}>
-          <div className={styles.sourceSummary}>
-            <div>
-              <div className={styles.eyebrow}>保存先の教材 repo</div>
-              <div className={styles.sourcePath}>
-                <code>{response.activeSourcePath}</code>
-                {response.sourceKind === "override" ? "（上書き指定）" : ""}
-              </div>
-            </div>
-            <div className={styles.status}>
-              保存すると、元画像と <code>shot manifest</code> はページ横の <code>shots/</code> に、
-              生成後の画像は既存の出力先に書き戻されます。
-            </div>
-          </div>
-          <div className={styles.actions}>
-            <input
-              onChange={(event) => setSourceInput(event.target.value)}
-              placeholder="../open-campus-unreal-90min"
-              value={sourceInput}
-            />
-            <button onClick={() => applySourceOverride(sourceInput)} type="button">
-              ローカル repo を切り替える
+      <header className={styles.topBar}>
+        <div className={styles.topBarLeft}>
+          <h1 className={styles.appTitle}>チュートリアル画像エディタ</h1>
+          <div className={styles.sourceLine}>
+            <span className={styles.sourceCaption}>編集中:</span>
+            <code className={styles.sourcePathInline}>{sourceLabel}</code>
+            {isOverridden ? <span className={styles.sourceTag}>上書き指定</span> : null}
+            <button
+              className={styles.linkButton}
+              onClick={() => setIsSourceEditorOpen((value) => !value)}
+              type="button"
+            >
+              {isSourceEditorOpen ? "閉じる" : "別のリポジトリに切り替え"}
             </button>
-            {sourceOverride ? (
+          </div>
+          {isSourceEditorOpen ? (
+            <div className={styles.sourceEditor}>
+              <input
+                className={styles.textInput}
+                onChange={(event) => setSourceInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    applySourceOverride(sourceInput);
+                  }
+                }}
+                placeholder="../open-campus-unreal-90min"
+                value={sourceInput}
+              />
               <button
-                className={styles.secondaryButton}
-                onClick={() => applySourceOverride("")}
+                className={styles.primaryButton}
+                onClick={() => applySourceOverride(sourceInput)}
                 type="button"
               >
-                COURSE_CONTENT_SOURCE を使う
+                切り替える
               </button>
-            ) : null}
-          </div>
-          {response.sourceKind === "override" ? (
-            <div className={styles.status}>
-              このエディタは上書き指定したローカル repo に保存します。通常の docs ページ側も同じ
-              repo を 表示したい場合は、<code>COURSE_CONTENT_SOURCE</code> もこのパスにして
-              <code>npm run dev</code> を再起動してください。
+              {sourceOverride ? (
+                <button
+                  className={styles.ghostButton}
+                  onClick={() => applySourceOverride("")}
+                  type="button"
+                >
+                  COURSE_CONTENT_SOURCE に戻す
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
-      </div>
+      </header>
 
       <div className={styles.layout}>
-        <aside className={styles.sidebar}>
+        <aside className={styles.sidebar} aria-label="編集する画像の一覧">
           <div className={styles.sidebarHeader}>
-            <h2>1. 編集する Action 画像を選ぶ</h2>
-            <p>
-              現在のローカル教材 repo から検出した Action 画像です。まず 1 枚選ぶと、右側に
-              現在の対象と次の作業が表示されます。
-            </p>
-            <div className={styles.status}>検出した画像: {shots.length} 件</div>
+            <div className={styles.sidebarTitle}>編集する画像</div>
+            <div className={styles.sidebarCount}>{shots.length} 件</div>
           </div>
-          <div className={styles.shotList}>
-            {shots.map((shot) => (
-              <button
-                key={shot.outputImagePath}
-                className={`${styles.shotButton} ${
-                  shot.outputImagePath === selectedKey ? styles.shotButtonActive : ""
-                }`}
-                onClick={() => setSelectedKey(shot.outputImagePath)}
-                aria-pressed={shot.outputImagePath === selectedKey}
-                type="button"
-              >
-                <div className={styles.shotTitle}>
-                  <span>{shot.id}</span>
-                  <span>{shot.line} 行目</span>
-                </div>
-                <div className={styles.shotMeta}>
-                  <div>{shot.pagePath}</div>
-                  <div>{shot.outputImagePath}</div>
-                </div>
-                <div className={styles.badgeRow}>
-                  <span className={styles.badge}>
-                    {shot.hasOutputImage ? "出力あり" : "出力なし"}
-                  </span>
-                  <span className={styles.badge}>
-                    {shot.hasRawImage ? "元画像あり" : "元画像が必要"}
-                  </span>
-                  <span className={styles.badge}>
-                    {shot.hasManifest ? "manifest あり" : "manifest なし"}
-                  </span>
-                  {shot.warnings.length > 0 ? (
-                    <span className={`${styles.badge} ${styles.badgeWarn}`}>
-                      警告 {shot.warnings.length} 件
-                    </span>
-                  ) : null}
-                </div>
-              </button>
-            ))}
-          </div>
+          <ul className={styles.shotList}>
+            {shots.map((shot) => {
+              const isActive = shot.outputImagePath === selectedKey;
+              const flags = getShotFlags(shot);
+              return (
+                <li key={shot.outputImagePath}>
+                  <button
+                    aria-current={isActive ? "true" : undefined}
+                    className={`${styles.shotRow} ${isActive ? styles.shotRowActive : ""}`}
+                    onClick={() => {
+                      setStatusText("");
+                      setSelectedKey(shot.outputImagePath);
+                    }}
+                    type="button"
+                  >
+                    <div className={styles.shotRowTitle}>{shot.id}</div>
+                    <div className={styles.shotRowMeta}>{shot.pagePath}</div>
+                    <div className={styles.shotRowFlags}>
+                      {flags.map((flag) => (
+                        <span
+                          className={`${styles.flag} ${flag.className}`}
+                          key={`${shot.outputImagePath}:${flag.label}`}
+                          title={flag.title}
+                        >
+                          {flag.label}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </aside>
 
-        <section className={styles.editor}>
+        <section className={styles.workspace} aria-label="画像エディタ">
           {!selectedShot || !draftManifest ? (
-            <div className={styles.empty}>
-              左の一覧から編集する画像を 1
-              枚選んでください。選ぶと、右側に現在の対象、次にやること、
-              編集手順が順番に表示されます。
-            </div>
+            <div className={styles.workspaceEmpty}>左の一覧から編集する画像を選んでください。</div>
           ) : (
             <>
-              <div className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <h2>2. 今編集中の画像</h2>
-                  <p>現在の対象と、次にやることです。迷ったらまずここを見てください。</p>
-                </div>
-                <div className={styles.panelBody}>
-                  <div className={styles.focusHeader}>
-                    <div>
-                      <div className={styles.eyebrow}>現在の対象</div>
-                      <div className={styles.focusTitle}>{draftManifest.id}</div>
-                      <div className={styles.shotMeta}>
-                        <div>{draftManifest.pagePath}</div>
-                        <div>{selectedShot.line} 行目の Action 画像</div>
-                      </div>
-                    </div>
-                    <div className={styles.badgeRow}>
-                      <span className={styles.badge}>
-                        {selectedShot.hasOutputImage ? "出力あり" : "出力なし"}
-                      </span>
-                      <span className={styles.badge}>
-                        {selectedShot.hasRawImage ? "元画像あり" : "元画像が必要"}
-                      </span>
-                      <span className={styles.badge}>
-                        {selectedShot.hasManifest ? "manifest あり" : "manifest なし"}
-                      </span>
-                      {warnings.length > 0 ? (
-                        <span className={`${styles.badge} ${styles.badgeWarn}`}>
-                          警告 {warnings.length} 件
+              <header className={styles.shotHeader}>
+                <div className={styles.shotHeaderMain}>
+                  <h2 className={styles.shotTitle}>{draftManifest.id}</h2>
+                  <div className={styles.shotSubtitle}>
+                    <code>{draftManifest.pagePath}</code>
+                    <span className={styles.dot} aria-hidden>
+                      ・
+                    </span>
+                    <span>{selectedShot.line} 行目</span>
+                    {warnings.length > 0 ? (
+                      <>
+                        <span className={styles.dot} aria-hidden>
+                          ・
                         </span>
-                      ) : null}
-                    </div>
+                        <a className={styles.warningLink} href="#warnings">
+                          確認したいこと {warnings.length} 件
+                        </a>
+                      </>
+                    ) : null}
                   </div>
-                  <div className={styles.nextStepCard}>
-                    <div className={styles.eyebrow}>次にやること</div>
-                    <p>
-                      {getNextStepMessage({
-                        bootstrapFromOutput,
-                        manifest: draftManifest,
-                        sourceImageSrc,
-                        warnings,
-                      })}
+                </div>
+                <div className={styles.shotHeaderActions}>
+                  {statusText ? (
+                    <span className={styles.saveStatus} aria-live="polite" role="status">
+                      {statusText}
+                    </span>
+                  ) : null}
+                  <button
+                    className={styles.primaryButton}
+                    disabled={isSaving}
+                    onClick={save}
+                    type="button"
+                  >
+                    {isSaving ? "保存中…" : "保存して反映"}
+                  </button>
+                </div>
+              </header>
+
+              <div className={styles.altCard}>
+                <label className={styles.fieldBlock} htmlFor="shot-alt">
+                  <span className={styles.fieldLabel}>画像の説明（Alt テキスト）</span>
+                  <span className={styles.fieldHint}>
+                    画像が表示できないときに読まれる文です。一目で何の画像か分かる短い文にしてください。
+                  </span>
+                  <input
+                    className={styles.textInput}
+                    id="shot-alt"
+                    onChange={(event) =>
+                      setDraftManifest((current) =>
+                        current
+                          ? ({
+                              ...current,
+                              alt: event.target.value,
+                            } as TutorialShotManifest)
+                          : current,
+                      )
+                    }
+                    placeholder="例: Epic Games Launcher の起動画面"
+                    value={draftManifest.alt}
+                  />
+                </label>
+              </div>
+
+              <article className={styles.workCard}>
+                <header className={styles.workCardHeader}>
+                  <div>
+                    <h3 className={styles.workCardTitle}>編集元の画像と公開する範囲</h3>
+                    <p className={styles.workCardHint}>
+                      公開したい範囲をドラッグして囲ってください。狭く切り抜くほど読み手に伝わりやすくなります。
                     </p>
                   </div>
-                  <details className={styles.detailsCard}>
-                    <summary>保存先と元画像パスを見る</summary>
-                    <div className={styles.detailsGrid}>
-                      <div className={styles.field}>
-                        <label htmlFor="shot-output">出力画像</label>
-                        <input id="shot-output" value={draftManifest.outputImagePath} readOnly />
-                      </div>
-                      <div className={styles.field}>
-                        <label htmlFor="shot-raw">元画像</label>
-                        <input id="shot-raw" value={draftManifest.rawImagePath} readOnly />
-                      </div>
-                    </div>
-                  </details>
-                </div>
-              </div>
+                  <div className={styles.workCardTools}>
+                    <button
+                      className={styles.ghostButton}
+                      onClick={() => fileInputRef.current?.click()}
+                      type="button"
+                    >
+                      {sourceImageSrc ? "元画像を差し替え" : "元画像をアップロード"}
+                    </button>
+                    {sourceImageSrc ? (
+                      <button
+                        className={styles.ghostButton}
+                        disabled={!sourceImageElement}
+                        onClick={resetCropToFull}
+                        type="button"
+                      >
+                        切り抜きをリセット
+                      </button>
+                    ) : null}
+                    <input
+                      accept="image/png,image/jpeg,image/webp"
+                      className={styles.fileInputHidden}
+                      onChange={(event) => handleRawUpload(event.target.files?.[0] ?? null)}
+                      ref={fileInputRef}
+                      type="file"
+                    />
+                  </div>
+                </header>
 
-              <div className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <h2>3. 元画像と説明を整える</h2>
-                  <p>この画像が何を示すかを短く決めて、必要なら元画像を差し替えます。</p>
-                </div>
-                <div className={styles.panelBody}>
-                  <div className={styles.grid}>
-                    <div className={styles.field}>
-                      <label htmlFor="shot-alt">Alt テキスト</label>
-                      <input
-                        id="shot-alt"
-                        onChange={(event) =>
-                          setDraftManifest((current) =>
-                            current
-                              ? ({
-                                  ...current,
-                                  alt: event.target.value,
-                                } as TutorialShotManifest)
-                              : current,
-                          )
-                        }
-                        placeholder="例: Epic Games Launcher の起動画面"
-                        value={draftManifest.alt}
+                {sourceImageSrc ? (
+                  <div className={styles.imageStage}>
+                    <ReactCrop
+                      crop={crop}
+                      onChange={(nextCrop) => setCrop(nextCrop)}
+                      onComplete={(nextCrop) => setCompletedCrop(nextCrop)}
+                    >
+                      {/* ReactCrop requires a plain img element so the crop box matches the source pixels exactly. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        alt=""
+                        className={styles.sourceImage}
+                        onLoad={(event) => {
+                          setSourceImageElement(event.currentTarget);
+                        }}
+                        src={sourceImageSrc}
+                      />
+                    </ReactCrop>
+                  </div>
+                ) : (
+                  <div className={styles.stageEmpty}>
+                    {bootstrapFromOutput
+                      ? "元画像がまだありません。「元画像をアップロード」で取り込むか、このまま「保存して反映」すれば、現在の出力画像から元画像を作成します。"
+                      : "「元画像をアップロード」から、編集したい画像を取り込んでください。"}
+                  </div>
+                )}
+              </article>
+
+              <article className={styles.workCard}>
+                <header className={styles.workCardHeader}>
+                  <div>
+                    <h3 className={styles.workCardTitle}>見せたい場所を示す</h3>
+                    <p className={styles.workCardHint}>
+                      枠・矢印・短いラベルで「どこを見るか」だけを伝えます。長い手順文は本文に書きます。
+                    </p>
+                  </div>
+                  <div className={styles.workCardTools}>
+                    <button
+                      className={styles.toolButton}
+                      disabled={!croppedPreviewSrc}
+                      onClick={() => addAnnotation("box")}
+                      type="button"
+                    >
+                      <span aria-hidden>▭</span> 枠を追加
+                    </button>
+                    <button
+                      className={styles.toolButton}
+                      disabled={!croppedPreviewSrc}
+                      onClick={() => addAnnotation("arrow")}
+                      type="button"
+                    >
+                      <span aria-hidden>↗</span> 矢印を追加
+                    </button>
+                    <button
+                      className={styles.toolButton}
+                      disabled={!croppedPreviewSrc}
+                      onClick={() => addAnnotation("label")}
+                      type="button"
+                    >
+                      <span aria-hidden>A</span> ラベルを追加
+                    </button>
+                  </div>
+                </header>
+
+                {!croppedPreviewSrc || !completedCrop ? (
+                  <div className={styles.stageEmpty}>
+                    まず上の「編集元の画像」で公開する範囲を決めてください。範囲を決めると、ここに注釈用のプレビューが表示されます。
+                  </div>
+                ) : (
+                  <div className={styles.annotateGrid}>
+                    <div className={styles.imageStage}>
+                      <AnnotationCanvas
+                        annotations={draftManifest.annotations}
+                        imageHeight={completedCrop.height}
+                        imageSrc={croppedPreviewSrc}
+                        imageWidth={completedCrop.width}
+                        onChange={updateAnnotations}
+                        onSelect={setSelectedAnnotationId}
+                        selectedAnnotationId={selectedAnnotationId}
                       />
                     </div>
-                    <div className={styles.field}>
-                      <label>元画像ファイル</label>
-                      <div className={styles.actions}>
-                        <button
-                          className={styles.uploadButton}
-                          onClick={() => fileInputRef.current?.click()}
-                          type="button"
-                        >
-                          元画像をアップロード
-                        </button>
-                        <input
-                          accept="image/png,image/jpeg,image/webp"
-                          className={styles.uploadInput}
-                          onChange={(event) => handleRawUpload(event.target.files?.[0] ?? null)}
-                          ref={fileInputRef}
-                          type="file"
-                        />
+                    <aside className={styles.annotationPanel}>
+                      <div className={styles.annotationPanelTitle}>
+                        追加した注釈 {draftManifest.annotations.length} 件
                       </div>
-                      {bootstrapFromOutput ? (
-                        <div className={styles.infoCard}>
-                          今このまま保存すると、現在の出力画像から元画像を初期作成します。
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <h2>4. 見せたい範囲を決める</h2>
-                  <p>この Action に必要な範囲だけを先に切り抜いてから注釈を付けます。</p>
-                </div>
-                <div className={styles.panelBody}>
-                  {!sourceImageSrc ? (
-                    <div className={styles.empty}>
-                      {bootstrapFromOutput
-                        ? "元画像をアップロードするか、一度保存して現在の出力画像から元画像を作成してください。"
-                        : "この Action 画像を編集するには、まず元画像をアップロードしてください。"}
-                    </div>
-                  ) : (
-                    <div className={styles.previewShell}>
-                      <div className={styles.actions}>
-                        <button
-                          className={styles.secondaryButton}
-                          onClick={() => {
-                            if (!sourceImageElement) {
-                              return;
-                            }
-                            const image = sourceImageElement;
-                            setCrop({
-                              unit: "px",
-                              x: 0,
-                              y: 0,
-                              width: image.naturalWidth,
-                              height: image.naturalHeight,
-                            });
-                            setCompletedCrop({
-                              unit: "px",
-                              x: 0,
-                              y: 0,
-                              width: image.naturalWidth,
-                              height: image.naturalHeight,
-                            });
-                          }}
-                          type="button"
-                        >
-                          切り抜きをリセット
-                        </button>
-                        <span className={styles.status}>
-                          必要な UI だけが見えるように、切り抜きは狭めに保ってください。
-                        </span>
-                      </div>
-                      <div className={styles.previewCanvas}>
-                        <ReactCrop
-                          crop={crop}
-                          onChange={(nextCrop) => setCrop(nextCrop)}
-                          onComplete={(nextCrop) => setCompletedCrop(nextCrop)}
-                        >
-                          {/* ReactCrop requires a plain img element so the crop box matches the source pixels exactly. */}
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            alt=""
-                            className={styles.sourceImage}
-                            onLoad={(event) => {
-                              setSourceImageElement(event.currentTarget);
-                            }}
-                            src={sourceImageSrc}
-                          />
-                        </ReactCrop>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <h2>5. 見る場所だけを示す</h2>
-                  <p>
-                    画像は WHERE
-                    を示す用途に絞ります。長い手順文は入れず、必要な場所だけ短く示してください。
-                  </p>
-                </div>
-                <div className={styles.panelBody}>
-                  {!croppedPreviewSrc || !completedCrop ? (
-                    <div className={styles.empty}>
-                      注釈を始める前に、先に切り抜きを決めてください。
-                    </div>
-                  ) : (
-                    <div className={styles.annotationShell}>
-                      <div className={styles.toolbar}>
-                        <button onClick={() => addAnnotation("box")} type="button">
-                          枠を追加
-                        </button>
-                        <button onClick={() => addAnnotation("arrow")} type="button">
-                          矢印を追加
-                        </button>
-                        <button onClick={() => addAnnotation("label")} type="button">
-                          ラベルを追加
-                        </button>
-                      </div>
-                      <div className={styles.annotationStage}>
-                        <AnnotationCanvas
-                          annotations={draftManifest.annotations}
-                          imageHeight={completedCrop.height}
-                          imageSrc={croppedPreviewSrc}
-                          imageWidth={completedCrop.width}
-                          onChange={updateAnnotations}
-                          onSelect={setSelectedAnnotationId}
-                          selectedAnnotationId={selectedAnnotationId}
-                        />
-                      </div>
-                      <div className={styles.annotationList}>
-                        {draftManifest.annotations.map((annotation) => (
-                          <div
-                            className={`${styles.annotationItem} ${
-                              annotation.id === selectedAnnotationId
-                                ? styles.annotationItemSelected
-                                : ""
-                            }`}
-                            key={annotation.id}
-                          >
-                            <div className={styles.annotationItemHeader}>
-                              <button
-                                className={styles.secondaryButton}
-                                onClick={() => setSelectedAnnotationId(annotation.id)}
-                                type="button"
+                      {draftManifest.annotations.length === 0 ? (
+                        <p className={styles.annotationPanelEmpty}>
+                          まだ注釈はありません。上のボタンで追加できます。
+                        </p>
+                      ) : (
+                        <ul className={styles.annotationList}>
+                          {draftManifest.annotations.map((annotation, index) => {
+                            const isSelected = annotation.id === selectedAnnotationId;
+                            return (
+                              <li
+                                className={`${styles.annotationItem} ${
+                                  isSelected ? styles.annotationItemSelected : ""
+                                }`}
+                                key={annotation.id}
                               >
-                                {getAnnotationTypeLabel(annotation.type)}
-                              </button>
-                              <button
-                                className={styles.secondaryButton}
-                                onClick={() =>
-                                  updateAnnotations(
-                                    draftManifest.annotations.filter(
-                                      (item) => item.id !== annotation.id,
-                                    ),
-                                  )
-                                }
-                                type="button"
-                              >
-                                削除
-                              </button>
-                            </div>
-                            {annotation.type === "label" ? (
-                              <div className={styles.field}>
-                                <label htmlFor={`label-${annotation.id}`}>ラベル</label>
-                                <input
-                                  id={`label-${annotation.id}`}
-                                  onChange={(event) =>
+                                <button
+                                  className={styles.annotationItemSelect}
+                                  onClick={() => setSelectedAnnotationId(annotation.id)}
+                                  type="button"
+                                >
+                                  <span className={styles.annotationItemKind}>
+                                    {getAnnotationTypeLabel(annotation.type)} {index + 1}
+                                  </span>
+                                  {annotation.type === "label" ? (
+                                    <span className={styles.annotationItemPreview}>
+                                      {annotation.text || "（テキストなし）"}
+                                    </span>
+                                  ) : (
+                                    <span className={styles.annotationItemPreview}>
+                                      画像上でドラッグして調整
+                                    </span>
+                                  )}
+                                </button>
+                                {annotation.type === "label" ? (
+                                  <input
+                                    aria-label={`ラベル ${index + 1} のテキスト`}
+                                    className={styles.textInput}
+                                    onChange={(event) =>
+                                      updateAnnotations(
+                                        draftManifest.annotations.map((item) =>
+                                          item.id === annotation.id
+                                            ? ({
+                                                ...item,
+                                                text: event.target.value,
+                                              } as TutorialShotAnnotation)
+                                            : item,
+                                        ),
+                                      )
+                                    }
+                                    placeholder="ラベルの文字"
+                                    value={annotation.text}
+                                  />
+                                ) : null}
+                                <button
+                                  className={styles.annotationItemDelete}
+                                  onClick={() =>
                                     updateAnnotations(
-                                      draftManifest.annotations.map((item) =>
-                                        item.id === annotation.id
-                                          ? ({
-                                              ...item,
-                                              text: event.target.value,
-                                            } as TutorialShotAnnotation)
-                                          : item,
+                                      draftManifest.annotations.filter(
+                                        (item) => item.id !== annotation.id,
                                       ),
                                     )
                                   }
-                                  value={annotation.text}
-                                />
-                              </div>
-                            ) : (
-                              <div className={styles.status}>
-                                位置やサイズは、キャンバス上で直接ドラッグして調整してください。
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+                                  type="button"
+                                >
+                                  削除
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </aside>
+                  </div>
+                )}
+              </article>
 
-              <div className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <h2>6. 保存して確認する</h2>
-                  <p>警告と保存結果を確認してから、資料ページ側の見た目をチェックします。</p>
-                </div>
-                <div className={styles.panelBody}>
-                  <div className={styles.saveSummary}>
-                    <div>
-                      <div className={styles.eyebrow}>保存前チェック</div>
-                      <p className={styles.status}>
-                        警告は参考情報です。画像内の注釈がチュートリアルの書き方から外れていないかを確認します。
-                      </p>
-                    </div>
-                    <div className={styles.actions}>
-                      <button disabled={isSaving} onClick={save} type="button">
-                        {isSaving ? "保存中..." : "保存して出力画像を更新"}
-                      </button>
-                    </div>
+              {warnings.length > 0 ? (
+                <article className={styles.warningCard} id="warnings">
+                  <header className={styles.warningHeader}>
+                    確認したいこと <span>{warnings.length} 件</span>
+                  </header>
+                  <ul className={styles.warningList}>
+                    {warnings.map((warning: string) => (
+                      <li className={styles.warningItem} key={warning}>
+                        {warning}
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ) : null}
+
+              <details className={styles.detailsCard}>
+                <summary>保存先のパスを見る</summary>
+                <dl className={styles.detailsList}>
+                  <div className={styles.detailsRow}>
+                    <dt>公開される画像</dt>
+                    <dd>
+                      <code>{draftManifest.outputImagePath}</code>
+                    </dd>
                   </div>
-                  {warnings.length === 0 ? (
-                    <div className={styles.empty}>画像に関する警告はありません。</div>
-                  ) : (
-                    <div className={styles.warningList}>
-                      {warnings.map((warning: string) => (
-                        <div className={styles.warningItem} key={warning}>
-                          {warning}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className={styles.resultCard}>
-                    <div className={styles.eyebrow}>保存結果</div>
-                    <p>{statusText || "保存すると、この欄に結果が表示されます。"}</p>
+                  <div className={styles.detailsRow}>
+                    <dt>編集元の画像</dt>
+                    <dd>
+                      <code>{draftManifest.rawImagePath}</code>
+                    </dd>
                   </div>
-                </div>
-              </div>
+                </dl>
+              </details>
             </>
           )}
         </section>
