@@ -254,8 +254,6 @@ test(
     await page.getByPlaceholder("../open-campus-unreal-90min").fill(overrideCourseRelativePath);
     await page.getByRole("button", { name: "切り替える" }).click();
     await page.getByRole("button", { name: /override-startup/i }).waitFor();
-    await page.getByText("編集元を追加").waitFor();
-    await page.getByText("このエディタでは未編集").waitFor();
 
     await page.getByLabel("画像の説明（Alt テキスト）").fill("起動画面");
     await page.getByRole("button", { name: "ラベルを追加" }).click();
@@ -264,8 +262,7 @@ test(
     await page.getByText("保存しました").waitFor();
 
     await page.getByRole("button", { name: /override-missing-output/i }).click();
-    await page.getByText("元画像を追加").waitFor();
-    await page.getByText("まだ画像を作成していません").waitFor();
+    await page.getByText("画像未設定").waitFor();
     await page
       .getByText("「元画像をアップロード」から、編集したい画像を取り込んでください。")
       .waitFor();

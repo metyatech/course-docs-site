@@ -35,3 +35,4 @@
 {"id":"CUhxO8Sy","description":"Localize tutorial shot editor UI and user-visible messages to Japanese","stage":"committed","createdAt":"2026-04-09T02:22:17.452Z","updatedAt":"2026-04-09T02:32:48.421Z","committedEventId":"pXokmNdoocKHkp30"}
 {"id":"yRM_0c-B","description":"Refine tutorial shot editor GUI around guided-gui-design principles","stage":"committed","createdAt":"2026-04-09T03:10:08.152Z","updatedAt":"2026-04-09T03:19:11.402Z","committedEventId":"spTo8Od6jMzxBEfR"}
 {"id":"9S2WSPdD","description":"Clarify tutorial shot editor status labels in course-docs-site","stage":"committed","createdAt":"2026-04-09T05:08:19.016Z","updatedAt":"2026-04-09T05:22:33.099Z","committedEventId":"rKmixJOmeEoHBGy2"}
+{"id":"mQQJuil6","description":"Simplify tutorial shot editor sidebar status badges","stage":"committed","createdAt":"2026-04-09T05:46:23.904Z","updatedAt":"2026-04-09T05:54:23.480Z","committedEventId":"fVAdu6-hhIhfnB6T"}

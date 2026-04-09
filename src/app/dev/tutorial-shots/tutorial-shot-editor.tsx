@@ -66,13 +66,11 @@ const getShotFlags = (shot: TutorialShotItem) => {
     title: string;
   }> = [];
 
-  if (!shot.hasRawImage) {
+  if (!shot.hasOutputImage) {
     flags.push({
       className: styles.flagMuted,
-      label: shot.hasOutputImage ? "編集元を追加" : "元画像を追加",
-      title: shot.hasOutputImage
-        ? "今は公開中の画像だけがあります。編集しやすいように編集元の画像を追加できます。"
-        : "まだこの Action 用の元画像がありません。元画像をアップロードすると編集できます。",
+      label: "画像未設定",
+      title: "まだこの Action 用の公開画像がありません。",
     });
   }
 
@@ -81,16 +79,6 @@ const getShotFlags = (shot: TutorialShotItem) => {
       className: styles.flagWarn,
       label: `要確認 ${shot.warnings.length}件`,
       title: `確認したいことが ${shot.warnings.length} 件あります。`,
-    });
-  }
-
-  if (!shot.hasManifest) {
-    flags.push({
-      className: styles.flagMuted,
-      label: shot.hasOutputImage ? "このエディタでは未編集" : "まだ画像を作成していません",
-      title: shot.hasOutputImage
-        ? "今の公開画像はありますが、このエディタ用の切り抜き・注釈設定はまだ保存していません。"
-        : "まだこの Action 用の出力画像と設定がありません。",
     });
   }
 
