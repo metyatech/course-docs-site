@@ -236,10 +236,10 @@ export default function TutorialShotEditor() {
   const annotationPanelHint =
     annotationErrors[0] ??
     (annotationSummary.boxCount === 0
-      ? "結果確認だけの画像なら、注釈なしのまま保存できます。クリック位置を示したいときだけ枠を追加してください。"
+      ? "結果確認だけなら、このまま保存できます。"
       : annotationSummary.arrowCount > 0
-        ? "保存できる状態です。矢印は補助なので、不要なら削除して枠だけに戻せます。"
-        : "保存できる状態です。必要なときだけ矢印を 1 本追加できます。");
+        ? "保存できます。矢印は不要なら削除できます。"
+        : "保存できます。必要なら矢印を追加できます。");
 
   useEffect(() => {
     const savedOverride = window.localStorage.getItem(SOURCE_OVERRIDE_STORAGE_KEY) ?? "";
@@ -557,9 +557,7 @@ export default function TutorialShotEditor() {
         <section className={styles.setupCard}>
           <header className={styles.setupHeader}>
             <h1>編集する教材リポジトリを選んでください</h1>
-            <p>
-              ローカルにある教材リポジトリのパスを指定すると、その中の画像を 1 枚ずつ編集できます。
-            </p>
+            <p>ローカル教材の画像を順に編集できます。</p>
           </header>
 
           <div className={styles.setupBody}>
@@ -775,9 +773,7 @@ export default function TutorialShotEditor() {
               <div className={styles.altCard}>
                 <label className={styles.fieldBlock} htmlFor="shot-alt">
                   <span className={styles.fieldLabel}>画像の説明（Alt テキスト）</span>
-                  <span className={styles.fieldHint}>
-                    画像が表示できないときに読まれる文です。一目で何の画像か分かる短い文にしてください。
-                  </span>
+                  <span className={styles.fieldHint}>画像の内容が分かる短い文にします。</span>
                   <input
                     className={styles.textInput}
                     id="shot-alt"
@@ -801,9 +797,7 @@ export default function TutorialShotEditor() {
                 <header className={styles.workCardHeader}>
                   <div>
                     <h3 className={styles.workCardTitle}>編集元の画像と公開する範囲</h3>
-                    <p className={styles.workCardHint}>
-                      公開したい範囲をドラッグして囲ってください。狭く切り抜くほど読み手に伝わりやすくなります。
-                    </p>
+                    <p className={styles.workCardHint}>公開する範囲だけを囲みます。</p>
                   </div>
                   <div className={styles.workCardTools}>
                     <button
@@ -872,8 +866,8 @@ export default function TutorialShotEditor() {
                 ) : (
                   <div className={styles.stageEmpty}>
                     {bootstrapFromOutput
-                      ? "元画像がまだありません。「元画像をアップロード」で取り込むか、このまま「保存して反映」すれば、現在の出力画像から元画像を作成します。"
-                      : "「元画像をアップロード」から、編集したい画像を取り込んでください。"}
+                      ? "元画像がありません。アップロードするか、このまま保存して現在の出力画像を元画像にします。"
+                      : "元画像をアップロードしてください。"}
                   </div>
                 )}
               </article>
@@ -881,10 +875,9 @@ export default function TutorialShotEditor() {
               <article className={styles.workCard}>
                 <header className={styles.workCardHeader}>
                   <div>
-                    <h3 className={styles.workCardTitle}>必要なら見せたい場所を示す</h3>
+                    <h3 className={styles.workCardTitle}>必要なら注釈を追加</h3>
                     <p className={styles.workCardHint}>
-                      結果確認だけの画像は注釈なしのままで構いません。操作位置を強調したいときだけ枠を
-                      1 つ置き、必要ならその枠を補助する矢印を 1 本追加してください。
+                      結果確認だけなら注釈不要です。場所を示すときだけ枠、必要なら矢印を追加します。
                     </p>
                   </div>
                   <div className={styles.workCardTools}>
@@ -909,7 +902,7 @@ export default function TutorialShotEditor() {
 
                 {!croppedPreviewSrc || !completedCrop ? (
                   <div className={styles.stageEmpty}>
-                    まず上の「編集元の画像」で公開する範囲を決めてください。範囲を決めると、ここに注釈用のプレビューが表示されます。
+                    上で公開範囲を決めると、ここで注釈できます。
                   </div>
                 ) : (
                   <div className={styles.annotateGrid}>
@@ -929,7 +922,7 @@ export default function TutorialShotEditor() {
                       <p className={styles.annotationPanelEmpty}>{annotationPanelHint}</p>
                       {draftManifest.annotations.length === 0 ? (
                         <p className={styles.annotationPanelEmpty}>
-                          注釈はまだありません。このまま保存するか、必要なときだけ枠を追加して注目位置を示してください。
+                          注釈なしでも保存できます。必要なときだけ枠を追加します。
                         </p>
                       ) : (
                         <ul className={styles.annotationList}>
@@ -954,15 +947,13 @@ export default function TutorialShotEditor() {
                                     <span className={styles.annotationItemPreview}>
                                       {annotation.text
                                         ? `旧ラベル: ${annotation.text}`
-                                        : "旧ラベルです。削除してください。"}
+                                        : "旧ラベル。削除してください。"}
                                     </span>
                                   ) : annotation.type === "arrow" ? (
-                                    <span className={styles.annotationItemPreview}>
-                                      枠を補助する矢印です。必要なときだけ残してください。
-                                    </span>
+                                    <span className={styles.annotationItemPreview}>補助の矢印</span>
                                   ) : (
                                     <span className={styles.annotationItemPreview}>
-                                      画像上でドラッグして、主注目点を 1 つ囲んでください。
+                                      画像上で調整
                                     </span>
                                   )}
                                 </button>

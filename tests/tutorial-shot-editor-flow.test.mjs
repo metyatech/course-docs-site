@@ -262,11 +262,7 @@ test(
     );
     await assert.equal(await page.getByRole("button", { name: "矢印を追加" }).isDisabled(), true);
     await assert.equal(await page.getByRole("button", { name: "ラベルを追加" }).count(), 0);
-    await page
-      .getByText(
-        "結果確認だけの画像なら、注釈なしのまま保存できます。クリック位置を示したいときだけ枠を追加してください。",
-      )
-      .waitFor();
+    await page.getByText("結果確認だけなら、このまま保存できます。").waitFor();
 
     await page.getByRole("button", { name: "枠を追加" }).click();
     await assert.equal(await page.getByRole("button", { name: "枠を追加" }).isDisabled(), true);
