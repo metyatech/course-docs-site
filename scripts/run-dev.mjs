@@ -123,7 +123,7 @@ const startDev = () => {
   devExitExpected = false;
   const devArgs = [...baseArgs, "--port", String(activePort)];
   const childEnv = {
-    ...process.env,
+    ...getRuntimeEnv(),
     COURSE_DOCS_SITE_DEV_REVISION: devRevision,
   };
   if (devInnerMode === "stub") {

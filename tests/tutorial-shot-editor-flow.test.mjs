@@ -13,6 +13,33 @@ import sharp from "sharp";
 import { createRunDevTestEnv } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const envCourseLocalPath = path.join(projectRoot, ".env.course.local");
+
+const fileExists = async (targetPath) => {
+  try {
+    await fs.stat(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const backupFile = async (targetPath) => {
+  if (!(await fileExists(targetPath))) {
+    return null;
+  }
+
+  return fs.readFile(targetPath, "utf8");
+};
+
+const restoreFile = async (targetPath, contentsOrNull) => {
+  if (contentsOrNull === null) {
+    await fs.rm(targetPath, { force: true });
+    return;
+  }
+
+  await fs.writeFile(targetPath, contentsOrNull, "utf8");
+};
 
 const getFreePort = () =>
   new Promise((resolve, reject) => {
@@ -280,5 +307,67 @@ test(
 
     const startupRawHash = await sha256File(startupRawPath);
     assert.equal(startupRawHash, startupOutputHashBefore);
+  },
+);
+
+test(
+  "tutorial shot editor API sees COURSE_CONTENT_SOURCE from .env.course.local",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-env-"));
+    const fixtureCourse = path.join(tempRoot, "course");
+    const fixtureCourseEnvPath = fixtureCourse.replaceAll("\\", "/");
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const envCourseLocalBackup = await backupFile(envCourseLocalPath);
+
+    await writeFixtureCourseRepo(fixtureCourse);
+    await fs.writeFile(
+      envCourseLocalPath,
+      `COURSE_CONTENT_SOURCE=${fixtureCourseEnvPath}\n`,
+      "utf8",
+    );
+
+    const childEnv = createRunDevTestEnv({
+      label: "tutorial-shot-editor-env-file",
+      env: process.env,
+    });
+    delete childEnv.COURSE_CONTENT_SOURCE;
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      cwd: projectRoot,
+      env: childEnv,
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await restoreFile(envCourseLocalPath, envCourseLocalBackup);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Tutorial shot editor did not become ready from env file startup.",
+      },
+    );
+
+    const response = await fetch(`${baseUrl}/api/dev/tutorial-shots/`, {
+      signal: AbortSignal.timeout(30_000),
+    });
+    const data = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(data.enabled, true);
+    assert.equal(data.configuredSource, fixtureCourseEnvPath);
+    assert.equal(data.activeSourcePath, fixtureCourseEnvPath);
+    assert.ok(Array.isArray(data.shots));
+    assert.ok(data.shots.length > 0);
   },
 );
