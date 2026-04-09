@@ -24,8 +24,30 @@ const AnnotationCanvas = dynamic(() => import("./tutorial-shot-editor-canvas"), 
   ssr: false,
 });
 
-const buildImageUrl = (contentRelativePath: string, revision: number) =>
-  `/api/dev/tutorial-shots/image?path=${encodeURIComponent(contentRelativePath)}&v=${revision}`;
+const SOURCE_OVERRIDE_STORAGE_KEY = "tutorial-shot-editor.sourceOverride";
+
+const buildTutorialShotsListUrl = (sourceOverride: string) => {
+  const params = new URLSearchParams();
+  if (sourceOverride) {
+    params.set("source", sourceOverride);
+  }
+  const query = params.toString();
+  return query ? `/api/dev/tutorial-shots?${query}` : "/api/dev/tutorial-shots";
+};
+
+const buildImageUrl = (contentRelativePath: string, revision: number, sourceOverride: string) => {
+  const params = new URLSearchParams({
+    path: contentRelativePath,
+    v: String(revision),
+  });
+  if (sourceOverride) {
+    params.set("source", sourceOverride);
+  }
+  return `/api/dev/tutorial-shots/image?${params.toString()}`;
+};
+
+const formatConfiguredSource = (configuredSource: string | null) =>
+  configuredSource && configuredSource.trim() ? configuredSource : "(not set)";
 
 const loadImageElement = (src: string) =>
   new Promise<HTMLImageElement>((resolve, reject) => {
@@ -112,6 +134,8 @@ const createDefaultLabel = (): TutorialShotLabelAnnotation => ({
 
 export default function TutorialShotEditor() {
   const [response, setResponse] = useState<TutorialShotResponse | null>(null);
+  const [sourceOverride, setSourceOverride] = useState<string | null>(null);
+  const [sourceInput, setSourceInput] = useState("");
   const [selectedKey, setSelectedKey] = useState<string>("");
   const [draftManifest, setDraftManifest] = useState<TutorialShotManifest | null>(null);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
@@ -138,22 +162,52 @@ export default function TutorialShotEditor() {
   );
 
   useEffect(() => {
+    const savedOverride = window.localStorage.getItem(SOURCE_OVERRIDE_STORAGE_KEY) ?? "";
+    setSourceOverride(savedOverride);
+    setSourceInput(savedOverride);
+  }, []);
+
+  useEffect(() => {
+    if (sourceOverride === null) {
+      return;
+    }
+
     const load = async () => {
-      const result = await fetch("/api/dev/tutorial-shots", { cache: "no-store" });
+      const result = await fetch(buildTutorialShotsListUrl(sourceOverride), {
+        cache: "no-store",
+      });
       const data = (await result.json()) as TutorialShotResponse;
       setResponse(data);
       if (data.enabled && data.shots.length > 0) {
-        setSelectedKey((current) => current || data.shots[0].outputImagePath);
+        setSelectedKey((current) =>
+          data.shots.some((shot) => shot.outputImagePath === current)
+            ? current
+            : data.shots[0].outputImagePath,
+        );
+        return;
       }
+
+      setSelectedKey("");
     };
 
     load().catch((error) => {
       setResponse({
         enabled: false,
         reason: error instanceof Error ? error.message : "Failed to load tutorial shots.",
+        configuredSource: null,
+        suggestedLocalSources: [],
+        overrideSource: sourceOverride,
       });
     });
-  }, []);
+  }, [sourceOverride]);
+
+  useEffect(() => {
+    if (response?.enabled || sourceInput || !response?.suggestedLocalSources.length) {
+      return;
+    }
+
+    setSourceInput(response.suggestedLocalSources[0]);
+  }, [response, sourceInput]);
 
   useEffect(() => {
     if (!selectedShot) {
@@ -178,12 +232,14 @@ export default function TutorialShotEditor() {
       : selectedShot.hasOutputImage
         ? selectedShot.outputImagePath
         : null;
-    setSourceImageSrc(nextImagePath ? buildImageUrl(nextImagePath, sourceImageRevision) : null);
+    setSourceImageSrc(
+      nextImagePath ? buildImageUrl(nextImagePath, sourceImageRevision, sourceOverride ?? "") : null,
+    );
     setSourceImageElement(null);
     setCrop(undefined);
     setCompletedCrop(null);
     setCroppedPreviewSrc(null);
-  }, [selectedShot, sourceImageRevision]);
+  }, [selectedShot, sourceImageRevision, sourceOverride]);
 
   useEffect(() => {
     if (!sourceImageElement) {
@@ -291,6 +347,7 @@ export default function TutorialShotEditor() {
         manifest: manifestToSave,
         rawImageDataUrl: pendingRawDataUrl,
         bootstrapFromOutput: bootstrapFromOutput && !pendingRawDataUrl,
+        source: sourceOverride,
       }),
     });
 
@@ -310,9 +367,25 @@ export default function TutorialShotEditor() {
     setSourceImageRevision((value) => value + 1);
     setIsSaving(false);
 
-    const listResponse = await fetch("/api/dev/tutorial-shots", { cache: "no-store" });
+    const listResponse = await fetch(buildTutorialShotsListUrl(sourceOverride ?? ""), {
+      cache: "no-store",
+    });
     const listData = (await listResponse.json()) as TutorialShotResponse;
     setResponse(listData);
+  };
+
+  const applySourceOverride = (nextSource: string) => {
+    const trimmed = nextSource.trim();
+    if (trimmed) {
+      window.localStorage.setItem(SOURCE_OVERRIDE_STORAGE_KEY, trimmed);
+    } else {
+      window.localStorage.removeItem(SOURCE_OVERRIDE_STORAGE_KEY);
+    }
+    setSourceInput(trimmed);
+    setResponse(null);
+    setSelectedKey("");
+    setSourceOverride(trimmed);
+    setStatusText("");
   };
 
   const handleRawUpload = async (file: File | null) => {
@@ -347,7 +420,70 @@ export default function TutorialShotEditor() {
   if (!response.enabled) {
     return (
       <main className={styles.page}>
-        <div className={styles.empty}>{response.reason}</div>
+        <div className={styles.setupCard}>
+          <div className={styles.panelHeader}>
+            <h1>Tutorial Shot Editor Setup</h1>
+            <p>
+              This editor needs a writable local content repo because it saves raw screenshots,
+              shot manifests, and generated Action images back into that repo.
+            </p>
+          </div>
+          <div className={styles.panelBody}>
+            <div className={styles.warningList}>
+              <div className={styles.warningItem}>{response.reason}</div>
+            </div>
+            <div className={styles.grid}>
+              <div className={styles.field}>
+                <label htmlFor="configured-source">Current COURSE_CONTENT_SOURCE</label>
+                <input
+                  id="configured-source"
+                  readOnly
+                  value={formatConfiguredSource(response.configuredSource)}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="local-source">Local Content Repo</label>
+                <input
+                  id="local-source"
+                  onChange={(event) => setSourceInput(event.target.value)}
+                  placeholder="../open-campus-unreal-90min"
+                  value={sourceInput}
+                />
+              </div>
+            </div>
+            {response.suggestedLocalSources.length > 0 ? (
+              <div className={styles.suggestedSources}>
+                <div className={styles.status}>Detected local repo candidates:</div>
+                <div className={styles.badgeRow}>
+                  {response.suggestedLocalSources.map((candidate) => (
+                    <button
+                      className={styles.secondaryButton}
+                      key={candidate}
+                      onClick={() => setSourceInput(candidate)}
+                      type="button"
+                    >
+                      {candidate}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className={styles.actions}>
+              <button onClick={() => applySourceOverride(sourceInput)} type="button">
+                Open Local Repo
+              </button>
+              {response.overrideSource ? (
+                <button
+                  className={styles.secondaryButton}
+                  onClick={() => applySourceOverride("")}
+                  type="button"
+                >
+                  Clear Saved Override
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
       </main>
     );
   }
@@ -361,6 +497,38 @@ export default function TutorialShotEditor() {
           source screenshot as <code>raw + crop + annotations -&gt; generated png</code>. The editor
           stores shot metadata beside the page and rewrites the existing output image in place.
         </p>
+        <div className={styles.sourceBanner}>
+          <div className={styles.status}>
+            Editing local repo: <code>{response.activeSourcePath}</code>
+            {response.sourceKind === "override" ? " (override)" : ""}
+          </div>
+          <div className={styles.actions}>
+            <input
+              onChange={(event) => setSourceInput(event.target.value)}
+              placeholder="../open-campus-unreal-90min"
+              value={sourceInput}
+            />
+            <button onClick={() => applySourceOverride(sourceInput)} type="button">
+              Switch Local Repo
+            </button>
+            {sourceOverride ? (
+              <button
+                className={styles.secondaryButton}
+                onClick={() => applySourceOverride("")}
+                type="button"
+              >
+                Use COURSE_CONTENT_SOURCE
+              </button>
+            ) : null}
+          </div>
+          {response.sourceKind === "override" ? (
+            <div className={styles.status}>
+              The editor is writing to a local override repo. If you want the normal docs pages to
+              preview that same repo, also set <code>COURSE_CONTENT_SOURCE</code> to this path and
+              restart <code>npm run dev</code>.
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className={styles.layout}>

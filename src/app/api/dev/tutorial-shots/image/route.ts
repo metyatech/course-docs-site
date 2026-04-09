@@ -9,12 +9,13 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
-    const context = getTutorialShotAuthoringContext();
+    const { searchParams } = new URL(request.url);
+    const requestedSource = searchParams.get("source");
+    const context = await getTutorialShotAuthoringContext({ requestedSource });
     if (!context.enabled) {
       return NextResponse.json(context, { status: 400 });
     }
 
-    const { searchParams } = new URL(request.url);
     const imagePath = searchParams.get("path");
     if (!imagePath) {
       return NextResponse.json({ error: "Missing image path." }, { status: 400 });

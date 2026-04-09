@@ -9,14 +9,15 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const context = getTutorialShotAuthoringContext();
-    if (!context.enabled) {
-      return NextResponse.json(context, { status: 400 });
-    }
-
     const body = await request.json();
     if (!body || typeof body !== "object" || !("manifest" in body)) {
       return NextResponse.json({ error: "Missing manifest payload." }, { status: 400 });
+    }
+    const requestedSource =
+      typeof body.source === "string" && body.source.trim() ? body.source.trim() : null;
+    const context = await getTutorialShotAuthoringContext({ requestedSource });
+    if (!context.enabled) {
+      return NextResponse.json(context, { status: 400 });
     }
 
     const result = await saveTutorialShot({

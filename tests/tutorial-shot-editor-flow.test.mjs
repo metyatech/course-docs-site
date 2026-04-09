@@ -75,9 +75,16 @@ const killProcessTree = async (child) => {
   await Promise.race([new Promise((resolve) => child.on("exit", () => resolve())), sleep(10_000)]);
 };
 
-const writeFixtureCourseRepo = async (rootDir) => {
+const writeFixtureCourseRepo = async (
+  rootDir,
+  {
+    logoText = "Tutorial Shot Fixture",
+    firstImageName = "startup",
+    secondImageName = "missing-output",
+  } = {},
+) => {
   const siteConfig = `export const siteConfig = {
-  logoText: "Tutorial Shot Fixture",
+  logoText: ${JSON.stringify(logoText)},
   projectLink: "https://example.invalid",
   docsRepositoryBase: "https://example.invalid",
   description: "tutorial shot editor fixture",
@@ -113,11 +120,11 @@ title: Tutorial
 ---
 
 <Section title="Step 1" goal="最初のショットを保存できる状態">
-  <Action img="./img/startup.png">
-    **Startup** を確認します
+  <Action img="./img/${firstImageName}.png">
+    **${firstImageName}** を確認します
   </Action>
-  <Action img="./img/missing-output.png">
-    **Missing output** を確認します
+  <Action img="./img/${secondImageName}.png">
+    **${secondImageName}** を確認します
   </Action>
 </Section>
 `;
@@ -143,7 +150,7 @@ title: Tutorial
     },
   })
     .png()
-    .toFile(path.join(imageDir, "startup.png"));
+    .toFile(path.join(imageDir, `${firstImageName}.png`));
 };
 
 const sha256File = async (filePath) => {
@@ -157,20 +164,27 @@ test(
   async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-"));
     const fixtureCourse = path.join(tempRoot, "course");
+    const overrideCourse = path.join(tempRoot, "override-course");
     const port = await getFreePort();
     const baseUrl = `http://127.0.0.1:${port}`;
 
     await writeFixtureCourseRepo(fixtureCourse);
+    await writeFixtureCourseRepo(overrideCourse, {
+      logoText: "Override Tutorial Shot Fixture",
+      firstImageName: "override-startup",
+      secondImageName: "override-missing-output",
+    });
 
     const startupOutputPath = path.join(
-      fixtureCourse,
+      overrideCourse,
       "content",
       "docs",
       "tutorial",
       "img",
-      "startup.png",
+      "override-startup.png",
     );
     const startupOutputHashBefore = await sha256File(startupOutputPath);
+    const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       cwd: projectRoot,
@@ -209,6 +223,10 @@ test(
 
     await page.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "Tutorial Shot Editor" }).waitFor();
+    await page.getByText("Editing local repo:").waitFor();
+    await page.getByPlaceholder("../open-campus-unreal-90min").fill(overrideCourseRelativePath);
+    await page.getByRole("button", { name: "Switch Local Repo" }).click();
+    await page.getByRole("button", { name: /override-startup/i }).waitFor();
 
     await page.getByLabel("Alt").fill("起動画面");
     await page.getByRole("button", { name: "Add Label" }).click();
@@ -216,7 +234,7 @@ test(
     await page.getByRole("button", { name: "Save Shot" }).click();
     await page.getByText("Saved tutorial shot.").waitFor();
 
-    await page.getByRole("button", { name: /missing-output/i }).click();
+    await page.getByRole("button", { name: /override-missing-output/i }).click();
     await page.getByText("Upload a raw screenshot to start editing this Action image.").waitFor();
     await page.getByRole("button", { name: "Save Shot" }).click();
     await page
@@ -226,20 +244,20 @@ test(
       .waitFor();
 
     const startupRawPath = path.join(
-      fixtureCourse,
+      overrideCourse,
       "content",
       "docs",
       "tutorial",
       "shots",
-      "startup.raw.png",
+      "override-startup.raw.png",
     );
     const startupManifestPath = path.join(
-      fixtureCourse,
+      overrideCourse,
       "content",
       "docs",
       "tutorial",
       "shots",
-      "startup.shot.json",
+      "override-startup.shot.json",
     );
 
     await assert.doesNotReject(() => fs.stat(startupRawPath));

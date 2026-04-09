@@ -79,6 +79,11 @@ When `COURSE_CONTENT_SOURCE` points to a **local** course content repository,
 the site exposes a local-only screenshot authoring surface at
 `/dev/tutorial-shots`.
 
+If the site is currently running against a remote repo, or against a different
+local course repo, the editor can temporarily switch to another local content
+repo from its own setup screen without restarting dev. That override affects
+only the editor. Normal docs pages still follow `COURSE_CONTENT_SOURCE`.
+
 Use it when a tutorial page already contains `Action img="./img/...png"` and
 you want to keep that output path stable while editing:
 

@@ -7,9 +7,11 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const context = getTutorialShotAuthoringContext();
+    const { searchParams } = new URL(request.url);
+    const requestedSource = searchParams.get("source");
+    const context = await getTutorialShotAuthoringContext({ requestedSource });
 
     if (!context.enabled) {
       return NextResponse.json(context, {
@@ -25,6 +27,10 @@ export async function GET() {
     return NextResponse.json(
       {
         enabled: true,
+        activeSourcePath: context.activeSourcePath,
+        sourceKind: context.sourceKind,
+        configuredSource: context.configuredSource,
+        suggestedLocalSources: context.suggestedLocalSources,
         shots,
       },
       {

@@ -20,6 +20,24 @@ const isLocalPathLike = (value) =>
   value.startsWith("\\") ||
   /^[a-zA-Z]:[\\/]/u.test(value);
 
+const hasRequiredCourseRepoShape = async (directoryPath) => {
+  const contentDir = path.join(directoryPath, "content");
+  const siteConfigPath = path.join(directoryPath, "site.config.ts");
+
+  const [hasContentDir, hasSiteConfig] = await Promise.all([
+    fs
+      .stat(contentDir)
+      .then((stats) => stats.isDirectory())
+      .catch(() => false),
+    fs
+      .stat(siteConfigPath)
+      .then((stats) => stats.isFile())
+      .catch(() => false),
+  ]);
+
+  return hasContentDir && hasSiteConfig;
+};
+
 const ensureInsideRoot = ({ rootDir, resolvedPath }) => {
   const normalizedRoot = path.resolve(rootDir);
   const normalizedResolved = path.resolve(resolvedPath);
@@ -70,18 +88,52 @@ const readJsonIfExists = async (filePath) => {
   }
 };
 
-const resolveContentSourceRoot = ({ env = process.env, projectRoot = process.cwd() } = {}) => {
-  const rawSource =
-    typeof env.COURSE_CONTENT_SOURCE === "string" ? env.COURSE_CONTENT_SOURCE.trim() : "";
+/**
+ * @param {{ rawSource?: string | null, projectRoot?: string }} options
+ */
+const resolveLocalContentSource = async ({ rawSource, projectRoot = process.cwd() }) => {
   if (!rawSource || !isLocalPathLike(rawSource)) {
     return null;
   }
 
   const sourceRoot = path.resolve(projectRoot, rawSource);
-  return ensureInsideRoot({
-    rootDir: path.dirname(sourceRoot),
-    resolvedPath: sourceRoot,
-  });
+
+  const hasRepoShape = await hasRequiredCourseRepoShape(sourceRoot);
+  if (!hasRepoShape) {
+    return null;
+  }
+
+  return {
+    sourceRoot,
+    relativePath: normalizePosixPath(path.relative(projectRoot, sourceRoot)),
+  };
+};
+
+const listSuggestedLocalSources = async ({ configuredSource, projectRoot }) => {
+  const suggestions = new Set();
+
+  const githubMatch = /^github:[^/]+\/([^#]+?)(?:#.+)?$/iu.exec(configuredSource ?? "");
+  if (githubMatch?.[1]) {
+    suggestions.add(normalizePosixPath(path.join("..", githubMatch[1])));
+  }
+
+  const workspaceRoot = path.resolve(projectRoot, "..");
+  const entries = await fs.readdir(workspaceRoot, { withFileTypes: true }).catch(() => []);
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const candidateRoot = path.join(workspaceRoot, entry.name);
+    if (!(await hasRequiredCourseRepoShape(candidateRoot))) {
+      continue;
+    }
+
+    suggestions.add(normalizePosixPath(path.relative(projectRoot, candidateRoot)));
+  }
+
+  return [...suggestions].sort((left, right) => left.localeCompare(right));
 };
 
 const resolveSourcePath = ({ sourceRoot, contentRelativePath, pattern }) => {
@@ -146,22 +198,75 @@ const normalizeCrop = ({ crop, width, height }) => {
   };
 };
 
-export const getTutorialShotAuthoringContext = ({
+/**
+ * @param {{ env?: NodeJS.ProcessEnv, projectRoot?: string, requestedSource?: string | null }} options
+ */
+export const getTutorialShotAuthoringContext = async ({
   env = process.env,
   projectRoot = process.cwd(),
+  requestedSource = null,
 } = {}) => {
-  const sourceRoot = resolveContentSourceRoot({ env, projectRoot });
-  if (!sourceRoot) {
+  const configuredSource =
+    typeof env.COURSE_CONTENT_SOURCE === "string" ? env.COURSE_CONTENT_SOURCE.trim() : "";
+  const overrideSource =
+    typeof requestedSource === "string" && requestedSource.trim() ? requestedSource.trim() : null;
+  const suggestedLocalSources = await listSuggestedLocalSources({
+    configuredSource,
+    projectRoot,
+  });
+
+  if (overrideSource) {
+    const resolvedOverride = await resolveLocalContentSource({
+      rawSource: overrideSource,
+      projectRoot,
+    });
+
+    if (!resolvedOverride) {
+      return {
+        enabled: false,
+        reason:
+          "Tutorial shot editor could not open that local content repository. Choose a local repo path that contains content/ and site.config.ts.",
+        configuredSource: configuredSource || null,
+        suggestedLocalSources,
+        overrideSource,
+      };
+    }
+
+    return {
+      enabled: true,
+      sourceRoot: resolvedOverride.sourceRoot,
+      activeSourcePath: overrideSource,
+      sourceKind: "override",
+      configuredSource: configuredSource || null,
+      suggestedLocalSources,
+    };
+  }
+
+  const resolvedConfiguredSource = await resolveLocalContentSource({
+    rawSource: configuredSource,
+    projectRoot,
+  });
+  if (!resolvedConfiguredSource) {
+    const reason = configuredSource
+      ? "Tutorial shot editor needs a writable local content repository. The current COURSE_CONTENT_SOURCE is not a local repo path."
+      : "Tutorial shot editor needs a writable local content repository. COURSE_CONTENT_SOURCE is not set to a local repo path.";
+
     return {
       enabled: false,
-      reason:
-        "Tutorial shot editor requires COURSE_CONTENT_SOURCE to point to a local content repository.",
+      reason,
+      configuredSource: configuredSource || null,
+      suggestedLocalSources,
+      overrideSource: null,
     };
   }
 
   return {
     enabled: true,
-    sourceRoot,
+    sourceRoot: resolvedConfiguredSource.sourceRoot,
+    activeSourcePath: configuredSource,
+    sourceKind: "env",
+    configuredSource: configuredSource || null,
+    suggestedLocalSources,
   };
 };
 

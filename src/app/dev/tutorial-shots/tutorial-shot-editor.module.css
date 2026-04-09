@@ -17,6 +17,30 @@
   color: rgb(75 85 99);
 }
 
+.sourceBanner,
+.setupCard,
+.suggestedSources {
+  display: grid;
+  gap: 1rem;
+}
+
+.sourceBanner {
+  margin-top: 1rem;
+  max-width: 64rem;
+  padding: 1rem;
+  border: 1px solid rgb(229 231 235);
+  border-radius: 1rem;
+  background: white;
+}
+
+.setupCard {
+  max-width: 64rem;
+  border: 1px solid rgb(229 231 235);
+  border-radius: 1rem;
+  background: white;
+  overflow: hidden;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 22rem minmax(0, 1fr);
@@ -154,12 +178,18 @@
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.actions input {
   width: 100%;
   border: 1px solid rgb(209 213 219);
   border-radius: 0.625rem;
   padding: 0.625rem 0.75rem;
   font: inherit;
+}
+
+.actions input {
+  min-width: min(28rem, 100%);
+  background: white;
 }
 
 .toolbar button,

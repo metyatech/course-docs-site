@@ -9,7 +9,11 @@ import {
   extractActionImageRefsFromMdx,
   getTutorialShotWarnings,
 } from "../src/lib/tutorial-shots-shared.mjs";
-import { saveTutorialShot, scanTutorialShots } from "../src/lib/tutorial-shots-server.mjs";
+import {
+  getTutorialShotAuthoringContext,
+  saveTutorialShot,
+  scanTutorialShots,
+} from "../src/lib/tutorial-shots-server.mjs";
 
 const writeTutorialFixture = async (rootDir) => {
   const pageDir = path.join(rootDir, "content", "docs", "student-guide");
@@ -208,4 +212,43 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
   assert.equal(rescannedShots[0].hasRawImage, true);
   assert.equal(rescannedShots[0].hasManifest, true);
   assert.deepEqual(rescannedShots[0].warnings, []);
+});
+
+test("getTutorialShotAuthoringContext accepts an explicit local override when COURSE_CONTENT_SOURCE is remote", async (t) => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-context-"));
+  const projectRoot = path.join(workspaceRoot, "course-docs-site");
+  const localCourse = path.join(workspaceRoot, "open-campus-unreal-90min");
+
+  t.after(async () => {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  await fs.mkdir(projectRoot, { recursive: true });
+  await writeTutorialFixture(localCourse);
+  await fs.writeFile(path.join(localCourse, "site.config.ts"), "export const siteConfig = {};\n", "utf8");
+
+  const disabledContext = await getTutorialShotAuthoringContext({
+    env: {
+      COURSE_CONTENT_SOURCE: "github:metyatech/javascript-course-docs#master",
+    },
+    projectRoot,
+  });
+  assert.equal(disabledContext.enabled, false);
+  assert.equal(disabledContext.configuredSource, "github:metyatech/javascript-course-docs#master");
+  assert.ok(disabledContext.suggestedLocalSources.includes("../open-campus-unreal-90min"));
+
+  const enabledContext = await getTutorialShotAuthoringContext({
+    env: {
+      COURSE_CONTENT_SOURCE: "github:metyatech/javascript-course-docs#master",
+    },
+    projectRoot,
+    requestedSource: "../open-campus-unreal-90min",
+  });
+  assert.equal(enabledContext.enabled, true);
+  if (!enabledContext.enabled) {
+    throw new Error("Expected the local override to enable tutorial shot authoring.");
+  }
+  assert.equal(enabledContext.sourceKind, "override");
+  assert.equal(enabledContext.activeSourcePath, "../open-campus-unreal-90min");
+  assert.equal(enabledContext.sourceRoot, localCourse);
 });

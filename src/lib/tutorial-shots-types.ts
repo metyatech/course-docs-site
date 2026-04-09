@@ -66,9 +66,16 @@ export type TutorialShotItem = {
 export type TutorialShotResponse =
   | {
       enabled: true;
+      activeSourcePath: string;
+      sourceKind: "env" | "override";
+      configuredSource: string | null;
+      suggestedLocalSources: string[];
       shots: TutorialShotItem[];
     }
   | {
       enabled: false;
       reason: string;
+      configuredSource: string | null;
+      suggestedLocalSources: string[];
+      overrideSource: string | null;
     };

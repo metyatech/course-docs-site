@@ -76,6 +76,7 @@ project-contract:
     - set COURSE_CONTENT_SOURCE to a local content repo
     - run npm run dev
     - open /dev/tutorial-shots
+    - if the site is running against a remote or different repo, choose a local override path inside the editor
 ```
 
 ## Tutorial-Authoring Rules
@@ -104,6 +105,7 @@ MVP goals:
 - save crop + annotations beside the page in `shots/`
 - regenerate the existing `img/*.png` file in place
 - warn when screenshot text drifts away from tutorial-authoring rules
+- allow a temporary local content-repo override when the site itself is running against a different source
 
 Out of scope for the MVP:
 
