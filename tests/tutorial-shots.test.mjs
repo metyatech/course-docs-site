@@ -88,28 +88,43 @@ test("extractActionImageRefsFromMdx derives output, raw, and manifest paths", ()
   );
 });
 
-test("getTutorialShotWarnings flags redundant screenshot text and overly dense annotations", () => {
+test("getTutorialShotWarnings enforces one box with optional one arrow and no labels", () => {
   const warnings = getTutorialShotWarnings({
     annotations: [
-      { id: "1", type: "label", x: 10, y: 10, text: "ここをクリックします。" },
+      { id: "legacy-label", type: "label", x: 10, y: 10, text: "Play" },
       {
-        id: "long-label",
-        type: "label",
+        id: "box-1",
+        type: "box",
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+      },
+      {
+        id: "box-2",
+        type: "box",
         x: 20,
         y: 20,
-        text: "This label is intentionally far too long for a tutorial screenshot",
+        width: 10,
+        height: 10,
       },
-      { id: "2", type: "box", x: 0, y: 0, width: 10, height: 10 },
-      { id: "3", type: "box", x: 0, y: 0, width: 10, height: 10 },
-      { id: "4", type: "box", x: 0, y: 0, width: 10, height: 10 },
-      { id: "5", type: "box", x: 0, y: 0, width: 10, height: 10 },
+      { id: "arrow-1", type: "arrow", fromX: 0, fromY: 0, toX: 10, toY: 10 },
+      { id: "arrow-2", type: "arrow", fromX: 4, fromY: 4, toX: 12, toY: 12 },
     ],
   });
 
-  assert.equal(warnings.length, 3);
-  assert.ok(warnings.some((warning) => /注目点は 1 つだけ/u.test(warning)));
-  assert.ok(warnings.some((warning) => /長すぎます/u.test(warning)));
-  assert.ok(warnings.some((warning) => /手順文に見えます/u.test(warning)));
+  assert.deepEqual(warnings, [
+    "ラベルは使えません。削除して、必要なら枠と矢印で示してください。",
+    "注目点を示す枠は 1 つだけにしてください。",
+    "矢印は 1 本だけにしてください。",
+  ]);
+
+  assert.deepEqual(
+    getTutorialShotWarnings({
+      annotations: [{ id: "arrow-only", type: "arrow", fromX: 10, fromY: 10, toX: 20, toY: 20 }],
+    }),
+    ["矢印だけは使えません。注目点を示す枠を 1 つ追加してください。"],
+  );
 });
 
 test("tutorial shot editor crop state stays isolated per image and restores per selection", () => {
@@ -331,6 +346,14 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
           width: 120,
           height: 64,
         },
+        {
+          id: "arrow-1",
+          type: "arrow",
+          fromX: 12,
+          fromY: 20,
+          toX: 44,
+          toY: 40,
+        },
       ],
     },
   });
@@ -377,6 +400,24 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
     width: 280,
     height: 160,
   });
+  assert.deepEqual(savedManifest.annotations, [
+    {
+      id: "box-1",
+      type: "box",
+      x: 32,
+      y: 24,
+      width: 120,
+      height: 64,
+    },
+    {
+      id: "arrow-1",
+      type: "arrow",
+      fromX: 12,
+      fromY: 20,
+      toX: 44,
+      toY: 40,
+    },
+  ]);
 
   const outputMetadata = await sharp(outputImagePath).metadata();
   assert.equal(outputMetadata.width, 280);
@@ -389,7 +430,58 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
   assert.deepEqual(rescannedShots[0].warnings, []);
 });
 
-test("saveTutorialShot rejects multiple focal annotations in one image", async (t) => {
+test("saveTutorialShot accepts a single box without an arrow", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-box-only-"));
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+
+  const result = await saveTutorialShot({
+    sourceRoot,
+    bootstrapFromOutput: true,
+    manifestInput: {
+      ...manifest,
+      crop: {
+        x: 16,
+        y: 16,
+        width: 320,
+        height: 180,
+      },
+      annotations: [
+        {
+          id: "box-1",
+          type: "box",
+          x: 24,
+          y: 24,
+          width: 120,
+          height: 64,
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.manifest.annotations, [
+    {
+      id: "box-1",
+      type: "box",
+      x: 24,
+      y: 24,
+      width: 120,
+      height: 64,
+    },
+  ]);
+});
+
+test("saveTutorialShot rejects unsupported annotation combinations", async (t) => {
   const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-limit-"));
 
   t.after(async () => {
@@ -403,11 +495,112 @@ test("saveTutorialShot rejects multiple focal annotations in one image", async (
     outputImagePath: "content/docs/student-guide/img/startup.png",
   });
 
+  const invalidScenarios = [
+    {
+      name: "label",
+      annotations: [{ id: "legacy-label", type: "label", x: 16, y: 16, text: "Play" }],
+      expectedMessage: /ラベルは使えません/u,
+    },
+    {
+      name: "arrow-only",
+      annotations: [{ id: "arrow-1", type: "arrow", fromX: 16, fromY: 16, toX: 80, toY: 64 }],
+      expectedMessage: /矢印だけは使えません/u,
+    },
+    {
+      name: "multiple-boxes",
+      annotations: [
+        {
+          id: "box-1",
+          type: "box",
+          x: 16,
+          y: 16,
+          width: 80,
+          height: 48,
+        },
+        {
+          id: "box-2",
+          type: "box",
+          x: 120,
+          y: 64,
+          width: 80,
+          height: 48,
+        },
+      ],
+      expectedMessage: /枠は 1 つだけ/u,
+    },
+    {
+      name: "multiple-arrows",
+      annotations: [
+        {
+          id: "box-1",
+          type: "box",
+          x: 16,
+          y: 16,
+          width: 80,
+          height: 48,
+        },
+        {
+          id: "arrow-1",
+          type: "arrow",
+          fromX: 10,
+          fromY: 10,
+          toX: 48,
+          toY: 40,
+        },
+        {
+          id: "arrow-2",
+          type: "arrow",
+          fromX: 12,
+          fromY: 12,
+          toX: 54,
+          toY: 44,
+        },
+      ],
+      expectedMessage: /矢印は 1 本だけ/u,
+    },
+  ];
+
+  for (const scenario of invalidScenarios) {
+    await assert.rejects(
+      () =>
+        saveTutorialShot({
+          sourceRoot,
+          bootstrapFromOutput: true,
+          manifestInput: {
+            ...manifest,
+            crop: {
+              x: 0,
+              y: 0,
+              width: 320,
+              height: 180,
+            },
+            annotations: scenario.annotations,
+          },
+        }),
+      scenario.expectedMessage,
+      scenario.name,
+    );
+  }
+});
+
+test("saveTutorialShot keeps reporting a missing raw image once annotations are valid", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-missing-raw-"));
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/missing.png",
+  });
+
   await assert.rejects(
     () =>
       saveTutorialShot({
         sourceRoot,
-        bootstrapFromOutput: true,
         manifestInput: {
           ...manifest,
           crop: {
@@ -420,23 +613,15 @@ test("saveTutorialShot rejects multiple focal annotations in one image", async (
             {
               id: "box-1",
               type: "box",
-              x: 16,
-              y: 16,
-              width: 80,
-              height: 48,
-            },
-            {
-              id: "box-2",
-              type: "box",
-              x: 120,
-              y: 64,
-              width: 80,
-              height: 48,
+              x: 24,
+              y: 24,
+              width: 96,
+              height: 64,
             },
           ],
         },
       }),
-    /注目点は 1 つだけ/u,
+    /元画像がまだ無いため/u,
   );
 });
 
@@ -451,7 +636,11 @@ test("getTutorialShotAuthoringContext accepts an explicit local override when CO
 
   await fs.mkdir(projectRoot, { recursive: true });
   await writeTutorialFixture(localCourse);
-  await fs.writeFile(path.join(localCourse, "site.config.ts"), "export const siteConfig = {};\n", "utf8");
+  await fs.writeFile(
+    path.join(localCourse, "site.config.ts"),
+    "export const siteConfig = {};\n",
+    "utf8",
+  );
 
   const disabledContext = await getTutorialShotAuthoringContext({
     env: {

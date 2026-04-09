@@ -186,7 +186,7 @@ const sha256File = async (filePath) => {
 };
 
 test(
-  "tutorial shot editor saves bootstrap shots and reports missing-output failures clearly",
+  "tutorial shot editor saves one boxed focal point with an optional arrow",
   { timeout: 3 * 60_000 },
   async (t) => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-"));
@@ -256,27 +256,22 @@ test(
     await page.getByRole("button", { name: /override-startup/i }).waitFor();
 
     await page.getByLabel("画像の説明（Alt テキスト）").fill("起動画面");
-    await page.getByRole("button", { name: "ラベルを追加" }).click();
-    await assert.equal(await page.getByRole("button", { name: "枠を追加" }).isDisabled(), true);
+    await assert.equal(await page.getByRole("button", { name: "保存して反映" }).isDisabled(), true);
     await assert.equal(await page.getByRole("button", { name: "矢印を追加" }).isDisabled(), true);
-    await page
-      .getByText("別の形に変えたい場合は、今の注釈を削除してから追加してください。")
-      .waitFor();
-    await page.getByLabel("ラベル 1 のテキスト").fill("Play");
+    await assert.equal(await page.getByRole("button", { name: "ラベルを追加" }).count(), 0);
+
+    await page.getByRole("button", { name: "枠を追加" }).click();
+    await assert.equal(await page.getByRole("button", { name: "枠を追加" }).isDisabled(), true);
+    await assert.equal(await page.getByRole("button", { name: "矢印を追加" }).isDisabled(), false);
+    await assert.equal(
+      await page.getByRole("button", { name: "保存して反映" }).isDisabled(),
+      false,
+    );
+
+    await page.getByRole("button", { name: "矢印を追加" }).click();
+    await assert.equal(await page.getByRole("button", { name: "矢印を追加" }).isDisabled(), true);
     await page.getByRole("button", { name: "保存して反映" }).click();
     await page.getByText("保存しました").waitFor();
-
-    await page.getByRole("button", { name: /override-missing-output/i }).click();
-    await page.getByText("画像未設定").waitFor();
-    await page
-      .getByText("「元画像をアップロード」から、編集したい画像を取り込んでください。")
-      .waitFor();
-    await page.getByRole("button", { name: "保存して反映" }).click();
-    await page
-      .getByText(
-        "元画像がまだ無いため、この Action 画像は保存できません。先に元画像をアップロードしてください。",
-      )
-      .waitFor();
 
     const startupRawPath = path.join(
       overrideCourse,
@@ -303,10 +298,19 @@ test(
     assert.deepEqual(startupManifest.annotations, [
       {
         id: startupManifest.annotations[0].id,
-        type: "label",
-        x: 24,
-        y: 48,
-        text: "Play",
+        type: "box",
+        x: 128,
+        y: 72,
+        width: 224,
+        height: 65,
+      },
+      {
+        id: startupManifest.annotations[1].id,
+        type: "arrow",
+        fromX: 72,
+        fromY: 32,
+        toX: 173,
+        toY: 85,
       },
     ]);
 

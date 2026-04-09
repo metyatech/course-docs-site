@@ -2,10 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import {
-  MAX_TUTORIAL_ANNOTATION_COUNT,
   createDefaultTutorialShotManifest,
   deriveTutorialShotPaths,
   extractActionImageRefsFromMdx,
+  getTutorialShotAnnotationErrors,
   getTutorialShotWarnings,
   normalizePosixPath,
   normalizeTutorialShotManifest,
@@ -351,11 +351,9 @@ export const saveTutorialShot = async ({
   bootstrapFromOutput = false,
 }) => {
   const manifest = prepareManifestForSave(manifestInput);
-
-  if (manifest.annotations.length > MAX_TUTORIAL_ANNOTATION_COUNT) {
-    throw new Error(
-      "1 枚の画像で示す注目点は 1 つだけです。余分な注釈を削除してから保存してください。",
-    );
+  const annotationErrors = getTutorialShotAnnotationErrors(manifest.annotations);
+  if (annotationErrors.length > 0) {
+    throw new Error(annotationErrors[0]);
   }
 
   if (!PAGE_PATH_PATTERN.test(manifest.pagePath)) {

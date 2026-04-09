@@ -15,10 +15,10 @@ For Unreal tutorials, the main bottleneck is usually not taking the screenshot
 itself but the follow-up editing work:
 
 - cropping
-- marking one focal point with a box, arrow, or short label
+- marking one focal point with a box and, only when needed, a supporting arrow
 - naming files
 - rewriting images in the correct page-local folder
-- checking whether screenshot text violates tutorial-authoring rules
+- checking whether the screenshot follows the focal-point annotation rules
 
 This tool turns that into a deterministic pipeline:
 
@@ -30,7 +30,7 @@ Pattern: `hybrid-gui`
 
 - Reused GUI subsystems:
   - `react-image-crop` for crop selection
-  - `react-konva` / `konva` for box, arrow, and label placement
+  - `react-konva` / `konva` for box and arrow placement
   - `sharp` for deterministic PNG generation
 - Custom glue:
   - scan `Action img="..."`
@@ -67,7 +67,7 @@ project-contract:
     - shot manifest stays authoritative for crop/annotations
     - generated img/*.png is overwritten from manifest on save
   validation:
-    - client warnings for long labels / instruction-like text / dense annotations
+    - client and server validation for one box, optional one arrow, and no labels
     - server path validation before read/write
     - repo tests for scan/save behavior
   generated_artifacts:
@@ -85,12 +85,9 @@ The editor intentionally supports only a narrow annotation set:
 
 - `box`
 - `arrow`
-- short `label`
 
-Use only one of those per image. One image should point the learner to one
-primary focal point and one associated step.
-
-It should not be used for long instruction sentences inside screenshots.
+Every saved image must contain exactly one `box`. An `arrow` is optional and is
+allowed only as a helper for that same focal point.
 
 Rule of thumb:
 
@@ -98,7 +95,6 @@ Rule of thumb:
 - Action text = WHAT
 - one image = one focal point
 
-If a label becomes a sentence, move that content back into the `Action` body.
 If you need to explain multiple places or multiple ordered actions, split the
 image into separate tutorial shots instead of numbering many callouts in one
 frame.

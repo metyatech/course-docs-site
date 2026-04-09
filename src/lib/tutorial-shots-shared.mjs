@@ -1,13 +1,9 @@
 export const TUTORIAL_SHOT_MANIFEST_VERSION = 1;
-export const MAX_TUTORIAL_LABEL_LENGTH = 24;
-export const MAX_TUTORIAL_ANNOTATION_COUNT = 1;
+export const MAX_TUTORIAL_BOX_COUNT = 1;
+export const MAX_TUTORIAL_ARROW_COUNT = 1;
 
 const ACTION_TAG_PATTERN = /<Action\b[\s\S]*?>/gu;
 const IMG_PROP_PATTERN = /\bimg=(["'])(.*?)\1/u;
-
-const INSTRUCTIONAL_LABEL_PATTERN =
-  /(します|してください|クリック|入力|追加|選択|押し|開き|開く|閉じ|移動|search|click|type|open)/iu;
-const SENTENCE_PUNCTUATION_PATTERN = /[。．.!?！？]/u;
 
 export const normalizePosixPath = (value) =>
   value
@@ -215,39 +211,50 @@ export const normalizeTutorialShotManifest = (manifest) => {
   };
 };
 
-export const getTutorialShotWarnings = (manifest) => {
-  const warnings = [];
-  const annotations = Array.isArray(manifest?.annotations) ? manifest.annotations : [];
+export const summarizeTutorialShotAnnotations = (annotations) => {
+  const list = Array.isArray(annotations) ? annotations : [];
+  const boxCount = list.filter((annotation) => annotation?.type === "box").length;
+  const arrowCount = list.filter((annotation) => annotation?.type === "arrow").length;
+  const labelCount = list.filter((annotation) => annotation?.type === "label").length;
 
-  if (annotations.length > MAX_TUTORIAL_ANNOTATION_COUNT) {
-    warnings.push(
-      "1 枚の画像で示す注目点は 1 つだけにしてください。余分な注釈を削除し、画像ごとに 1 手順へ分けてください。",
+  return {
+    totalCount: list.length,
+    boxCount,
+    arrowCount,
+    labelCount,
+  };
+};
+
+export const getTutorialShotAnnotationErrors = (annotations) => {
+  const { boxCount, arrowCount, labelCount } = summarizeTutorialShotAnnotations(annotations);
+  const errors = [];
+
+  if (labelCount > 0) {
+    errors.push("ラベルは使えません。削除して、必要なら枠と矢印で示してください。");
+  }
+
+  if (boxCount > MAX_TUTORIAL_BOX_COUNT) {
+    errors.push("注目点を示す枠は 1 つだけにしてください。");
+  }
+
+  if (arrowCount > MAX_TUTORIAL_ARROW_COUNT) {
+    errors.push("矢印は 1 本だけにしてください。");
+  }
+
+  if (boxCount === 0) {
+    errors.push(
+      arrowCount > 0
+        ? "矢印だけは使えません。注目点を示す枠を 1 つ追加してください。"
+        : "注目点を示す枠を 1 つ追加してください。",
     );
   }
 
-  for (const annotation of annotations) {
-    if (annotation.type !== "label") {
-      continue;
-    }
+  return errors;
+};
 
-    if (annotation.text.length > MAX_TUTORIAL_LABEL_LENGTH) {
-      warnings.push(
-        `ラベル「${annotation.text}」が長すぎます。ラベルは短く保ち、手順文は Action 本文に移してください。`,
-      );
-    }
-
-    if (
-      annotation.text &&
-      (INSTRUCTIONAL_LABEL_PATTERN.test(annotation.text) ||
-        SENTENCE_PUNCTUATION_PATTERN.test(annotation.text))
-    ) {
-      warnings.push(
-        `ラベル「${annotation.text}」は手順文に見えます。画像は WHERE を示し、WHAT は Action 本文で説明してください。`,
-      );
-    }
-  }
-
-  return warnings;
+export const getTutorialShotWarnings = (manifest) => {
+  const annotations = Array.isArray(manifest?.annotations) ? manifest.annotations : [];
+  return getTutorialShotAnnotationErrors(annotations);
 };
 
 const renderArrowHead = ({ fromX, fromY, toX, toY, strokeWidth }) => {

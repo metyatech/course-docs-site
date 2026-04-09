@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactCrop, { type PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import {
-  MAX_TUTORIAL_ANNOTATION_COUNT,
+  getTutorialShotAnnotationErrors,
+  summarizeTutorialShotAnnotations,
   getTutorialShotWarnings,
   normalizeTutorialShotManifest,
 } from "../../../lib/tutorial-shots-shared.mjs";
@@ -18,7 +19,6 @@ import type {
   TutorialShotAnnotation,
   TutorialShotArrowAnnotation,
   TutorialShotBoxAnnotation,
-  TutorialShotLabelAnnotation,
   TutorialShotManifest,
   TutorialShotItem,
   TutorialShotResponse,
@@ -63,6 +63,11 @@ const getAnnotationTypeLabel = (type: TutorialShotAnnotation["type"]) => {
   }
   return "ラベル";
 };
+
+const findPrimaryBox = (annotations: TutorialShotAnnotation[]) =>
+  annotations.find(
+    (annotation): annotation is TutorialShotBoxAnnotation => annotation.type === "box",
+  ) ?? null;
 
 const getShotFlags = (shot: TutorialShotItem) => {
   const flags: Array<{
@@ -156,22 +161,18 @@ const createDefaultBox = (width: number, height: number): TutorialShotBoxAnnotat
   height: Math.max(64, Math.round(height * 0.18)),
 });
 
-const createDefaultArrow = (width: number, height: number): TutorialShotArrowAnnotation => ({
-  id: crypto.randomUUID(),
-  type: "arrow",
-  fromX: Math.round(width * 0.18),
-  fromY: Math.round(height * 0.2),
-  toX: Math.round(width * 0.42),
-  toY: Math.round(height * 0.38),
-});
-
-const createDefaultLabel = (): TutorialShotLabelAnnotation => ({
-  id: crypto.randomUUID(),
-  type: "label",
-  x: 24,
-  y: 48,
-  text: "ラベル",
-});
+const createArrowForBox = (box: TutorialShotBoxAnnotation): TutorialShotArrowAnnotation => {
+  const toX = box.x + Math.round(box.width * 0.2);
+  const toY = box.y + Math.round(box.height * 0.2);
+  return {
+    id: crypto.randomUUID(),
+    type: "arrow",
+    fromX: Math.max(16, box.x - 56),
+    fromY: Math.max(16, box.y - 40),
+    toX,
+    toY,
+  };
+};
 
 type TutorialShotEditorStoredCropState = {
   crop: PixelCrop | null;
@@ -212,15 +213,31 @@ export default function TutorialShotEditor() {
     () => (draftManifest ? getTutorialShotWarnings(draftManifest) : []),
     [draftManifest],
   );
-  const annotationCount = draftManifest?.annotations.length ?? 0;
-  const canAddAnnotation =
-    Boolean(croppedPreviewSrc) && annotationCount < MAX_TUTORIAL_ANNOTATION_COUNT;
-  const exceedsAnnotationLimit = annotationCount > MAX_TUTORIAL_ANNOTATION_COUNT;
-  const annotationLimitMessage = exceedsAnnotationLimit
-    ? "注目点が多すぎます。削除して 1 つにしてください。"
-    : annotationCount >= MAX_TUTORIAL_ANNOTATION_COUNT
-      ? "別の形に変えたい場合は、今の注釈を削除してから追加してください。"
-      : "枠・矢印・短いラベルのどれか 1 つだけ追加できます。";
+  const annotationSummary = useMemo(
+    () => summarizeTutorialShotAnnotations(draftManifest?.annotations ?? []),
+    [draftManifest],
+  );
+  const annotationErrors = useMemo(
+    () => getTutorialShotAnnotationErrors(draftManifest?.annotations ?? []),
+    [draftManifest],
+  );
+  const primaryBox = useMemo(
+    () => findPrimaryBox(draftManifest?.annotations ?? []),
+    [draftManifest],
+  );
+  const hasAnnotationSurface = Boolean(croppedPreviewSrc) && Boolean(completedCrop);
+  const canAddBox = hasAnnotationSurface && annotationSummary.boxCount === 0;
+  const canAddArrow =
+    hasAnnotationSurface && Boolean(primaryBox) && annotationSummary.arrowCount === 0;
+  const saveBlockedByAnnotationErrors = hasAnnotationSurface && annotationErrors.length > 0;
+  const annotationPanelTitle = `枠 ${annotationSummary.boxCount}/1 ・ 矢印 ${annotationSummary.arrowCount}/1${
+    annotationSummary.labelCount > 0 ? ` ・ ラベル ${annotationSummary.labelCount}` : ""
+  }`;
+  const annotationPanelHint =
+    annotationErrors[0] ??
+    (annotationSummary.arrowCount > 0
+      ? "保存できる状態です。矢印は補助なので、不要なら削除して枠だけに戻せます。"
+      : "保存できる状態です。必要なときだけ矢印を 1 本追加できます。");
 
   useEffect(() => {
     const savedOverride = window.localStorage.getItem(SOURCE_OVERRIDE_STORAGE_KEY) ?? "";
@@ -366,28 +383,52 @@ export default function TutorialShotEditor() {
     );
   };
 
-  const addAnnotation = (kind: "box" | "arrow" | "label") => {
-    if (!draftManifest || !completedCrop || draftManifest.annotations.length >= MAX_TUTORIAL_ANNOTATION_COUNT) {
+  const addBox = () => {
+    if (!draftManifest || !completedCrop || annotationSummary.boxCount > 0) {
       return;
     }
 
-    const next =
-      kind === "box"
-        ? createDefaultBox(completedCrop.width, completedCrop.height)
-        : kind === "arrow"
-          ? createDefaultArrow(completedCrop.width, completedCrop.height)
-          : createDefaultLabel();
-
+    const next = createDefaultBox(completedCrop.width, completedCrop.height);
     updateAnnotations([...draftManifest.annotations, next]);
     setSelectedAnnotationId(next.id);
+  };
+
+  const addArrow = () => {
+    if (!draftManifest || !primaryBox || annotationSummary.arrowCount > 0) {
+      return;
+    }
+
+    const next = createArrowForBox(primaryBox);
+    updateAnnotations([...draftManifest.annotations, next]);
+    setSelectedAnnotationId(next.id);
+  };
+
+  const removeAnnotation = (annotationId: string) => {
+    if (!draftManifest) {
+      return;
+    }
+
+    const target = draftManifest.annotations.find((annotation) => annotation.id === annotationId);
+    if (!target) {
+      return;
+    }
+
+    updateAnnotations(
+      draftManifest.annotations.filter((annotation) =>
+        target.type === "box"
+          ? annotation.id !== target.id && annotation.type !== "arrow"
+          : annotation.id !== target.id,
+      ),
+    );
+    setSelectedAnnotationId(null);
   };
 
   const save = async () => {
     if (!draftManifest) {
       return;
     }
-    if (draftManifest.annotations.length > MAX_TUTORIAL_ANNOTATION_COUNT) {
-      setStatusText("注目点は 1 つだけです。余分な注釈を削除してから保存してください。");
+    if (hasAnnotationSurface && annotationErrors.length > 0) {
+      setStatusText(annotationErrors[0]);
       return;
     }
 
@@ -720,7 +761,7 @@ export default function TutorialShotEditor() {
                   ) : null}
                   <button
                     className={styles.primaryButton}
-                    disabled={isSaving || exceedsAnnotationLimit}
+                    disabled={isSaving || saveBlockedByAnnotationErrors}
                     onClick={save}
                     type="button"
                   >
@@ -840,33 +881,26 @@ export default function TutorialShotEditor() {
                   <div>
                     <h3 className={styles.workCardTitle}>見せたい場所を 1 つ示す</h3>
                     <p className={styles.workCardHint}>
-                      この画像で強調する注目点は 1 つだけです。複数の場所を説明したい場合は画像を分けてください。
+                      枠を 1 つ置いて主注目点を示します。必要なときだけ、その枠を補助する矢印を 1
+                      本追加できます。
                     </p>
                   </div>
                   <div className={styles.workCardTools}>
                     <button
                       className={styles.toolButton}
-                      disabled={!canAddAnnotation}
-                      onClick={() => addAnnotation("box")}
+                      disabled={!canAddBox}
+                      onClick={addBox}
                       type="button"
                     >
                       <span aria-hidden>▭</span> 枠を追加
                     </button>
                     <button
                       className={styles.toolButton}
-                      disabled={!canAddAnnotation}
-                      onClick={() => addAnnotation("arrow")}
+                      disabled={!canAddArrow}
+                      onClick={addArrow}
                       type="button"
                     >
                       <span aria-hidden>↗</span> 矢印を追加
-                    </button>
-                    <button
-                      className={styles.toolButton}
-                      disabled={!canAddAnnotation}
-                      onClick={() => addAnnotation("label")}
-                      type="button"
-                    >
-                      <span aria-hidden>A</span> ラベルを追加
                     </button>
                   </div>
                 </header>
@@ -889,13 +923,11 @@ export default function TutorialShotEditor() {
                       />
                     </div>
                     <aside className={styles.annotationPanel}>
-                      <div className={styles.annotationPanelTitle}>
-                        現在の注目点 {annotationCount}/{MAX_TUTORIAL_ANNOTATION_COUNT}
-                      </div>
-                      <p className={styles.annotationPanelEmpty}>{annotationLimitMessage}</p>
+                      <div className={styles.annotationPanelTitle}>{annotationPanelTitle}</div>
+                      <p className={styles.annotationPanelEmpty}>{annotationPanelHint}</p>
                       {draftManifest.annotations.length === 0 ? (
                         <p className={styles.annotationPanelEmpty}>
-                          まだ注目点はありません。上のボタンから 1 つ選んで追加してください。
+                          まだ注目点はありません。まず枠を追加して、画像のどこを見るべきかを示してください。
                         </p>
                       ) : (
                         <ul className={styles.annotationList}>
@@ -918,47 +950,26 @@ export default function TutorialShotEditor() {
                                   </span>
                                   {annotation.type === "label" ? (
                                     <span className={styles.annotationItemPreview}>
-                                      {annotation.text || "（テキストなし）"}
+                                      {annotation.text
+                                        ? `旧ラベル: ${annotation.text}`
+                                        : "旧ラベルです。削除してください。"}
+                                    </span>
+                                  ) : annotation.type === "arrow" ? (
+                                    <span className={styles.annotationItemPreview}>
+                                      枠を補助する矢印です。必要なときだけ残してください。
                                     </span>
                                   ) : (
                                     <span className={styles.annotationItemPreview}>
-                                      画像上でドラッグして調整
+                                      画像上でドラッグして、主注目点を 1 つ囲んでください。
                                     </span>
                                   )}
                                 </button>
-                                {annotation.type === "label" ? (
-                                  <input
-                                    aria-label={`ラベル ${index + 1} のテキスト`}
-                                    className={styles.textInput}
-                                    onChange={(event) =>
-                                      updateAnnotations(
-                                        draftManifest.annotations.map((item) =>
-                                          item.id === annotation.id
-                                            ? ({
-                                                ...item,
-                                                text: event.target.value,
-                                              } as TutorialShotAnnotation)
-                                            : item,
-                                        ),
-                                      )
-                                    }
-                                    placeholder="ラベルの文字"
-                                    value={annotation.text}
-                                  />
-                                ) : null}
-                                  <button
-                                    className={styles.annotationItemDelete}
-                                    onClick={() => {
-                                      updateAnnotations(
-                                        draftManifest.annotations.filter(
-                                          (item) => item.id !== annotation.id,
-                                        ),
-                                      );
-                                      setSelectedAnnotationId(null);
-                                    }}
-                                    type="button"
-                                  >
-                                    削除
+                                <button
+                                  className={styles.annotationItemDelete}
+                                  onClick={() => removeAnnotation(annotation.id)}
+                                  type="button"
+                                >
+                                  削除
                                 </button>
                               </li>
                             );
