@@ -5,10 +5,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactCrop, { type PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import {
-  createDefaultTutorialShotManifest,
+  MAX_TUTORIAL_ANNOTATION_COUNT,
   getTutorialShotWarnings,
   normalizeTutorialShotManifest,
 } from "../../../lib/tutorial-shots-shared.mjs";
+import {
+  getStoredTutorialShotCropState,
+  getTutorialShotCropStateForImage,
+  updateTutorialShotCropStateMap,
+} from "../../../lib/tutorial-shot-editor-crop-state.mjs";
 import type {
   TutorialShotAnnotation,
   TutorialShotArrowAnnotation,
@@ -168,6 +173,13 @@ const createDefaultLabel = (): TutorialShotLabelAnnotation => ({
   text: "ラベル",
 });
 
+type TutorialShotEditorStoredCropState = {
+  crop: PixelCrop | null;
+  completedCrop: PixelCrop | null;
+};
+
+type TutorialShotEditorStoredCropStateMap = Record<string, TutorialShotEditorStoredCropState>;
+
 export default function TutorialShotEditor() {
   const [response, setResponse] = useState<TutorialShotResponse | null>(null);
   const [sourceOverride, setSourceOverride] = useState<string | null>(null);
@@ -177,6 +189,9 @@ export default function TutorialShotEditor() {
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [crop, setCrop] = useState<PixelCrop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
+  const [cropOwnerKey, setCropOwnerKey] = useState<string | null>(null);
+  const [, setCropStatesByShot] = useState<TutorialShotEditorStoredCropStateMap>({});
+  const cropStatesByShotRef = useRef<TutorialShotEditorStoredCropStateMap>({});
   const [sourceImageSrc, setSourceImageSrc] = useState<string | null>(null);
   const [sourceImageElement, setSourceImageElement] = useState<HTMLImageElement | null>(null);
   const [sourceImageRevision, setSourceImageRevision] = useState(0);
@@ -197,6 +212,15 @@ export default function TutorialShotEditor() {
     () => (draftManifest ? getTutorialShotWarnings(draftManifest) : []),
     [draftManifest],
   );
+  const annotationCount = draftManifest?.annotations.length ?? 0;
+  const canAddAnnotation =
+    Boolean(croppedPreviewSrc) && annotationCount < MAX_TUTORIAL_ANNOTATION_COUNT;
+  const exceedsAnnotationLimit = annotationCount > MAX_TUTORIAL_ANNOTATION_COUNT;
+  const annotationLimitMessage = exceedsAnnotationLimit
+    ? "注目点が多すぎます。削除して 1 つにしてください。"
+    : annotationCount >= MAX_TUTORIAL_ANNOTATION_COUNT
+      ? "別の形に変えたい場合は、今の注釈を削除してから追加してください。"
+      : "枠・矢印・短いラベルのどれか 1 つだけ追加できます。";
 
   useEffect(() => {
     const savedOverride = window.localStorage.getItem(SOURCE_OVERRIDE_STORAGE_KEY) ?? "";
@@ -254,6 +278,7 @@ export default function TutorialShotEditor() {
       setSourceImageSrc(null);
       setCrop(undefined);
       setCompletedCrop(null);
+      setCropOwnerKey(null);
       setCroppedPreviewSrc(null);
       setSourceImageElement(null);
       setPendingRawDataUrl(null);
@@ -261,6 +286,10 @@ export default function TutorialShotEditor() {
       return;
     }
 
+    const storedCropState = getStoredTutorialShotCropState({
+      currentCropStates: cropStatesByShotRef.current,
+      shotKey: selectedShot.outputImagePath,
+    }) as TutorialShotEditorStoredCropState | null;
     setDraftManifest(normalizeTutorialShotManifest(selectedShot.manifest) as TutorialShotManifest);
     setSelectedAnnotationId(null);
     setPendingRawDataUrl(null);
@@ -276,36 +305,29 @@ export default function TutorialShotEditor() {
         : null,
     );
     setSourceImageElement(null);
-    setCrop(undefined);
-    setCompletedCrop(null);
+    setCrop(storedCropState?.crop ?? undefined);
+    setCompletedCrop(storedCropState?.completedCrop ?? null);
+    setCropOwnerKey(selectedShot.outputImagePath);
     setCroppedPreviewSrc(null);
   }, [selectedShot, sourceImageRevision, sourceOverride]);
 
   useEffect(() => {
-    if (!sourceImageElement) {
+    const activeShotKey = selectedShot?.outputImagePath ?? null;
+    if (!activeShotKey || cropOwnerKey !== activeShotKey || (!crop && !completedCrop)) {
       return;
     }
 
-    const sourceImage = sourceImageElement;
-    const nextCrop =
-      crop ??
-      createInitialCrop(
-        sourceImage,
-        draftManifest ??
-          (createDefaultTutorialShotManifest({
-            pagePath: selectedShot?.pagePath ?? "",
-            outputImagePath: selectedShot?.outputImagePath ?? "",
-          }) as TutorialShotManifest),
-      );
-    setCrop(nextCrop);
-    setCompletedCrop({
-      x: Math.round(nextCrop.x ?? 0),
-      y: Math.round(nextCrop.y ?? 0),
-      width: Math.round(nextCrop.width ?? sourceImage.naturalWidth),
-      height: Math.round(nextCrop.height ?? sourceImage.naturalHeight),
-      unit: "px",
+    setCropStatesByShot((current) => {
+      const next = updateTutorialShotCropStateMap({
+        currentCropStates: current,
+        shotKey: activeShotKey,
+        crop: crop ?? null,
+        completedCrop,
+      }) as TutorialShotEditorStoredCropStateMap;
+      cropStatesByShotRef.current = next;
+      return next;
     });
-  }, [crop, draftManifest, selectedShot, sourceImageElement]);
+  }, [completedCrop, crop, cropOwnerKey, selectedShot]);
 
   useEffect(() => {
     if (!sourceImageSrc || !completedCrop) {
@@ -345,7 +367,7 @@ export default function TutorialShotEditor() {
   };
 
   const addAnnotation = (kind: "box" | "arrow" | "label") => {
-    if (!draftManifest || !completedCrop) {
+    if (!draftManifest || !completedCrop || draftManifest.annotations.length >= MAX_TUTORIAL_ANNOTATION_COUNT) {
       return;
     }
 
@@ -362,6 +384,10 @@ export default function TutorialShotEditor() {
 
   const save = async () => {
     if (!draftManifest) {
+      return;
+    }
+    if (draftManifest.annotations.length > MAX_TUTORIAL_ANNOTATION_COUNT) {
+      setStatusText("注目点は 1 つだけです。余分な注釈を削除してから保存してください。");
       return;
     }
 
@@ -426,6 +452,9 @@ export default function TutorialShotEditor() {
     setSourceInput(trimmed);
     setResponse(null);
     setSelectedKey("");
+    cropStatesByShotRef.current = {};
+    setCropStatesByShot({});
+    setCropOwnerKey(null);
     setSourceOverride(trimmed);
     setStatusText("");
     setIsSourceEditorOpen(false);
@@ -447,6 +476,8 @@ export default function TutorialShotEditor() {
     });
 
     setPendingRawDataUrl(dataUrl);
+    setSourceImageElement(null);
+    setCroppedPreviewSrc(null);
     setSourceImageSrc(dataUrl);
     setBootstrapFromOutput(false);
     setStatusText(`新しい元画像を読み込みました（${file.name}）`);
@@ -466,6 +497,7 @@ export default function TutorialShotEditor() {
     };
     setCrop(fullCrop);
     setCompletedCrop(fullCrop);
+    setCropOwnerKey(selectedShot?.outputImagePath ?? null);
   };
 
   if (!response) {
@@ -688,7 +720,7 @@ export default function TutorialShotEditor() {
                   ) : null}
                   <button
                     className={styles.primaryButton}
-                    disabled={isSaving}
+                    disabled={isSaving || exceedsAnnotationLimit}
                     onClick={save}
                     type="button"
                   >
@@ -762,8 +794,14 @@ export default function TutorialShotEditor() {
                   <div className={styles.imageStage}>
                     <ReactCrop
                       crop={crop}
-                      onChange={(nextCrop) => setCrop(nextCrop)}
-                      onComplete={(nextCrop) => setCompletedCrop(nextCrop)}
+                      onChange={(nextCrop) => {
+                        setCrop(nextCrop);
+                        setCropOwnerKey(selectedShot.outputImagePath);
+                      }}
+                      onComplete={(nextCrop) => {
+                        setCompletedCrop(nextCrop);
+                        setCropOwnerKey(selectedShot.outputImagePath);
+                      }}
                     >
                       {/* ReactCrop requires a plain img element so the crop box matches the source pixels exactly. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -771,7 +809,18 @@ export default function TutorialShotEditor() {
                         alt=""
                         className={styles.sourceImage}
                         onLoad={(event) => {
-                          setSourceImageElement(event.currentTarget);
+                          const image = event.currentTarget;
+                          const nextCropState = getTutorialShotCropStateForImage({
+                            currentCropStates: cropStatesByShotRef.current,
+                            shotKey: selectedShot.outputImagePath,
+                            manifestCrop: draftManifest.crop,
+                            imageWidth: image.naturalWidth,
+                            imageHeight: image.naturalHeight,
+                          }) as TutorialShotEditorStoredCropState;
+                          setSourceImageElement(image);
+                          setCropOwnerKey(selectedShot.outputImagePath);
+                          setCrop(nextCropState.crop ?? createInitialCrop(image, draftManifest));
+                          setCompletedCrop(nextCropState.completedCrop);
                         }}
                         src={sourceImageSrc}
                       />
@@ -789,15 +838,15 @@ export default function TutorialShotEditor() {
               <article className={styles.workCard}>
                 <header className={styles.workCardHeader}>
                   <div>
-                    <h3 className={styles.workCardTitle}>見せたい場所を示す</h3>
+                    <h3 className={styles.workCardTitle}>見せたい場所を 1 つ示す</h3>
                     <p className={styles.workCardHint}>
-                      枠・矢印・短いラベルで「どこを見るか」だけを伝えます。長い手順文は本文に書きます。
+                      この画像で強調する注目点は 1 つだけです。複数の場所を説明したい場合は画像を分けてください。
                     </p>
                   </div>
                   <div className={styles.workCardTools}>
                     <button
                       className={styles.toolButton}
-                      disabled={!croppedPreviewSrc}
+                      disabled={!canAddAnnotation}
                       onClick={() => addAnnotation("box")}
                       type="button"
                     >
@@ -805,7 +854,7 @@ export default function TutorialShotEditor() {
                     </button>
                     <button
                       className={styles.toolButton}
-                      disabled={!croppedPreviewSrc}
+                      disabled={!canAddAnnotation}
                       onClick={() => addAnnotation("arrow")}
                       type="button"
                     >
@@ -813,7 +862,7 @@ export default function TutorialShotEditor() {
                     </button>
                     <button
                       className={styles.toolButton}
-                      disabled={!croppedPreviewSrc}
+                      disabled={!canAddAnnotation}
                       onClick={() => addAnnotation("label")}
                       type="button"
                     >
@@ -841,11 +890,12 @@ export default function TutorialShotEditor() {
                     </div>
                     <aside className={styles.annotationPanel}>
                       <div className={styles.annotationPanelTitle}>
-                        追加した注釈 {draftManifest.annotations.length} 件
+                        現在の注目点 {annotationCount}/{MAX_TUTORIAL_ANNOTATION_COUNT}
                       </div>
+                      <p className={styles.annotationPanelEmpty}>{annotationLimitMessage}</p>
                       {draftManifest.annotations.length === 0 ? (
                         <p className={styles.annotationPanelEmpty}>
-                          まだ注釈はありません。上のボタンで追加できます。
+                          まだ注目点はありません。上のボタンから 1 つ選んで追加してください。
                         </p>
                       ) : (
                         <ul className={styles.annotationList}>
@@ -896,18 +946,19 @@ export default function TutorialShotEditor() {
                                     value={annotation.text}
                                   />
                                 ) : null}
-                                <button
-                                  className={styles.annotationItemDelete}
-                                  onClick={() =>
-                                    updateAnnotations(
-                                      draftManifest.annotations.filter(
-                                        (item) => item.id !== annotation.id,
-                                      ),
-                                    )
-                                  }
-                                  type="button"
-                                >
-                                  削除
+                                  <button
+                                    className={styles.annotationItemDelete}
+                                    onClick={() => {
+                                      updateAnnotations(
+                                        draftManifest.annotations.filter(
+                                          (item) => item.id !== annotation.id,
+                                        ),
+                                      );
+                                      setSelectedAnnotationId(null);
+                                    }}
+                                    type="button"
+                                  >
+                                    削除
                                 </button>
                               </li>
                             );

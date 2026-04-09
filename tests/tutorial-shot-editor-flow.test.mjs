@@ -257,6 +257,11 @@ test(
 
     await page.getByLabel("画像の説明（Alt テキスト）").fill("起動画面");
     await page.getByRole("button", { name: "ラベルを追加" }).click();
+    await assert.equal(await page.getByRole("button", { name: "枠を追加" }).isDisabled(), true);
+    await assert.equal(await page.getByRole("button", { name: "矢印を追加" }).isDisabled(), true);
+    await page
+      .getByText("別の形に変えたい場合は、今の注釈を削除してから追加してください。")
+      .waitFor();
     await page.getByLabel("ラベル 1 のテキスト").fill("Play");
     await page.getByRole("button", { name: "保存して反映" }).click();
     await page.getByText("保存しました").waitFor();

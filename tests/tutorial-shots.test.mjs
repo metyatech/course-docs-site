@@ -10,6 +10,11 @@ import {
   getTutorialShotWarnings,
 } from "../src/lib/tutorial-shots-shared.mjs";
 import {
+  getStoredTutorialShotCropState,
+  getTutorialShotCropStateForImage,
+  updateTutorialShotCropStateMap,
+} from "../src/lib/tutorial-shot-editor-crop-state.mjs";
+import {
   getTutorialShotAuthoringContext,
   saveTutorialShot,
   scanTutorialShots,
@@ -102,9 +107,186 @@ test("getTutorialShotWarnings flags redundant screenshot text and overly dense a
   });
 
   assert.equal(warnings.length, 3);
-  assert.ok(warnings.some((warning) => /注釈が 4 個を超えています/u.test(warning)));
+  assert.ok(warnings.some((warning) => /注目点は 1 つだけ/u.test(warning)));
   assert.ok(warnings.some((warning) => /長すぎます/u.test(warning)));
   assert.ok(warnings.some((warning) => /手順文に見えます/u.test(warning)));
+});
+
+test("tutorial shot editor crop state stays isolated per image and restores per selection", () => {
+  let cropStates = {};
+
+  cropStates = updateTutorialShotCropStateMap({
+    currentCropStates: cropStates,
+    shotKey: "content/docs/tutorial/img/startup.png",
+    crop: {
+      unit: "px",
+      x: 12,
+      y: 16,
+      width: 240,
+      height: 140,
+    },
+    completedCrop: {
+      unit: "px",
+      x: 12,
+      y: 16,
+      width: 240,
+      height: 140,
+    },
+  });
+  cropStates = updateTutorialShotCropStateMap({
+    currentCropStates: cropStates,
+    shotKey: "content/docs/tutorial/img/open-menu.png",
+    crop: {
+      unit: "px",
+      x: 48,
+      y: 24,
+      width: 180,
+      height: 96,
+    },
+    completedCrop: {
+      unit: "px",
+      x: 48,
+      y: 24,
+      width: 180,
+      height: 96,
+    },
+  });
+
+  assert.deepEqual(
+    getStoredTutorialShotCropState({
+      currentCropStates: cropStates,
+      shotKey: "content/docs/tutorial/img/startup.png",
+    }),
+    {
+      crop: {
+        unit: "px",
+        x: 12,
+        y: 16,
+        width: 240,
+        height: 140,
+      },
+      completedCrop: {
+        unit: "px",
+        x: 12,
+        y: 16,
+        width: 240,
+        height: 140,
+      },
+    },
+  );
+  assert.deepEqual(
+    getStoredTutorialShotCropState({
+      currentCropStates: cropStates,
+      shotKey: "content/docs/tutorial/img/open-menu.png",
+    }),
+    {
+      crop: {
+        unit: "px",
+        x: 48,
+        y: 24,
+        width: 180,
+        height: 96,
+      },
+      completedCrop: {
+        unit: "px",
+        x: 48,
+        y: 24,
+        width: 180,
+        height: 96,
+      },
+    },
+  );
+
+  assert.deepEqual(
+    getTutorialShotCropStateForImage({
+      currentCropStates: cropStates,
+      shotKey: "content/docs/tutorial/img/startup.png",
+      manifestCrop: {
+        x: 0,
+        y: 0,
+        width: 320,
+        height: 180,
+      },
+      imageWidth: 640,
+      imageHeight: 360,
+    }),
+    {
+      crop: {
+        unit: "px",
+        x: 12,
+        y: 16,
+        width: 240,
+        height: 140,
+      },
+      completedCrop: {
+        unit: "px",
+        x: 12,
+        y: 16,
+        width: 240,
+        height: 140,
+      },
+    },
+  );
+  assert.deepEqual(
+    getTutorialShotCropStateForImage({
+      currentCropStates: cropStates,
+      shotKey: "content/docs/tutorial/img/open-menu.png",
+      manifestCrop: {
+        x: 8,
+        y: 8,
+        width: 200,
+        height: 120,
+      },
+      imageWidth: 640,
+      imageHeight: 360,
+    }),
+    {
+      crop: {
+        unit: "px",
+        x: 48,
+        y: 24,
+        width: 180,
+        height: 96,
+      },
+      completedCrop: {
+        unit: "px",
+        x: 48,
+        y: 24,
+        width: 180,
+        height: 96,
+      },
+    },
+  );
+  assert.deepEqual(
+    getTutorialShotCropStateForImage({
+      currentCropStates: cropStates,
+      shotKey: "content/docs/tutorial/img/missing.png",
+      manifestCrop: {
+        x: 500,
+        y: 300,
+        width: 400,
+        height: 200,
+      },
+      imageWidth: 640,
+      imageHeight: 360,
+    }),
+    {
+      crop: {
+        unit: "px",
+        x: 500,
+        y: 300,
+        width: 140,
+        height: 60,
+      },
+      completedCrop: {
+        unit: "px",
+        x: 500,
+        y: 300,
+        width: 140,
+        height: 60,
+      },
+    },
+  );
 });
 
 test("scanTutorialShots and saveTutorialShot keep Action img output paths stable", async (t) => {
@@ -148,13 +330,6 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
           y: 24,
           width: 120,
           height: 64,
-        },
-        {
-          id: "label-1",
-          type: "label",
-          x: 16,
-          y: 40,
-          text: "Play",
         },
       ],
     },
@@ -212,6 +387,57 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
   assert.equal(rescannedShots[0].hasRawImage, true);
   assert.equal(rescannedShots[0].hasManifest, true);
   assert.deepEqual(rescannedShots[0].warnings, []);
+});
+
+test("saveTutorialShot rejects multiple focal annotations in one image", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-limit-"));
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+
+  await assert.rejects(
+    () =>
+      saveTutorialShot({
+        sourceRoot,
+        bootstrapFromOutput: true,
+        manifestInput: {
+          ...manifest,
+          crop: {
+            x: 0,
+            y: 0,
+            width: 320,
+            height: 180,
+          },
+          annotations: [
+            {
+              id: "box-1",
+              type: "box",
+              x: 16,
+              y: 16,
+              width: 80,
+              height: 48,
+            },
+            {
+              id: "box-2",
+              type: "box",
+              x: 120,
+              y: 64,
+              width: 80,
+              height: 48,
+            },
+          ],
+        },
+      }),
+    /注目点は 1 つだけ/u,
+  );
 });
 
 test("getTutorialShotAuthoringContext accepts an explicit local override when COURSE_CONTENT_SOURCE is remote", async (t) => {

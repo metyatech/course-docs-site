@@ -15,7 +15,7 @@ For Unreal tutorials, the main bottleneck is usually not taking the screenshot
 itself but the follow-up editing work:
 
 - cropping
-- adding boxes / arrows / short labels
+- marking one focal point with a box, arrow, or short label
 - naming files
 - rewriting images in the correct page-local folder
 - checking whether screenshot text violates tutorial-authoring rules
@@ -87,14 +87,21 @@ The editor intentionally supports only a narrow annotation set:
 - `arrow`
 - short `label`
 
+Use only one of those per image. One image should point the learner to one
+primary focal point and one associated step.
+
 It should not be used for long instruction sentences inside screenshots.
 
 Rule of thumb:
 
 - image = WHERE
 - Action text = WHAT
+- one image = one focal point
 
 If a label becomes a sentence, move that content back into the `Action` body.
+If you need to explain multiple places or multiple ordered actions, split the
+image into separate tutorial shots instead of numbering many callouts in one
+frame.
 
 ## Current Scope
 

@@ -1,6 +1,6 @@
 export const TUTORIAL_SHOT_MANIFEST_VERSION = 1;
 export const MAX_TUTORIAL_LABEL_LENGTH = 24;
-export const MAX_TUTORIAL_ANNOTATION_COUNT = 4;
+export const MAX_TUTORIAL_ANNOTATION_COUNT = 1;
 
 const ACTION_TAG_PATTERN = /<Action\b[\s\S]*?>/gu;
 const IMG_PROP_PATTERN = /\bimg=(["'])(.*?)\1/u;
@@ -221,7 +221,7 @@ export const getTutorialShotWarnings = (manifest) => {
 
   if (annotations.length > MAX_TUTORIAL_ANNOTATION_COUNT) {
     warnings.push(
-      `注釈が ${MAX_TUTORIAL_ANNOTATION_COUNT} 個を超えています。画像を見やすくするため、注釈数を減らしてください。`,
+      "1 枚の画像で示す注目点は 1 つだけにしてください。余分な注釈を削除し、画像ごとに 1 手順へ分けてください。",
     );
   }
 
