@@ -88,7 +88,7 @@ test("extractActionImageRefsFromMdx derives output, raw, and manifest paths", ()
   );
 });
 
-test("getTutorialShotWarnings enforces one box with optional one arrow and no labels", () => {
+test("getTutorialShotWarnings allows no annotations but rejects invalid callouts", () => {
   const warnings = getTutorialShotWarnings({
     annotations: [
       { id: "legacy-label", type: "label", x: 10, y: 10, text: "Play" },
@@ -123,8 +123,10 @@ test("getTutorialShotWarnings enforces one box with optional one arrow and no la
     getTutorialShotWarnings({
       annotations: [{ id: "arrow-only", type: "arrow", fromX: 10, fromY: 10, toX: 20, toY: 20 }],
     }),
-    ["矢印だけは使えません。注目点を示す枠を 1 つ追加してください。"],
+    ["矢印だけは使えません。矢印を使うなら注目点を示す枠を 1 つ追加してください。"],
   );
+
+  assert.deepEqual(getTutorialShotWarnings({ annotations: [] }), []);
 });
 
 test("tutorial shot editor crop state stays isolated per image and restores per selection", () => {
@@ -428,6 +430,41 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
   assert.equal(rescannedShots[0].hasRawImage, true);
   assert.equal(rescannedShots[0].hasManifest, true);
   assert.deepEqual(rescannedShots[0].warnings, []);
+});
+
+test("saveTutorialShot accepts no annotations for result-confirmation shots", async (t) => {
+  const sourceRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "course-tutorial-shots-no-annotations-"),
+  );
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+
+  const result = await saveTutorialShot({
+    sourceRoot,
+    bootstrapFromOutput: true,
+    manifestInput: {
+      ...manifest,
+      crop: {
+        x: 16,
+        y: 16,
+        width: 320,
+        height: 180,
+      },
+      annotations: [],
+    },
+  });
+
+  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.manifest.annotations, []);
 });
 
 test("saveTutorialShot accepts a single box without an arrow", async (t) => {

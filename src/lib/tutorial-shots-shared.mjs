@@ -241,12 +241,8 @@ export const getTutorialShotAnnotationErrors = (annotations) => {
     errors.push("矢印は 1 本だけにしてください。");
   }
 
-  if (boxCount === 0) {
-    errors.push(
-      arrowCount > 0
-        ? "矢印だけは使えません。注目点を示す枠を 1 つ追加してください。"
-        : "注目点を示す枠を 1 つ追加してください。",
-    );
+  if (arrowCount > 0 && boxCount === 0) {
+    errors.push("矢印だけは使えません。矢印を使うなら注目点を示す枠を 1 つ追加してください。");
   }
 
   return errors;

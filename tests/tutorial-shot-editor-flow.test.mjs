@@ -256,9 +256,17 @@ test(
     await page.getByRole("button", { name: /override-startup/i }).waitFor();
 
     await page.getByLabel("画像の説明（Alt テキスト）").fill("起動画面");
-    await assert.equal(await page.getByRole("button", { name: "保存して反映" }).isDisabled(), true);
+    await assert.equal(
+      await page.getByRole("button", { name: "保存して反映" }).isDisabled(),
+      false,
+    );
     await assert.equal(await page.getByRole("button", { name: "矢印を追加" }).isDisabled(), true);
     await assert.equal(await page.getByRole("button", { name: "ラベルを追加" }).count(), 0);
+    await page
+      .getByText(
+        "結果確認だけの画像なら、注釈なしのまま保存できます。クリック位置を示したいときだけ枠を追加してください。",
+      )
+      .waitFor();
 
     await page.getByRole("button", { name: "枠を追加" }).click();
     await assert.equal(await page.getByRole("button", { name: "枠を追加" }).isDisabled(), true);

@@ -235,9 +235,11 @@ export default function TutorialShotEditor() {
   }`;
   const annotationPanelHint =
     annotationErrors[0] ??
-    (annotationSummary.arrowCount > 0
-      ? "保存できる状態です。矢印は補助なので、不要なら削除して枠だけに戻せます。"
-      : "保存できる状態です。必要なときだけ矢印を 1 本追加できます。");
+    (annotationSummary.boxCount === 0
+      ? "結果確認だけの画像なら、注釈なしのまま保存できます。クリック位置を示したいときだけ枠を追加してください。"
+      : annotationSummary.arrowCount > 0
+        ? "保存できる状態です。矢印は補助なので、不要なら削除して枠だけに戻せます。"
+        : "保存できる状態です。必要なときだけ矢印を 1 本追加できます。");
 
   useEffect(() => {
     const savedOverride = window.localStorage.getItem(SOURCE_OVERRIDE_STORAGE_KEY) ?? "";
@@ -879,10 +881,10 @@ export default function TutorialShotEditor() {
               <article className={styles.workCard}>
                 <header className={styles.workCardHeader}>
                   <div>
-                    <h3 className={styles.workCardTitle}>見せたい場所を 1 つ示す</h3>
+                    <h3 className={styles.workCardTitle}>必要なら見せたい場所を示す</h3>
                     <p className={styles.workCardHint}>
-                      枠を 1 つ置いて主注目点を示します。必要なときだけ、その枠を補助する矢印を 1
-                      本追加できます。
+                      結果確認だけの画像は注釈なしのままで構いません。操作位置を強調したいときだけ枠を
+                      1 つ置き、必要ならその枠を補助する矢印を 1 本追加してください。
                     </p>
                   </div>
                   <div className={styles.workCardTools}>
@@ -927,7 +929,7 @@ export default function TutorialShotEditor() {
                       <p className={styles.annotationPanelEmpty}>{annotationPanelHint}</p>
                       {draftManifest.annotations.length === 0 ? (
                         <p className={styles.annotationPanelEmpty}>
-                          まだ注目点はありません。まず枠を追加して、画像のどこを見るべきかを示してください。
+                          注釈はまだありません。このまま保存するか、必要なときだけ枠を追加して注目位置を示してください。
                         </p>
                       ) : (
                         <ul className={styles.annotationList}>

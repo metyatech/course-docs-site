@@ -15,7 +15,7 @@ For Unreal tutorials, the main bottleneck is usually not taking the screenshot
 itself but the follow-up editing work:
 
 - cropping
-- marking one focal point with a box and, only when needed, a supporting arrow
+- optionally marking one focal point with a box and, only when needed, a supporting arrow
 - naming files
 - rewriting images in the correct page-local folder
 - checking whether the screenshot follows the focal-point annotation rules
@@ -36,7 +36,7 @@ Pattern: `hybrid-gui`
   - scan `Action img="..."`
   - keep output image paths stable
   - save shot manifests beside each tutorial page
-  - run tutorial-authoring warnings on image-internal text
+  - validate when annotations are absent, box-led, or invalid
 
 ## Project Contract
 
@@ -67,7 +67,7 @@ project-contract:
     - shot manifest stays authoritative for crop/annotations
     - generated img/*.png is overwritten from manifest on save
   validation:
-    - client and server validation for one box, optional one arrow, and no labels
+    - client and server validation for no annotation, or one box with an optional arrow, and no labels
     - server path validation before read/write
     - repo tests for scan/save behavior
   generated_artifacts:
@@ -86,14 +86,16 @@ The editor intentionally supports only a narrow annotation set:
 - `box`
 - `arrow`
 
-Every saved image must contain exactly one `box`. An `arrow` is optional and is
-allowed only as a helper for that same focal point.
+Images used only to confirm a resulting state may be saved without annotations.
+When an image needs a callout, use at most one `box`; an `arrow` is optional
+and is allowed only as a helper for that box.
 
 Rule of thumb:
 
-- image = WHERE
+- callout image = WHERE
+- result-only image = STATE
 - Action text = WHAT
-- one image = one focal point
+- one image = one purpose
 
 If you need to explain multiple places or multiple ordered actions, split the
 image into separate tutorial shots instead of numbering many callouts in one
