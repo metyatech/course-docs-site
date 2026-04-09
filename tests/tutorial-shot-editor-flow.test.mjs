@@ -257,24 +257,24 @@ test(
 
     await page.getByLabel("画像の説明（Alt テキスト）").fill("起動画面");
     await assert.equal(
-      await page.getByRole("button", { name: "保存して反映" }).isDisabled(),
+      await page.getByRole("button", { name: "保存", exact: true }).isDisabled(),
       false,
     );
     await assert.equal(await page.getByRole("button", { name: "矢印を追加" }).isDisabled(), true);
     await assert.equal(await page.getByRole("button", { name: "ラベルを追加" }).count(), 0);
-    await page.getByText("結果確認だけなら、このまま保存できます。").waitFor();
+    await page.getByText("特に示したい場所がなければ、このまま保存できます。").waitFor();
 
     await page.getByRole("button", { name: "枠を追加" }).click();
     await assert.equal(await page.getByRole("button", { name: "枠を追加" }).isDisabled(), true);
     await assert.equal(await page.getByRole("button", { name: "矢印を追加" }).isDisabled(), false);
     await assert.equal(
-      await page.getByRole("button", { name: "保存して反映" }).isDisabled(),
+      await page.getByRole("button", { name: "保存", exact: true }).isDisabled(),
       false,
     );
 
     await page.getByRole("button", { name: "矢印を追加" }).click();
     await assert.equal(await page.getByRole("button", { name: "矢印を追加" }).isDisabled(), true);
-    await page.getByRole("button", { name: "保存して反映" }).click();
+    await page.getByRole("button", { name: "保存", exact: true }).click();
     await page.getByText("保存しました").waitFor();
 
     const startupRawPath = path.join(

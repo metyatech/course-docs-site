@@ -80,7 +80,7 @@ const getShotFlags = (shot: TutorialShotItem) => {
     flags.push({
       className: styles.flagMuted,
       label: "画像未設定",
-      title: "まだこの Action 用の公開画像がありません。",
+      title: "公開画像がまだありません。元画像をアップロードして保存すると作成されます。",
     });
   }
 
@@ -236,7 +236,7 @@ export default function TutorialShotEditor() {
   const annotationPanelHint =
     annotationErrors[0] ??
     (annotationSummary.boxCount === 0
-      ? "結果確認だけなら、このまま保存できます。"
+      ? "特に示したい場所がなければ、このまま保存できます。"
       : annotationSummary.arrowCount > 0
         ? "保存できます。矢印は不要なら削除できます。"
         : "保存できます。必要なら矢印を追加できます。");
@@ -557,7 +557,7 @@ export default function TutorialShotEditor() {
         <section className={styles.setupCard}>
           <header className={styles.setupHeader}>
             <h1>編集する教材リポジトリを選んでください</h1>
-            <p>ローカル教材の画像を順に編集できます。</p>
+            <p>ローカル教材の画像をまとめて編集できます。</p>
           </header>
 
           <div className={styles.setupBody}>
@@ -610,7 +610,7 @@ export default function TutorialShotEditor() {
             <div className={styles.setupReason}>{response.reason}</div>
 
             <div className={styles.setupFootnote}>
-              現在の <code>COURSE_CONTENT_SOURCE</code>:{" "}
+              現在の参照先:{" "}
               <code>{formatConfiguredSource(response.configuredSource)}</code>
               {response.overrideSource ? (
                 <>
@@ -621,7 +621,7 @@ export default function TutorialShotEditor() {
                     onClick={() => applySourceOverride("")}
                     type="button"
                   >
-                    保存した上書きを解除
+                    一時切替を解除
                   </button>
                 </>
               ) : null}
@@ -643,7 +643,7 @@ export default function TutorialShotEditor() {
           <div className={styles.sourceLine}>
             <span className={styles.sourceCaption}>編集中:</span>
             <code className={styles.sourcePathInline}>{sourceLabel}</code>
-            {isOverridden ? <span className={styles.sourceTag}>上書き指定</span> : null}
+            {isOverridden ? <span className={styles.sourceTag}>一時切替中</span> : null}
             <button
               className={styles.linkButton}
               onClick={() => setIsSourceEditorOpen((value) => !value)}
@@ -678,7 +678,7 @@ export default function TutorialShotEditor() {
                   onClick={() => applySourceOverride("")}
                   type="button"
                 >
-                  COURSE_CONTENT_SOURCE に戻す
+                  既定の参照先に戻す
                 </button>
               ) : null}
             </div>
@@ -765,7 +765,7 @@ export default function TutorialShotEditor() {
                     onClick={save}
                     type="button"
                   >
-                    {isSaving ? "保存中…" : "保存して反映"}
+                    {isSaving ? "保存中…" : "保存"}
                   </button>
                 </div>
               </header>
@@ -773,7 +773,7 @@ export default function TutorialShotEditor() {
               <div className={styles.altCard}>
                 <label className={styles.fieldBlock} htmlFor="shot-alt">
                   <span className={styles.fieldLabel}>画像の説明（Alt テキスト）</span>
-                  <span className={styles.fieldHint}>画像の内容が分かる短い文にします。</span>
+                  <span className={styles.fieldHint}>画像の内容を短い文で書きます。</span>
                   <input
                     className={styles.textInput}
                     id="shot-alt"
@@ -796,8 +796,8 @@ export default function TutorialShotEditor() {
               <article className={styles.workCard}>
                 <header className={styles.workCardHeader}>
                   <div>
-                    <h3 className={styles.workCardTitle}>編集元の画像と公開する範囲</h3>
-                    <p className={styles.workCardHint}>公開する範囲だけを囲みます。</p>
+                    <h3 className={styles.workCardTitle}>元画像と切り抜き範囲</h3>
+                    <p className={styles.workCardHint}>ドラッグで囲んだ範囲が公開画像になります。</p>
                   </div>
                   <div className={styles.workCardTools}>
                     <button
@@ -877,7 +877,7 @@ export default function TutorialShotEditor() {
                   <div>
                     <h3 className={styles.workCardTitle}>必要なら注釈を追加</h3>
                     <p className={styles.workCardHint}>
-                      結果確認だけなら注釈不要です。場所を示すときだけ枠、必要なら矢印を追加します。
+                      特に示したい場所がなければ注釈は不要です。注目してほしい場所があるときだけ枠を追加し、必要なら矢印を添えます。
                     </p>
                   </div>
                   <div className={styles.workCardTools}>
@@ -902,7 +902,7 @@ export default function TutorialShotEditor() {
 
                 {!croppedPreviewSrc || !completedCrop ? (
                   <div className={styles.stageEmpty}>
-                    上で公開範囲を決めると、ここで注釈できます。
+                    切り抜き範囲を決めると、ここに注釈を追加できます。
                   </div>
                 ) : (
                   <div className={styles.annotateGrid}>
@@ -922,7 +922,7 @@ export default function TutorialShotEditor() {
                       <p className={styles.annotationPanelEmpty}>{annotationPanelHint}</p>
                       {draftManifest.annotations.length === 0 ? (
                         <p className={styles.annotationPanelEmpty}>
-                          注釈なしでも保存できます。必要なときだけ枠を追加します。
+                          注釈なしでも保存できます。必要なときだけ枠を追加してください。
                         </p>
                       ) : (
                         <ul className={styles.annotationList}>
@@ -946,14 +946,14 @@ export default function TutorialShotEditor() {
                                   {annotation.type === "label" ? (
                                     <span className={styles.annotationItemPreview}>
                                       {annotation.text
-                                        ? `旧ラベル: ${annotation.text}`
-                                        : "旧ラベル。削除してください。"}
+                                        ? `ラベル（廃止）: ${annotation.text}`
+                                        : "ラベル（廃止 / 削除してください）"}
                                     </span>
                                   ) : annotation.type === "arrow" ? (
-                                    <span className={styles.annotationItemPreview}>補助の矢印</span>
+                                    <span className={styles.annotationItemPreview}>矢印</span>
                                   ) : (
                                     <span className={styles.annotationItemPreview}>
-                                      画像上で調整
+                                      画像上でドラッグして調整
                                     </span>
                                   )}
                                 </button>
