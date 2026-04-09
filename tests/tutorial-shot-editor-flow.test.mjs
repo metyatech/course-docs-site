@@ -246,7 +246,10 @@ test(
     t.after(async () => {
       await browser.close();
     });
-    const page = await browser.newPage({ baseURL: baseUrl });
+    const page = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
 
     await page.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "チュートリアル画像エディタ" }).waitFor();
@@ -254,6 +257,26 @@ test(
     await page.getByPlaceholder("../open-campus-unreal-90min").fill(overrideCourseRelativePath);
     await page.getByRole("button", { name: "切り替える" }).click();
     await page.getByRole("button", { name: /override-startup/i }).waitFor();
+    await page.getByRole("heading", { name: "必要なら注釈を追加" }).scrollIntoViewIfNeeded();
+    await waitFor(
+      async () =>
+        page.evaluate(() => {
+          const stage = document.querySelector('[data-testid="annotation-stage"]');
+          const canvas = stage?.querySelector("canvas");
+          if (!stage || !canvas) {
+            return false;
+          }
+
+          const stageRect = stage.getBoundingClientRect();
+          const canvasRect = canvas.getBoundingClientRect();
+          return canvasRect.left >= stageRect.left + 10;
+        }),
+      {
+        timeoutMs: 30_000,
+        intervalMs: 200,
+        onTimeoutMessage: "Annotation canvas left edge stayed clipped.",
+      },
+    );
 
     await page.getByLabel("画像の説明（Alt テキスト）").fill("起動画面");
     await assert.equal(
