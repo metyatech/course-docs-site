@@ -250,20 +250,25 @@ test(
 
     await page.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "チュートリアル画像エディタ" }).waitFor();
-    await page.getByText("編集対象のローカル repo:").waitFor();
+    await page.getByRole("heading", { name: "1. 編集する Action 画像を選ぶ" }).waitFor();
+    await page.getByText("この画面でやること").waitFor();
+    await page.getByText("保存先の教材 repo").waitFor();
     await page.getByPlaceholder("../open-campus-unreal-90min").fill(overrideCourseRelativePath);
     await page.getByRole("button", { name: "ローカル repo を切り替える" }).click();
     await page.getByRole("button", { name: /override-startup/i }).waitFor();
+    await page.getByText("次にやること", { exact: true }).waitFor();
 
     await page.getByLabel("Alt テキスト").fill("起動画面");
     await page.getByRole("button", { name: "ラベルを追加" }).click();
     await page.getByLabel("ラベル").fill("Play");
-    await page.getByRole("button", { name: "保存" }).click();
+    await page.getByRole("button", { name: "保存して出力画像を更新" }).click();
     await page.getByText("保存しました。").waitFor();
 
     await page.getByRole("button", { name: /override-missing-output/i }).click();
-    await page.getByText("この Action 画像を編集するには、まず元画像をアップロードしてください。").waitFor();
-    await page.getByRole("button", { name: "保存" }).click();
+    await page
+      .getByText("この Action 画像を編集するには、まず元画像をアップロードしてください。")
+      .waitFor();
+    await page.getByRole("button", { name: "保存して出力画像を更新" }).click();
     await page
       .getByText(
         "元画像がまだ無いため、この Action 画像は保存できません。先に元画像をアップロードしてください。",

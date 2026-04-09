@@ -1,9 +1,15 @@
 .page {
   padding: 2rem;
+  display: grid;
+  gap: 1.5rem;
+  background:
+    radial-gradient(circle at top right, rgb(255 237 213 / 0.7), transparent 30%),
+    linear-gradient(180deg, rgb(255 255 255), rgb(249 250 251));
 }
 
 .header {
-  margin-bottom: 1.5rem;
+  display: grid;
+  gap: 1rem;
 }
 
 .header h1 {
@@ -19,33 +25,148 @@
 
 .sourceBanner,
 .setupCard,
-.suggestedSources {
+.suggestedSources,
+.guideCard,
+.nextStepCard,
+.detailsCard,
+.resultCard,
+.infoCard {
   display: grid;
   gap: 1rem;
 }
 
 .sourceBanner {
-  margin-top: 1rem;
   max-width: 64rem;
   padding: 1rem;
   border: 1px solid rgb(229 231 235);
   border-radius: 1rem;
-  background: white;
+  background: rgb(255 255 255 / 0.94);
+  box-shadow: 0 16px 32px rgb(15 23 42 / 0.06);
 }
 
 .setupCard {
   max-width: 64rem;
   border: 1px solid rgb(229 231 235);
   border-radius: 1rem;
-  background: white;
+  background: rgb(255 255 255 / 0.94);
   overflow: hidden;
+  box-shadow: 0 18px 40px rgb(15 23 42 / 0.08);
+}
+
+.guideCard,
+.nextStepCard,
+.detailsCard,
+.infoCard,
+.resultCard {
+  padding: 1rem;
+  border: 1px solid rgb(229 231 235);
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 0.94);
+}
+
+.guideCard {
+  max-width: 64rem;
+  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
+  align-items: flex-start;
+}
+
+.guideIntro h2,
+.sourceSummary {
+  margin: 0;
+}
+
+.guideIntro h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.guideIntro p {
+  color: rgb(75 85 99);
+  font-size: 0.925rem;
+  line-height: 1.45;
+}
+
+.stepList {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.stepList li {
+  line-height: 1.5;
+}
+
+.sourceSummary,
+.saveSummary,
+.focusHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sourcePath,
+.focusTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.eyebrow {
+  color: rgb(107 114 128);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.focusTitle {
+  margin-top: 0.25rem;
+}
+
+.nextStepCard {
+  background: linear-gradient(135deg, rgb(255 247 237), rgb(255 255 255));
+  border-color: rgb(253 186 116);
+}
+
+.nextStepCard p,
+.resultCard p {
+  margin: 0.35rem 0 0;
+  line-height: 1.55;
+}
+
+.detailsCard {
+  gap: 0.75rem;
+}
+
+.detailsCard summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.detailsGrid {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.infoCard {
+  background: rgb(249 250 251);
+}
+
+.resultCard {
+  background: rgb(249 250 251);
 }
 
 .layout {
   display: grid;
-  grid-template-columns: 22rem minmax(0, 1fr);
+  grid-template-columns: 20rem minmax(0, 1fr);
   gap: 1.5rem;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .sidebar {
@@ -53,8 +174,9 @@
   top: 1rem;
   border: 1px solid rgb(229 231 235);
   border-radius: 1rem;
-  background: white;
+  background: rgb(255 255 255 / 0.94);
   overflow: hidden;
+  box-shadow: 0 16px 32px rgb(15 23 42 / 0.06);
 }
 
 .sidebarHeader {
@@ -142,8 +264,9 @@
 .panel {
   border: 1px solid rgb(229 231 235);
   border-radius: 1rem;
-  background: white;
+  background: rgb(255 255 255 / 0.96);
   overflow: hidden;
+  box-shadow: 0 16px 32px rgb(15 23 42 / 0.05);
 }
 
 .panelHeader,
@@ -272,13 +395,19 @@
   color: rgb(75 85 99);
 }
 
+.saveSummary {
+  margin-bottom: 1rem;
+}
+
 .uploadInput {
   display: none;
 }
 
 @media (max-width: 1100px) {
   .layout,
-  .grid {
+  .grid,
+  .guideCard,
+  .detailsGrid {
     grid-template-columns: 1fr;
   }
 

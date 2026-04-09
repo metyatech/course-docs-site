@@ -59,6 +59,38 @@ const getAnnotationTypeLabel = (type: TutorialShotAnnotation["type"]) => {
   return "ラベル";
 };
 
+const getNextStepMessage = ({
+  bootstrapFromOutput,
+  manifest,
+  sourceImageSrc,
+  warnings,
+}: {
+  bootstrapFromOutput: boolean;
+  manifest: TutorialShotManifest;
+  sourceImageSrc: string | null;
+  warnings: string[];
+}) => {
+  if (!sourceImageSrc) {
+    return bootstrapFromOutput
+      ? "元画像をアップロードするか、このまま保存して現在の出力画像から元画像を初期作成してください。"
+      : "まず元画像をアップロードしてください。";
+  }
+
+  if (!manifest.alt.trim()) {
+    return "Alt テキストを入れて、この画像が何を示すかを短く伝えてください。";
+  }
+
+  if (manifest.annotations.length === 0) {
+    return "必要なら枠・矢印・短いラベルを追加して、見る場所だけを示してください。注釈が不要ならそのまま保存できます。";
+  }
+
+  if (warnings.length > 0) {
+    return `保存できますが、先に警告 ${warnings.length} 件を確認してください。`;
+  }
+
+  return "保存できます。保存後は資料ページを開いて、見た目と読みやすさを確認してください。";
+};
+
 const loadImageElement = (src: string) =>
   new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new window.Image();
@@ -204,9 +236,7 @@ export default function TutorialShotEditor() {
       setResponse({
         enabled: false,
         reason:
-          error instanceof Error
-            ? error.message
-            : "チュートリアル画像一覧を読み込めませんでした。",
+          error instanceof Error ? error.message : "チュートリアル画像一覧を読み込めませんでした。",
         configuredSource: null,
         suggestedLocalSources: [],
         overrideSource: sourceOverride,
@@ -246,7 +276,9 @@ export default function TutorialShotEditor() {
         ? selectedShot.outputImagePath
         : null;
     setSourceImageSrc(
-      nextImagePath ? buildImageUrl(nextImagePath, sourceImageRevision, sourceOverride ?? "") : null,
+      nextImagePath
+        ? buildImageUrl(nextImagePath, sourceImageRevision, sourceOverride ?? "")
+        : null,
     );
     setSourceImageElement(null);
     setCrop(undefined);
@@ -439,11 +471,22 @@ export default function TutorialShotEditor() {
           <div className={styles.panelHeader}>
             <h1>チュートリアル画像エディタの設定</h1>
             <p>
-              このエディタは、元画像・shot manifest・生成後の Action 画像を教材 repo に書き戻すため、
-              書き込み可能なローカル教材 repo が必要です。
+              この画面では、教材 repo の Action 画像を 1 枚ずつ編集します。最初に、保存先として使う
+              書き込み可能なローカル教材 repo を選んでください。
             </p>
           </div>
           <div className={styles.panelBody}>
+            <div className={styles.guideCard}>
+              <div className={styles.guideIntro}>
+                <h2>最初にやること</h2>
+                <p>保存先のローカル教材 repo を指定すると、Action 画像一覧が開きます。</p>
+              </div>
+              <ol className={styles.stepList}>
+                <li>現在の COURSE_CONTENT_SOURCE を確認する</li>
+                <li>保存先にしたいローカル教材 repo を入力する</li>
+                <li>「ローカル repo を開く」で編集画面へ進む</li>
+              </ol>
+            </div>
             <div className={styles.warningList}>
               <div className={styles.warningItem}>{response.reason}</div>
             </div>
@@ -508,14 +551,34 @@ export default function TutorialShotEditor() {
       <div className={styles.header}>
         <h1>チュートリアル画像エディタ</h1>
         <p>
-          既存の <code>Action img=&quot;./img/...png&quot;</code> はそのまま使いながら、
-          元画像を <code>raw + 切り抜き + 注釈 -&gt; 生成 png</code> として編集できます。shot
-          metadata はページ横の <code>shots/</code> に保存され、既存の出力画像を同じ場所で上書きします。
+          Action 画像を 1 枚ずつ選び、元画像の準備、切り抜き、注釈、保存までをこの画面で進めます。
+          既存の <code>Action img=&quot;./img/...png&quot;</code> はそのまま保たれます。
         </p>
+        <div className={styles.guideCard}>
+          <div className={styles.guideIntro}>
+            <h2>この画面でやること</h2>
+            <p>初見でも順番に辿れるように、作業は 4 段階に分けています。</p>
+          </div>
+          <ol className={styles.stepList}>
+            <li>編集する Action 画像を選ぶ</li>
+            <li>元画像と Alt テキストを整える</li>
+            <li>見せたい範囲を切り抜き、見る場所だけ注釈する</li>
+            <li>警告を確認して保存し、資料ページで見た目を確認する</li>
+          </ol>
+        </div>
         <div className={styles.sourceBanner}>
-          <div className={styles.status}>
-            編集対象のローカル repo: <code>{response.activeSourcePath}</code>
-            {response.sourceKind === "override" ? "（上書き指定）" : ""}
+          <div className={styles.sourceSummary}>
+            <div>
+              <div className={styles.eyebrow}>保存先の教材 repo</div>
+              <div className={styles.sourcePath}>
+                <code>{response.activeSourcePath}</code>
+                {response.sourceKind === "override" ? "（上書き指定）" : ""}
+              </div>
+            </div>
+            <div className={styles.status}>
+              保存すると、元画像と <code>shot manifest</code> はページ横の <code>shots/</code> に、
+              生成後の画像は既存の出力先に書き戻されます。
+            </div>
           </div>
           <div className={styles.actions}>
             <input
@@ -538,8 +601,8 @@ export default function TutorialShotEditor() {
           </div>
           {response.sourceKind === "override" ? (
             <div className={styles.status}>
-              このエディタは上書き指定したローカル repo に保存します。通常の docs ページ側も同じ repo を
-              表示したい場合は、<code>COURSE_CONTENT_SOURCE</code> もこのパスにして
+              このエディタは上書き指定したローカル repo に保存します。通常の docs ページ側も同じ
+              repo を 表示したい場合は、<code>COURSE_CONTENT_SOURCE</code> もこのパスにして
               <code>npm run dev</code> を再起動してください。
             </div>
           ) : null}
@@ -549,11 +612,12 @@ export default function TutorialShotEditor() {
       <div className={styles.layout}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
-            <h2>Action 画像</h2>
+            <h2>1. 編集する Action 画像を選ぶ</h2>
             <p>
-              現在のローカル教材 repo から検出した Action 画像です。選んだ shot の元画像、切り抜き、
-              注釈を編集できます。
+              現在のローカル教材 repo から検出した Action 画像です。まず 1 枚選ぶと、右側に
+              現在の対象と次の作業が表示されます。
             </p>
+            <div className={styles.status}>検出した画像: {shots.length} 件</div>
           </div>
           <div className={styles.shotList}>
             {shots.map((shot) => (
@@ -563,6 +627,7 @@ export default function TutorialShotEditor() {
                   shot.outputImagePath === selectedKey ? styles.shotButtonActive : ""
                 }`}
                 onClick={() => setSelectedKey(shot.outputImagePath)}
+                aria-pressed={shot.outputImagePath === selectedKey}
                 type="button"
               >
                 <div className={styles.shotTitle}>
@@ -596,23 +661,79 @@ export default function TutorialShotEditor() {
 
         <section className={styles.editor}>
           {!selectedShot || !draftManifest ? (
-            <div className={styles.empty}>左の一覧から shot を選ぶと編集を始められます。</div>
+            <div className={styles.empty}>
+              左の一覧から編集する画像を 1
+              枚選んでください。選ぶと、右側に現在の対象、次にやること、
+              編集手順が順番に表示されます。
+            </div>
           ) : (
             <>
               <div className={styles.panel}>
                 <div className={styles.panelHeader}>
-                  <h2>ショット情報</h2>
-                  <p>
-                    出力画像のパスは既存の Action 画像参照と一致したままです。元画像と manifest は
-                    ページ横の <code>shots/</code> に保存されます。
-                  </p>
+                  <h2>2. 今編集中の画像</h2>
+                  <p>現在の対象と、次にやることです。迷ったらまずここを見てください。</p>
+                </div>
+                <div className={styles.panelBody}>
+                  <div className={styles.focusHeader}>
+                    <div>
+                      <div className={styles.eyebrow}>現在の対象</div>
+                      <div className={styles.focusTitle}>{draftManifest.id}</div>
+                      <div className={styles.shotMeta}>
+                        <div>{draftManifest.pagePath}</div>
+                        <div>{selectedShot.line} 行目の Action 画像</div>
+                      </div>
+                    </div>
+                    <div className={styles.badgeRow}>
+                      <span className={styles.badge}>
+                        {selectedShot.hasOutputImage ? "出力あり" : "出力なし"}
+                      </span>
+                      <span className={styles.badge}>
+                        {selectedShot.hasRawImage ? "元画像あり" : "元画像が必要"}
+                      </span>
+                      <span className={styles.badge}>
+                        {selectedShot.hasManifest ? "manifest あり" : "manifest なし"}
+                      </span>
+                      {warnings.length > 0 ? (
+                        <span className={`${styles.badge} ${styles.badgeWarn}`}>
+                          警告 {warnings.length} 件
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className={styles.nextStepCard}>
+                    <div className={styles.eyebrow}>次にやること</div>
+                    <p>
+                      {getNextStepMessage({
+                        bootstrapFromOutput,
+                        manifest: draftManifest,
+                        sourceImageSrc,
+                        warnings,
+                      })}
+                    </p>
+                  </div>
+                  <details className={styles.detailsCard}>
+                    <summary>保存先と元画像パスを見る</summary>
+                    <div className={styles.detailsGrid}>
+                      <div className={styles.field}>
+                        <label htmlFor="shot-output">出力画像</label>
+                        <input id="shot-output" value={draftManifest.outputImagePath} readOnly />
+                      </div>
+                      <div className={styles.field}>
+                        <label htmlFor="shot-raw">元画像</label>
+                        <input id="shot-raw" value={draftManifest.rawImagePath} readOnly />
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              </div>
+
+              <div className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <h2>3. 元画像と説明を整える</h2>
+                  <p>この画像が何を示すかを短く決めて、必要なら元画像を差し替えます。</p>
                 </div>
                 <div className={styles.panelBody}>
                   <div className={styles.grid}>
-                    <div className={styles.field}>
-                      <label htmlFor="shot-id">ショット ID</label>
-                      <input id="shot-id" value={draftManifest.id} readOnly />
-                    </div>
                     <div className={styles.field}>
                       <label htmlFor="shot-alt">Alt テキスト</label>
                       <input
@@ -627,20 +748,9 @@ export default function TutorialShotEditor() {
                               : current,
                           )
                         }
+                        placeholder="例: Epic Games Launcher の起動画面"
                         value={draftManifest.alt}
                       />
-                    </div>
-                    <div className={styles.field}>
-                      <label htmlFor="shot-page">ページ</label>
-                      <input id="shot-page" value={draftManifest.pagePath} readOnly />
-                    </div>
-                    <div className={styles.field}>
-                      <label htmlFor="shot-output">出力画像</label>
-                      <input id="shot-output" value={draftManifest.outputImagePath} readOnly />
-                    </div>
-                    <div className={styles.field}>
-                      <label htmlFor="shot-raw">元画像</label>
-                      <input id="shot-raw" value={draftManifest.rawImagePath} readOnly />
                     </div>
                     <div className={styles.field}>
                       <label>元画像ファイル</label>
@@ -652,11 +762,6 @@ export default function TutorialShotEditor() {
                         >
                           元画像をアップロード
                         </button>
-                        {bootstrapFromOutput ? (
-                          <span className={styles.status}>
-                            今このまま保存すると、現在の出力画像から元画像を初期作成します。
-                          </span>
-                        ) : null}
                         <input
                           accept="image/png,image/jpeg,image/webp"
                           className={styles.uploadInput}
@@ -665,6 +770,11 @@ export default function TutorialShotEditor() {
                           type="file"
                         />
                       </div>
+                      {bootstrapFromOutput ? (
+                        <div className={styles.infoCard}>
+                          今このまま保存すると、現在の出力画像から元画像を初期作成します。
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -672,7 +782,7 @@ export default function TutorialShotEditor() {
 
               <div className={styles.panel}>
                 <div className={styles.panelHeader}>
-                  <h2>切り抜き</h2>
+                  <h2>4. 見せたい範囲を決める</h2>
                   <p>この Action に必要な範囲だけを先に切り抜いてから注釈を付けます。</p>
                 </div>
                 <div className={styles.panelBody}>
@@ -740,12 +850,17 @@ export default function TutorialShotEditor() {
 
               <div className={styles.panel}>
                 <div className={styles.panelHeader}>
-                  <h2>注釈</h2>
-                  <p>画像は WHERE を示す用途に絞り、ラベルは短く保って長い手順文は入れません。</p>
+                  <h2>5. 見る場所だけを示す</h2>
+                  <p>
+                    画像は WHERE
+                    を示す用途に絞ります。長い手順文は入れず、必要な場所だけ短く示してください。
+                  </p>
                 </div>
                 <div className={styles.panelBody}>
                   {!croppedPreviewSrc || !completedCrop ? (
-                    <div className={styles.empty}>注釈を始める前に、先に切り抜きを決めてください。</div>
+                    <div className={styles.empty}>
+                      注釈を始める前に、先に切り抜きを決めてください。
+                    </div>
                   ) : (
                     <div className={styles.annotationShell}>
                       <div className={styles.toolbar}>
@@ -837,10 +952,23 @@ export default function TutorialShotEditor() {
 
               <div className={styles.panel}>
                 <div className={styles.panelHeader}>
-                  <h2>チュートリアルルール確認</h2>
-                  <p>警告は参考情報です。画像内の注釈がチュートリアルの書き方から外れていないかを確認します。</p>
+                  <h2>6. 保存して確認する</h2>
+                  <p>警告と保存結果を確認してから、資料ページ側の見た目をチェックします。</p>
                 </div>
                 <div className={styles.panelBody}>
+                  <div className={styles.saveSummary}>
+                    <div>
+                      <div className={styles.eyebrow}>保存前チェック</div>
+                      <p className={styles.status}>
+                        警告は参考情報です。画像内の注釈がチュートリアルの書き方から外れていないかを確認します。
+                      </p>
+                    </div>
+                    <div className={styles.actions}>
+                      <button disabled={isSaving} onClick={save} type="button">
+                        {isSaving ? "保存中..." : "保存して出力画像を更新"}
+                      </button>
+                    </div>
+                  </div>
                   {warnings.length === 0 ? (
                     <div className={styles.empty}>画像に関する警告はありません。</div>
                   ) : (
@@ -852,14 +980,11 @@ export default function TutorialShotEditor() {
                       ))}
                     </div>
                   )}
+                  <div className={styles.resultCard}>
+                    <div className={styles.eyebrow}>保存結果</div>
+                    <p>{statusText || "保存すると、この欄に結果が表示されます。"}</p>
+                  </div>
                 </div>
-              </div>
-
-              <div className={styles.actions}>
-                <button disabled={isSaving} onClick={save} type="button">
-                  {isSaving ? "保存中..." : "保存"}
-                </button>
-                <span className={styles.status}>{statusText}</span>
               </div>
             </>
           )}
