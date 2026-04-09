@@ -27,6 +27,7 @@ const nextConfig = {
   distDir: resolveNextDistDir({ projectRoot, env: process.env }),
   reactStrictMode: true,
   trailingSlash: true,
+  allowedDevOrigins: ["127.0.0.1"],
   transpilePackages: ["@metyatech/course-docs-platform"],
   eslint: {
     ignoreDuringBuilds: skipBuildLint,

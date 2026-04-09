@@ -73,6 +73,23 @@ $env:COURSE_CONTENT_SOURCE = '..\javascript-course-docs'
 npm run dev
 ```
 
+### Tutorial Shot Editor
+
+When `COURSE_CONTENT_SOURCE` points to a **local** course content repository,
+the site exposes a local-only screenshot authoring surface at
+`/dev/tutorial-shots`.
+
+Use it when a tutorial page already contains `Action img="./img/...png"` and
+you want to keep that output path stable while editing:
+
+- raw screenshot
+- crop
+- box / arrow / short label annotations
+- generated page-local output image
+
+See [Tutorial Shot Editor](./docs/tutorial-shot-editor.md) for the architecture,
+canonical files, and authoring rules.
+
 ## Build
 
 ```sh

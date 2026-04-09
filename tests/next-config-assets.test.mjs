@@ -48,6 +48,12 @@ test("next build keeps lint and typecheck enabled by default", async () => {
   assert.equal(nextConfig.typescript?.ignoreBuildErrors, false);
 });
 
+test("next dev allows 127.0.0.1 as an additional local origin", async () => {
+  const nextConfig = await importNextConfig();
+  assert.ok(Array.isArray(nextConfig.allowedDevOrigins));
+  assert.ok(nextConfig.allowedDevOrigins.includes("127.0.0.1"));
+});
+
 test("verified builds can skip duplicate lint and typecheck passes", async () => {
   const nextConfig = await importNextConfig({
     COURSE_DOCS_SKIP_BUILD_LINT: "1",

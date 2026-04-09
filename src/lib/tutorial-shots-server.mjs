@@ -1,0 +1,366 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import sharp from "sharp";
+import {
+  createDefaultTutorialShotManifest,
+  deriveTutorialShotPaths,
+  extractActionImageRefsFromMdx,
+  getTutorialShotWarnings,
+  normalizePosixPath,
+  normalizeTutorialShotManifest,
+  renderTutorialShotOverlaySvg,
+} from "./tutorial-shots-shared.mjs";
+
+const IMAGE_PATH_PATTERN = /^content\/.+\.(png|jpe?g|webp)$/iu;
+const PAGE_PATH_PATTERN = /^content\/.+\/index\.mdx?$/iu;
+
+const isLocalPathLike = (value) =>
+  value.startsWith(".") ||
+  value.startsWith("/") ||
+  value.startsWith("\\") ||
+  /^[a-zA-Z]:[\\/]/u.test(value);
+
+const ensureInsideRoot = ({ rootDir, resolvedPath }) => {
+  const normalizedRoot = path.resolve(rootDir);
+  const normalizedResolved = path.resolve(resolvedPath);
+
+  if (
+    normalizedResolved !== normalizedRoot &&
+    !normalizedResolved.startsWith(`${normalizedRoot}${path.sep}`)
+  ) {
+    throw new Error(`Resolved path escapes the content source root: ${normalizedResolved}`);
+  }
+
+  return normalizedResolved;
+};
+
+const assertContentRelativePath = (value, pattern = IMAGE_PATH_PATTERN) => {
+  const normalized = normalizePosixPath(value ?? "");
+  if (!pattern.test(normalized)) {
+    throw new Error(`Invalid content-relative path: ${value}`);
+  }
+  return normalized;
+};
+
+const enumerateFiles = async (rootDir, results = []) => {
+  const entries = await fs.readdir(rootDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const nextPath = path.join(rootDir, entry.name);
+    if (entry.isDirectory()) {
+      await enumerateFiles(nextPath, results);
+      continue;
+    }
+
+    results.push(nextPath);
+  }
+
+  return results;
+};
+
+const readJsonIfExists = async (filePath) => {
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    return JSON.parse(raw);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+};
+
+const resolveContentSourceRoot = ({ env = process.env, projectRoot = process.cwd() } = {}) => {
+  const rawSource =
+    typeof env.COURSE_CONTENT_SOURCE === "string" ? env.COURSE_CONTENT_SOURCE.trim() : "";
+  if (!rawSource || !isLocalPathLike(rawSource)) {
+    return null;
+  }
+
+  const sourceRoot = path.resolve(projectRoot, rawSource);
+  return ensureInsideRoot({
+    rootDir: path.dirname(sourceRoot),
+    resolvedPath: sourceRoot,
+  });
+};
+
+const resolveSourcePath = ({ sourceRoot, contentRelativePath, pattern }) => {
+  const normalized = assertContentRelativePath(contentRelativePath, pattern);
+  return ensureInsideRoot({
+    rootDir: sourceRoot,
+    resolvedPath: path.resolve(sourceRoot, normalized),
+  });
+};
+
+const ensureParentDir = async (filePath) => {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+};
+
+const hydrateManifest = (manifestInput) => {
+  const normalized = normalizeTutorialShotManifest(manifestInput);
+  const defaults = createDefaultTutorialShotManifest({
+    pagePath: normalized.pagePath,
+    outputImagePath: normalized.outputImagePath,
+  });
+
+  return {
+    ...normalized,
+    id: defaults.id,
+    rawImagePath: defaults.rawImagePath,
+    version: defaults.version,
+  };
+};
+
+const prepareManifestForSave = (manifestInput) => ({
+  ...hydrateManifest(manifestInput),
+  updatedAt: new Date().toISOString(),
+});
+
+const parseDataUrl = (value) => {
+  const match = /^data:([^;,]+)?;base64,(.+)$/u.exec(value ?? "");
+  if (!match) {
+    throw new Error("Expected a base64 data URL.");
+  }
+
+  return {
+    mimeType: match[1] ?? "application/octet-stream",
+    buffer: Buffer.from(match[2], "base64"),
+  };
+};
+
+const normalizeCrop = ({ crop, width, height }) => {
+  if (!crop) {
+    return { x: 0, y: 0, width, height };
+  }
+
+  const x = Math.min(Math.max(0, crop.x), Math.max(0, width - 1));
+  const y = Math.min(Math.max(0, crop.y), Math.max(0, height - 1));
+  const extractedWidth = Math.min(Math.max(1, crop.width), width - x);
+  const extractedHeight = Math.min(Math.max(1, crop.height), height - y);
+
+  return {
+    x,
+    y,
+    width: extractedWidth,
+    height: extractedHeight,
+  };
+};
+
+export const getTutorialShotAuthoringContext = ({
+  env = process.env,
+  projectRoot = process.cwd(),
+} = {}) => {
+  const sourceRoot = resolveContentSourceRoot({ env, projectRoot });
+  if (!sourceRoot) {
+    return {
+      enabled: false,
+      reason:
+        "Tutorial shot editor requires COURSE_CONTENT_SOURCE to point to a local content repository.",
+    };
+  }
+
+  return {
+    enabled: true,
+    sourceRoot,
+  };
+};
+
+export const scanTutorialShots = async ({ sourceRoot }) => {
+  const contentRoot = path.join(sourceRoot, "content");
+  const allFiles = await enumerateFiles(contentRoot);
+  const pageFiles = allFiles.filter((filePath) => {
+    const relativePath = normalizePosixPath(path.relative(sourceRoot, filePath));
+    return PAGE_PATH_PATTERN.test(relativePath);
+  });
+  const shots = [];
+
+  for (const filePath of pageFiles) {
+    const relativePath = normalizePosixPath(path.relative(sourceRoot, filePath));
+    const sourceText = await fs.readFile(filePath, "utf8");
+    const refs = extractActionImageRefsFromMdx({
+      pagePath: relativePath,
+      sourceText,
+    });
+
+    for (const ref of refs) {
+      const manifestPath = resolveSourcePath({
+        sourceRoot,
+        contentRelativePath: ref.manifestPath,
+        pattern: /^content\/.+\/shots\/.+\.shot\.json$/iu,
+      });
+      const rawImagePath = resolveSourcePath({
+        sourceRoot,
+        contentRelativePath: ref.rawImagePath,
+        pattern: /^content\/.+\/shots\/.+\.(png|jpe?g|webp)$/iu,
+      });
+      const outputImagePath = resolveSourcePath({
+        sourceRoot,
+        contentRelativePath: ref.outputImagePath,
+        pattern: IMAGE_PATH_PATTERN,
+      });
+
+      const rawManifest = await readJsonIfExists(manifestPath);
+      const manifest = hydrateManifest(
+        rawManifest ??
+          createDefaultTutorialShotManifest({
+            pagePath: ref.pagePath,
+            outputImagePath: ref.outputImagePath,
+          }),
+      );
+
+      const warnings = getTutorialShotWarnings(manifest);
+      const hasManifest = rawManifest !== null;
+      const hasRawImage = await fs
+        .stat(rawImagePath)
+        .then(() => true)
+        .catch(() => false);
+      const hasOutputImage = await fs
+        .stat(outputImagePath)
+        .then(() => true)
+        .catch(() => false);
+
+      shots.push({
+        ...ref,
+        manifest,
+        warnings,
+        hasManifest,
+        hasRawImage,
+        hasOutputImage,
+      });
+    }
+  }
+
+  return shots.sort((left, right) => {
+    if (left.pagePath !== right.pagePath) {
+      return left.pagePath.localeCompare(right.pagePath);
+    }
+    return left.line - right.line;
+  });
+};
+
+export const saveTutorialShot = async ({
+  sourceRoot,
+  manifestInput,
+  rawImageDataUrl = null,
+  bootstrapFromOutput = false,
+}) => {
+  const manifest = prepareManifestForSave(manifestInput);
+
+  if (!PAGE_PATH_PATTERN.test(manifest.pagePath)) {
+    throw new Error(`Invalid tutorial shot page path: ${manifest.pagePath}`);
+  }
+
+  const outputAbsPath = resolveSourcePath({
+    sourceRoot,
+    contentRelativePath: manifest.outputImagePath,
+    pattern: IMAGE_PATH_PATTERN,
+  });
+  const rawAbsPath = resolveSourcePath({
+    sourceRoot,
+    contentRelativePath: manifest.rawImagePath,
+    pattern: /^content\/.+\/shots\/.+\.(png|jpe?g|webp)$/iu,
+  });
+  const derivedPaths = deriveTutorialShotPaths({
+    pagePath: manifest.pagePath,
+    outputImagePath: manifest.outputImagePath,
+  });
+  const manifestAbsPath = resolveSourcePath({
+    sourceRoot,
+    contentRelativePath: derivedPaths.manifestPath,
+    pattern: /^content\/.+\/shots\/.+\.shot\.json$/iu,
+  });
+
+  if (rawImageDataUrl) {
+    const { buffer } = parseDataUrl(rawImageDataUrl);
+    await ensureParentDir(rawAbsPath);
+    await fs.writeFile(rawAbsPath, buffer);
+  } else if (bootstrapFromOutput) {
+    const outputExists = await fs
+      .stat(outputAbsPath)
+      .then(() => true)
+      .catch(() => false);
+    if (!outputExists) {
+      throw new Error(
+        "Cannot bootstrap the raw screenshot because the current output image is missing. Upload a raw screenshot first.",
+      );
+    }
+    await ensureParentDir(rawAbsPath);
+    await fs.copyFile(outputAbsPath, rawAbsPath);
+  }
+
+  const rawExists = await fs
+    .stat(rawAbsPath)
+    .then(() => true)
+    .catch(() => false);
+  if (!rawExists) {
+    throw new Error(
+      "Cannot save this Action image because no raw screenshot is available yet. Upload a raw screenshot first.",
+    );
+  }
+
+  const rawBuffer = await fs.readFile(rawAbsPath);
+  const rawImage = sharp(rawBuffer);
+  const metadata = await rawImage.metadata();
+
+  if (!metadata.width || !metadata.height) {
+    throw new Error(`Could not determine source image dimensions for ${manifest.rawImagePath}`);
+  }
+
+  const crop = normalizeCrop({
+    crop: manifest.crop,
+    width: metadata.width,
+    height: metadata.height,
+  });
+  const overlaySvg = renderTutorialShotOverlaySvg({
+    width: crop.width,
+    height: crop.height,
+    annotations: manifest.annotations,
+  });
+
+  await ensureParentDir(outputAbsPath);
+  await rawImage
+    .extract({
+      left: crop.x,
+      top: crop.y,
+      width: crop.width,
+      height: crop.height,
+    })
+    .composite([{ input: Buffer.from(overlaySvg, "utf8") }])
+    .png()
+    .toFile(outputAbsPath);
+
+  const savedManifest = {
+    ...manifest,
+    crop,
+  };
+
+  await ensureParentDir(manifestAbsPath);
+  await fs.writeFile(manifestAbsPath, `${JSON.stringify(savedManifest, null, 2)}\n`, "utf8");
+
+  return {
+    manifest: savedManifest,
+    warnings: getTutorialShotWarnings(savedManifest),
+  };
+};
+
+export const readTutorialShotImage = async ({ sourceRoot, contentRelativePath }) => {
+  const absolutePath = resolveSourcePath({
+    sourceRoot,
+    contentRelativePath,
+    pattern: /^content\/.+\.(png|jpe?g|webp)$/iu,
+  });
+
+  const bytes = await fs.readFile(absolutePath);
+  const extension = path.extname(absolutePath).toLowerCase();
+  const contentType =
+    extension === ".jpg" || extension === ".jpeg"
+      ? "image/jpeg"
+      : extension === ".webp"
+        ? "image/webp"
+        : "image/png";
+
+  return {
+    bytes,
+    contentType,
+  };
+};

@@ -21,6 +21,7 @@
     ]
   },
   "include": [
+    "**/*.mjs",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",

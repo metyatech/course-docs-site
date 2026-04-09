@@ -26,8 +26,8 @@
     "format": "prettier --check .",
     "audit": "npm audit",
     "typecheck": "npm run sync:content && next typegen && tsc --noEmit",
-    "test": "npm run test:e2e-config && node --test --test-concurrency=1 tests/admin-mode-route-protection.test.mjs tests/import-asset-resolution.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-link-mode.test.mjs tests/sync-course-content-remote-cache.test.mjs && node scripts/test-e2e-matrix.mjs",
-    "test:shared": "npm run test:e2e-config && node --test --test-concurrency=1 tests/admin-mode-route-protection.test.mjs tests/import-asset-resolution.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-link-mode.test.mjs tests/sync-course-content-remote-cache.test.mjs",
+    "test": "npm run test:e2e-config && node --test --test-concurrency=1 tests/admin-mode-route-protection.test.mjs tests/import-asset-resolution.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-link-mode.test.mjs tests/sync-course-content-remote-cache.test.mjs tests/tutorial-shots.test.mjs tests/tutorial-shot-editor-flow.test.mjs && node scripts/test-e2e-matrix.mjs",
+    "test:shared": "npm run test:e2e-config && node --test --test-concurrency=1 tests/admin-mode-route-protection.test.mjs tests/import-asset-resolution.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-link-mode.test.mjs tests/sync-course-content-remote-cache.test.mjs tests/tutorial-shots.test.mjs tests/tutorial-shot-editor-flow.test.mjs",
     "test:course": "npm run test:e2e",
     "test:e2e-config": "node --test tests/e2e-course-defaults.test.mjs tests/next-dist-dir.test.mjs tests/next-config-assets.test.mjs",
     "test:dev-switch": "node --test --test-concurrency=1 tests/dev-switch.test.mjs tests/admin-mode-route-protection.test.mjs tests/import-asset-resolution.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs tests/e2e-content-source.test.mjs tests/intro-image-resolution.test.mjs tests/qspec-relative-image-resolution.test.mjs tests/asset-route-trace-config.test.mjs",
@@ -41,11 +41,15 @@
     "@mdx-js/react": "^3.1.1",
     "@metyatech/course-docs-platform": "github:metyatech/course-docs-platform#5b34b97",
     "dotenv": "^17.2.3",
+    "konva": "^10.2.3",
     "next": "^15.5.14",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "react-image-crop": "^11.0.10",
+    "react-konva": "^19.2.3",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
