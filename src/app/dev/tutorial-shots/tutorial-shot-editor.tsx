@@ -610,8 +610,7 @@ export default function TutorialShotEditor() {
             <div className={styles.setupReason}>{response.reason}</div>
 
             <div className={styles.setupFootnote}>
-              現在の参照先:{" "}
-              <code>{formatConfiguredSource(response.configuredSource)}</code>
+              現在の参照先: <code>{formatConfiguredSource(response.configuredSource)}</code>
               {response.overrideSource ? (
                 <>
                   {" "}
@@ -797,7 +796,9 @@ export default function TutorialShotEditor() {
                 <header className={styles.workCardHeader}>
                   <div>
                     <h3 className={styles.workCardTitle}>元画像と切り抜き範囲</h3>
-                    <p className={styles.workCardHint}>ドラッグで囲んだ範囲が公開画像になります。</p>
+                    <p className={styles.workCardHint}>
+                      ドラッグで囲んだ範囲が公開画像になります。
+                    </p>
                   </div>
                   <div className={styles.workCardTools}>
                     <button
@@ -828,40 +829,42 @@ export default function TutorialShotEditor() {
                 </header>
 
                 {sourceImageSrc ? (
-                  <div className={styles.imageStage}>
-                    <ReactCrop
-                      crop={crop}
-                      onChange={(nextCrop) => {
-                        setCrop(nextCrop);
-                        setCropOwnerKey(selectedShot.outputImagePath);
-                      }}
-                      onComplete={(nextCrop) => {
-                        setCompletedCrop(nextCrop);
-                        setCropOwnerKey(selectedShot.outputImagePath);
-                      }}
-                    >
-                      {/* ReactCrop requires a plain img element so the crop box matches the source pixels exactly. */}
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        alt=""
-                        className={styles.sourceImage}
-                        onLoad={(event) => {
-                          const image = event.currentTarget;
-                          const nextCropState = getTutorialShotCropStateForImage({
-                            currentCropStates: cropStatesByShotRef.current,
-                            shotKey: selectedShot.outputImagePath,
-                            manifestCrop: draftManifest.crop,
-                            imageWidth: image.naturalWidth,
-                            imageHeight: image.naturalHeight,
-                          }) as TutorialShotEditorStoredCropState;
-                          setSourceImageElement(image);
+                  <div className={styles.imageStage} data-testid="crop-stage">
+                    <div className={styles.stageSurface}>
+                      <ReactCrop
+                        crop={crop}
+                        onChange={(nextCrop) => {
+                          setCrop(nextCrop);
                           setCropOwnerKey(selectedShot.outputImagePath);
-                          setCrop(nextCropState.crop ?? createInitialCrop(image, draftManifest));
-                          setCompletedCrop(nextCropState.completedCrop);
                         }}
-                        src={sourceImageSrc}
-                      />
-                    </ReactCrop>
+                        onComplete={(nextCrop) => {
+                          setCompletedCrop(nextCrop);
+                          setCropOwnerKey(selectedShot.outputImagePath);
+                        }}
+                      >
+                        {/* ReactCrop requires a plain img element so the crop box matches the source pixels exactly. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          alt=""
+                          className={styles.sourceImage}
+                          onLoad={(event) => {
+                            const image = event.currentTarget;
+                            const nextCropState = getTutorialShotCropStateForImage({
+                              currentCropStates: cropStatesByShotRef.current,
+                              shotKey: selectedShot.outputImagePath,
+                              manifestCrop: draftManifest.crop,
+                              imageWidth: image.naturalWidth,
+                              imageHeight: image.naturalHeight,
+                            }) as TutorialShotEditorStoredCropState;
+                            setSourceImageElement(image);
+                            setCropOwnerKey(selectedShot.outputImagePath);
+                            setCrop(nextCropState.crop ?? createInitialCrop(image, draftManifest));
+                            setCompletedCrop(nextCropState.completedCrop);
+                          }}
+                          src={sourceImageSrc}
+                        />
+                      </ReactCrop>
+                    </div>
                   </div>
                 ) : (
                   <div className={styles.stageEmpty}>
@@ -906,16 +909,18 @@ export default function TutorialShotEditor() {
                   </div>
                 ) : (
                   <div className={styles.annotateGrid}>
-                    <div className={styles.imageStage}>
-                      <AnnotationCanvas
-                        annotations={draftManifest.annotations}
-                        imageHeight={completedCrop.height}
-                        imageSrc={croppedPreviewSrc}
-                        imageWidth={completedCrop.width}
-                        onChange={updateAnnotations}
-                        onSelect={setSelectedAnnotationId}
-                        selectedAnnotationId={selectedAnnotationId}
-                      />
+                    <div className={styles.imageStage} data-testid="annotation-stage">
+                      <div className={styles.stageSurface}>
+                        <AnnotationCanvas
+                          annotations={draftManifest.annotations}
+                          imageHeight={completedCrop.height}
+                          imageSrc={croppedPreviewSrc}
+                          imageWidth={completedCrop.width}
+                          onChange={updateAnnotations}
+                          onSelect={setSelectedAnnotationId}
+                          selectedAnnotationId={selectedAnnotationId}
+                        />
+                      </div>
                     </div>
                     <aside className={styles.annotationPanel}>
                       <div className={styles.annotationPanelTitle}>{annotationPanelTitle}</div>
