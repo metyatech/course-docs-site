@@ -22,7 +22,6 @@ Optional env vars:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
 - `ADMIN_MODE_TOKEN` (server-only, shared admin token for comment deletion and admin-mode unlock)
-- `COURSE_DOCS_LOCAL_SOURCE_MODE` (`copy` or `link`; default auto)
 
 The Supabase variables are only needed when the selected course enables the `/submissions` experience backed by
 `@metyatech/course-docs-platform`. At the moment, that means `programming-course-docs`. They are not required for
@@ -47,6 +46,11 @@ To preview local, unpushed content changes:
 ```sh
 COURSE_CONTENT_SOURCE=../javascript-course-docs npm run dev
 ```
+
+When `COURSE_CONTENT_SOURCE` points to a local directory, `npm run dev` mirrors
+that repo's `content/`, `public/`, and `site.config.ts` into this app as real
+files. Source edits are watched and resynced automatically without restarting
+the dev server. The source repo itself is never linked into this working tree.
 
 ### Using `.env.course.local` (recommended)
 
@@ -125,7 +129,7 @@ Behavior:
 - Source format:
   - Remote GitHub: `github:owner/repo#ref`
   - Local path: `../path-to-content-repo`
-- Playwright copies local content sources instead of linking them, so switching course repos inside the E2E matrix does not reuse stale symlinked content.
+- Local content sources are mirrored as real files, so switching course repos inside the E2E matrix does not reuse stale linked content.
 
 Recommended files:
 

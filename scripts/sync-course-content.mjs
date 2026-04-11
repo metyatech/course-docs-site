@@ -4,7 +4,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { getRequiredContentSourceText, parseContentSource } from "./content-source.mjs";
 import { resolveNextDistDirPath } from "./next-dist-dir.mjs";
-import { shouldLinkLocalSource } from "./sync-course-content-mode.mjs";
 
 const projectRoot = process.cwd();
 const workRoot = path.join(projectRoot, ".course-content");
@@ -44,7 +43,9 @@ const nextDistDirPath = resolveNextDistDirPath({ projectRoot, env: process.env }
 const courseSourceText = getRequiredContentSourceText(process.env);
 const courseSource = parseContentSource(courseSourceText);
 const gitCommand = process.env.COURSE_DOCS_GIT_COMMAND || "git";
-const gitCommandPrefix = process.env.COURSE_DOCS_GIT_SCRIPT ? [process.env.COURSE_DOCS_GIT_SCRIPT] : [];
+const gitCommandPrefix = process.env.COURSE_DOCS_GIT_SCRIPT
+  ? [process.env.COURSE_DOCS_GIT_SCRIPT]
+  : [];
 
 const runGit = (args, options = {}) =>
   spawnSync(gitCommand, [...gitCommandPrefix, ...args], options);
@@ -107,51 +108,114 @@ const writeTextFile = (p, text) => {
   fs.writeFileSync(p, text);
 };
 
-const tryLinkDir = (target, linkPath) => {
-  rmIfExists(linkPath);
-  fs.mkdirSync(path.dirname(linkPath), { recursive: true });
-  fs.symlinkSync(target, linkPath, "junction");
-};
-
-const copyDir = (from, to) => {
-  fs.mkdirSync(to, { recursive: true });
-  for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
-    if (entry.name === "_pagefind") {
-      continue;
-    }
-    if (to.endsWith(`${path.sep}public`) && entry.name === "student-works") {
-      continue;
-    }
-    const src = path.join(from, entry.name);
-    const dst = path.join(to, entry.name);
-    if (entry.isDirectory()) {
-      copyDir(src, dst);
-      continue;
-    }
-    fs.mkdirSync(path.dirname(dst), { recursive: true });
-    fs.copyFileSync(src, dst);
-  }
-};
-
-const copyFile = (from, to) => {
-  fs.mkdirSync(path.dirname(to), { recursive: true });
-  fs.copyFileSync(from, to);
-};
-
-const writeKeepFileIfRealDir = (dirPath) => {
+const ensureRealDirectory = (dirPath) => {
   try {
     const st = fs.lstatSync(dirPath);
-    if (st.isSymbolicLink()) {
-      return;
+    if (!st.isDirectory() || st.isSymbolicLink()) {
+      rmIfExists(dirPath);
     }
   } catch {
     // ignore
   }
+  fs.mkdirSync(dirPath, { recursive: true });
+};
 
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
+const normalizeRelativePath = (relativePath) => relativePath.split(path.sep).join("/");
+
+const copyFile = (from, to) => {
+  try {
+    const st = fs.lstatSync(to);
+    if (st.isDirectory() || st.isSymbolicLink()) {
+      rmIfExists(to);
+    }
+  } catch {
+    // ignore
   }
-  fs.writeFileSync(path.join(dirPath, ".keep"), "");
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  fs.copyFileSync(from, to);
+};
+
+const mirrorPath = (from, to, options) => {
+  const st = fs.lstatSync(from);
+
+  if (st.isSymbolicLink()) {
+    const resolved = fs.realpathSync(from);
+    const resolvedStat = fs.statSync(resolved);
+    if (resolvedStat.isDirectory()) {
+      mirrorDir(resolved, to, { ...options, rootFrom: options.rootFrom ?? from });
+      return;
+    }
+    if (resolvedStat.isFile()) {
+      copyFile(resolved, to);
+      return;
+    }
+    throw new Error(`Unsupported symlink target in content repo: ${from}`);
+  }
+
+  if (st.isDirectory()) {
+    mirrorDir(from, to, { ...options, rootFrom: options.rootFrom ?? from });
+    return;
+  }
+
+  if (st.isFile()) {
+    copyFile(from, to);
+    return;
+  }
+
+  throw new Error(`Unsupported filesystem entry in content repo: ${from}`);
+};
+
+const mirrorDir = (from, to, options = {}) => {
+  const { shouldSkip } = options;
+  const rootFrom = options.rootFrom ?? from;
+  ensureRealDirectory(to);
+
+  const sourceEntries = fs.readdirSync(from, { withFileTypes: true });
+  const keptNames = new Set();
+
+  for (const entry of sourceEntries) {
+    const sourcePath = path.join(from, entry.name);
+    const targetPath = path.join(to, entry.name);
+    const relativePath = normalizeRelativePath(path.relative(rootFrom, sourcePath));
+
+    if (shouldSkip?.({ name: entry.name, sourcePath, targetPath, relativePath })) {
+      continue;
+    }
+    keptNames.add(entry.name);
+  }
+
+  for (const entry of fs.readdirSync(to, { withFileTypes: true })) {
+    if (entry.name === ".keep") {
+      continue;
+    }
+    if (!keptNames.has(entry.name)) {
+      rmIfExists(path.join(to, entry.name));
+    }
+  }
+
+  for (const entry of sourceEntries) {
+    const sourcePath = path.join(from, entry.name);
+    const targetPath = path.join(to, entry.name);
+    const relativePath = normalizeRelativePath(path.relative(rootFrom, sourcePath));
+
+    if (shouldSkip?.({ name: entry.name, sourcePath, targetPath, relativePath })) {
+      continue;
+    }
+
+    mirrorPath(sourcePath, targetPath, { rootFrom, shouldSkip });
+  }
+};
+
+const syncDirectory = ({ from, to, shouldSkip }) => {
+  if (!fs.existsSync(from)) {
+    rmIfExists(to);
+    ensureRealDirectory(to);
+    fs.writeFileSync(path.join(to, ".keep"), "");
+    return;
+  }
+
+  mirrorDir(from, to, { shouldSkip });
+  fs.writeFileSync(path.join(to, ".keep"), "");
 };
 
 const resolveRemoteHeadSha = ({ repoUrl, ref }) => {
@@ -217,28 +281,11 @@ for (const required of requiredPaths) {
 
 const contentFrom = path.join(sourceRoot, "content");
 const contentTo = path.join(projectRoot, "content");
-const shouldLinkLocalContent =
-  courseSource.kind === "local" &&
-  shouldLinkLocalSource({
-    projectRoot,
-    env: process.env,
-  });
-rmIfExists(contentTo);
-if (shouldLinkLocalContent) {
-  try {
-    tryLinkDir(contentFrom, contentTo);
-  } catch (error) {
-    console.warn(`Warning: failed to link content directory, falling back to copy. (${error})`);
-    copyDir(contentFrom, contentTo);
-  }
-} else {
-  copyDir(contentFrom, contentTo);
-}
-
-if (!fs.existsSync(contentTo)) {
-  fs.mkdirSync(contentTo, { recursive: true });
-}
-writeKeepFileIfRealDir(contentTo);
+syncDirectory({
+  from: contentFrom,
+  to: contentTo,
+  shouldSkip: ({ name }) => name === "_pagefind",
+});
 
 const siteConfigFrom = path.join(sourceRoot, "site.config.ts");
 const siteConfigTo = path.join(projectRoot, "site.config.ts");
@@ -246,18 +293,8 @@ copyFile(siteConfigFrom, siteConfigTo);
 
 const publicFrom = path.join(sourceRoot, "public");
 const publicTo = path.join(projectRoot, "public");
-if (fs.existsSync(publicFrom)) {
-  rmIfExists(publicTo);
-  if (shouldLinkLocalContent) {
-    try {
-      tryLinkDir(publicFrom, publicTo);
-    } catch (error) {
-      console.warn(`Warning: failed to link public directory, falling back to copy. (${error})`);
-      copyDir(publicFrom, publicTo);
-    }
-  } else {
-    copyDir(publicFrom, publicTo);
-  }
-  fs.mkdirSync(publicTo, { recursive: true });
-  writeKeepFileIfRealDir(publicTo);
-}
+syncDirectory({
+  from: publicFrom,
+  to: publicTo,
+  shouldSkip: ({ relativePath }) => relativePath === "student-works",
+});

@@ -15,6 +15,7 @@
 
 # Misc
 .DS_Store
+.threads.jsonl
 .env.local
 .env.course
 .env.*.local

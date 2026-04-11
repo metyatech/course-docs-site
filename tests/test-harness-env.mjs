@@ -9,7 +9,6 @@ export const createRunDevTestEnv = ({ label, env = process.env, overrides = {} }
 
 export const createPlaywrightWebServerEnv = ({ label, env = process.env, overrides = {} }) => ({
   ...env,
-  COURSE_DOCS_LOCAL_SOURCE_MODE: "copy",
   COURSE_DOCS_NEXT_DIST_DIR: env.COURSE_DOCS_NEXT_DIST_DIR ?? createIsolatedNextDistDir(label),
   ...overrides,
 });

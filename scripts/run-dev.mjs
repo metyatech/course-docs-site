@@ -79,13 +79,14 @@ const getRuntimeEnv = () => ({
 const normalizeCourseEnv = (env) => {
   const sourceText = getRequiredContentSourceText(env);
   const source = parseContentSource(sourceText);
+  const sourceRoot = source.kind === "local" ? path.resolve(projectRoot, source.localDir) : null;
   const sourceId =
-    source.kind === "local"
-      ? `dir:${path.resolve(projectRoot, source.localDir)}`
-      : `repo:${source.repo}#${source.ref}`;
+    source.kind === "local" ? `dir:${sourceRoot}` : `repo:${source.repo}#${source.ref}`;
 
   return {
     sourceId,
+    source,
+    sourceRoot,
   };
 };
 
@@ -110,6 +111,7 @@ let devProcess = null;
 let devExitExpected = false;
 let shuttingDown = false;
 let devRevision = crypto.randomUUID();
+let sourceWatcher = null;
 
 const runSync = () =>
   new Promise((resolve) => {
@@ -214,6 +216,199 @@ const rmIfExists = (targetPath) => {
   fs.rmSync(targetPath, { recursive: true, force: true });
 };
 
+const normalizeWatcherPath = (filename) => String(filename ?? "").replace(/\\/g, "/");
+
+const isRelevantSourceChangePath = (filename) => {
+  const normalized = normalizeWatcherPath(filename);
+  if (!normalized) {
+    return true;
+  }
+  return (
+    normalized === "site.config.ts" ||
+    normalized === "content" ||
+    normalized.startsWith("content/") ||
+    normalized === "public" ||
+    normalized.startsWith("public/")
+  );
+};
+
+const collectDirectoryTree = (rootDir, directories = new Set()) => {
+  try {
+    const st = fs.lstatSync(rootDir);
+    if (!st.isDirectory() || st.isSymbolicLink()) {
+      return directories;
+    }
+  } catch {
+    return directories;
+  }
+
+  directories.add(rootDir);
+  for (const entry of fs.readdirSync(rootDir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      collectDirectoryTree(path.join(rootDir, entry.name), directories);
+    }
+  }
+  return directories;
+};
+
+const createLocalSourceWatcher = ({ sourceRoot, onChange }) => {
+  let debounceTimer = null;
+  let refreshTimer = null;
+  let recursiveWatcher = null;
+  let rootWatcher = null;
+  const treeWatchers = new Map();
+
+  const scheduleSync = (filename) => {
+    if (restarting || restartQueued || shuttingDown) {
+      return;
+    }
+    if (!isRelevantSourceChangePath(filename)) {
+      return;
+    }
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(() => {
+      void onChange();
+    }, 150);
+  };
+
+  const closeTreeWatchers = () => {
+    for (const watcher of treeWatchers.values()) {
+      try {
+        watcher.close();
+      } catch {
+        // ignore
+      }
+    }
+    treeWatchers.clear();
+  };
+
+  const scheduleRefresh = () => {
+    if (refreshTimer) {
+      return;
+    }
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null;
+      refreshTreeWatchers();
+    }, 150);
+  };
+
+  const refreshTreeWatchers = () => {
+    const desiredDirs = new Set();
+    collectDirectoryTree(path.join(sourceRoot, "content"), desiredDirs);
+    collectDirectoryTree(path.join(sourceRoot, "public"), desiredDirs);
+
+    for (const [dirPath, watcher] of treeWatchers.entries()) {
+      if (desiredDirs.has(dirPath)) {
+        continue;
+      }
+      try {
+        watcher.close();
+      } catch {
+        // ignore
+      }
+      treeWatchers.delete(dirPath);
+    }
+
+    for (const dirPath of desiredDirs) {
+      if (treeWatchers.has(dirPath)) {
+        continue;
+      }
+      try {
+        const watcher = fs.watch(dirPath, () => {
+          scheduleSync(dirPath);
+          scheduleRefresh();
+        });
+        watcher.on("error", () => {
+          // ignore transient watcher failures; the next refresh will rebuild state.
+        });
+        treeWatchers.set(dirPath, watcher);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  try {
+    recursiveWatcher = fs.watch(sourceRoot, { recursive: true }, (_eventType, filename) => {
+      scheduleSync(filename);
+    });
+    recursiveWatcher.on("error", () => {
+      // ignore
+    });
+  } catch {
+    recursiveWatcher = null;
+  }
+
+  if (!recursiveWatcher) {
+    try {
+      rootWatcher = fs.watch(sourceRoot, (_eventType, filename) => {
+        scheduleSync(filename);
+        const normalized = normalizeWatcherPath(filename);
+        if (
+          normalized === "content" ||
+          normalized.startsWith("content/") ||
+          normalized === "public" ||
+          normalized.startsWith("public/")
+        ) {
+          scheduleRefresh();
+        }
+      });
+      rootWatcher.on("error", () => {
+        // ignore
+      });
+    } catch {
+      rootWatcher = null;
+    }
+
+    refreshTreeWatchers();
+  }
+
+  return {
+    close: () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+      if (recursiveWatcher) {
+        try {
+          recursiveWatcher.close();
+        } catch {
+          // ignore
+        }
+      }
+      if (rootWatcher) {
+        try {
+          rootWatcher.close();
+        } catch {
+          // ignore
+        }
+      }
+      closeTreeWatchers();
+    },
+  };
+};
+
+const replaceSourceWatcher = () => {
+  if (sourceWatcher) {
+    sourceWatcher.close();
+    sourceWatcher = null;
+  }
+
+  const nextCourseEnv = getCourseEnv();
+  if (nextCourseEnv.source.kind !== "local" || !nextCourseEnv.sourceRoot) {
+    return;
+  }
+
+  sourceWatcher = createLocalSourceWatcher({
+    sourceRoot: nextCourseEnv.sourceRoot,
+    onChange: queueSync,
+  });
+};
+
 const waitForPortFree = async (port, timeoutMs = 10_000) => {
   const startedAt = Date.now();
   while (true) {
@@ -281,6 +476,7 @@ const queueRestart = async () => {
       );
     }
     await queueSync();
+    replaceSourceWatcher();
 
     // Switching course content can change the MDX tree and page-map.
     // Clear Next's dev cache to avoid cross-course stale artifacts.
@@ -337,6 +533,7 @@ const createEnvWatcher = () => {
 };
 
 queueSync().then(async () => {
+  replaceSourceWatcher();
   activePort = await findFirstFreePort(portPreference);
   const envWatcher = createEnvWatcher();
   if (shouldResetNextDistDirOnStart()) {
@@ -350,6 +547,10 @@ queueSync().then(async () => {
     }
     shuttingDown = true;
     envWatcher.close();
+    if (sourceWatcher) {
+      sourceWatcher.close();
+      sourceWatcher = null;
+    }
     await stopDev();
     process.exit(0);
   };

@@ -501,3 +501,95 @@ test(
     assert.notEqual(nextRevision, initialRevision);
   },
 );
+
+test(
+  "local source edits resync content without restarting dev",
+  { timeout: 2 * 60_000 },
+  async (t) => {
+    const port = await getFreePort();
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-dev-watch-"));
+    const courseA = path.join(tempRoot, "course-a");
+
+    await writeCourseRepo({ rootDir: courseA, courseName: "Course A", extraDocsFolder: "a-only" });
+
+    const envCourseBackup = await backupFile(envCoursePath);
+    const envCourseLocalBackup = await backupFile(envCourseLocalPath);
+
+    t.after(async () => {
+      await restoreFile(envCourseLocalPath, envCourseLocalBackup);
+      await restoreFile(envCoursePath, envCourseBackup);
+      await safeRm(path.join(projectRoot, "content"));
+      await safeRm(path.join(projectRoot, "public"));
+      await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
+      await fs.mkdir(path.join(projectRoot, "public"), { recursive: true });
+      await fs.writeFile(path.join(projectRoot, "content", ".keep"), "", "utf8");
+      await fs.writeFile(path.join(projectRoot, "public", ".keep"), "", "utf8");
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await fs.rm(envCoursePath, { force: true });
+    await fs.writeFile(
+      envCourseLocalPath,
+      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
+      "utf8",
+    );
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "dev-watch-local-source",
+        env: process.env,
+        overrides: {
+          COURSE_DOCS_SITE_DEV_INNER: "stub",
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+    });
+
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await waitFor(
+      async () => {
+        const result = await tryFetchText(`${baseUrl}/docs/a-only/`);
+        return result?.status === 200;
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 200,
+        onTimeoutMessage: "Server did not become ready with the initial local source.",
+      },
+    );
+
+    const initialHealthz = await fetchText(`${baseUrl}/healthz`);
+    assert.equal(initialHealthz.status, 200);
+    const initialRevision = initialHealthz.text.trim();
+    assert.ok(initialRevision.startsWith("course-docs-site-stub:"), "Expected stub revision");
+
+    await fs.mkdir(path.join(courseA, "content", "docs", "watch-only"), { recursive: true });
+    await fs.writeFile(
+      path.join(courseA, "content", "docs", "watch-only", "index.mdx"),
+      '---\ntitle: "Watch Only"\n---\n\nwatch update\n',
+      "utf8",
+    );
+
+    await waitFor(
+      async () => {
+        const result = await tryFetchText(`${baseUrl}/docs/watch-only/`);
+        return result?.status === 200;
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 200,
+        onTimeoutMessage: "Server did not reflect local source edits.",
+      },
+    );
+
+    const nextHealthz = await fetchText(`${baseUrl}/healthz`);
+    assert.equal(nextHealthz.status, 200);
+    assert.equal(nextHealthz.text.trim(), initialRevision);
+  },
+);
