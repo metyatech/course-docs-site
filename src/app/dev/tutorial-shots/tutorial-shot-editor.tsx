@@ -17,6 +17,7 @@ import {
 } from "../../../lib/tutorial-shot-editor-crop-state.mjs";
 import type {
   TutorialShotAnnotation,
+  TutorialShotAnnotationMode,
   TutorialShotArrowAnnotation,
   TutorialShotBoxAnnotation,
   TutorialShotManifest,
@@ -58,10 +59,7 @@ const getAnnotationTypeLabel = (type: TutorialShotAnnotation["type"]) => {
   if (type === "box") {
     return "枠";
   }
-  if (type === "arrow") {
-    return "矢印";
-  }
-  return "ラベル";
+  return "矢印";
 };
 
 const findPrimaryBox = (annotations: TutorialShotAnnotation[]) =>
@@ -217,29 +215,40 @@ export default function TutorialShotEditor() {
     () => summarizeTutorialShotAnnotations(draftManifest?.annotations ?? []),
     [draftManifest],
   );
+  const annotationMode: TutorialShotAnnotationMode = draftManifest?.annotationMode ?? "focal";
   const annotationErrors = useMemo(
-    () => getTutorialShotAnnotationErrors(draftManifest?.annotations ?? []),
-    [draftManifest],
+    () => getTutorialShotAnnotationErrors(draftManifest?.annotations ?? [], annotationMode),
+    [draftManifest, annotationMode],
   );
   const primaryBox = useMemo(
     () => findPrimaryBox(draftManifest?.annotations ?? []),
     [draftManifest],
   );
   const hasAnnotationSurface = Boolean(croppedPreviewSrc) && Boolean(completedCrop);
-  const canAddBox = hasAnnotationSurface && annotationSummary.boxCount === 0;
+  const canAddBox =
+    hasAnnotationSurface &&
+    (annotationMode === "callout" || annotationSummary.boxCount === 0);
   const canAddArrow =
-    hasAnnotationSurface && Boolean(primaryBox) && annotationSummary.arrowCount === 0;
+    hasAnnotationSurface &&
+    annotationMode === "focal" &&
+    Boolean(primaryBox) &&
+    annotationSummary.arrowCount === 0;
   const saveBlockedByAnnotationErrors = hasAnnotationSurface && annotationErrors.length > 0;
-  const annotationPanelTitle = `枠 ${annotationSummary.boxCount}/1 ・ 矢印 ${annotationSummary.arrowCount}/1${
-    annotationSummary.labelCount > 0 ? ` ・ ラベル ${annotationSummary.labelCount}` : ""
-  }`;
+  const annotationPanelTitle =
+    annotationMode === "callout"
+      ? `番号コールアウト ・ 枠 ${annotationSummary.boxCount} 個`
+      : `枠 ${annotationSummary.boxCount}/1 ・ 矢印 ${annotationSummary.arrowCount}/1`;
   const annotationPanelHint =
     annotationErrors[0] ??
-    (annotationSummary.boxCount === 0
-      ? "特に示したい場所がなければ、このまま保存できます。"
-      : annotationSummary.arrowCount > 0
-        ? "保存できます。矢印は不要なら削除できます。"
-        : "保存できます。必要なら矢印を追加できます。");
+    (annotationMode === "callout"
+      ? annotationSummary.boxCount === 0
+        ? "設定項目など複数の場所を示す画像に使います。枠を追加すると自動で番号が付きます。"
+        : "保存できます。枠をさらに追加できます。"
+      : annotationSummary.boxCount === 0
+        ? "特に示したい場所がなければ、このまま保存できます。"
+        : annotationSummary.arrowCount > 0
+          ? "保存できます。矢印は不要なら削除できます。"
+          : "保存できます。必要なら矢印を追加できます。");
 
   useEffect(() => {
     const savedOverride = window.localStorage.getItem(SOURCE_OVERRIDE_STORAGE_KEY) ?? "";
@@ -385,8 +394,23 @@ export default function TutorialShotEditor() {
     );
   };
 
+  const switchAnnotationMode = (nextMode: TutorialShotAnnotationMode) => {
+    setDraftManifest((current) =>
+      current
+        ? ({
+            ...current,
+            annotationMode: nextMode,
+          } as TutorialShotManifest)
+        : current,
+    );
+    setSelectedAnnotationId(null);
+  };
+
   const addBox = () => {
-    if (!draftManifest || !completedCrop || annotationSummary.boxCount > 0) {
+    if (!draftManifest || !completedCrop) {
+      return;
+    }
+    if (annotationMode === "focal" && annotationSummary.boxCount > 0) {
       return;
     }
 
@@ -880,8 +904,26 @@ export default function TutorialShotEditor() {
                   <div>
                     <h3 className={styles.workCardTitle}>必要なら注釈を追加</h3>
                     <p className={styles.workCardHint}>
-                      特に示したい場所がなければ注釈は不要です。注目してほしい場所があるときだけ枠を追加し、必要なら矢印を添えます。
+                      {annotationMode === "callout"
+                        ? "設定項目など複数の場所を示す画像用です。各枠に自動で番号が付きます。"
+                        : "特に示したい場所がなければ注釈は不要です。注目してほしい場所があるときだけ枠を追加し、必要なら矢印を添えます。"}
                     </p>
+                    <div className={styles.modeToggle}>
+                      <button
+                        className={`${styles.modeButton} ${annotationMode === "focal" ? styles.modeButtonActive : ""}`}
+                        onClick={() => switchAnnotationMode("focal")}
+                        type="button"
+                      >
+                        注目点
+                      </button>
+                      <button
+                        className={`${styles.modeButton} ${annotationMode === "callout" ? styles.modeButtonActive : ""}`}
+                        onClick={() => switchAnnotationMode("callout")}
+                        type="button"
+                      >
+                        番号コールアウト
+                      </button>
+                    </div>
                   </div>
                   <div className={styles.workCardTools}>
                     <button
@@ -892,14 +934,16 @@ export default function TutorialShotEditor() {
                     >
                       <span aria-hidden>▭</span> 枠を追加
                     </button>
-                    <button
-                      className={styles.toolButton}
-                      disabled={!canAddArrow}
-                      onClick={addArrow}
-                      type="button"
-                    >
-                      <span aria-hidden>↗</span> 矢印を追加
-                    </button>
+                    {annotationMode === "focal" ? (
+                      <button
+                        className={styles.toolButton}
+                        disabled={!canAddArrow}
+                        onClick={addArrow}
+                        type="button"
+                      >
+                        <span aria-hidden>↗</span> 矢印を追加
+                      </button>
+                    ) : null}
                   </div>
                 </header>
 
@@ -912,6 +956,7 @@ export default function TutorialShotEditor() {
                     <div className={styles.imageStage} data-testid="annotation-stage">
                       <div className={styles.stageSurface}>
                         <AnnotationCanvas
+                          annotationMode={annotationMode}
                           annotations={draftManifest.annotations}
                           imageHeight={completedCrop.height}
                           imageSrc={croppedPreviewSrc}
@@ -933,6 +978,11 @@ export default function TutorialShotEditor() {
                         <ul className={styles.annotationList}>
                           {draftManifest.annotations.map((annotation, index) => {
                             const isSelected = annotation.id === selectedAnnotationId;
+                            const boxNumber = annotationMode === "callout" && annotation.type === "box"
+                              ? draftManifest.annotations
+                                  .filter((a, i) => a.type === "box" && i <= index)
+                                  .length
+                              : 0;
                             return (
                               <li
                                 className={`${styles.annotationItem} ${
@@ -946,15 +996,11 @@ export default function TutorialShotEditor() {
                                   type="button"
                                 >
                                   <span className={styles.annotationItemKind}>
-                                    {getAnnotationTypeLabel(annotation.type)} {index + 1}
+                                    {boxNumber > 0
+                                      ? `${String.fromCodePoint(0x2460 + boxNumber - 1)} 枠 ${boxNumber}`
+                                      : `${getAnnotationTypeLabel(annotation.type)} ${index + 1}`}
                                   </span>
-                                  {annotation.type === "label" ? (
-                                    <span className={styles.annotationItemPreview}>
-                                      {annotation.text
-                                        ? `ラベル（廃止）: ${annotation.text}`
-                                        : "ラベル（廃止 / 削除してください）"}
-                                    </span>
-                                  ) : annotation.type === "arrow" ? (
+                                  {annotation.type === "arrow" ? (
                                     <span className={styles.annotationItemPreview}>矢印</span>
                                   ) : (
                                     <span className={styles.annotationItemPreview}>

@@ -88,10 +88,10 @@ test("extractActionImageRefsFromMdx derives output, raw, and manifest paths", ()
   );
 });
 
-test("getTutorialShotWarnings allows no annotations but rejects invalid callouts", () => {
+test("getTutorialShotWarnings validates focal mode annotations", () => {
   const warnings = getTutorialShotWarnings({
+    annotationMode: "focal",
     annotations: [
-      { id: "legacy-label", type: "label", x: 10, y: 10, text: "Play" },
       {
         id: "box-1",
         type: "box",
@@ -114,8 +114,7 @@ test("getTutorialShotWarnings allows no annotations but rejects invalid callouts
   });
 
   assert.deepEqual(warnings, [
-    "ラベルは使えません。削除して、必要なら枠と矢印で示してください。",
-    "注目点を示す枠は 1 つだけにしてください。",
+    "注目点モードの枠は 1 つだけです。複数の場所を示すには番号コールアウトモードに切り替えてください。",
     "矢印は 1 本だけにしてください。",
   ]);
 
@@ -127,6 +126,42 @@ test("getTutorialShotWarnings allows no annotations but rejects invalid callouts
   );
 
   assert.deepEqual(getTutorialShotWarnings({ annotations: [] }), []);
+});
+
+test("getTutorialShotWarnings validates callout mode annotations", () => {
+  assert.deepEqual(
+    getTutorialShotWarnings({
+      annotationMode: "callout",
+      annotations: [
+        { id: "box-1", type: "box", x: 0, y: 0, width: 80, height: 40 },
+        { id: "box-2", type: "box", x: 100, y: 50, width: 80, height: 40 },
+        { id: "box-3", type: "box", x: 200, y: 100, width: 80, height: 40 },
+      ],
+    }),
+    [],
+    "callout mode allows multiple boxes",
+  );
+
+  assert.deepEqual(
+    getTutorialShotWarnings({
+      annotationMode: "callout",
+      annotations: [
+        { id: "box-1", type: "box", x: 0, y: 0, width: 80, height: 40 },
+        { id: "arrow-1", type: "arrow", fromX: 10, fromY: 10, toX: 20, toY: 20 },
+      ],
+    }),
+    ["番号コールアウトモードでは矢印は使えません。不要な矢印を削除してください。"],
+    "callout mode rejects arrows",
+  );
+
+  assert.deepEqual(
+    getTutorialShotWarnings({
+      annotationMode: "callout",
+      annotations: [],
+    }),
+    [],
+    "callout mode allows no annotations",
+  );
 });
 
 test("tutorial shot editor crop state stays isolated per image and restores per selection", () => {
@@ -518,6 +553,80 @@ test("saveTutorialShot accepts a single box without an arrow", async (t) => {
   ]);
 });
 
+test("saveTutorialShot accepts multiple boxes in callout mode", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-callout-"));
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+
+  const result = await saveTutorialShot({
+    sourceRoot,
+    bootstrapFromOutput: true,
+    manifestInput: {
+      ...manifest,
+      annotationMode: "callout",
+      crop: {
+        x: 16,
+        y: 16,
+        width: 320,
+        height: 180,
+      },
+      annotations: [
+        { id: "box-1", type: "box", x: 10, y: 10, width: 80, height: 40 },
+        { id: "box-2", type: "box", x: 120, y: 60, width: 80, height: 40 },
+        { id: "box-3", type: "box", x: 220, y: 110, width: 80, height: 40 },
+      ],
+    },
+  });
+
+  assert.deepEqual(result.warnings, []);
+  assert.equal(result.manifest.annotationMode, "callout");
+  assert.equal(result.manifest.annotations.length, 3);
+});
+
+test("saveTutorialShot rejects arrows in callout mode", async (t) => {
+  const sourceRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "course-tutorial-shots-callout-arrow-"),
+  );
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+
+  await assert.rejects(
+    () =>
+      saveTutorialShot({
+        sourceRoot,
+        bootstrapFromOutput: true,
+        manifestInput: {
+          ...manifest,
+          annotationMode: "callout",
+          crop: { x: 0, y: 0, width: 320, height: 180 },
+          annotations: [
+            { id: "box-1", type: "box", x: 10, y: 10, width: 80, height: 40 },
+            { id: "arrow-1", type: "arrow", fromX: 10, fromY: 10, toX: 40, toY: 30 },
+          ],
+        },
+      }),
+    /番号コールアウトモードでは矢印は使えません/u,
+  );
+});
+
 test("saveTutorialShot rejects unsupported annotation combinations", async (t) => {
   const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-limit-"));
 
@@ -534,17 +643,12 @@ test("saveTutorialShot rejects unsupported annotation combinations", async (t) =
 
   const invalidScenarios = [
     {
-      name: "label",
-      annotations: [{ id: "legacy-label", type: "label", x: 16, y: 16, text: "Play" }],
-      expectedMessage: /ラベルは使えません/u,
-    },
-    {
-      name: "arrow-only",
+      name: "arrow-only (focal)",
       annotations: [{ id: "arrow-1", type: "arrow", fromX: 16, fromY: 16, toX: 80, toY: 64 }],
       expectedMessage: /矢印だけは使えません/u,
     },
     {
-      name: "multiple-boxes",
+      name: "multiple-boxes (focal)",
       annotations: [
         {
           id: "box-1",
@@ -566,7 +670,7 @@ test("saveTutorialShot rejects unsupported annotation combinations", async (t) =
       expectedMessage: /枠は 1 つだけ/u,
     },
     {
-      name: "multiple-arrows",
+      name: "multiple-arrows (focal)",
       annotations: [
         {
           id: "box-1",

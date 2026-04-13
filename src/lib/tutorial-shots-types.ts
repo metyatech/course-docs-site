@@ -16,18 +16,11 @@ export type TutorialShotArrowAnnotation = {
   toY: number;
 };
 
-export type TutorialShotLabelAnnotation = {
-  id: string;
-  type: "label";
-  x: number;
-  y: number;
-  text: string;
-};
+export type TutorialShotAnnotationMode = "focal" | "callout";
 
 export type TutorialShotAnnotation =
   | TutorialShotBoxAnnotation
-  | TutorialShotArrowAnnotation
-  | TutorialShotLabelAnnotation;
+  | TutorialShotArrowAnnotation;
 
 export type TutorialShotCrop = {
   x: number;
@@ -44,6 +37,7 @@ export type TutorialShotManifest = {
   rawImagePath: string;
   crop: TutorialShotCrop | null;
   annotations: TutorialShotAnnotation[];
+  annotationMode: TutorialShotAnnotationMode;
   alt: string;
   updatedAt?: string;
 };

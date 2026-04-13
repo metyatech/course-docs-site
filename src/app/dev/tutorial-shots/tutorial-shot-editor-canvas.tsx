@@ -13,9 +13,13 @@ import {
   Text,
   Transformer,
 } from "react-konva";
-import type { TutorialShotAnnotation } from "../../../lib/tutorial-shots-types";
+import type {
+  TutorialShotAnnotation,
+  TutorialShotAnnotationMode,
+} from "../../../lib/tutorial-shots-types";
 
 type Props = {
+  annotationMode: TutorialShotAnnotationMode;
   annotations: TutorialShotAnnotation[];
   imageHeight: number;
   imageSrc: string;
@@ -25,9 +29,10 @@ type Props = {
   selectedAnnotationId: string | null;
 };
 
-const estimateLabelWidth = (text: string) => Math.max(44, 16 * 0.64 * text.length + 20);
+const CALLOUT_BADGE_RADIUS = 16;
 
 export default function TutorialShotEditorCanvas({
+  annotationMode,
   annotations,
   imageHeight,
   imageSrc,
@@ -98,45 +103,75 @@ export default function TutorialShotEditorCanvas({
           />
         ) : null}
 
-        {annotations.map((annotation) => {
+        {annotations.map((annotation, annotationIndex) => {
           if (annotation.type === "box") {
+            const boxNumber = annotationMode === "callout"
+              ? annotations.filter((a, i) => a.type === "box" && i <= annotationIndex).length
+              : 0;
             return (
-              <Rect
-                draggable
-                height={annotation.height}
-                key={annotation.id}
-                onClick={() => onSelect(annotation.id)}
-                onDragEnd={(event) =>
-                  updateAnnotation(annotation.id, (current) => ({
-                    ...current,
-                    x: Math.round(event.target.x()),
-                    y: Math.round(event.target.y()),
-                  }))
-                }
-                onTap={() => onSelect(annotation.id)}
-                onTransformEnd={(event) => {
-                  const node = event.target;
-                  const scaleX = node.scaleX();
-                  const scaleY = node.scaleY();
-                  node.scaleX(1);
-                  node.scaleY(1);
-                  updateAnnotation(annotation.id, (current) => ({
-                    ...current,
-                    x: Math.round(node.x()),
-                    y: Math.round(node.y()),
-                    width: Math.max(12, Math.round(node.width() * scaleX)),
-                    height: Math.max(12, Math.round(node.height() * scaleY)),
-                  }));
-                }}
-                ref={(node) => {
-                  nodeRefs.current[annotation.id] = node;
-                }}
-                stroke="#ff6b00"
-                strokeWidth={4}
-                width={annotation.width}
-                x={annotation.x}
-                y={annotation.y}
-              />
+              <Group key={annotation.id}>
+                <Rect
+                  cornerRadius={10}
+                  draggable
+                  height={annotation.height}
+                  onClick={() => onSelect(annotation.id)}
+                  onDragEnd={(event) =>
+                    updateAnnotation(annotation.id, (current) => ({
+                      ...current,
+                      x: Math.round(event.target.x()),
+                      y: Math.round(event.target.y()),
+                    }))
+                  }
+                  onTap={() => onSelect(annotation.id)}
+                  onTransformEnd={(event) => {
+                    const node = event.target;
+                    const scaleX = node.scaleX();
+                    const scaleY = node.scaleY();
+                    node.scaleX(1);
+                    node.scaleY(1);
+                    updateAnnotation(annotation.id, (current) => ({
+                      ...current,
+                      x: Math.round(node.x()),
+                      y: Math.round(node.y()),
+                      width: Math.max(12, Math.round(node.width() * scaleX)),
+                      height: Math.max(12, Math.round(node.height() * scaleY)),
+                    }));
+                  }}
+                  ref={(node) => {
+                    nodeRefs.current[annotation.id] = node;
+                  }}
+                  stroke="#ff6b00"
+                  strokeWidth={4}
+                  width={annotation.width}
+                  x={annotation.x}
+                  y={annotation.y}
+                />
+                {boxNumber > 0 ? (
+                  <>
+                    <Circle
+                      fill="#ff6b00"
+                      listening={false}
+                      radius={CALLOUT_BADGE_RADIUS}
+                      stroke="#ffffff"
+                      strokeWidth={2.5}
+                      x={annotation.x}
+                      y={annotation.y}
+                    />
+                    <Text
+                      align="center"
+                      fill="#ffffff"
+                      fontFamily="Arial, sans-serif"
+                      fontSize={18}
+                      fontStyle="bold"
+                      listening={false}
+                      text={String(boxNumber)}
+                      width={CALLOUT_BADGE_RADIUS * 2}
+                      x={annotation.x - CALLOUT_BADGE_RADIUS}
+                      y={annotation.y - 9}
+                    />
+                  </>
+                ) : null}
+              </Group>
             );
           }
 
@@ -193,45 +228,7 @@ export default function TutorialShotEditorCanvas({
             );
           }
 
-          const labelWidth = estimateLabelWidth(annotation.text);
-          return (
-            <Group
-              draggable
-              key={annotation.id}
-              onClick={() => onSelect(annotation.id)}
-              onDragEnd={(event) =>
-                updateAnnotation(annotation.id, (current) => ({
-                  ...current,
-                  x: Math.round(event.target.x()),
-                  y: Math.round(event.target.y() + 32),
-                }))
-              }
-              onTap={() => onSelect(annotation.id)}
-              x={annotation.x}
-              y={annotation.y - 32}
-            >
-              <Rect fill="#111827" cornerRadius={8} height={32} width={labelWidth} />
-              <Text
-                fill="#ffffff"
-                fontFamily="Arial, sans-serif"
-                fontSize={16}
-                fontStyle="bold"
-                padding={10}
-                text={annotation.text}
-                y={6}
-              />
-              {selectedAnnotationId === annotation.id ? (
-                <Rect
-                  dash={[8, 6]}
-                  height={32}
-                  listening={false}
-                  stroke="#ff6b00"
-                  strokeWidth={2}
-                  width={labelWidth}
-                />
-              ) : null}
-            </Group>
-          );
+          return null;
         })}
 
         <Transformer

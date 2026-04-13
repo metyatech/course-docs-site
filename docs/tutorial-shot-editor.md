@@ -67,7 +67,7 @@ project-contract:
     - shot manifest stays authoritative for crop/annotations
     - generated img/*.png is overwritten from manifest on save
   validation:
-    - client and server validation for no annotation, or one box with an optional arrow, and no labels
+    - client and server validation per annotation mode (focal: 0–1 box + 0–1 arrow; callout: N boxes, no arrows)
     - server path validation before read/write
     - repo tests for scan/save behavior
   generated_artifacts:
@@ -81,25 +81,40 @@ project-contract:
 
 ## Tutorial-Authoring Rules
 
-The editor intentionally supports only a narrow annotation set:
+The editor supports two annotation modes:
 
-- `box`
-- `arrow`
+### Focal mode (default)
 
-Images used only to confirm a resulting state may be saved without annotations.
-When an image needs a callout, use at most one `box`; an `arrow` is optional
-and is allowed only as a helper for that box.
+For images that highlight a single click target or UI element.
+
+- At most one `box` and one optional `arrow`.
+- If an image only confirms a resulting state, save it without annotations.
+
+### Callout mode
+
+For images that show multiple settings or UI areas in a single dialog
+(e.g. a project settings form with several fields).
+
+- Multiple `box` annotations, each automatically numbered (①②③…).
+- No `arrow` allowed — the number badge serves as the visual anchor.
+- The numbered boxes map to a corresponding table in the Action text.
+
+### Choosing a mode
+
+| Scenario | Mode | Why |
+|---|---|---|
+| Click target / button | Focal | One focal point is sufficient |
+| Result confirmation | Focal (no annotations) | No callout needed |
+| Form with multiple settings | Callout | Splitting into N images would repeat the same dialog |
+| Sequential UI interaction | Focal (split into N shots) | Each shot shows one step |
 
 Rule of thumb:
 
-- callout image = WHERE
+- focal image = WHERE (single point)
+- callout image = WHERE (multiple numbered points)
 - result-only image = STATE
 - Action text = WHAT
 - one image = one purpose
-
-If you need to explain multiple places or multiple ordered actions, split the
-image into separate tutorial shots instead of numbering many callouts in one
-frame.
 
 ## Current Scope
 

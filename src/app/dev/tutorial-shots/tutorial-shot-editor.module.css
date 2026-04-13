@@ -409,6 +409,42 @@
   max-width: 38rem;
 }
 
+.modeToggle {
+  display: inline-flex;
+  gap: 0;
+  margin-top: 0.5rem;
+  border: 1px solid rgb(203 213 225);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.modeButton {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.35rem 0.85rem;
+  border: 0;
+  background: white;
+  color: rgb(71 85 105);
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.modeButton:not(:last-child) {
+  border-right: 1px solid rgb(203 213 225);
+}
+
+.modeButton:hover:not(.modeButtonActive) {
+  background: rgb(248 250 252);
+}
+
+.modeButtonActive {
+  background: rgb(15 23 42);
+  color: white;
+}
+
 .workCardTools {
   display: flex;
   flex-wrap: wrap;

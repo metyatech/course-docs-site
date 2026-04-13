@@ -1,6 +1,5 @@
 export const TUTORIAL_SHOT_MANIFEST_VERSION = 1;
-export const MAX_TUTORIAL_BOX_COUNT = 1;
-export const MAX_TUTORIAL_ARROW_COUNT = 1;
+export const TUTORIAL_SHOT_ANNOTATION_MODES = ["focal", "callout"];
 
 const ACTION_TAG_PATTERN = /<Action\b[\s\S]*?>/gu;
 const IMG_PROP_PATTERN = /\bimg=(["'])(.*?)\1/u;
@@ -61,14 +60,6 @@ export const sanitizeShotId = (value) =>
     .replace(/^-+/u, "")
     .replace(/-+$/u, "") || "shot";
 
-const escapeXml = (value) =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-
 export const deriveTutorialShotPaths = ({ pagePath, outputImagePath }) => {
   const normalizedPagePath = normalizePosixPath(pagePath);
   const normalizedOutputPath = normalizePosixPath(outputImagePath);
@@ -96,6 +87,7 @@ export const createDefaultTutorialShotManifest = ({ pagePath, outputImagePath })
     rawImagePath: derived.rawImagePath,
     crop: null,
     annotations: [],
+    annotationMode: "focal",
     alt: "",
   };
 };
@@ -162,16 +154,6 @@ const normalizeAnnotation = (annotation) => {
     };
   }
 
-  if (annotation.type === "label") {
-    return {
-      id: typeof annotation.id === "string" ? annotation.id : crypto.randomUUID(),
-      type: "label",
-      x: Number(annotation.x) || 0,
-      y: Number(annotation.y) || 0,
-      text: typeof annotation.text === "string" ? annotation.text.trim() : "",
-    };
-  }
-
   return null;
 };
 
@@ -191,6 +173,10 @@ export const normalizeTutorialShotManifest = (manifest) => {
     pagePath: normalizePosixPath(manifest?.pagePath ?? normalized.pagePath),
     outputImagePath: normalizePosixPath(manifest?.outputImagePath ?? normalized.outputImagePath),
     rawImagePath: normalizePosixPath(manifest?.rawImagePath ?? normalized.rawImagePath),
+    annotationMode:
+      TUTORIAL_SHOT_ANNOTATION_MODES.includes(manifest?.annotationMode)
+        ? manifest.annotationMode
+        : "focal",
     alt: typeof manifest?.alt === "string" ? manifest.alt.trim() : "",
     crop:
       manifest?.crop &&
@@ -215,29 +201,30 @@ export const summarizeTutorialShotAnnotations = (annotations) => {
   const list = Array.isArray(annotations) ? annotations : [];
   const boxCount = list.filter((annotation) => annotation?.type === "box").length;
   const arrowCount = list.filter((annotation) => annotation?.type === "arrow").length;
-  const labelCount = list.filter((annotation) => annotation?.type === "label").length;
 
   return {
     totalCount: list.length,
     boxCount,
     arrowCount,
-    labelCount,
   };
 };
 
-export const getTutorialShotAnnotationErrors = (annotations) => {
-  const { boxCount, arrowCount, labelCount } = summarizeTutorialShotAnnotations(annotations);
+export const getTutorialShotAnnotationErrors = (annotations, annotationMode = "focal") => {
+  const { boxCount, arrowCount } = summarizeTutorialShotAnnotations(annotations);
   const errors = [];
 
-  if (labelCount > 0) {
-    errors.push("ラベルは使えません。削除して、必要なら枠と矢印で示してください。");
+  if (annotationMode === "callout") {
+    if (arrowCount > 0) {
+      errors.push("番号コールアウトモードでは矢印は使えません。不要な矢印を削除してください。");
+    }
+    return errors;
   }
 
-  if (boxCount > MAX_TUTORIAL_BOX_COUNT) {
-    errors.push("注目点を示す枠は 1 つだけにしてください。");
+  if (boxCount > 1) {
+    errors.push("注目点モードの枠は 1 つだけです。複数の場所を示すには番号コールアウトモードに切り替えてください。");
   }
 
-  if (arrowCount > MAX_TUTORIAL_ARROW_COUNT) {
+  if (arrowCount > 1) {
     errors.push("矢印は 1 本だけにしてください。");
   }
 
@@ -250,7 +237,10 @@ export const getTutorialShotAnnotationErrors = (annotations) => {
 
 export const getTutorialShotWarnings = (manifest) => {
   const annotations = Array.isArray(manifest?.annotations) ? manifest.annotations : [];
-  return getTutorialShotAnnotationErrors(annotations);
+  const annotationMode = TUTORIAL_SHOT_ANNOTATION_MODES.includes(manifest?.annotationMode)
+    ? manifest.annotationMode
+    : "focal";
+  return getTutorialShotAnnotationErrors(annotations, annotationMode);
 };
 
 const renderArrowHead = ({ fromX, fromY, toX, toY, strokeWidth }) => {
@@ -265,16 +255,31 @@ const renderArrowHead = ({ fromX, fromY, toX, toY, strokeWidth }) => {
   return `${toX},${toY} ${x1},${y1} ${x2},${y2}`;
 };
 
-const estimateLabelWidth = (text, fontSize) => Math.max(44, fontSize * 0.64 * text.length + 20);
+const CALLOUT_BADGE_RADIUS = 16;
 
-export const renderTutorialShotOverlaySvg = ({ width, height, annotations }) => {
+const renderCalloutBadge = ({ cx, cy, number }) => {
+  const r = CALLOUT_BADGE_RADIUS;
+  return [
+    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#ff6b00" stroke="#ffffff" stroke-width="2.5" />`,
+    `<text x="${cx}" y="${cy + 6}" text-anchor="middle" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="18" font-weight="700" fill="#ffffff">${number}</text>`,
+  ].join("");
+};
+
+export const renderTutorialShotOverlaySvg = ({ width, height, annotations, annotationMode = "focal" }) => {
   const shapes = [];
+  let calloutIndex = 0;
 
   for (const annotation of annotations ?? []) {
     if (annotation.type === "box") {
       shapes.push(
         `<rect x="${annotation.x}" y="${annotation.y}" width="${annotation.width}" height="${annotation.height}" rx="10" ry="10" fill="none" stroke="#ff6b00" stroke-width="4" />`,
       );
+      if (annotationMode === "callout") {
+        calloutIndex += 1;
+        const cx = annotation.x;
+        const cy = annotation.y;
+        shapes.push(renderCalloutBadge({ cx, cy, number: calloutIndex }));
+      }
       continue;
     }
 
@@ -292,19 +297,6 @@ export const renderTutorialShotOverlaySvg = ({ width, height, annotations }) => 
         })}" fill="#ff6b00" />`,
       );
       continue;
-    }
-
-    if (annotation.type === "label") {
-      const fontSize = 18;
-      const labelWidth = estimateLabelWidth(annotation.text, fontSize);
-      const labelHeight = 32;
-      const rectY = annotation.y - labelHeight;
-      shapes.push(
-        `<rect x="${annotation.x}" y="${rectY}" width="${labelWidth}" height="${labelHeight}" rx="8" ry="8" fill="#111827" fill-opacity="0.92" />`,
-      );
-      shapes.push(
-        `<text x="${annotation.x + 10}" y="${rectY + 21}" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="${fontSize}" font-weight="700" fill="#ffffff">${escapeXml(annotation.text)}</text>`,
-      );
     }
   }
 

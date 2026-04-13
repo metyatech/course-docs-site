@@ -351,7 +351,7 @@ export const saveTutorialShot = async ({
   bootstrapFromOutput = false,
 }) => {
   const manifest = prepareManifestForSave(manifestInput);
-  const annotationErrors = getTutorialShotAnnotationErrors(manifest.annotations);
+  const annotationErrors = getTutorialShotAnnotationErrors(manifest.annotations, manifest.annotationMode);
   if (annotationErrors.length > 0) {
     throw new Error(annotationErrors[0]);
   }
@@ -425,6 +425,7 @@ export const saveTutorialShot = async ({
     width: crop.width,
     height: crop.height,
     annotations: manifest.annotations,
+    annotationMode: manifest.annotationMode,
   });
 
   await ensureParentDir(outputAbsPath);
