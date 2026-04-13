@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -12,6 +13,7 @@ import {
   resolveNextDistDir,
   resolveNextDistDirPath,
 } from "../scripts/next-dist-dir.mjs";
+import { findFirstFreePort, parsePortValue } from "../scripts/port-availability.mjs";
 import { createPlaywrightWebServerEnv, createRunDevTestEnv } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -80,6 +82,33 @@ test("playwright helper preserves explicit dist dir overrides", () => {
     env: { COURSE_DOCS_NEXT_DIST_DIR: TEST_NEXT_DIST_DIR },
   });
   assert.equal(env.COURSE_DOCS_NEXT_DIST_DIR, TEST_NEXT_DIST_DIR);
+});
+
+test("parsePortValue keeps explicit valid ports and rejects invalid input", () => {
+  assert.equal(parsePortValue("3101"), 3101);
+  assert.equal(parsePortValue(" 0 "), null);
+  assert.equal(parsePortValue("not-a-port"), null);
+  assert.equal(parsePortValue(undefined), null);
+});
+
+test("findFirstFreePort skips an occupied preferred port", async () => {
+  const basePort = await findFirstFreePort(3101, { maxAttempts: 100 });
+  const blocker = net.createServer();
+
+  await new Promise((resolve, reject) => {
+    blocker.once("error", reject);
+    blocker.listen(basePort, resolve);
+  });
+
+  try {
+    const resolvedPort = await findFirstFreePort(basePort, { maxAttempts: 5 });
+    assert.notEqual(resolvedPort, basePort);
+    assert.ok(resolvedPort > basePort);
+  } finally {
+    await new Promise((resolve, reject) => {
+      blocker.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
 });
 
 test("normalizeNextEnvDts restores the canonical typed-route header", () => {

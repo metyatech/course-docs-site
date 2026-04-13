@@ -158,6 +158,11 @@ Run the full verification suite (typecheck and tests):
 npm run verify
 ```
 
+The matrix E2E harness now auto-selects a free local `E2E_PORT` when none is
+explicitly configured, so full verification does not fail just because another
+local Next dev server is already using the default Playwright port. Set
+`E2E_PORT` yourself only when you need a fixed port for a specific run.
+
 ## Documentation
 
 - [LICENSE](./LICENSE)

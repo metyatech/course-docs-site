@@ -2,11 +2,11 @@ import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import dotenv from "dotenv";
 import fs from "node:fs";
-import net from "node:net";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { getRequiredContentSourceText, parseContentSource } from "./content-source.mjs";
 import { isCustomNextDistDir, resolveNextDistDirPath } from "./next-dist-dir.mjs";
+import { findFirstFreePort, waitForPortFree } from "./port-availability.mjs";
 
 const args = process.argv.slice(2);
 const projectRoot = process.cwd();
@@ -407,50 +407,6 @@ const replaceSourceWatcher = () => {
     sourceRoot: nextCourseEnv.sourceRoot,
     onChange: queueSync,
   });
-};
-
-const waitForPortFree = async (port, timeoutMs = 10_000) => {
-  const startedAt = Date.now();
-  while (true) {
-    if (Date.now() - startedAt > timeoutMs) {
-      throw new Error(
-        `Port ${port} is still in use after restart. Stop the old dev server and retry.`,
-      );
-    }
-
-    const canListen = await new Promise((resolve) => {
-      const server = net.createServer();
-      server.unref();
-      server.once("error", () => resolve(false));
-      server.listen(port, "127.0.0.1", () => {
-        server.close(() => resolve(true));
-      });
-    });
-
-    if (canListen) {
-      return;
-    }
-
-    await new Promise((r) => setTimeout(r, 250));
-  }
-};
-
-const findFirstFreePort = async (fromPort, maxAttempts = 20) => {
-  for (let i = 0; i < maxAttempts; i += 1) {
-    const port = fromPort + i;
-    const canListen = await new Promise((resolve) => {
-      const server = net.createServer();
-      server.unref();
-      server.once("error", () => resolve(false));
-      server.listen(port, "127.0.0.1", () => {
-        server.close(() => resolve(true));
-      });
-    });
-    if (canListen) {
-      return port;
-    }
-  }
-  throw new Error(`No free port found starting from ${fromPort}.`);
 };
 
 const queueRestart = async () => {

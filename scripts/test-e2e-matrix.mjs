@@ -5,6 +5,7 @@ import path from "node:path";
 import dotenv from "dotenv";
 import { formatContentSource, parseContentSource } from "./content-source.mjs";
 import { createIsolatedNextDistDir } from "./next-dist-dir.mjs";
+import { findFirstFreePort, parsePortValue } from "./port-availability.mjs";
 
 const require = createRequire(import.meta.url);
 const { resolveCourseSuiteConfig } = require("../tests/e2e/course-defaults.cjs");
@@ -79,6 +80,15 @@ const loadEnvDefaults = () => {
   }
 };
 
+const resolveMatrixE2ePort = async (env) => {
+  const explicitPort = parsePortValue(env.E2E_PORT);
+  if (explicitPort !== null) {
+    return explicitPort;
+  }
+
+  return await findFirstFreePort(3101);
+};
+
 const resolveCourseEnv = (course) => {
   const env = { ...process.env };
   const sourceText = process.env[course.sourceEnv]?.trim() || course.defaultSource;
@@ -106,10 +116,13 @@ loadEnvDefaults();
 for (const course of courses) {
   const { env: sourceEnv, sourceLabel } = resolveCourseEnv(course);
   const env = { ...sourceEnv };
+  env.E2E_PORT = String(await resolveMatrixE2ePort(env));
   env.COURSE_DOCS_NEXT_DIST_DIR = createIsolatedNextDistDir(`playwright-${course.name}`);
   const suiteConfig = resolveCourseSuiteConfig(env.COURSE_CONTENT_SOURCE);
 
-  console.log(`\n=== Running E2E for ${course.name} (${sourceLabel}) ===`);
+  console.log(
+    `\n=== Running E2E for ${course.name} (${sourceLabel}, E2E_PORT=${env.E2E_PORT}) ===`,
+  );
 
   fs.mkdirSync(path.dirname(suiteConfigPath), { recursive: true });
   fs.writeFileSync(suiteConfigPath, `${JSON.stringify(suiteConfig, null, 2)}\n`, "utf8");
