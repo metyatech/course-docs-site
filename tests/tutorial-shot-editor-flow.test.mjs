@@ -185,6 +185,48 @@ const sha256File = async (filePath) => {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 };
 
+const getAnnotationCanvas = (page) =>
+  page.locator('[data-testid="annotation-stage"] canvas').first();
+
+const getAnnotationCanvasBox = async (page) => {
+  const canvasBox = await getAnnotationCanvas(page).boundingBox();
+  assert.ok(canvasBox, "Annotation canvas should have a bounding box.");
+  return canvasBox;
+};
+
+const waitForAnnotationCanvasReady = async (page) => {
+  await waitFor(
+    async () =>
+      page.evaluate(() => {
+        const stage = document.querySelector('[data-testid="annotation-stage"]');
+        const canvas = stage?.querySelector("canvas");
+        if (!stage || !canvas) {
+          return false;
+        }
+
+        const stageRect = stage.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        return canvasRect.left >= stageRect.left + 10;
+      }),
+    {
+      timeoutMs: 30_000,
+      intervalMs: 200,
+      onTimeoutMessage: "Annotation canvas left edge stayed clipped.",
+    },
+  );
+};
+
+const openTutorialShotEditor = async (page, overrideCourseRelativePath) => {
+  await page.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: "チュートリアル画像エディタ" }).waitFor();
+  await page.getByRole("button", { name: "別のリポジトリに切り替え" }).click();
+  await page.getByPlaceholder("../open-campus-unreal-90min").fill(overrideCourseRelativePath);
+  await page.getByRole("button", { name: "切り替える" }).click();
+  await page.getByRole("button", { name: /override-startup/i }).waitFor();
+  await page.getByRole("heading", { name: "必要なら注釈を追加" }).scrollIntoViewIfNeeded();
+  await waitForAnnotationCanvasReady(page);
+};
+
 test(
   "tutorial shot editor saves one boxed focal point with an optional arrow",
   { timeout: 3 * 60_000 },
@@ -251,32 +293,7 @@ test(
       viewport: { width: 1440, height: 1100 },
     });
 
-    await page.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { name: "チュートリアル画像エディタ" }).waitFor();
-    await page.getByRole("button", { name: "別のリポジトリに切り替え" }).click();
-    await page.getByPlaceholder("../open-campus-unreal-90min").fill(overrideCourseRelativePath);
-    await page.getByRole("button", { name: "切り替える" }).click();
-    await page.getByRole("button", { name: /override-startup/i }).waitFor();
-    await page.getByRole("heading", { name: "必要なら注釈を追加" }).scrollIntoViewIfNeeded();
-    await waitFor(
-      async () =>
-        page.evaluate(() => {
-          const stage = document.querySelector('[data-testid="annotation-stage"]');
-          const canvas = stage?.querySelector("canvas");
-          if (!stage || !canvas) {
-            return false;
-          }
-
-          const stageRect = stage.getBoundingClientRect();
-          const canvasRect = canvas.getBoundingClientRect();
-          return canvasRect.left >= stageRect.left + 10;
-        }),
-      {
-        timeoutMs: 30_000,
-        intervalMs: 200,
-        onTimeoutMessage: "Annotation canvas left edge stayed clipped.",
-      },
-    );
+    await openTutorialShotEditor(page, overrideCourseRelativePath);
 
     await page.getByLabel("画像の説明（Alt テキスト）").fill("起動画面");
     await assert.equal(
@@ -346,6 +363,108 @@ test(
 
     const startupRawHash = await sha256File(startupRawPath);
     assert.equal(startupRawHash, startupOutputHashBefore);
+  },
+);
+
+test(
+  "tutorial shot editor canvas keeps PowerPoint-like resize and callout drag behavior wired in",
+  async () => {
+    const canvasSourcePath = path.join(
+      projectRoot,
+      "src",
+      "app",
+      "dev",
+      "tutorial-shots",
+      "tutorial-shot-editor-canvas.tsx",
+    );
+    const source = await fs.readFile(canvasSourcePath, "utf8");
+
+    assert.match(
+      source,
+      /enabledAnchors=\{\[\s*"top-left",\s*"top-center",\s*"top-right",\s*"middle-left",\s*"middle-right",\s*"bottom-left",\s*"bottom-center",\s*"bottom-right",\s*\]\}/s,
+    );
+    assert.match(source, /keepRatio=\{false\}/);
+    assert.match(source, /targetClassName === "Image"/);
+    assert.match(source, /targetClassName === "Layer"/);
+    assert.match(source, /onMouseDown=\{\(event\) => \{[\s\S]*onSelect\(null\);/);
+    assert.match(source, /<Group[\s\S]*draggable[\s\S]*onDragStart=\{\(\) => onSelect\(annotation\.id\)\}/);
+    assert.match(source, /<Circle[\s\S]*x=\{0\}[\s\S]*y=\{0\}/);
+    assert.match(source, /<Text[\s\S]*x=\{-CALLOUT_BADGE_RADIUS\}[\s\S]*y=\{-9\}/);
+  },
+);
+
+test(
+  "tutorial shot editor clears selection on empty canvas clicks",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-gui-"));
+    const fixtureCourse = path.join(tempRoot, "course");
+    const overrideCourse = path.join(tempRoot, "override-course");
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+    await writeFixtureCourseRepo(overrideCourse, {
+      logoText: "Override Tutorial Shot Fixture",
+      firstImageName: "override-startup",
+      secondImageName: "override-missing-output",
+    });
+
+    const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "tutorial-shot-editor-gui",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Tutorial shot editor did not become ready.",
+      },
+    );
+
+    const browser = await chromium.launch({ headless: true });
+    t.after(async () => {
+      await browser.close();
+    });
+    const page = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+
+    await openTutorialShotEditor(page, overrideCourseRelativePath);
+    await page.getByRole("button", { name: "枠を追加" }).click();
+    await page.locator('li[data-selected="true"]').first().waitFor();
+
+    const stageLocator = page.locator('[data-testid="annotation-stage"]');
+    const canvasBox = await getAnnotationCanvasBox(page);
+
+    await stageLocator.click({
+      position: { x: 620, y: 340 },
+    });
+    await assert.equal(
+      await page.locator('li[data-selected="true"]').count(),
+      0,
+      "Clicking empty canvas space should clear the selection.",
+    );
   },
 );
 

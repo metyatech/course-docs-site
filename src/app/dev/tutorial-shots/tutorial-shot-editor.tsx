@@ -988,6 +988,7 @@ export default function TutorialShotEditor() {
                                 className={`${styles.annotationItem} ${
                                   isSelected ? styles.annotationItemSelected : ""
                                 }`}
+                                data-selected={isSelected ? "true" : "false"}
                                 key={annotation.id}
                               >
                                 <button

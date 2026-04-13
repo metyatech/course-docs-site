@@ -71,7 +71,7 @@ export default function TutorialShotEditorCanvas({
 
     transformerRef.current.nodes([selectedNode]);
     transformerRef.current.getLayer()?.batchDraw();
-  }, [selectedAnnotationId, annotations]);
+  }, [selectedAnnotationId]);
 
   const updateAnnotation = (
     annotationId: string,
@@ -87,6 +87,26 @@ export default function TutorialShotEditorCanvas({
   return (
     <Stage
       height={Math.round(imageHeight * scale)}
+      onMouseDown={(event) => {
+        const targetClassName = event.target.getClassName();
+        if (
+          event.target === event.target.getStage() ||
+          targetClassName === "Image" ||
+          targetClassName === "Layer"
+        ) {
+          onSelect(null);
+        }
+      }}
+      onTouchStart={(event) => {
+        const targetClassName = event.target.getClassName();
+        if (
+          event.target === event.target.getStage() ||
+          targetClassName === "Image" ||
+          targetClassName === "Layer"
+        ) {
+          onSelect(null);
+        }
+      }}
       scaleX={scale}
       scaleY={scale}
       width={Math.round(imageWidth * scale)}
@@ -109,30 +129,40 @@ export default function TutorialShotEditorCanvas({
               ? annotations.filter((a, i) => a.type === "box" && i <= annotationIndex).length
               : 0;
             return (
-              <Group key={annotation.id}>
+              <Group
+                draggable
+                key={annotation.id}
+                onDragStart={() => onSelect(annotation.id)}
+                onDragEnd={(event) =>
+                  updateAnnotation(annotation.id, (current) => ({
+                    ...current,
+                    x: Math.round(event.target.x()),
+                    y: Math.round(event.target.y()),
+                  }))
+                }
+                x={annotation.x}
+                y={annotation.y}
+              >
                 <Rect
                   cornerRadius={10}
-                  draggable
                   height={annotation.height}
                   onClick={() => onSelect(annotation.id)}
-                  onDragEnd={(event) =>
-                    updateAnnotation(annotation.id, (current) => ({
-                      ...current,
-                      x: Math.round(event.target.x()),
-                      y: Math.round(event.target.y()),
-                    }))
-                  }
                   onTap={() => onSelect(annotation.id)}
                   onTransformEnd={(event) => {
                     const node = event.target;
+                    const parent = node.getParent();
                     const scaleX = node.scaleX();
                     const scaleY = node.scaleY();
+                    const nextX = Math.round((parent?.x() ?? 0) + node.x());
+                    const nextY = Math.round((parent?.y() ?? 0) + node.y());
                     node.scaleX(1);
                     node.scaleY(1);
+                    node.x(0);
+                    node.y(0);
                     updateAnnotation(annotation.id, (current) => ({
                       ...current,
-                      x: Math.round(node.x()),
-                      y: Math.round(node.y()),
+                      x: nextX,
+                      y: nextY,
                       width: Math.max(12, Math.round(node.width() * scaleX)),
                       height: Math.max(12, Math.round(node.height() * scaleY)),
                     }));
@@ -143,8 +173,8 @@ export default function TutorialShotEditorCanvas({
                   stroke="#ff6b00"
                   strokeWidth={4}
                   width={annotation.width}
-                  x={annotation.x}
-                  y={annotation.y}
+                  x={0}
+                  y={0}
                 />
                 {boxNumber > 0 ? (
                   <>
@@ -154,8 +184,8 @@ export default function TutorialShotEditorCanvas({
                       radius={CALLOUT_BADGE_RADIUS}
                       stroke="#ffffff"
                       strokeWidth={2.5}
-                      x={annotation.x}
-                      y={annotation.y}
+                      x={0}
+                      y={0}
                     />
                     <Text
                       align="center"
@@ -166,8 +196,8 @@ export default function TutorialShotEditorCanvas({
                       listening={false}
                       text={String(boxNumber)}
                       width={CALLOUT_BADGE_RADIUS * 2}
-                      x={annotation.x - CALLOUT_BADGE_RADIUS}
-                      y={annotation.y - 9}
+                      x={-CALLOUT_BADGE_RADIUS}
+                      y={-9}
                     />
                   </>
                 ) : null}
@@ -193,6 +223,13 @@ export default function TutorialShotEditorCanvas({
                     <Circle
                       draggable
                       fill="#ffffff"
+                      onDragMove={(event) =>
+                        updateAnnotation(annotation.id, (current) => ({
+                          ...current,
+                          fromX: Math.round(event.target.x()),
+                          fromY: Math.round(event.target.y()),
+                        }))
+                      }
                       onDragEnd={(event) =>
                         updateAnnotation(annotation.id, (current) => ({
                           ...current,
@@ -209,6 +246,13 @@ export default function TutorialShotEditorCanvas({
                     <Circle
                       draggable
                       fill="#ffffff"
+                      onDragMove={(event) =>
+                        updateAnnotation(annotation.id, (current) => ({
+                          ...current,
+                          toX: Math.round(event.target.x()),
+                          toY: Math.round(event.target.y()),
+                        }))
+                      }
                       onDragEnd={(event) =>
                         updateAnnotation(annotation.id, (current) => ({
                           ...current,
@@ -234,7 +278,21 @@ export default function TutorialShotEditorCanvas({
         <Transformer
           anchorSize={10}
           borderDash={[8, 6]}
-          enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+          boundBoxFunc={(oldBox, newBox) =>
+            Math.abs(newBox.width) < 12 || Math.abs(newBox.height) < 12 ? oldBox : newBox
+          }
+          enabledAnchors={[
+            "top-left",
+            "top-center",
+            "top-right",
+            "middle-left",
+            "middle-right",
+            "bottom-left",
+            "bottom-center",
+            "bottom-right",
+          ]}
+          flipEnabled={false}
+          keepRatio={false}
           ref={transformerRef}
           rotateEnabled={false}
         />
