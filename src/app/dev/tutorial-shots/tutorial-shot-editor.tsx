@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactCrop, { type PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import {
@@ -31,6 +31,18 @@ const AnnotationCanvas = dynamic(() => import("./tutorial-shot-editor-canvas"), 
 });
 
 const SOURCE_OVERRIDE_STORAGE_KEY = "tutorial-shot-editor.sourceOverride";
+const NON_TEXT_INPUT_TYPES = new Set([
+  "button",
+  "checkbox",
+  "color",
+  "file",
+  "hidden",
+  "image",
+  "radio",
+  "range",
+  "reset",
+  "submit",
+]);
 
 const buildTutorialShotsListUrl = (sourceOverride: string) => {
   const params = new URLSearchParams();
@@ -54,6 +66,56 @@ const buildImageUrl = (contentRelativePath: string, revision: number, sourceOver
 
 const formatConfiguredSource = (configuredSource: string | null) =>
   configuredSource && configuredSource.trim() ? configuredSource : "未設定";
+
+const getReadableImageName = (file: File, fallbackFileName: string) => {
+  const trimmed = file.name.trim();
+  return trimmed || fallbackFileName;
+};
+
+const isTextEditableElement = (element: Element | null) => {
+  if (!element) {
+    return false;
+  }
+
+  if (element instanceof HTMLTextAreaElement) {
+    return true;
+  }
+
+  if (element instanceof HTMLInputElement) {
+    return !NON_TEXT_INPUT_TYPES.has(element.type.toLowerCase());
+  }
+
+  return (
+    element instanceof HTMLElement &&
+    (element.isContentEditable || Boolean(element.closest("[contenteditable='true']")))
+  );
+};
+
+const readImageFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      typeof reader.result === "string"
+        ? resolve(reader.result)
+        : reject(new Error("画像ファイルを読み込めませんでした。"));
+    reader.onerror = () => reject(new Error("画像ファイルを読み込めませんでした。"));
+    reader.readAsDataURL(file);
+  });
+
+const getClipboardImageFile = (clipboardData: DataTransfer | null) => {
+  for (const item of Array.from(clipboardData?.items ?? [])) {
+    if (item.kind !== "file" || !item.type.startsWith("image/")) {
+      continue;
+    }
+
+    const file = item.getAsFile();
+    if (file) {
+      return file;
+    }
+  }
+
+  return null;
+};
 
 const getAnnotationTypeLabel = (type: TutorialShotAnnotation["type"]) => {
   if (type === "box") {
@@ -527,28 +589,75 @@ export default function TutorialShotEditor() {
     setIsSourceEditorOpen(false);
   };
 
-  const handleRawUpload = async (file: File | null) => {
+  const importRawImage = useCallback(
+    async ({
+      file,
+      statusPrefix,
+      fallbackFileName,
+    }: {
+      file: File;
+      statusPrefix: string;
+      fallbackFileName: string;
+    }) => {
+      try {
+        const dataUrl = await readImageFileAsDataUrl(file);
+        setPendingRawDataUrl(dataUrl);
+        setSourceImageElement(null);
+        setCroppedPreviewSrc(null);
+        setSourceImageSrc(dataUrl);
+        setBootstrapFromOutput(false);
+        setStatusText(
+          `${statusPrefix}を読み込みました（${getReadableImageName(file, fallbackFileName)}）`,
+        );
+      } catch (error) {
+        setStatusText(
+          error instanceof Error ? error.message : "画像ファイルを読み込めませんでした。",
+        );
+      }
+    },
+    [],
+  );
+
+  const handleRawUpload = (file: File | null) => {
     if (!file) {
       return;
     }
 
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () =>
-        typeof reader.result === "string"
-          ? resolve(reader.result)
-          : reject(new Error("画像ファイルを読み込めませんでした。"));
-      reader.onerror = () => reject(new Error("画像ファイルを読み込めませんでした。"));
-      reader.readAsDataURL(file);
+    void importRawImage({
+      file,
+      statusPrefix: "新しい元画像",
+      fallbackFileName: "image.png",
     });
-
-    setPendingRawDataUrl(dataUrl);
-    setSourceImageElement(null);
-    setCroppedPreviewSrc(null);
-    setSourceImageSrc(dataUrl);
-    setBootstrapFromOutput(false);
-    setStatusText(`新しい元画像を読み込みました（${file.name}）`);
   };
+
+  useEffect(() => {
+    if (!selectedShot) {
+      return;
+    }
+
+    const handleWindowPaste = (event: ClipboardEvent) => {
+      if (isTextEditableElement(document.activeElement)) {
+        return;
+      }
+
+      const pastedImage = getClipboardImageFile(event.clipboardData);
+      if (!pastedImage) {
+        return;
+      }
+
+      event.preventDefault();
+      void importRawImage({
+        file: pastedImage,
+        statusPrefix: "クリップボードの画像",
+        fallbackFileName: "clipboard.png",
+      });
+    };
+
+    window.addEventListener("paste", handleWindowPaste);
+    return () => {
+      window.removeEventListener("paste", handleWindowPaste);
+    };
+  }, [importRawImage, selectedShot]);
 
   const resetCropToFull = () => {
     if (!sourceImageElement) {
@@ -821,7 +930,8 @@ export default function TutorialShotEditor() {
                   <div>
                     <h3 className={styles.workCardTitle}>元画像と切り抜き範囲</h3>
                     <p className={styles.workCardHint}>
-                      ドラッグで囲んだ範囲が公開画像になります。
+                      ドラッグで囲んだ範囲が公開画像になります。ファイルを選ぶ代わりに、
+                      この画面で <code>Ctrl + V</code> でも貼り付けられます。
                     </p>
                   </div>
                   <div className={styles.workCardTools}>

@@ -166,6 +166,21 @@ const sha256File = async (filePath) => {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 };
 
+const createSolidPngBuffer = async ({ background = "#38bdf8", width = 640, height = 360 } = {}) =>
+  sharp({
+    create: {
+      width,
+      height,
+      channels: 4,
+      background,
+    },
+  })
+    .png()
+    .toBuffer();
+
+const toDataUrl = (buffer, mimeType = "image/png") =>
+  `data:${mimeType};base64,${buffer.toString("base64")}`;
+
 const getAnnotationCanvas = (page) =>
   page.locator('[data-testid="annotation-stage"] canvas').first();
 
@@ -224,6 +239,22 @@ const openTutorialShotEditor = async (page, overrideCourseRelativePath) => {
   await page.getByRole("button", { name: /override-startup/i }).waitFor({ timeout: 60_000 });
   await page.getByRole("heading", { name: "必要なら注釈を追加" }).scrollIntoViewIfNeeded();
   await waitForAnnotationCanvasReady(page);
+};
+
+const pasteImageIntoEditor = async (page, imageDataUrl) => {
+  await page.evaluate(async (dataUrl) => {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    const file = new File([blob], "clipboard.png", { type: blob.type || "image/png" });
+    const clipboardData = new DataTransfer();
+    clipboardData.items.add(file);
+    const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      configurable: true,
+      value: clipboardData,
+    });
+    window.dispatchEvent(pasteEvent);
+  }, imageDataUrl);
 };
 
 test(
@@ -362,6 +393,99 @@ test(
 
     const startupRawHash = await sha256File(startupRawPath);
     assert.equal(startupRawHash, startupOutputHashBefore);
+  },
+);
+
+test(
+  "tutorial shot editor accepts an image pasted from the clipboard",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-paste-"));
+    const fixtureCourse = path.join(tempRoot, "course");
+    const overrideCourse = path.join(tempRoot, "override-course");
+    const pastedImageBuffer = await createSolidPngBuffer({ background: "#f97316" });
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+    await writeFixtureCourseRepo(overrideCourse, {
+      logoText: "Override Tutorial Shot Fixture",
+      firstImageName: "override-startup",
+      secondImageName: "override-missing-output",
+    });
+
+    const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "tutorial-shot-editor-paste",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Tutorial shot editor did not become ready.",
+      },
+    );
+
+    const browser = await chromium.launch({ headless: true });
+    t.after(async () => {
+      await browser.close();
+    });
+    const page = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+
+    await openTutorialShotEditor(page, overrideCourseRelativePath);
+    await page.getByText("Ctrl + V").waitFor();
+    await page.getByRole("button", { name: /override-missing-output/i }).click();
+    await page.getByText("元画像をアップロードしてください。").waitFor();
+
+    await pasteImageIntoEditor(page, toDataUrl(pastedImageBuffer));
+    await page.getByText("クリップボードの画像を読み込みました").waitFor();
+    await page.locator('[data-testid="crop-stage"] img').waitFor();
+
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await page.getByText("保存しました").waitFor();
+
+    const pastedRawPath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "shots",
+      "override-missing-output.raw.png",
+    );
+    const pastedOutputPath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "img",
+      "override-missing-output.png",
+    );
+
+    await assert.doesNotReject(() => fs.stat(pastedRawPath));
+    await assert.doesNotReject(() => fs.stat(pastedOutputPath));
+    assert.equal(Buffer.compare(await fs.readFile(pastedRawPath), pastedImageBuffer), 0);
   },
 );
 
