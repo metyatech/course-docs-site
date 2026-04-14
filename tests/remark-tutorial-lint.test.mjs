@@ -252,3 +252,270 @@ test('well-formed Step with exercise before Checkpoint passes', async () => {
   assert.doesNotThrow(() => plugin()(tree, file));
   assert.deepEqual(warnings, []);
 });
+
+// -----------------------------------------------------------------------
+// Principle-driven rules (Mayer / CLT)
+// -----------------------------------------------------------------------
+
+const strong = (text) => ({
+  type: 'strong',
+  children: [{ type: 'text', value: text }],
+});
+
+const paragraphWithChildren = (...children) => ({ type: 'paragraph', children });
+
+test('Action with three bold spans emits action-bold-overuse warning', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section(
+      { goal: 'foo します' },
+      action(
+        { img: './a.png' },
+        paragraphWithChildren(
+          strong('A'),
+          { type: 'text', value: ' と ' },
+          strong('B'),
+          { type: 'text', value: ' と ' },
+          strong('C'),
+          { type: 'text', value: ' を選びます' },
+        ),
+      ),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => /action-bold-overuse/.test(w.origin ?? '')),
+    'action-bold-overuse should warn',
+  );
+});
+
+test('Action with two bold spans does not warn', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section(
+      { goal: 'foo します' },
+      action(
+        { img: './a.png' },
+        paragraphWithChildren(strong('A'), { type: 'text', value: ' と ' }, strong('B')),
+      ),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    !warnings.some((w) => /action-bold-overuse/.test(w.origin ?? '')),
+    'two bold spans should not warn',
+  );
+});
+
+test('third-person reader ("受講者") emits Personalization warning', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    paragraph('受講者が操作を行います'),
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => /third-person-reader/.test(w.origin ?? '')),
+    'third-person-reader should warn',
+  );
+});
+
+test('second-person addressing does not trigger third-person warning', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    paragraph('ここで Unreal Engine を起動しましょう'),
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    !warnings.some((w) => /third-person-reader/.test(w.origin ?? '')),
+    'second-person should not warn',
+  );
+});
+
+test('page opening with "この教材は" emits Personalization warning', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    paragraph('この教材は Unreal Engine の入門資料です'),
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => /page-opens-with-doc-description/.test(w.origin ?? '')),
+    'page-opens-with-doc-description should warn',
+  );
+});
+
+test('Verify describing internal mechanics emits warning', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('Destroy Actor が実行されました')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => /verify-internal-mechanics/.test(w.origin ?? '')),
+    'verify-internal-mechanics should warn',
+  );
+});
+
+test('Concept with 6 sentences emits concept-length warning', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section(
+      { goal: 'foo します' },
+      jsxElement(
+        'Concept',
+        { title: 'コリジョン' },
+        paragraph('文1です。文2です。文3です。文4です。文5です。文6です。'),
+      ),
+      action({ img: './a.png' }, paragraph('コリジョンを設定します')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => /concept-length/.test(w.origin ?? '')),
+    'concept-length should warn',
+  );
+});
+
+test('Concept with no following usage site emits concept-placement warning', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Concept', { title: '終わったあとの用語' }, paragraph('短い説明')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => /concept-placement/.test(w.origin ?? '')),
+    'concept-placement should warn when no usage site follows',
+  );
+});
+
+test('Concept immediately before Action does not warn', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section(
+      { goal: 'foo します' },
+      jsxElement('Concept', { title: '用語' }, paragraph('短い説明')),
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    !warnings.some((w) => /concept-placement/.test(w.origin ?? '')),
+    'concept placed before a usage site should not warn',
+  );
+});
+
+test('Section with Action but no feedback surface emits section-lacks-feedback', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section({ goal: 'foo します' }, action({ img: './a.png' }, paragraph('進めます'))),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => /section-lacks-feedback/.test(w.origin ?? '')),
+    'section-lacks-feedback should warn',
+  );
+});
+
+test('Section that delegates to nested Sections is exempt from feedback rule', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section(
+      { goal: 'outer goal します' },
+      section(
+        { goal: 'inner goal します' },
+        action({ img: './a.png' }, paragraph('進めます')),
+        jsxElement('Verify', {}, paragraph('成功')),
+      ),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    !warnings.some((w) => /section-lacks-feedback/.test(w.origin ?? '')),
+    'grouping Section should not warn',
+  );
+});
+
+test('decorative emoji outside signaling surface emits warning', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    paragraph('楽しく進めましょう 🎉'),
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => /decorative-emoji/.test(w.origin ?? '')),
+    'decorative-emoji should warn',
+  );
+});
+
+test('signalling emoji (✅) inside Checkpoint is allowed', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('✅ done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    !warnings.some((w) => /decorative-emoji/.test(w.origin ?? '')),
+    '✅ inside Checkpoint should not warn',
+  );
+});

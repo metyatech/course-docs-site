@@ -9,14 +9,25 @@ import type { Node } from 'unist';
  *
  * Rules implemented:
  *
- *  - tutorial/section-goal-required  (error)
- *  - tutorial/section-goal-tense     (error)
- *  - tutorial/action-single-image    (error)
- *  - tutorial/section-no-hrule       (error)
- *  - tutorial/reference-image-only   (warn)
+ *  Structural / legacy:
+ *  - tutorial/section-goal-required     (error)
+ *  - tutorial/section-goal-tense        (error)
+ *  - tutorial/action-single-image       (error)
+ *  - tutorial/section-no-hrule          (error)
+ *  - tutorial/reference-image-only      (warn)
  *  - tutorial/verify-no-duplicate-arrow (warn)
- *  - tutorial/checkpoint-placement   (error)
- *  - tutorial/action-positional-prefix (warn)
+ *  - tutorial/checkpoint-placement      (error)
+ *  - tutorial/action-positional-prefix  (warn)
+ *
+ *  Principle-driven (Mayer / CLT):
+ *  - tutorial/action-bold-overuse        (warn) — Signaling (dilution)
+ *  - tutorial/third-person-reader        (warn) — Personalization
+ *  - tutorial/page-opens-with-doc-description (warn) — Personalization
+ *  - tutorial/verify-internal-mechanics  (warn) — Generative activity
+ *  - tutorial/concept-length             (warn) — Pre-training
+ *  - tutorial/concept-placement          (warn) — Pre-training × Minimalism
+ *  - tutorial/section-lacks-feedback     (warn) — Feedback / Generative
+ *  - tutorial/decorative-emoji           (warn) — Coherence
  *
  * Severity handling:
  *  - Errors call `file.fail()` which throws and fails the MDX compile.
@@ -84,6 +95,58 @@ const POSITIONAL_PREFIXES = [
 
 const POSITIONAL_PREFIX_PATTERN = new RegExp(`(${POSITIONAL_PREFIXES.join('|')})`);
 
+// Signaling dilution: too many bold spans in one Action.
+const ACTION_BOLD_MAX = 2;
+
+// Personalization: third-person descriptions of the reader.
+// These terms frame the reader as an external subject, which contradicts
+// Mayer's Personalization principle.
+const THIRD_PERSON_READER_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /受講者/, label: '受講者' },
+  { pattern: /学習者(は|が|の)/, label: '学習者は/が/の' },
+  { pattern: /初学者向け/, label: '初学者向け' },
+  { pattern: /初心者向け/, label: '初心者向け' },
+  { pattern: /ユーザー(は|が)[^。]*(する|します|行う|行います)/, label: 'ユーザーは/が 〜する' },
+];
+
+// Personalization: page-opening patterns that describe the document
+// instead of addressing the reader directly.
+const DOC_DESCRIPTION_OPENER_PATTERNS: RegExp[] = [
+  /^この(教材|資料|ページ|授業|ドキュメント|マニュアル|記事|解説|ガイド)は/,
+  /^本(教材|資料|ページ|授業|ドキュメント|マニュアル|記事|解説|ガイド)は/,
+  /^この(教材|資料|ページ|授業|ドキュメント|マニュアル|記事|解説|ガイド)では/,
+];
+
+// Generative activity: Verify that reports internal engine state instead
+// of observable behaviour. Observable phrasing uses 〜すれば / 〜と表示 /
+// 〜になれば / etc.; internal phrasing names the engine action.
+const VERIFY_INTERNAL_MECHANICS_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /が実行されました/, label: 'が実行されました' },
+  { pattern: /を実行しました/, label: 'を実行しました' },
+  { pattern: /が呼び出されました/, label: 'が呼び出されました' },
+  { pattern: /をコールしました/, label: 'をコールしました' },
+  { pattern: /が(発火|トリガー)/, label: 'が発火/トリガー' },
+  { pattern: /が fire/i, label: 'fire (英語)' },
+  { pattern: /が trigger/i, label: 'trigger (英語)' },
+];
+
+// Pre-training: Concept length limits.
+const CONCEPT_SENTENCE_MAX = 5;
+
+// Coherence: decorative emoji outside of known cueing positions.
+// We match common pictographic ranges (pictographs, misc symbols,
+// dingbats, emoticons, transport/map, supplemental symbols).
+// ✅ ❌ ⚠️ are used by course authors as deliberate signalling — they
+// are allowed in Checkpoint/Reference contexts but flagged elsewhere
+// to prevent decorative spread.
+const DECORATIVE_EMOJI_PATTERN =
+  /[\u{1F300}-\u{1F5FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{2700}-\u{27BF}]/u;
+// Signalling-safe emoji that are permitted even outside cueing positions.
+// \u26A0 (warning sign) may appear with or without a trailing variation
+// selector (\uFE0F); matching both requires alternation rather than
+// putting the variation selector inside a character class.
+const ALLOWED_SIGNAL_EMOJI = /[\u2705\u274C\u{1F4A1}\u{1F4D6}]|\u26A0\uFE0F?/u;
+
 const hasChildren = (node: Node): node is Parent => Array.isArray((node as Parent).children);
 
 const isJsxElement = (node: Node, name?: string): node is MdxJsxElement => {
@@ -143,6 +206,119 @@ const countImages = (node: Node): number => {
   return count;
 };
 
+// Count `**bold**` spans (remark `strong` nodes) within a subtree. MDX
+// `<strong>` elements are also counted.
+const countBoldSpans = (node: Node): number => {
+  let count = 0;
+  const walk = (n: Node) => {
+    if (n.type === 'strong') count += 1;
+    if (
+      (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
+      ((n as MdxJsxElement).name === 'strong' || (n as MdxJsxElement).name === 'b')
+    ) {
+      count += 1;
+    }
+    if (hasChildren(n)) {
+      for (const child of n.children) walk(child);
+    }
+  };
+  walk(node);
+  return count;
+};
+
+// Rough sentence counter for Japanese prose. Splits on 。 ! ! ? ？ and
+// newline/paragraph boundaries.
+const countJapaneseSentences = (text: string): number => {
+  const trimmed = text.replace(/\s+/g, ' ').trim();
+  if (trimmed.length === 0) return 0;
+  const splits = trimmed
+    .split(/[。．.!！?？]/u)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return splits.length;
+};
+
+// Count `table` nodes in a subtree.
+const countTables = (node: Node): number => {
+  let count = 0;
+  const walk = (n: Node) => {
+    if (n.type === 'table') count += 1;
+    if (hasChildren(n)) {
+      for (const child of n.children) walk(child);
+    }
+  };
+  walk(node);
+  return count;
+};
+
+// Detect whether a subtree contains at least one `<Verify>`, `<Recovery>`,
+// or `<Checkpoint>` element — i.e. a Feedback / Generative-activity surface.
+const containsFeedbackSurface = (node: Node): boolean => {
+  let found = false;
+  const walk = (n: Node) => {
+    if (found) return;
+    if (
+      (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
+      ((n as MdxJsxElement).name === 'Verify' ||
+        (n as MdxJsxElement).name === 'Recovery' ||
+        (n as MdxJsxElement).name === 'Checkpoint')
+    ) {
+      found = true;
+      return;
+    }
+    if (hasChildren(n)) {
+      for (const child of n.children) walk(child);
+    }
+  };
+  walk(node);
+  return found;
+};
+
+// Detect whether a subtree contains at least one `<Action>` — used to
+// decide whether a Section "does operational work" (if not, Feedback
+// enforcement is relaxed).
+const containsAction = (node: Node): boolean => {
+  let found = false;
+  const walk = (n: Node) => {
+    if (found) return;
+    if (
+      (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
+      (n as MdxJsxElement).name === 'Action'
+    ) {
+      found = true;
+      return;
+    }
+    if (hasChildren(n)) {
+      for (const child of n.children) walk(child);
+    }
+  };
+  walk(node);
+  return found;
+};
+
+// Detect whether a subtree contains nested <Section> elements. When a
+// Section delegates its Feedback surfaces to child Sections, the parent
+// need not carry its own Verify/Checkpoint.
+const containsNestedSection = (node: Node): boolean => {
+  let found = false;
+  const walk = (n: Node, isRoot: boolean) => {
+    if (found) return;
+    if (
+      !isRoot &&
+      (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
+      (n as MdxJsxElement).name === 'Section'
+    ) {
+      found = true;
+      return;
+    }
+    if (hasChildren(n)) {
+      for (const child of n.children) walk(child, false);
+    }
+  };
+  walk(node, true);
+  return found;
+};
+
 // Check whether a <Reference> contains only image-bearing content.
 const isReferenceImageOnly = (node: MdxJsxElement): boolean => {
   const meaningful: Node[] = [];
@@ -200,6 +376,11 @@ type StepContext = {
 
 export default function remarkTutorialLint() {
   return function transform(tree: Node, file: VFileLike) {
+    // Page-level checks that need the full tree root.
+    validatePageOpener(file, tree);
+    validateThirdPersonReader(file, tree);
+    validateDecorativeEmoji(file, tree);
+
     const walk = (node: Node, stepContext: StepContext | null, sectionDepth: number) => {
       if (!hasChildren(node)) return;
 
@@ -251,6 +432,7 @@ export default function remarkTutorialLint() {
 
           if (sectionDepth === 0) {
             validateCheckpointPlacement(file, childAsStep);
+            validateSectionFeedback(file, child);
           }
           continue;
         }
@@ -265,6 +447,10 @@ export default function remarkTutorialLint() {
 
         if (isJsxElement(child, 'Reference')) {
           validateReference(file, child);
+        }
+
+        if (isJsxElement(child, 'Concept')) {
+          validateConcept(file, child, node.children, i);
         }
 
         if (isJsxElement(child, 'Checkpoint') && stepContext) {
@@ -308,6 +494,30 @@ function validateAction(file: VFileLike, node: MdxJsxElement) {
       );
     }
   }
+
+  // Signaling dilution: too many bold spans destroy emphasis effectiveness.
+  const boldCount = countBoldSpans(node);
+  if (boldCount > ACTION_BOLD_MAX) {
+    emitWarning(
+      file,
+      `<Action> contains ${boldCount} bold spans (max recommended: ${ACTION_BOLD_MAX}); dilute bold emphasis — reserve it for the single element the learner must find or type`,
+      node,
+      'action-bold-overuse',
+    );
+  }
+
+  // Verify internal-mechanics phrasing can also appear inside an Action
+  // body when the author mistakes an inline result for an engine report.
+  const bodyText = collectText(node);
+  const internal = detectInternalMechanics(bodyText);
+  if (internal) {
+    emitWarning(
+      file,
+      `<Action> body describes internal mechanics ("${internal}"); rewrite as an observable result the learner can see`,
+      node,
+      'verify-internal-mechanics',
+    );
+  }
 }
 
 function validateVerify(file: VFileLike, node: MdxJsxElement) {
@@ -324,6 +534,25 @@ function validateVerify(file: VFileLike, node: MdxJsxElement) {
       'verify-no-duplicate-arrow',
     );
   }
+
+  // Generative activity: Verify must describe observable state, not
+  // engine / internal mechanics.
+  const internal = detectInternalMechanics(body);
+  if (internal) {
+    emitWarning(
+      file,
+      `<Verify> describes internal mechanics ("${internal}"); rewrite as an observable outcome the learner can see (e.g. "キューブが消えれば成功")`,
+      node,
+      'verify-internal-mechanics',
+    );
+  }
+}
+
+function detectInternalMechanics(text: string): string | null {
+  for (const { pattern, label } of VERIFY_INTERNAL_MECHANICS_PATTERNS) {
+    if (pattern.test(text)) return label;
+  }
+  return null;
 }
 
 function validateReference(file: VFileLike, node: MdxJsxElement) {
@@ -335,6 +564,195 @@ function validateReference(file: VFileLike, node: MdxJsxElement) {
       'reference-image-only',
     );
   }
+}
+
+function validateConcept(
+  file: VFileLike,
+  node: MdxJsxElement,
+  siblings: Node[],
+  indexInParent: number,
+) {
+  // Pre-training: Concept length limits (5 sentences or 1 short table).
+  const body = collectText(node);
+  const sentenceCount = countJapaneseSentences(body);
+  const tableCount = countTables(node);
+
+  if (sentenceCount > CONCEPT_SENTENCE_MAX) {
+    emitWarning(
+      file,
+      `<Concept> has ${sentenceCount} sentences (max: ${CONCEPT_SENTENCE_MAX}); split into multiple Concepts, each placed before its own first-use Procedure`,
+      node,
+      'concept-length',
+    );
+  }
+  if (tableCount > 1) {
+    emitWarning(
+      file,
+      `<Concept> contains ${tableCount} tables (max: 1); split the concept into multiple Concepts`,
+      node,
+      'concept-length',
+    );
+  }
+
+  // Pre-training × Minimalism: Concept MUST be followed by a Procedure /
+  // Action / nested Section that actually uses the term. If the Concept
+  // trails at the end of its parent with no usage site, it is either
+  // front-loaded or orphaned.
+  let foundUsageSite = false;
+  for (let j = indexInParent + 1; j < siblings.length; j += 1) {
+    const sibling = siblings[j];
+    if (
+      (sibling.type === 'mdxJsxFlowElement' || sibling.type === 'mdxJsxTextElement') &&
+      ['Action', 'Procedure', 'Section', 'Verify', 'Exercise'].includes(
+        (sibling as MdxJsxElement).name ?? '',
+      )
+    ) {
+      foundUsageSite = true;
+      break;
+    }
+    // Nested children may still contain a usage site.
+    if (hasChildren(sibling) && containsUsageSite(sibling)) {
+      foundUsageSite = true;
+      break;
+    }
+  }
+  if (!foundUsageSite) {
+    emitWarning(
+      file,
+      '<Concept> has no following Action/Procedure/Section/Exercise that uses the term in its parent; Pre-training requires placing Concepts immediately before first-use, not as trailing filler',
+      node,
+      'concept-placement',
+    );
+  }
+}
+
+function containsUsageSite(node: Node): boolean {
+  let found = false;
+  const walk = (n: Node) => {
+    if (found) return;
+    if (
+      (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
+      ['Action', 'Procedure', 'Section', 'Verify', 'Exercise'].includes(
+        (n as MdxJsxElement).name ?? '',
+      )
+    ) {
+      found = true;
+      return;
+    }
+    if (hasChildren(n)) {
+      for (const child of n.children) walk(child);
+    }
+  };
+  walk(node);
+  return found;
+}
+
+function validateSectionFeedback(file: VFileLike, section: MdxJsxElement) {
+  // Feedback / Generative activity: a Section that does operational work
+  // (contains at least one Action) MUST expose at least one feedback
+  // surface (Verify / Recovery / Checkpoint). Grouping-only Sections that
+  // delegate to nested Sections are exempt.
+  if (!containsAction(section)) return;
+  if (containsFeedbackSurface(section)) return;
+  if (containsNestedSection(section)) return;
+  emitWarning(
+    file,
+    '<Section> contains Actions but no <Verify>, <Recovery>, or <Checkpoint>; add a feedback surface so the learner can confirm the outcome (Feedback / Generative activity)',
+    section,
+    'section-lacks-feedback',
+  );
+}
+
+// Personalization: flag a page that opens by describing itself instead of
+// addressing the reader. We inspect the first non-empty paragraph outside
+// of any JSX wrapper.
+function validatePageOpener(file: VFileLike, tree: Node) {
+  if (!hasChildren(tree)) return;
+  for (const child of tree.children) {
+    if (child.type === 'yaml' || child.type === 'toml' || child.type === 'mdxjsEsm') continue;
+    if (child.type === 'heading') continue;
+    if (child.type === 'paragraph') {
+      const text = collectText(child).trim();
+      if (text.length === 0) continue;
+      for (const pattern of DOC_DESCRIPTION_OPENER_PATTERNS) {
+        if (pattern.test(text)) {
+          emitWarning(
+            file,
+            `Page opens with a document-describing sentence ("${text.slice(0, 30)}..."); Personalization requires second-person direct address — open with an action or inviting goal, not with "この教材は〜" style`,
+            child,
+            'page-opens-with-doc-description',
+          );
+          return;
+        }
+      }
+      return;
+    }
+    // First non-heading, non-metadata content is not a paragraph — skip.
+    return;
+  }
+}
+
+// Personalization: flag third-person descriptions of the reader anywhere
+// in the tutorial body. We walk all paragraphs, emitting at most one
+// warning per unique pattern per file to avoid spam.
+function validateThirdPersonReader(file: VFileLike, tree: Node) {
+  const seenPatterns = new Set<string>();
+  const walk = (node: Node) => {
+    if (node.type === 'code' || node.type === 'inlineCode') return;
+    if (node.type === 'paragraph') {
+      const text = collectText(node);
+      for (const { pattern, label } of THIRD_PERSON_READER_PATTERNS) {
+        if (seenPatterns.has(label)) continue;
+        if (pattern.test(text)) {
+          seenPatterns.add(label);
+          emitWarning(
+            file,
+            `Text describes the reader in third person ("${label}"); Personalization requires second-person direct address ("〜しましょう" / "確認してください")`,
+            node,
+            'third-person-reader',
+          );
+        }
+      }
+      return;
+    }
+    if (hasChildren(node)) {
+      for (const child of node.children) walk(child);
+    }
+  };
+  walk(tree);
+}
+
+// Coherence: flag decorative emoji outside of Checkpoint/Reference
+// cueing positions. A single emoji anywhere else likely indicates
+// decorative use rather than deliberate signaling.
+function validateDecorativeEmoji(file: VFileLike, tree: Node) {
+  const walk = (node: Node, insideSignalSurface: boolean) => {
+    if (node.type === 'code' || node.type === 'inlineCode') return;
+    const isSignalSurface =
+      (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') &&
+      ['Checkpoint', 'Reference', 'Recovery'].includes((node as MdxJsxElement).name ?? '');
+    const nextInside = insideSignalSurface || isSignalSurface;
+
+    if (!nextInside && (node.type === 'text' || node.type === 'paragraph')) {
+      const text = node.type === 'text' ? (node as TextNode).value : collectText(node);
+      // Strip explicitly allowed signal emoji before scanning.
+      const stripped = text.replace(new RegExp(ALLOWED_SIGNAL_EMOJI, 'gu'), '');
+      const match = DECORATIVE_EMOJI_PATTERN.exec(stripped);
+      if (match) {
+        emitWarning(
+          file,
+          `Decorative emoji "${match[0]}" outside a signaling surface (Checkpoint/Reference/Recovery); Coherence requires removing ornamental elements unrelated to the learning objective`,
+          node,
+          'decorative-emoji',
+        );
+        return;
+      }
+    }
+    if (hasChildren(node)) {
+      for (const child of node.children) walk(child, nextInside);
+    }
+  };
+  walk(tree, false);
 }
 
 function validateCheckpointPlacement(file: VFileLike, step: StepContext) {
