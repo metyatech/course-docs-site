@@ -106,7 +106,10 @@ const POSITIONAL_PREFIXES = [
 const POSITIONAL_PREFIX_PATTERN = new RegExp(`(${POSITIONAL_PREFIXES.join('|')})`);
 
 // Signaling dilution: too many bold spans in one Action.
-const ACTION_BOLD_MAX = 2;
+// Set to 3 — small Markdown tables with 3 keyboard-key rows are a
+// legitimate Signaling surface, so we only flag 4+ bold spans per
+// Action as clear dilution.
+const ACTION_BOLD_MAX = 3;
 
 // Personalization: third-person descriptions of the reader.
 // These terms frame the reader as an external subject, which contradicts

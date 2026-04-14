@@ -265,7 +265,7 @@ const strong = (text) => ({
 
 const paragraphWithChildren = (...children) => ({ type: 'paragraph', children });
 
-test('Action with three bold spans emits action-bold-overuse warning', async () => {
+test('Action with four bold spans emits action-bold-overuse warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -274,10 +274,12 @@ test('Action with three bold spans emits action-bold-overuse warning', async () 
         { img: './a.png' },
         paragraphWithChildren(
           strong('A'),
-          { type: 'text', value: ' と ' },
+          { type: 'text', value: ' ' },
           strong('B'),
-          { type: 'text', value: ' と ' },
+          { type: 'text', value: ' ' },
           strong('C'),
+          { type: 'text', value: ' ' },
+          strong('D'),
           { type: 'text', value: ' を選びます' },
         ),
       ),
@@ -289,18 +291,24 @@ test('Action with three bold spans emits action-bold-overuse warning', async () 
   plugin()(tree, file);
   assert.ok(
     warnings.some((w) => /action-bold-overuse/.test(w.origin ?? '')),
-    'action-bold-overuse should warn',
+    'action-bold-overuse should warn on 4+ bold spans',
   );
 });
 
-test('Action with two bold spans does not warn', async () => {
+test('Action with three bold spans does not warn (small signaling table is allowed)', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
       { goal: 'foo します' },
       action(
         { img: './a.png' },
-        paragraphWithChildren(strong('A'), { type: 'text', value: ' と ' }, strong('B')),
+        paragraphWithChildren(
+          strong('A'),
+          { type: 'text', value: ' ' },
+          strong('B'),
+          { type: 'text', value: ' ' },
+          strong('C'),
+        ),
       ),
       jsxElement('Verify', {}, paragraph('成功')),
       jsxElement('Checkpoint', {}, paragraph('done')),
@@ -310,7 +318,7 @@ test('Action with two bold spans does not warn', async () => {
   plugin()(tree, file);
   assert.ok(
     !warnings.some((w) => /action-bold-overuse/.test(w.origin ?? '')),
-    'two bold spans should not warn',
+    'three bold spans should not warn (typical key-row table)',
   );
 });
 
@@ -576,7 +584,7 @@ test('TUTORIAL_LINT_COLLECT=1 accumulates every finding and fails once with all 
     paragraph('楽しく 🎉'),
     section(
       { goal: 'foo します' },
-      // Triggers action-bold-overuse (three bold spans).
+      // Triggers action-bold-overuse (four bold spans).
       action(
         { img: './a.png' },
         paragraphWithChildren(
@@ -585,6 +593,8 @@ test('TUTORIAL_LINT_COLLECT=1 accumulates every finding and fails once with all 
           strong('B'),
           { type: 'text', value: ' ' },
           strong('C'),
+          { type: 'text', value: ' ' },
+          strong('D'),
           { type: 'text', value: ' を選びます' },
         ),
       ),
