@@ -7,43 +7,60 @@ import type { Node } from 'unist';
  * (rather than in the skill text) per the `rule-system` mechanisation
  * rule.
  *
+ * Severity policy:
+ *  - error: structural break that makes the MDX incoherent or loses
+ *           required authoring metadata. Blocks the build.
+ *  - warn : principle violation with solid empirical support OR a
+ *           render/technical bug that would affect rendering.
+ *  - note : best-practice advisory derived from a principle whose
+ *           specific numeric threshold or lexical pattern does NOT
+ *           have direct empirical support. Printed as console.info,
+ *           never escalated to error even under TUTORIAL_LINT_STRICT.
+ *           Notes surface in collect-all output but do not by
+ *           themselves fail the build.
+ *
  * Rules implemented:
  *
- *  Structural / legacy:
- *  - tutorial/section-goal-required     (error)
- *  - tutorial/section-goal-tense        (error)
- *  - tutorial/action-single-image       (error)
- *  - tutorial/section-no-hrule          (error)
- *  - tutorial/reference-image-only      (warn)
- *  - tutorial/verify-no-duplicate-arrow (warn)
- *  - tutorial/checkpoint-placement      (error)
- *  - tutorial/action-positional-prefix  (warn)
+ *  Structural / technical:
+ *  - tutorial/section-goal-required     (error) — missing metadata
+ *  - tutorial/action-single-image       (error) — structural break
+ *  - tutorial/checkpoint-placement      (warn)  — structure rule
+ *  - tutorial/section-no-hrule          (warn)  — structure convention
+ *  - tutorial/verify-no-duplicate-arrow (warn)  — render bug
+ *  - tutorial/action-positional-prefix  (warn)  — Redundancy (strong)
+ *  - tutorial/section-lacks-feedback    (warn)  — Feedback (strong)
  *
- *  Principle-driven (Mayer / CLT):
- *  - tutorial/action-bold-overuse        (warn) — Signaling (dilution)
- *  - tutorial/third-person-reader        (warn) — Personalization
- *  - tutorial/page-opens-with-doc-description (warn) — Personalization
- *  - tutorial/verify-internal-mechanics  (warn) — Generative activity
- *  - tutorial/concept-length             (warn) — Pre-training
- *  - tutorial/concept-placement          (warn) — Pre-training × Minimalism
- *  - tutorial/section-lacks-feedback     (warn) — Feedback / Generative
- *  - tutorial/decorative-emoji           (warn) — Coherence
+ *  Principle-driven advisories (note):
+ *  - tutorial/section-goal-tense        (note)  — heuristic endings
+ *  - tutorial/reference-image-only      (note)  — design convention
+ *  - tutorial/action-bold-overuse       (note)  — Signaling; numeric
+ *                                                  threshold is a
+ *                                                  professional guess
+ *  - tutorial/third-person-reader       (note)  — pattern list heuristic
+ *  - tutorial/page-opens-with-doc-description (note) — opener-only scope
+ *  - tutorial/verify-internal-mechanics (note)  — pattern list heuristic
+ *  - tutorial/concept-length            (note)  — numeric threshold
+ *  - tutorial/concept-placement         (note)  — judgement
+ *  - tutorial/decorative-emoji          (note)  — allowlist heuristic
  *
  * Severity handling:
  *  - Errors call `file.fail()` which throws and fails the MDX compile.
  *  - Warnings call `file.message()` AND emit `console.warn(...)` so they
  *    surface in both `npm run dev` and `npm run build` output regardless
  *    of the loader's vfile-message handling.
+ *  - Notes call `console.info(...)` only. They are never escalated to
+ *    error, even under strict mode, because their thresholds/patterns
+ *    are heuristic rather than empirical.
  *  - Strict mode: setting `TUTORIAL_LINT_STRICT=1` (or `1`/`true`) at
- *    build time promotes every warning into a build-failing error. CI
- *    pipelines should enable this to prevent warning drift.
+ *    build time promotes every WARNING into a build-failing error. CI
+ *    pipelines should enable this to prevent warning drift. Notes are
+ *    never promoted.
  *  - Collect-all mode: setting `TUTORIAL_LINT_COLLECT=1` (or `1`/`true`)
- *    suppresses early termination across BOTH warnings and errors; all
- *    findings within a single MDX file are accumulated and emitted as
- *    one aggregated `file.fail()` at the end of transform. Use this for
- *    PR-review builds where a single full list of violations is more
- *    useful than the first-fail behaviour of strict mode.
- *    Collect-all implies strict (warnings count as violations).
+ *    suppresses early termination; all findings within a single MDX
+ *    file are accumulated. At the end of transform, the collection is
+ *    emitted as one aggregated `file.fail()` IF it contains any
+ *    warn/error entries; notes-only collections are printed via
+ *    console.info and do not fail the build.
  */
 
 const RULE_ORIGIN = 'tutorial-lint';
@@ -106,10 +123,13 @@ const POSITIONAL_PREFIXES = [
 const POSITIONAL_PREFIX_PATTERN = new RegExp(`(${POSITIONAL_PREFIXES.join('|')})`);
 
 // Signaling dilution: too many bold spans in one Action.
-// Set to 3 — small Markdown tables with 3 keyboard-key rows are a
-// legitimate Signaling surface, so we only flag 4+ bold spans per
-// Action as clear dilution.
-const ACTION_BOLD_MAX = 3;
+// The specific numeric threshold has no direct empirical backing —
+// Mayer's Signaling principle says "signal the important" but not a
+// quantity. Set to 5: legitimate signaling surfaces (key-row tables,
+// 2-3 numbered callouts plus a typed value) stay under this; 6+ bold
+// spans is in "obviously diluted" territory where even without research
+// the practitioner can flag it. Emitted as a note, not an error.
+const ACTION_BOLD_MAX = 5;
 
 // Personalization: third-person descriptions of the reader.
 // These terms frame the reader as an external subject, which contradicts
@@ -144,7 +164,12 @@ const VERIFY_INTERNAL_MECHANICS_PATTERNS: Array<{ pattern: RegExp; label: string
 ];
 
 // Pre-training: Concept length limits.
-const CONCEPT_SENTENCE_MAX = 5;
+// Mayer prescribes "name + key features" but no specific sentence
+// count. 5 was arbitrarily tight; 10 is the "obviously too long"
+// point where Concept stops functioning as quick pre-training and
+// turns into a full explanation that belongs elsewhere. Emitted as
+// a note.
+const CONCEPT_SENTENCE_MAX = 10;
 
 // Coherence: decorative emoji outside of known cueing positions.
 // We match common pictographic ranges (pictographs, misc symbols,
@@ -375,7 +400,7 @@ const isCollectMode = (): boolean => {
 };
 
 type Finding = {
-  severity: 'warn' | 'error';
+  severity: 'note' | 'warn' | 'error';
   reason: string;
   ruleId: string;
   node: Node;
@@ -428,6 +453,19 @@ const emitError = (file: VFileLike, reason: string, place: Node, ruleId: string)
   file.fail(`${reason} (${ruleId})`, place, origin);
 };
 
+// Note: best-practice advisory whose specific threshold or pattern has
+// no direct empirical support. Printed via console.info only, never
+// escalated to an error or a vfile message; strict mode ignores it.
+const emitNote = (file: VFileLike, reason: string, place: Node, ruleId: string) => {
+  const collection = getCollection(file);
+  if (collection) {
+    collection.push({ severity: 'note', reason, ruleId, node: place });
+    return;
+  }
+  const where = file.path ?? 'unknown';
+  console.info(`[tutorial-lint:note] ${where}: ${reason} (${ruleId})`);
+};
+
 const flushCollection = (file: VFileLike) => {
   const collection = getCollection(file);
   if (!collection) return;
@@ -439,7 +477,17 @@ const flushCollection = (file: VFileLike) => {
         `  ${String(i + 1).padStart(2, ' ')}. [${f.severity.padEnd(5, ' ')}] ${f.reason} (${f.ruleId})`,
     )
     .join('\n');
-  const summary = `tutorial-lint: ${collection.length} issue(s) found [collect-all]\n${lines}`;
+  const hasEscalator = collection.some((f) => f.severity === 'warn' || f.severity === 'error');
+  const where = file.path ?? 'unknown';
+  const summary = `tutorial-lint (${where}): ${collection.length} issue(s) [collect-all]\n${lines}`;
+
+  if (!hasEscalator) {
+    // Notes-only: report but do not fail the build. Thresholds behind
+    // notes are heuristic, so they must not gate merges.
+    console.info(summary);
+    return;
+  }
+
   file.fail(summary, collection[0].node, `${RULE_ORIGIN}:collect-all`);
 };
 
@@ -499,9 +547,9 @@ export default function remarkTutorialLint() {
       if (isJsxElement(node, 'Section')) {
         for (const child of node.children) {
           if (child.type === 'thematicBreak') {
-            emitError(
+            emitWarning(
               file,
-              '<Section> must not contain a horizontal rule (`---`); use it only between top-level Steps',
+              '<Section> should not contain a horizontal rule (`---`); use it only between top-level Steps',
               child,
               'section-no-hrule',
             );
@@ -522,9 +570,9 @@ export default function remarkTutorialLint() {
               'section-goal-required',
             );
           } else if (GOAL_PAST_TENSE.test(goal)) {
-            emitError(
+            emitNote(
               file,
-              `<Section goal="..."> uses past/completed form ("${goal}"); use future-declarative form (e.g. "〜します" / "〜できるようになります")`,
+              `<Section goal="..."> uses past/completed form ("${goal}"); consider future-declarative form (e.g. "〜します" / "〜できるようになります"). Specific ending patterns are heuristic, so this is advisory only`,
               child,
               'section-goal-tense',
             );
@@ -612,9 +660,9 @@ function validateAction(file: VFileLike, node: MdxJsxElement) {
   // Signaling dilution: too many bold spans destroy emphasis effectiveness.
   const boldCount = countBoldSpans(node);
   if (boldCount > ACTION_BOLD_MAX) {
-    emitWarning(
+    emitNote(
       file,
-      `<Action> contains ${boldCount} bold spans (max recommended: ${ACTION_BOLD_MAX}); dilute bold emphasis — reserve it for the single element the learner must find or type`,
+      `<Action> contains ${boldCount} bold spans (advisory max: ${ACTION_BOLD_MAX}); consider diluting — reserve bold for the few elements the learner must find or type. Numeric threshold is advisory, not empirical`,
       node,
       'action-bold-overuse',
     );
@@ -625,9 +673,9 @@ function validateAction(file: VFileLike, node: MdxJsxElement) {
   const bodyText = collectText(node);
   const internal = detectInternalMechanics(bodyText);
   if (internal) {
-    emitWarning(
+    emitNote(
       file,
-      `<Action> body describes internal mechanics ("${internal}"); rewrite as an observable result the learner can see`,
+      `<Action> body describes internal mechanics ("${internal}"); consider rewriting as an observable result the learner can see. Pattern list is heuristic`,
       node,
       'verify-internal-mechanics',
     );
@@ -649,13 +697,14 @@ function validateVerify(file: VFileLike, node: MdxJsxElement) {
     );
   }
 
-  // Generative activity: Verify must describe observable state, not
-  // engine / internal mechanics.
+  // Generative activity: Verify should describe observable state, not
+  // engine / internal mechanics. Pattern list is heuristic so this is
+  // an advisory note.
   const internal = detectInternalMechanics(body);
   if (internal) {
-    emitWarning(
+    emitNote(
       file,
-      `<Verify> describes internal mechanics ("${internal}"); rewrite as an observable outcome the learner can see (e.g. "キューブが消えれば成功")`,
+      `<Verify> describes internal mechanics ("${internal}"); consider rewriting as an observable outcome the learner can see (e.g. "キューブが消えれば成功"). Pattern list is heuristic`,
       node,
       'verify-internal-mechanics',
     );
@@ -671,9 +720,9 @@ function detectInternalMechanics(text: string): string | null {
 
 function validateReference(file: VFileLike, node: MdxJsxElement) {
   if (isReferenceImageOnly(node)) {
-    emitWarning(
+    emitNote(
       file,
-      '<Reference> contains only an image; success-verifying screenshots belong in an always-visible <Action>, not a collapsible <Reference>',
+      '<Reference> contains only an image; success-verifying screenshots typically belong in an always-visible <Action>. This is a design convention, so treat as advisory',
       node,
       'reference-image-only',
     );
@@ -692,17 +741,17 @@ function validateConcept(
   const tableCount = countTables(node);
 
   if (sentenceCount > CONCEPT_SENTENCE_MAX) {
-    emitWarning(
+    emitNote(
       file,
-      `<Concept> has ${sentenceCount} sentences (max: ${CONCEPT_SENTENCE_MAX}); split into multiple Concepts, each placed before its own first-use Procedure`,
+      `<Concept> has ${sentenceCount} sentences (advisory max: ${CONCEPT_SENTENCE_MAX}); consider splitting into multiple Concepts. Specific sentence count is a professional guess, not an empirical threshold`,
       node,
       'concept-length',
     );
   }
   if (tableCount > 1) {
-    emitWarning(
+    emitNote(
       file,
-      `<Concept> contains ${tableCount} tables (max: 1); split the concept into multiple Concepts`,
+      `<Concept> contains ${tableCount} tables (advisory max: 1); consider splitting the concept`,
       node,
       'concept-length',
     );
@@ -731,9 +780,9 @@ function validateConcept(
     }
   }
   if (!foundUsageSite) {
-    emitWarning(
+    emitNote(
       file,
-      '<Concept> has no following Action/Procedure/Section/Exercise that uses the term in its parent; Pre-training requires placing Concepts immediately before first-use, not as trailing filler',
+      '<Concept> has no following Action/Procedure/Section/Exercise that uses the term in its parent; Pre-training suggests placing Concepts immediately before first-use. This is a structural judgement — the exception is a legitimate trailing summary',
       node,
       'concept-placement',
     );
@@ -790,9 +839,9 @@ function validatePageOpener(file: VFileLike, tree: Node) {
       if (text.length === 0) continue;
       for (const pattern of DOC_DESCRIPTION_OPENER_PATTERNS) {
         if (pattern.test(text)) {
-          emitWarning(
+          emitNote(
             file,
-            `Page opens with a document-describing sentence ("${text.slice(0, 30)}..."); Personalization requires second-person direct address — open with an action or inviting goal, not with "この教材は〜" style`,
+            `Page opens with a document-describing sentence ("${text.slice(0, 30)}..."); consider second-person direct address — opening with an action or inviting goal is typically stronger. Opener-only scope and the pattern list are heuristic`,
             child,
             'page-opens-with-doc-description',
           );
@@ -819,9 +868,9 @@ function validateThirdPersonReader(file: VFileLike, tree: Node) {
         if (seenPatterns.has(label)) continue;
         if (pattern.test(text)) {
           seenPatterns.add(label);
-          emitWarning(
+          emitNote(
             file,
-            `Text describes the reader in third person ("${label}"); Personalization requires second-person direct address ("〜しましょう" / "確認してください")`,
+            `Text describes the reader in third person ("${label}"); Personalization benefits from second-person direct address ("〜しましょう" / "確認してください"). Pattern list is heuristic — legitimate use exists when quoting or defining a role`,
             node,
             'third-person-reader',
           );
@@ -853,9 +902,9 @@ function validateDecorativeEmoji(file: VFileLike, tree: Node) {
       const stripped = text.replace(new RegExp(ALLOWED_SIGNAL_EMOJI, 'gu'), '');
       const match = DECORATIVE_EMOJI_PATTERN.exec(stripped);
       if (match) {
-        emitWarning(
+        emitNote(
           file,
-          `Decorative emoji "${match[0]}" outside a signaling surface (Checkpoint/Reference/Recovery); Coherence requires removing ornamental elements unrelated to the learning objective`,
+          `Decorative emoji "${match[0]}" outside a signaling surface (Checkpoint/Reference/Recovery); Coherence suggests removing ornamental elements unrelated to the learning objective. Allowlist is a cultural convention, so treat as advisory`,
           node,
           'decorative-emoji',
         );
@@ -874,9 +923,9 @@ function validateCheckpointPlacement(file: VFileLike, step: StepContext) {
     return;
   }
   if (step.checkpoints.length > 1) {
-    emitError(
+    emitWarning(
       file,
-      'Step contains multiple <Checkpoint> elements; exactly one <Checkpoint> per Step is allowed',
+      'Step contains multiple <Checkpoint> elements; exactly one <Checkpoint> per Step is the intended structure',
       step.checkpoints[1].node,
       'checkpoint-placement',
     );
@@ -892,9 +941,9 @@ function validateCheckpointPlacement(file: VFileLike, step: StepContext) {
   if (directIndex < 0) {
     // Checkpoint is not a direct child of the Step Section — that means the
     // Step placed it inside a subsection, which is itself a placement error.
-    emitError(
+    emitWarning(
       file,
-      '<Checkpoint> must be a direct child of its top-level <Section> (Step), not nested inside a sub-Section',
+      '<Checkpoint> should be a direct child of its top-level <Section> (Step), not nested inside a sub-Section',
       checkpoint.node,
       'checkpoint-placement',
     );
@@ -910,9 +959,9 @@ function validateCheckpointPlacement(file: VFileLike, step: StepContext) {
       const text = collectText(following).trim();
       if (text.length === 0) continue;
     }
-    emitError(
+    emitWarning(
       file,
-      '<Checkpoint> must be the last element of its Step; move any content that follows it before the Checkpoint or into a separate Step',
+      '<Checkpoint> should be the last element of its Step; move any content that follows it before the Checkpoint or into a separate Step',
       checkpoint.node,
       'checkpoint-placement',
     );

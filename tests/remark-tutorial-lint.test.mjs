@@ -4,8 +4,14 @@ import process from 'node:process';
 
 const pluginModulePath = '../dist/mdx/tutorial/remark-tutorial-lint.js';
 
+// Captured console.info lines (notes) across tests. Tests execute
+// sequentially (node:test is single-threaded here) so a slice view
+// per-stub is safe.
+const capturedInfo = [];
+
 const createVFileStub = (path = 'test.mdx') => {
   const warnings = [];
+  const startIndex = capturedInfo.length;
   return {
     file: {
       path,
@@ -19,6 +25,9 @@ const createVFileStub = (path = 'test.mdx') => {
       },
     },
     warnings,
+    get notes() {
+      return capturedInfo.slice(startIndex);
+    },
   };
 };
 
@@ -71,13 +80,18 @@ const root = (...children) => ({
   children,
 });
 
-// Suppress console.warn spam from the plugin during tests.
+// Suppress console.warn spam and capture console.info lines (notes).
 const originalConsoleWarn = console.warn;
+const originalConsoleInfo = console.info;
 test.before(() => {
   console.warn = () => {};
+  console.info = (...args) => {
+    capturedInfo.push(String(args[0] ?? ''));
+  };
 });
 test.after(() => {
   console.warn = originalConsoleWarn;
+  console.info = originalConsoleInfo;
 });
 
 test('<Section> without goal prop fails', async () => {
@@ -87,11 +101,22 @@ test('<Section> without goal prop fails', async () => {
   assert.throws(() => plugin()(tree, file), /section-goal-required/);
 });
 
-test('<Section> with past-tense goal fails', async () => {
+test('<Section> with past-tense goal emits a note (advisory only)', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(section({ goal: 'キューブが置かれた状態' }, paragraph('body')));
-  const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /section-goal-tense/);
+  const tree = root(
+    section(
+      { goal: 'キューブが置かれた状態' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const stub = createVFileStub();
+  assert.doesNotThrow(() => plugin()(tree, stub.file));
+  assert.ok(
+    stub.notes.some((n) => /section-goal-tense/.test(n)),
+    'section-goal-tense should be a note, not an error',
+  );
 });
 
 test('<Section> with future goal passes', async () => {
@@ -133,7 +158,7 @@ test('<Action> with positional prefix emits a warning', async () => {
   );
 });
 
-test('<Section> containing --- horizontal rule fails', async () => {
+test('<Section> containing --- horizontal rule emits a warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -142,11 +167,15 @@ test('<Section> containing --- horizontal rule fails', async () => {
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /section-no-hrule/);
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => w.origin?.includes('section-no-hrule')),
+    'expected section-no-hrule warning',
+  );
 });
 
-test('image-only <Reference> emits a warning', async () => {
+test('image-only <Reference> emits a note (advisory)', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -155,11 +184,11 @@ test('image-only <Reference> emits a warning', async () => {
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    warnings.some((w) => w.origin?.includes('reference-image-only')),
-    'expected reference-image-only warning',
+    stub.notes.some((n) => /reference-image-only/.test(n)),
+    'reference-image-only should be a note, not a warning',
   );
 });
 
@@ -197,7 +226,7 @@ test('<Verify> without leading → does not warn', async () => {
   );
 });
 
-test('multiple <Checkpoint> in one Step fails', async () => {
+test('multiple <Checkpoint> in one Step emits a warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -206,11 +235,15 @@ test('multiple <Checkpoint> in one Step fails', async () => {
       jsxElement('Checkpoint', {}, paragraph('b')),
     ),
   );
-  const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /checkpoint-placement/);
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => w.origin?.includes('checkpoint-placement')),
+    'expected checkpoint-placement warning',
+  );
 });
 
-test('content after <Checkpoint> fails', async () => {
+test('content after <Checkpoint> emits a warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -219,11 +252,15 @@ test('content after <Checkpoint> fails', async () => {
       paragraph('this should not be here'),
     ),
   );
-  const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /checkpoint-placement/);
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => w.origin?.includes('checkpoint-placement')),
+    'expected checkpoint-placement warning',
+  );
 });
 
-test('Checkpoint nested inside subsection fails', async () => {
+test('Checkpoint nested inside subsection emits a warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -231,8 +268,12 @@ test('Checkpoint nested inside subsection fails', async () => {
       section({ goal: 'inner' }, jsxElement('Checkpoint', {}, paragraph('a'))),
     ),
   );
-  const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /checkpoint-placement/);
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => w.origin?.includes('checkpoint-placement')),
+    'expected checkpoint-placement warning',
+  );
 });
 
 test('well-formed Step with exercise before Checkpoint passes', async () => {
@@ -265,7 +306,7 @@ const strong = (text) => ({
 
 const paragraphWithChildren = (...children) => ({ type: 'paragraph', children });
 
-test('Action with four bold spans emits action-bold-overuse warning', async () => {
+test('Action with six bold spans emits action-bold-overuse note', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -280,6 +321,10 @@ test('Action with four bold spans emits action-bold-overuse warning', async () =
           strong('C'),
           { type: 'text', value: ' ' },
           strong('D'),
+          { type: 'text', value: ' ' },
+          strong('E'),
+          { type: 'text', value: ' ' },
+          strong('F'),
           { type: 'text', value: ' を選びます' },
         ),
       ),
@@ -287,15 +332,19 @@ test('Action with four bold spans emits action-bold-overuse warning', async () =
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    warnings.some((w) => /action-bold-overuse/.test(w.origin ?? '')),
-    'action-bold-overuse should warn on 4+ bold spans',
+    stub.notes.some((n) => /action-bold-overuse/.test(n)),
+    'action-bold-overuse should be a note on 6+ bold spans',
+  );
+  assert.ok(
+    !stub.warnings.some((w) => /action-bold-overuse/.test(w.origin ?? '')),
+    'action-bold-overuse must not be a warning',
   );
 });
 
-test('Action with three bold spans does not warn (small signaling table is allowed)', async () => {
+test('Action with five bold spans does not emit action-bold-overuse', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -308,21 +357,25 @@ test('Action with three bold spans does not warn (small signaling table is allow
           strong('B'),
           { type: 'text', value: ' ' },
           strong('C'),
+          { type: 'text', value: ' ' },
+          strong('D'),
+          { type: 'text', value: ' ' },
+          strong('E'),
         ),
       ),
       jsxElement('Verify', {}, paragraph('成功')),
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    !warnings.some((w) => /action-bold-overuse/.test(w.origin ?? '')),
-    'three bold spans should not warn (typical key-row table)',
+    !stub.notes.some((n) => /action-bold-overuse/.test(n)),
+    'five bold spans should not emit action-bold-overuse',
   );
 });
 
-test('third-person reader ("受講者") emits Personalization warning', async () => {
+test('third-person reader ("受講者") emits Personalization note', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     paragraph('受講者が操作を行います'),
@@ -333,15 +386,15 @@ test('third-person reader ("受講者") emits Personalization warning', async ()
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    warnings.some((w) => /third-person-reader/.test(w.origin ?? '')),
-    'third-person-reader should warn',
+    stub.notes.some((n) => /third-person-reader/.test(n)),
+    'third-person-reader should be a note',
   );
 });
 
-test('second-person addressing does not trigger third-person warning', async () => {
+test('second-person addressing does not trigger third-person note', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     paragraph('ここで Unreal Engine を起動しましょう'),
@@ -352,15 +405,15 @@ test('second-person addressing does not trigger third-person warning', async () 
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    !warnings.some((w) => /third-person-reader/.test(w.origin ?? '')),
-    'second-person should not warn',
+    !stub.notes.some((n) => /third-person-reader/.test(n)),
+    'second-person should not emit third-person-reader note',
   );
 });
 
-test('page opening with "この教材は" emits Personalization warning', async () => {
+test('page opening with "この教材は" emits Personalization note', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     paragraph('この教材は Unreal Engine の入門資料です'),
@@ -371,15 +424,15 @@ test('page opening with "この教材は" emits Personalization warning', async 
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    warnings.some((w) => /page-opens-with-doc-description/.test(w.origin ?? '')),
-    'page-opens-with-doc-description should warn',
+    stub.notes.some((n) => /page-opens-with-doc-description/.test(n)),
+    'page-opens-with-doc-description should be a note',
   );
 });
 
-test('Verify describing internal mechanics emits warning', async () => {
+test('Verify describing internal mechanics emits a note', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -389,15 +442,15 @@ test('Verify describing internal mechanics emits warning', async () => {
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    warnings.some((w) => /verify-internal-mechanics/.test(w.origin ?? '')),
-    'verify-internal-mechanics should warn',
+    stub.notes.some((n) => /verify-internal-mechanics/.test(n)),
+    'verify-internal-mechanics should be a note',
   );
 });
 
-test('Concept with 6 sentences emits concept-length warning', async () => {
+test('Concept with 11 sentences emits concept-length note', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -405,22 +458,24 @@ test('Concept with 6 sentences emits concept-length warning', async () => {
       jsxElement(
         'Concept',
         { title: 'コリジョン' },
-        paragraph('文1です。文2です。文3です。文4です。文5です。文6です。'),
+        paragraph(
+          '文1です。文2です。文3です。文4です。文5です。文6です。文7です。文8です。文9です。文10です。文11です。',
+        ),
       ),
       action({ img: './a.png' }, paragraph('コリジョンを設定します')),
       jsxElement('Verify', {}, paragraph('成功')),
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    warnings.some((w) => /concept-length/.test(w.origin ?? '')),
-    'concept-length should warn',
+    stub.notes.some((n) => /concept-length/.test(n)),
+    'concept-length should be a note beyond advisory threshold',
   );
 });
 
-test('Concept with no following usage site emits concept-placement warning', async () => {
+test('Concept with no following usage site emits concept-placement note', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -431,15 +486,15 @@ test('Concept with no following usage site emits concept-placement warning', asy
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    warnings.some((w) => /concept-placement/.test(w.origin ?? '')),
-    'concept-placement should warn when no usage site follows',
+    stub.notes.some((n) => /concept-placement/.test(n)),
+    'concept-placement should be a note when no usage site follows',
   );
 });
 
-test('Concept immediately before Action does not warn', async () => {
+test('Concept immediately before Action does not emit concept-placement', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -450,11 +505,11 @@ test('Concept immediately before Action does not warn', async () => {
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    !warnings.some((w) => /concept-placement/.test(w.origin ?? '')),
-    'concept placed before a usage site should not warn',
+    !stub.notes.some((n) => /concept-placement/.test(n)),
+    'concept placed before a usage site should not emit concept-placement',
   );
 });
 
@@ -492,7 +547,7 @@ test('Section that delegates to nested Sections is exempt from feedback rule', a
   );
 });
 
-test('decorative emoji outside signaling surface emits warning', async () => {
+test('decorative emoji outside signaling surface emits a note', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     paragraph('楽しく進めましょう 🎉'),
@@ -503,11 +558,11 @@ test('decorative emoji outside signaling surface emits warning', async () => {
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    warnings.some((w) => /decorative-emoji/.test(w.origin ?? '')),
-    'decorative-emoji should warn',
+    stub.notes.some((n) => /decorative-emoji/.test(n)),
+    'decorative-emoji should be a note',
   );
 });
 
@@ -521,16 +576,40 @@ test('signalling emoji (✅) inside Checkpoint is allowed', async () => {
       jsxElement('Checkpoint', {}, paragraph('✅ done')),
     ),
   );
-  const { file, warnings } = createVFileStub();
-  plugin()(tree, file);
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
   assert.ok(
-    !warnings.some((w) => /decorative-emoji/.test(w.origin ?? '')),
-    '✅ inside Checkpoint should not warn',
+    !stub.notes.some((n) => /decorative-emoji/.test(n)) &&
+      !stub.warnings.some((w) => /decorative-emoji/.test(w.origin ?? '')),
+    '✅ inside Checkpoint should not emit decorative-emoji',
   );
 });
 
 test('TUTORIAL_LINT_STRICT=1 promotes warnings into build-failing errors', async () => {
   const { default: plugin } = await import(pluginModulePath);
+  // Use a warn-level violation (section-no-hrule) because notes are
+  // never promoted to errors, only warnings are.
+  const tree = root(
+    section(
+      { goal: 'foo します' },
+      { type: 'thematicBreak' },
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file } = createVFileStub();
+  const prev = process.env.TUTORIAL_LINT_STRICT;
+  process.env.TUTORIAL_LINT_STRICT = '1';
+  try {
+    assert.throws(() => plugin()(tree, file), /section-no-hrule.*\[strict\]/);
+  } finally {
+    if (prev === undefined) delete process.env.TUTORIAL_LINT_STRICT;
+    else process.env.TUTORIAL_LINT_STRICT = prev;
+  }
+});
+
+test('TUTORIAL_LINT_STRICT does NOT promote notes to errors', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  // decorative-emoji is a note, so strict mode must leave it as a note.
   const tree = root(
     paragraph('楽しく進めましょう 🎉'),
     section(
@@ -540,11 +619,15 @@ test('TUTORIAL_LINT_STRICT=1 promotes warnings into build-failing errors', async
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const { file } = createVFileStub();
+  const stub = createVFileStub();
   const prev = process.env.TUTORIAL_LINT_STRICT;
   process.env.TUTORIAL_LINT_STRICT = '1';
   try {
-    assert.throws(() => plugin()(tree, file), /decorative-emoji.*\[strict\]/);
+    assert.doesNotThrow(() => plugin()(tree, stub.file));
+    assert.ok(
+      stub.notes.some((n) => /decorative-emoji/.test(n)),
+      'note should still appear even under strict',
+    );
   } finally {
     if (prev === undefined) delete process.env.TUTORIAL_LINT_STRICT;
     else process.env.TUTORIAL_LINT_STRICT = prev;
@@ -554,11 +637,9 @@ test('TUTORIAL_LINT_STRICT=1 promotes warnings into build-failing errors', async
 test('TUTORIAL_LINT_STRICT unset leaves warnings as warnings', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
-    paragraph('楽しく進めましょう 🎉'),
     section(
       { goal: 'foo します' },
-      action({ img: './a.png' }, paragraph('進めます')),
-      jsxElement('Verify', {}, paragraph('成功')),
+      { type: 'thematicBreak' },
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
@@ -567,37 +648,24 @@ test('TUTORIAL_LINT_STRICT unset leaves warnings as warnings', async () => {
   delete process.env.TUTORIAL_LINT_STRICT;
   try {
     assert.doesNotThrow(() => plugin()(tree, file));
-    assert.ok(warnings.some((w) => /decorative-emoji/.test(w.origin ?? '')));
+    assert.ok(warnings.some((w) => /section-no-hrule/.test(w.origin ?? '')));
   } finally {
     if (prev !== undefined) process.env.TUTORIAL_LINT_STRICT = prev;
   }
 });
 
-test('TUTORIAL_LINT_COLLECT=1 accumulates every finding and fails once with all of them', async () => {
+test('TUTORIAL_LINT_COLLECT=1 fails once when warnings + notes are mixed', async () => {
   const { default: plugin } = await import(pluginModulePath);
+  // Mix a warning (section-no-hrule) with notes so collect-all has to
+  // aggregate and fail once (because a warning is present).
   const tree = root(
-    // Triggers page-opens-with-doc-description.
-    paragraph('この教材は Unreal Engine の入門資料です'),
-    // Triggers third-person-reader.
-    paragraph('受講者が操作を行います'),
-    // Triggers decorative-emoji outside signalling surface.
-    paragraph('楽しく 🎉'),
+    paragraph('この教材は Unreal Engine の入門資料です'), // note
+    paragraph('受講者が操作を行います'), // note
+    paragraph('楽しく 🎉'), // note
     section(
       { goal: 'foo します' },
-      // Triggers action-bold-overuse (four bold spans).
-      action(
-        { img: './a.png' },
-        paragraphWithChildren(
-          strong('A'),
-          { type: 'text', value: ' ' },
-          strong('B'),
-          { type: 'text', value: ' ' },
-          strong('C'),
-          { type: 'text', value: ' ' },
-          strong('D'),
-          { type: 'text', value: ' を選びます' },
-        ),
-      ),
+      { type: 'thematicBreak' }, // warn: section-no-hrule
+      action({ img: './a.png' }, paragraph('進めます')),
       jsxElement('Verify', {}, paragraph('成功')),
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
@@ -614,18 +682,48 @@ test('TUTORIAL_LINT_COLLECT=1 accumulates every finding and fails once with all 
     } catch (err) {
       thrown = err;
     }
-    assert.ok(thrown, 'collect-all mode should throw one aggregated failure');
+    assert.ok(thrown, 'collect-all must fail once when at least one warn/error is present');
     const body = String(thrown.reason ?? thrown.message ?? '');
-    assert.match(body, /tutorial-lint: \d+ issue\(s\) found \[collect-all\]/);
-    // All four rules that the tree violates should appear in the summary.
+    assert.match(body, /tutorial-lint.*issue\(s\).*\[collect-all\]/);
+    // Warn and all note rules should be present in the summary.
+    assert.match(body, /section-no-hrule/);
     assert.match(body, /page-opens-with-doc-description/);
     assert.match(body, /third-person-reader/);
     assert.match(body, /decorative-emoji/);
-    assert.match(body, /action-bold-overuse/);
   } finally {
     if (prevCollect === undefined) delete process.env.TUTORIAL_LINT_COLLECT;
     else process.env.TUTORIAL_LINT_COLLECT = prevCollect;
     if (prevStrict !== undefined) process.env.TUTORIAL_LINT_STRICT = prevStrict;
+  }
+});
+
+test('TUTORIAL_LINT_COLLECT=1 does NOT fail when only notes are found', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  // Notes-only tree: all the below rules are notes.
+  const tree = root(
+    paragraph('この教材は 〜 です'), // note: page-opens-with-doc-description
+    paragraph('受講者が 〜'), // note: third-person-reader
+    paragraph('🎉'), // note: decorative-emoji
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const stub = createVFileStub();
+  const prevCollect = process.env.TUTORIAL_LINT_COLLECT;
+  process.env.TUTORIAL_LINT_COLLECT = '1';
+  try {
+    assert.doesNotThrow(() => plugin()(tree, stub.file), 'notes-only should not fail collect-all');
+    // The aggregated summary is printed via console.info.
+    assert.ok(
+      stub.notes.some((n) => /\[collect-all\]/.test(n)),
+      'collect-all summary should still be printed',
+    );
+  } finally {
+    if (prevCollect === undefined) delete process.env.TUTORIAL_LINT_COLLECT;
+    else process.env.TUTORIAL_LINT_COLLECT = prevCollect;
   }
 });
 
