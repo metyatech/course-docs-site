@@ -14,7 +14,7 @@ import type { Node } from 'unist';
  *  - tutorial/action-single-image    (error)
  *  - tutorial/section-no-hrule       (error)
  *  - tutorial/reference-image-only   (warn)
- *  - tutorial/verify-arrow-prefix    (warn)
+ *  - tutorial/verify-no-duplicate-arrow (warn)
  *  - tutorial/checkpoint-placement   (error)
  *  - tutorial/action-positional-prefix (warn)
  *
@@ -313,12 +313,15 @@ function validateAction(file: VFileLike, node: MdxJsxElement) {
 function validateVerify(file: VFileLike, node: MdxJsxElement) {
   const body = collectText(node).trimStart();
   if (body.length === 0) return;
-  if (!body.startsWith('→')) {
+  // The <Verify> component renders its own leading "→" arrow. Authors who
+  // additionally include "→" in the source produce a doubled arrow at
+  // render time.
+  if (body.startsWith('→')) {
     emitWarning(
       file,
-      '<Verify> body should start with "→" so the expected result reads as a Procedure-end confirmation',
+      '<Verify> body starts with "→", but the Verify component already renders the arrow; remove the leading "→" from the source',
       node,
-      'verify-arrow-prefix',
+      'verify-no-duplicate-arrow',
     );
   }
 }

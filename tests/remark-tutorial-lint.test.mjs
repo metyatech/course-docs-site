@@ -162,7 +162,24 @@ test('image-only <Reference> emits a warning', async () => {
   );
 });
 
-test('<Verify> not starting with → emits a warning', async () => {
+test('<Verify> starting with → emits a duplicate-arrow warning', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section(
+      { goal: 'foo します' },
+      jsxElement('Verify', {}, paragraph('→ 成功です')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => w.origin?.includes('verify-no-duplicate-arrow')),
+    'expected verify-no-duplicate-arrow warning',
+  );
+});
+
+test('<Verify> without leading → does not warn', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -174,8 +191,8 @@ test('<Verify> not starting with → emits a warning', async () => {
   const { file, warnings } = createVFileStub();
   plugin()(tree, file);
   assert.ok(
-    warnings.some((w) => w.origin?.includes('verify-arrow-prefix')),
-    'expected verify-arrow-prefix warning',
+    !warnings.some((w) => w.origin?.includes('verify-no-duplicate-arrow')),
+    'Verify without leading → should not warn',
   );
 });
 
@@ -225,7 +242,7 @@ test('well-formed Step with exercise before Checkpoint passes', async () => {
       section(
         { goal: 'N-1 します' },
         action({ img: './a.png' }, paragraph('「**作成**」をクリックします')),
-        jsxElement('Verify', {}, paragraph('→ 成功です')),
+        jsxElement('Verify', {}, paragraph('成功です')),
       ),
       section({ goal: '演習 goal' }, jsxElement('Exercise', {}, paragraph('body'))),
       jsxElement('Checkpoint', {}, paragraph('done')),
