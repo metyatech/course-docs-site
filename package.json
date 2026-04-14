@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@mdx-js/react": "^3.1.1",
-    "@metyatech/course-docs-platform": "github:metyatech/course-docs-platform#7dc8f70",
+    "@metyatech/course-docs-platform": "github:metyatech/course-docs-platform#b558854",
     "dotenv": "^17.2.3",
     "konva": "^10.2.3",
     "next": "^15.5.14",
