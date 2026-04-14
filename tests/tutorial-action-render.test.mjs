@@ -24,3 +24,17 @@ test('Action keeps the tutorial text container alongside the optional image', as
   assert.match(source, /img\?: string;/);
   assert.match(source, /<div className="tutorial-action__text">\{children\}<\/div>/);
 });
+
+test('Action exposes callouts prop and renders an overlay when callouts exist', async () => {
+  const source = await fs.readFile(actionSourcePath, 'utf8');
+
+  assert.match(source, /export type ActionCallout = /);
+  assert.match(source, /callouts\?: ActionCallout\[\];/);
+  assert.match(source, /className="tutorial-action__img-wrapper"/);
+  assert.match(source, /className="tutorial-action__callouts"/);
+  assert.match(source, /className="tutorial-action__callout"/);
+  // x/y must be applied as CSS percentages so callouts scale with the
+  // responsive image.
+  assert.match(source, /left: `\$\{callout\.x\}%`/);
+  assert.match(source, /top: `\$\{callout\.y\}%`/);
+});

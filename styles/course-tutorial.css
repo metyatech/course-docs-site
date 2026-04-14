@@ -89,6 +89,48 @@
     margin: 0.25rem 0 0.5rem;
 }
 
+/* Callout overlay: image wrapper keeps the image as the layout driver,
+   the callout layer sits on top at the same dimensions. */
+.tutorial-action__img-wrapper {
+    position: relative;
+    display: inline-block;
+    max-width: min(600px, 100%);
+    margin: 0.25rem 0 0.5rem;
+}
+
+.tutorial-action__img-wrapper .tutorial-action__img {
+    margin: 0;
+}
+
+.tutorial-action__callouts {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.tutorial-action__callout {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: hsl(20 90% 55%);
+    color: white;
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1;
+    box-shadow: 0 0 0 2px white, 0 2px 6px rgba(0, 0, 0, 0.25);
+    font-variant-numeric: tabular-nums;
+}
+
+.dark .tutorial-action__callout {
+    box-shadow: 0 0 0 2px #1a1a1a, 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
 .tutorial-action__text {
     margin-top: 0.25rem;
 }
