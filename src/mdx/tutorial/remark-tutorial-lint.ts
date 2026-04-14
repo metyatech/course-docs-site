@@ -1,4 +1,5 @@
 import type { Node } from 'unist';
+import { resolvePageAuthoringMode } from './page-authoring-mode.js';
 
 /**
  * Remark plugin that lints `<Section>` / `<Action>` / `<Verify>` /
@@ -22,6 +23,9 @@ import type { Node } from 'unist';
  * Rules implemented:
  *
  *  Structural / technical:
+ *  - tutorial/page-authoring-mode-invalid      (error) — invalid page metadata
+ *  - tutorial/page-mode-tutorial-requires-section (error) — tutorial page boundary missing
+ *  - tutorial/page-mode-non-tutorial-has-section (error) — non-tutorial page uses tutorial boundary
  *  - tutorial/section-goal-required     (error) — missing metadata
  *  - tutorial/action-single-image       (error) — structural break
  *  - tutorial/checkpoint-placement      (warn)  — structure rule
@@ -42,6 +46,7 @@ import type { Node } from 'unist';
  *  - tutorial/concept-length            (note)  — numeric threshold
  *  - tutorial/concept-placement         (note)  — judgement
  *  - tutorial/decorative-emoji          (note)  — allowlist heuristic
+ *  - tutorial/page-mode-implicit-tutorial (note) — migration guidance
  *
  * Severity handling:
  *  - Errors call `file.fail()` which throws and fails the MDX compile.
@@ -502,38 +507,59 @@ type StepContext = {
   checkpoints: CheckpointInfo[];
 };
 
-// A page is considered a learner-facing tutorial only when it uses at
-// least one <Section> component. Pages without <Section> (operational
-// memos, teacher guides, index pages, intros) fall outside the
-// tutorial-authoring skill's scope and must NOT be flagged by its
-// rules — e.g. Personalization's "no document-describing opener"
-// applies to tutorials, not to teacher-facing overviews.
-const hasTutorialSection = (tree: Node): boolean => {
-  let found = false;
-  const walk = (n: Node) => {
-    if (found) return;
-    if (
-      (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
-      (n as MdxJsxElement).name === 'Section'
-    ) {
-      found = true;
-      return;
-    }
-    if (hasChildren(n)) {
-      for (const child of n.children) walk(child);
-    }
-  };
-  walk(tree);
-  return found;
-};
-
 export default function remarkTutorialLint() {
   return function transform(tree: Node, file: VFileLike) {
-    // Gate: skip non-tutorial pages (no <Section>). This keeps
-    // teacher-facing memos, indexes, and intros out of scope.
-    if (!hasTutorialSection(tree)) return;
-
     if (isCollectMode()) startCollection(file);
+
+    const pageMode = resolvePageAuthoringMode(tree);
+
+    if (pageMode.mode === null) {
+      emitError(
+        file,
+        `Page frontmatter uses invalid authoringMode "${pageMode.rawValue}"; use "tutorial" or "non-tutorial"`,
+        tree,
+        'page-authoring-mode-invalid',
+      );
+      flushCollection(file);
+      return;
+    }
+
+    if (pageMode.mode === 'non-tutorial') {
+      if (pageMode.hasTutorialSection) {
+        emitError(
+          file,
+          'Page declares `authoringMode: non-tutorial` but still uses <Section>; keep short procedural blocks inline or split the tutorial into its own page',
+          tree,
+          'page-mode-non-tutorial-has-section',
+        );
+        flushCollection(file);
+        return;
+      }
+
+      // Non-tutorial pages are intentionally out of scope for tutorial lint.
+      flushCollection(file);
+      return;
+    }
+
+    if (!pageMode.hasTutorialSection) {
+      emitError(
+        file,
+        'Page declares `authoringMode: tutorial` but has no <Section>; tutorial pages must use <Section> to mark the page-level learning milestones',
+        tree,
+        'page-mode-tutorial-requires-section',
+      );
+      flushCollection(file);
+      return;
+    }
+
+    if (!pageMode.explicit) {
+      emitNote(
+        file,
+        'Page uses <Section> but does not declare frontmatter `authoringMode: tutorial`; add it so tutorial/non-tutorial classification is explicit at the page boundary during migration',
+        tree,
+        'page-mode-implicit-tutorial',
+      );
+    }
 
     // Page-level checks that need the full tree root.
     validatePageOpener(file, tree);

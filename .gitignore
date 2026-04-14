@@ -9,6 +9,7 @@
 .DS_Store
 Thumbs.db
 Desktop.ini
+.threads.jsonl
 .env.local
 .env.*.local
 .vercel

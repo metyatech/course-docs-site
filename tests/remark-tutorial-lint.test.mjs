@@ -80,6 +80,16 @@ const root = (...children) => ({
   children,
 });
 
+const yamlFrontmatter = (value) => ({
+  type: 'yaml',
+  value,
+});
+
+const mdxEsm = (value) => ({
+  type: 'mdxjsEsm',
+  value,
+});
+
 // Suppress console.warn spam and capture console.info lines (notes).
 const originalConsoleWarn = console.warn;
 const originalConsoleInfo = console.info;
@@ -748,6 +758,70 @@ test('TUTORIAL_LINT_COLLECT=1 passes clean documents without throwing', async ()
     if (prev === undefined) delete process.env.TUTORIAL_LINT_COLLECT;
     else process.env.TUTORIAL_LINT_COLLECT = prev;
   }
+});
+
+test('authoringMode: tutorial without <Section> fails', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    yamlFrontmatter('title: Tutorial\nauthoringMode: tutorial'),
+    paragraph('ここから始めましょう'),
+  );
+  const { file } = createVFileStub();
+  assert.throws(() => plugin()(tree, file), /page-mode-tutorial-requires-section/);
+});
+
+test('authoringMode: non-tutorial with <Section> fails', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    yamlFrontmatter('title: Memo\nauthoringMode: non-tutorial'),
+    section({ goal: 'foo します' }, jsxElement('Checkpoint', {}, paragraph('done'))),
+  );
+  const { file } = createVFileStub();
+  assert.throws(() => plugin()(tree, file), /page-mode-non-tutorial-has-section/);
+});
+
+test('invalid authoringMode value fails fast', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(yamlFrontmatter('title: Broken\nauthoringMode: hybrid'), paragraph('invalid'));
+  const { file } = createVFileStub();
+  assert.throws(() => plugin()(tree, file), /page-authoring-mode-invalid/);
+});
+
+test('pages with implicit tutorial mode still lint but emit migration note', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const stub = createVFileStub();
+  assert.doesNotThrow(() => plugin()(tree, stub.file));
+  assert.ok(
+    stub.notes.some((n) => /page-mode-implicit-tutorial/.test(n)),
+    'legacy Section inference should emit a migration note',
+  );
+});
+
+test('mdx metadata export can declare tutorial mode explicitly', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    mdxEsm("export const metadata = { title: 'Tutorial', authoringMode: 'tutorial' }"),
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const stub = createVFileStub();
+  assert.doesNotThrow(() => plugin()(tree, stub.file));
+  assert.ok(
+    !stub.notes.some((n) => /page-mode-implicit-tutorial/.test(n)),
+    'explicit mdx export metadata should suppress the migration note',
+  );
 });
 
 test('pages without <Section> are treated as non-tutorials and skipped', async () => {
