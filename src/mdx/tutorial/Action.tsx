@@ -1,28 +1,11 @@
 import type { ReactNode } from 'react';
 import { ImageZoom } from 'nextra/components';
 
-export type ActionCallout = {
-  /** Horizontal centre of the callout, as a percentage of the image width (0-100). */
-  x: number;
-  /** Vertical centre of the callout, as a percentage of the image height (0-100). */
-  y: number;
-  /** Label rendered inside the callout (e.g. "①" or "1"). */
-  label: string;
-};
-
 export type ActionProps = {
   /** Path to the screenshot showing where to interact. */
   img?: string;
   /** Alt text for the image. */
   alt?: string;
-  /**
-   * Optional numbered callouts to overlay on the image. Each callout is
-   * positioned as a percentage of the image dimensions so the overlay
-   * scales with responsive layouts. Use in conjunction with the matching
-   * ①②③ numbers in the instruction text (Signaling principle — sequence
-   * cues are complementary across image and text).
-   */
-  callouts?: ActionCallout[];
   /** What the learner should do (text instruction). */
   children: ReactNode;
 };
@@ -36,34 +19,19 @@ export type ActionProps = {
  * Visual numbering is provided by a CSS counter scoped to the nearest
  * Section, so action numbers reset cleanly per sub-section.
  *
- * Image is always above the text (spatial proximity principle). When
- * `callouts` are supplied, they are overlaid on the image at the given
- * percentage coordinates to support Signaling (visual cueing) without
- * requiring the author to bake numbers into the screenshot.
+ * Image is always above the text (spatial proximity principle). For
+ * numbered callouts on screenshots, use the tutorial-shots editor in
+ * course-docs-site (`/dev/tutorial-shots`): it keeps a separate raw
+ * image and an annotation JSON and bakes the callouts into the
+ * published image at build time, which keeps MDX free of pixel
+ * coordinates and keeps annotations re-editable.
  */
-export default function Action({ img, alt, callouts, children }: ActionProps) {
-  const hasCallouts = img && callouts && callouts.length > 0;
+export default function Action({ img, alt, children }: ActionProps) {
   return (
     <div className="tutorial-action">
-      {img &&
-        (hasCallouts ? (
-          <div className="tutorial-action__img-wrapper">
-            <ImageZoom src={img} alt={alt ?? ''} className="tutorial-action__img" loading="lazy" />
-            <div className="tutorial-action__callouts" aria-hidden="true">
-              {callouts.map((callout, index) => (
-                <span
-                  key={`${callout.label}-${index}`}
-                  className="tutorial-action__callout"
-                  style={{ left: `${callout.x}%`, top: `${callout.y}%` }}
-                >
-                  {callout.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <ImageZoom src={img} alt={alt ?? ''} className="tutorial-action__img" loading="lazy" />
-        ))}
+      {img && (
+        <ImageZoom src={img} alt={alt ?? ''} className="tutorial-action__img" loading="lazy" />
+      )}
       <div className="tutorial-action__text">{children}</div>
     </div>
   );

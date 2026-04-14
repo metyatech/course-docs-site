@@ -25,16 +25,15 @@ test('Action keeps the tutorial text container alongside the optional image', as
   assert.match(source, /<div className="tutorial-action__text">\{children\}<\/div>/);
 });
 
-test('Action exposes callouts prop and renders an overlay when callouts exist', async () => {
+test('Action delegates numbered callouts to tutorial-shots (no overlay surface)', async () => {
   const source = await fs.readFile(actionSourcePath, 'utf8');
 
-  assert.match(source, /export type ActionCallout = /);
-  assert.match(source, /callouts\?: ActionCallout\[\];/);
-  assert.match(source, /className="tutorial-action__img-wrapper"/);
-  assert.match(source, /className="tutorial-action__callouts"/);
-  assert.match(source, /className="tutorial-action__callout"/);
-  // x/y must be applied as CSS percentages so callouts scale with the
-  // responsive image.
-  assert.match(source, /left: `\$\{callout\.x\}%`/);
-  assert.match(source, /top: `\$\{callout\.y\}%`/);
+  // Callouts are the responsibility of the tutorial-shots dev editor,
+  // which bakes annotations into the published image. The Action
+  // component must NOT offer its own overlay surface, which would
+  // encourage authors to hand-write pixel coordinates in MDX.
+  assert.doesNotMatch(source, /ActionCallout/);
+  assert.doesNotMatch(source, /callouts\?:/);
+  assert.doesNotMatch(source, /tutorial-action__callouts?/);
+  assert.doesNotMatch(source, /tutorial-action__img-wrapper/);
 });
