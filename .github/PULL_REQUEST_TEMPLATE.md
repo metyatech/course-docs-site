@@ -22,3 +22,9 @@ Please describe the tests that you ran to verify your changes.
 - [ ] My changes generate no new warnings
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] New and existing unit tests pass locally with my changes
+
+### If this PR touches tutorial-lint (remark-tutorial-lint) or tutorial MDX components
+
+- [ ] Added a node:test case for every new rule or branch
+- [ ] Verified `TUTORIAL_LINT_STRICT=1 npm run build:verified` in at least one content repo
+- [ ] Updated `skill-tutorial-authoring`'s `SKILL.md` and `REVIEW-CHECKLIST.md` if a new rule or principle was introduced
