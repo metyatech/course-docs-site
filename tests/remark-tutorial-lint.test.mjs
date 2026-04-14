@@ -641,3 +641,35 @@ test('TUTORIAL_LINT_COLLECT=1 passes clean documents without throwing', async ()
     else process.env.TUTORIAL_LINT_COLLECT = prev;
   }
 });
+
+test('pages without <Section> are treated as non-tutorials and skipped', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  // A teacher-facing memo that would violate Personalization
+  // (page-opens-with-doc-description) and decorative-emoji, but carries
+  // no <Section>, so the plugin must not flag it.
+  const tree = root(
+    paragraph('このページは、授業を止めないための運営メモです 🎉'),
+    paragraph('受講者は事前に確認してください'),
+  );
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.deepEqual(warnings, [], 'non-tutorial pages must not emit any tutorial-lint findings');
+});
+
+test('pages without <Section> skip even in strict/collect modes', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(paragraph('このページは運営メモです 🎉'), paragraph('学習者は〜'));
+  const { file } = createVFileStub();
+  const prevStrict = process.env.TUTORIAL_LINT_STRICT;
+  const prevCollect = process.env.TUTORIAL_LINT_COLLECT;
+  process.env.TUTORIAL_LINT_STRICT = '1';
+  process.env.TUTORIAL_LINT_COLLECT = '1';
+  try {
+    assert.doesNotThrow(() => plugin()(tree, file));
+  } finally {
+    if (prevStrict === undefined) delete process.env.TUTORIAL_LINT_STRICT;
+    else process.env.TUTORIAL_LINT_STRICT = prevStrict;
+    if (prevCollect === undefined) delete process.env.TUTORIAL_LINT_COLLECT;
+    else process.env.TUTORIAL_LINT_COLLECT = prevCollect;
+  }
+});

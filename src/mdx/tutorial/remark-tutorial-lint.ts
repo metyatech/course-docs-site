@@ -451,8 +451,37 @@ type StepContext = {
   checkpoints: CheckpointInfo[];
 };
 
+// A page is considered a learner-facing tutorial only when it uses at
+// least one <Section> component. Pages without <Section> (operational
+// memos, teacher guides, index pages, intros) fall outside the
+// tutorial-authoring skill's scope and must NOT be flagged by its
+// rules — e.g. Personalization's "no document-describing opener"
+// applies to tutorials, not to teacher-facing overviews.
+const hasTutorialSection = (tree: Node): boolean => {
+  let found = false;
+  const walk = (n: Node) => {
+    if (found) return;
+    if (
+      (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
+      (n as MdxJsxElement).name === 'Section'
+    ) {
+      found = true;
+      return;
+    }
+    if (hasChildren(n)) {
+      for (const child of n.children) walk(child);
+    }
+  };
+  walk(tree);
+  return found;
+};
+
 export default function remarkTutorialLint() {
   return function transform(tree: Node, file: VFileLike) {
+    // Gate: skip non-tutorial pages (no <Section>). This keeps
+    // teacher-facing memos, indexes, and intros out of scope.
+    if (!hasTutorialSection(tree)) return;
+
     if (isCollectMode()) startCollection(file);
 
     // Page-level checks that need the full tree root.
