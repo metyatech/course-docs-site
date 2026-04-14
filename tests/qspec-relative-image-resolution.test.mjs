@@ -7,7 +7,7 @@ import path from "node:path";
 import process from "node:process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { createRunDevTestEnv } from "./test-harness-env.mjs";
+import { createRunDevTestEnv, killProcessTree } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -249,25 +249,6 @@ done
   await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
-const killProcessTree = async (child) => {
-  if (!child || child.killed) {
-    return;
-  }
-  try {
-    child.kill();
-  } catch {
-    // ignore
-  }
-
-  if (process.platform === "win32") {
-    try {
-      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-    } catch {
-      // ignore
-    }
-  }
-  await Promise.race([new Promise((resolve) => child.on("exit", () => resolve())), sleep(10_000)]);
-};
 
 test(
   "qspec markdown image resolves relative path from qspec directory",

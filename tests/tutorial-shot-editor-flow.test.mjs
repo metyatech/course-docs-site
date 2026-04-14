@@ -10,7 +10,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import sharp from "sharp";
-import { createRunDevTestEnv } from "./test-harness-env.mjs";
+import { createRunDevTestEnv, killProcessTree } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const envCourseLocalPath = path.join(projectRoot, ".env.course.local");
@@ -82,25 +82,6 @@ const tryFetchStatus = async (url) => {
   }
 };
 
-const killProcessTree = async (child) => {
-  if (!child || child.killed) {
-    return;
-  }
-  try {
-    child.kill();
-  } catch {
-    // ignore
-  }
-
-  if (process.platform === "win32") {
-    try {
-      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-    } catch {
-      // ignore
-    }
-  }
-  await Promise.race([new Promise((resolve) => child.on("exit", () => resolve())), sleep(10_000)]);
-};
 
 const writeFixtureCourseRepo = async (
   rootDir,
@@ -238,7 +219,9 @@ const openTutorialShotEditor = async (page, overrideCourseRelativePath) => {
   await page.getByRole("button", { name: "別のリポジトリに切り替え" }).click();
   await page.getByPlaceholder("../open-campus-unreal-90min").fill(overrideCourseRelativePath);
   await page.getByRole("button", { name: "切り替える" }).click();
-  await page.getByRole("button", { name: /override-startup/i }).waitFor();
+  // The server rescans the override-course directory on click; on Windows
+  // this can exceed Playwright's 30 s default under heavy disk/CPU load.
+  await page.getByRole("button", { name: /override-startup/i }).waitFor({ timeout: 60_000 });
   await page.getByRole("heading", { name: "必要なら注釈を追加" }).scrollIntoViewIfNeeded();
   await waitForAnnotationCanvasReady(page);
 };

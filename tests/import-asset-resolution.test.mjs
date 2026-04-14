@@ -8,7 +8,7 @@ import process from "node:process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { normalizeNextEnvDts } from "../scripts/next-dist-dir.mjs";
-import { createRunDevTestEnv } from "./test-harness-env.mjs";
+import { createRunDevTestEnv, killProcessTree } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const nextBinPath = path.join(projectRoot, "node_modules", "next", "dist", "bin", "next");
@@ -153,25 +153,6 @@ import demoVideoUrl from './assets/demo.mp4';
   await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
-const killProcessTree = async (child) => {
-  if (!child || child.killed) {
-    return;
-  }
-  try {
-    child.kill();
-  } catch {
-    // ignore
-  }
-
-  if (process.platform === "win32") {
-    try {
-      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-    } catch {
-      // ignore
-    }
-  }
-  await Promise.race([new Promise((resolve) => child.on("exit", () => resolve())), sleep(10_000)]);
-};
 
 test(
   "imported download assets resolve through stable-filename URLs",
@@ -227,7 +208,10 @@ test(
         return result?.status === 200;
       },
       {
-        timeoutMs: 60_000,
+        // Windows CI/dev hosts occasionally take > 60 s for `next start` to
+        // accept the first request after a fresh build. 120 s covers the
+        // observed tail; we still fail loudly if the server is truly stuck.
+        timeoutMs: 120_000,
         intervalMs: 500,
         onTimeoutMessage: "Server did not become ready for /docs/imports/.",
       },
