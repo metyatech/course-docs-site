@@ -37,6 +37,13 @@ import type { Node } from 'unist';
  *  - Strict mode: setting `TUTORIAL_LINT_STRICT=1` (or `1`/`true`) at
  *    build time promotes every warning into a build-failing error. CI
  *    pipelines should enable this to prevent warning drift.
+ *  - Collect-all mode: setting `TUTORIAL_LINT_COLLECT=1` (or `1`/`true`)
+ *    suppresses early termination across BOTH warnings and errors; all
+ *    findings within a single MDX file are accumulated and emitted as
+ *    one aggregated `file.fail()` at the end of transform. Use this for
+ *    PR-review builds where a single full list of violations is more
+ *    useful than the first-fail behaviour of strict mode.
+ *    Collect-all implies strict (warnings count as violations).
  */
 
 const RULE_ORIGIN = 'tutorial-lint';
@@ -358,8 +365,42 @@ const isStrictMode = (): boolean => {
   return raw === '1' || raw.toLowerCase() === 'true';
 };
 
+const isCollectMode = (): boolean => {
+  const raw = process?.env?.TUTORIAL_LINT_COLLECT;
+  if (!raw) return false;
+  return raw === '1' || raw.toLowerCase() === 'true';
+};
+
+type Finding = {
+  severity: 'warn' | 'error';
+  reason: string;
+  ruleId: string;
+  node: Node;
+};
+
+// Per-file finding buffers, keyed by the VFile instance. Populated in
+// collect-all mode; drained and thrown in one aggregated file.fail() at
+// the end of transform. WeakMap ensures no leak if the plugin is reused.
+const findingsByFile = new WeakMap<object, Finding[]>();
+
+const startCollection = (file: VFileLike) => {
+  findingsByFile.set(file as unknown as object, []);
+};
+
+const getCollection = (file: VFileLike): Finding[] | undefined =>
+  findingsByFile.get(file as unknown as object);
+
+const endCollection = (file: VFileLike) => {
+  findingsByFile.delete(file as unknown as object);
+};
+
 const emitWarning = (file: VFileLike, reason: string, place: Node, ruleId: string) => {
   const origin = `${RULE_ORIGIN}:${ruleId}`;
+  const collection = getCollection(file);
+  if (collection) {
+    collection.push({ severity: 'warn', reason, ruleId, node: place });
+    return;
+  }
   if (isStrictMode()) {
     // Strict mode promotes warnings into build-failing errors so CI can
     // catch authoring drift. The message body is identical so rule IDs
@@ -375,8 +416,28 @@ const emitWarning = (file: VFileLike, reason: string, place: Node, ruleId: strin
 
 const emitError = (file: VFileLike, reason: string, place: Node, ruleId: string) => {
   const origin = `${RULE_ORIGIN}:${ruleId}`;
+  const collection = getCollection(file);
+  if (collection) {
+    collection.push({ severity: 'error', reason, ruleId, node: place });
+    return;
+  }
   // `file.fail` throws; construct the full origin so consumers can filter.
   file.fail(`${reason} (${ruleId})`, place, origin);
+};
+
+const flushCollection = (file: VFileLike) => {
+  const collection = getCollection(file);
+  if (!collection) return;
+  endCollection(file);
+  if (collection.length === 0) return;
+  const lines = collection
+    .map(
+      (f, i) =>
+        `  ${String(i + 1).padStart(2, ' ')}. [${f.severity.padEnd(5, ' ')}] ${f.reason} (${f.ruleId})`,
+    )
+    .join('\n');
+  const summary = `tutorial-lint: ${collection.length} issue(s) found [collect-all]\n${lines}`;
+  file.fail(summary, collection[0].node, `${RULE_ORIGIN}:collect-all`);
 };
 
 type CheckpointInfo = {
@@ -392,6 +453,8 @@ type StepContext = {
 
 export default function remarkTutorialLint() {
   return function transform(tree: Node, file: VFileLike) {
+    if (isCollectMode()) startCollection(file);
+
     // Page-level checks that need the full tree root.
     validatePageOpener(file, tree);
     validateThirdPersonReader(file, tree);
@@ -482,6 +545,9 @@ export default function remarkTutorialLint() {
     };
 
     walk(tree, null, 0);
+
+    // Collect-all mode: throw one aggregated error listing every finding.
+    flushCollection(file);
   };
 }
 

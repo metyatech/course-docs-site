@@ -564,3 +564,80 @@ test('TUTORIAL_LINT_STRICT unset leaves warnings as warnings', async () => {
     if (prev !== undefined) process.env.TUTORIAL_LINT_STRICT = prev;
   }
 });
+
+test('TUTORIAL_LINT_COLLECT=1 accumulates every finding and fails once with all of them', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    // Triggers page-opens-with-doc-description.
+    paragraph('この教材は Unreal Engine の入門資料です'),
+    // Triggers third-person-reader.
+    paragraph('受講者が操作を行います'),
+    // Triggers decorative-emoji outside signalling surface.
+    paragraph('楽しく 🎉'),
+    section(
+      { goal: 'foo します' },
+      // Triggers action-bold-overuse (three bold spans).
+      action(
+        { img: './a.png' },
+        paragraphWithChildren(
+          strong('A'),
+          { type: 'text', value: ' ' },
+          strong('B'),
+          { type: 'text', value: ' ' },
+          strong('C'),
+          { type: 'text', value: ' を選びます' },
+        ),
+      ),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file } = createVFileStub();
+  const prevCollect = process.env.TUTORIAL_LINT_COLLECT;
+  const prevStrict = process.env.TUTORIAL_LINT_STRICT;
+  process.env.TUTORIAL_LINT_COLLECT = '1';
+  delete process.env.TUTORIAL_LINT_STRICT;
+  try {
+    let thrown;
+    try {
+      plugin()(tree, file);
+    } catch (err) {
+      thrown = err;
+    }
+    assert.ok(thrown, 'collect-all mode should throw one aggregated failure');
+    const body = String(thrown.reason ?? thrown.message ?? '');
+    assert.match(body, /tutorial-lint: \d+ issue\(s\) found \[collect-all\]/);
+    // All four rules that the tree violates should appear in the summary.
+    assert.match(body, /page-opens-with-doc-description/);
+    assert.match(body, /third-person-reader/);
+    assert.match(body, /decorative-emoji/);
+    assert.match(body, /action-bold-overuse/);
+  } finally {
+    if (prevCollect === undefined) delete process.env.TUTORIAL_LINT_COLLECT;
+    else process.env.TUTORIAL_LINT_COLLECT = prevCollect;
+    if (prevStrict !== undefined) process.env.TUTORIAL_LINT_STRICT = prevStrict;
+  }
+});
+
+test('TUTORIAL_LINT_COLLECT=1 passes clean documents without throwing', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    paragraph('ここで Unreal Engine を起動しましょう'),
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  const prev = process.env.TUTORIAL_LINT_COLLECT;
+  process.env.TUTORIAL_LINT_COLLECT = '1';
+  try {
+    assert.doesNotThrow(() => plugin()(tree, file));
+    assert.deepEqual(warnings, []);
+  } finally {
+    if (prev === undefined) delete process.env.TUTORIAL_LINT_COLLECT;
+    else process.env.TUTORIAL_LINT_COLLECT = prev;
+  }
+});
