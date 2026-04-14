@@ -10,13 +10,13 @@ type MetadataNode = Node & {
 export type PageAuthoringMode = 'tutorial' | 'non-tutorial';
 
 type ExplicitModeSource = 'yaml-frontmatter' | 'toml-frontmatter' | 'mdx-export';
-type ImplicitModeSource = 'legacy-section-inference' | 'default-non-tutorial';
+type DefaultModeSource = 'default-non-tutorial';
 
 export type PageAuthoringModeResolution =
   | {
       mode: PageAuthoringMode;
       explicit: boolean;
-      source: ExplicitModeSource | ImplicitModeSource;
+      source: ExplicitModeSource | DefaultModeSource;
       hasTutorialSection: boolean;
     }
   | {
@@ -144,19 +144,10 @@ export const resolvePageAuthoringMode = (tree: Node): PageAuthoringModeResolutio
     }
   }
 
-  if (hasSection) {
-    return {
-      mode: 'tutorial',
-      explicit: false,
-      source: 'legacy-section-inference',
-      hasTutorialSection: true,
-    };
-  }
-
   return {
     mode: 'non-tutorial',
     explicit: false,
     source: 'default-non-tutorial',
-    hasTutorialSection: false,
+    hasTutorialSection: hasSection,
   };
 };

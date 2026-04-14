@@ -45,8 +45,11 @@ Rules:
 - Short procedural blocks may still appear inline on non-tutorial pages; that does not change the page mode by itself.
 - If a page becomes both a full tutorial and a reference/overview, split it into separate pages instead of inventing a third page type.
 
-## Migration behavior
+## Default when omitted
 
-Existing pages that already use `<Section>` but do not yet declare `authoringMode: tutorial` still run through tutorial lint so older course content does not silently lose checks. The linter emits a migration note until the frontmatter is added.
+If a page omits `authoringMode`, Course Docs Site treats it as `non-tutorial`.
 
-Pages without `<Section>` and without `authoringMode` continue to behave as non-tutorial pages.
+Rules:
+
+- A page without `authoringMode` and without `<Section>` behaves as a non-tutorial page and skips tutorial lint.
+- A page without `authoringMode` that still uses `<Section>` fails the MDX build; add `authoringMode: tutorial` before using tutorial structure.

@@ -90,6 +90,9 @@ const mdxEsm = (value) => ({
   value,
 });
 
+const tutorialRoot = (...children) =>
+  root(yamlFrontmatter('title: Tutorial\nauthoringMode: tutorial'), ...children);
+
 // Suppress console.warn spam and capture console.info lines (notes).
 const originalConsoleWarn = console.warn;
 const originalConsoleInfo = console.info;
@@ -106,14 +109,14 @@ test.after(() => {
 
 test('<Section> without goal prop fails', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(section({}, paragraph('body')));
+  const tree = tutorialRoot(section({}, paragraph('body')));
   const { file } = createVFileStub();
   assert.throws(() => plugin()(tree, file), /section-goal-required/);
 });
 
 test('<Section> with past-tense goal emits a note (advisory only)', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'キューブが置かれた状態' },
       action({ img: './a.png' }, paragraph('進めます')),
@@ -131,7 +134,7 @@ test('<Section> with past-tense goal emits a note (advisory only)', async () => 
 
 test('<Section> with future goal passes', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section({ goal: 'キューブを 1 つ置きます' }, jsxElement('Checkpoint', {}, paragraph('done'))),
   );
   const { file } = createVFileStub();
@@ -140,7 +143,7 @@ test('<Section> with future goal passes', async () => {
 
 test('<Action> with two images fails', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       action({ img: './a.png' }, paragraph('text'), mdImage('./b.png')),
@@ -153,7 +156,7 @@ test('<Action> with two images fails', async () => {
 
 test('<Action> with positional prefix emits a warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       action({ img: './a.png' }, paragraph('左側から「新規プロジェクト」を押します')),
@@ -170,7 +173,7 @@ test('<Action> with positional prefix emits a warning', async () => {
 
 test('<Section> containing --- horizontal rule emits a warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       { type: 'thematicBreak' },
@@ -187,7 +190,7 @@ test('<Section> containing --- horizontal rule emits a warning', async () => {
 
 test('image-only <Reference> emits a note (advisory)', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       jsxElement('Reference', { title: 'ここまでの状態' }, mdImage()),
@@ -204,7 +207,7 @@ test('image-only <Reference> emits a note (advisory)', async () => {
 
 test('<Verify> starting with → emits a duplicate-arrow warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       jsxElement('Verify', {}, paragraph('→ 成功です')),
@@ -221,7 +224,7 @@ test('<Verify> starting with → emits a duplicate-arrow warning', async () => {
 
 test('<Verify> without leading → does not warn', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       jsxElement('Verify', {}, paragraph('成功です')),
@@ -238,7 +241,7 @@ test('<Verify> without leading → does not warn', async () => {
 
 test('multiple <Checkpoint> in one Step emits a warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       jsxElement('Checkpoint', {}, paragraph('a')),
@@ -255,7 +258,7 @@ test('multiple <Checkpoint> in one Step emits a warning', async () => {
 
 test('content after <Checkpoint> emits a warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       jsxElement('Checkpoint', {}, paragraph('a')),
@@ -272,7 +275,7 @@ test('content after <Checkpoint> emits a warning', async () => {
 
 test('Checkpoint nested inside subsection emits a warning', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'outer' },
       section({ goal: 'inner' }, jsxElement('Checkpoint', {}, paragraph('a'))),
@@ -288,7 +291,7 @@ test('Checkpoint nested inside subsection emits a warning', async () => {
 
 test('well-formed Step with exercise before Checkpoint passes', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       section(
@@ -318,7 +321,7 @@ const paragraphWithChildren = (...children) => ({ type: 'paragraph', children })
 
 test('Action with six bold spans emits action-bold-overuse note', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       action(
@@ -356,7 +359,7 @@ test('Action with six bold spans emits action-bold-overuse note', async () => {
 
 test('Action with five bold spans does not emit action-bold-overuse', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       action(
@@ -387,7 +390,7 @@ test('Action with five bold spans does not emit action-bold-overuse', async () =
 
 test('third-person reader ("受講者") emits Personalization note', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     paragraph('受講者が操作を行います'),
     section(
       { goal: 'foo します' },
@@ -406,7 +409,7 @@ test('third-person reader ("受講者") emits Personalization note', async () =>
 
 test('second-person addressing does not trigger third-person note', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     paragraph('ここで Unreal Engine を起動しましょう'),
     section(
       { goal: 'foo します' },
@@ -425,7 +428,7 @@ test('second-person addressing does not trigger third-person note', async () => 
 
 test('page opening with "この教材は" emits Personalization note', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     paragraph('この教材は Unreal Engine の入門資料です'),
     section(
       { goal: 'foo します' },
@@ -444,7 +447,7 @@ test('page opening with "この教材は" emits Personalization note', async () 
 
 test('Verify describing internal mechanics emits a note', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       action({ img: './a.png' }, paragraph('進めます')),
@@ -462,7 +465,7 @@ test('Verify describing internal mechanics emits a note', async () => {
 
 test('Concept with 11 sentences emits concept-length note', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       jsxElement(
@@ -487,7 +490,7 @@ test('Concept with 11 sentences emits concept-length note', async () => {
 
 test('Concept with no following usage site emits concept-placement note', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       action({ img: './a.png' }, paragraph('進めます')),
@@ -506,7 +509,7 @@ test('Concept with no following usage site emits concept-placement note', async 
 
 test('Concept immediately before Action does not emit concept-placement', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       jsxElement('Concept', { title: '用語' }, paragraph('短い説明')),
@@ -525,7 +528,7 @@ test('Concept immediately before Action does not emit concept-placement', async 
 
 test('Section with Action but no feedback surface emits section-lacks-feedback', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section({ goal: 'foo します' }, action({ img: './a.png' }, paragraph('進めます'))),
   );
   const { file, warnings } = createVFileStub();
@@ -538,7 +541,7 @@ test('Section with Action but no feedback surface emits section-lacks-feedback',
 
 test('Section that delegates to nested Sections is exempt from feedback rule', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'outer goal します' },
       section(
@@ -559,7 +562,7 @@ test('Section that delegates to nested Sections is exempt from feedback rule', a
 
 test('decorative emoji outside signaling surface emits a note', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     paragraph('楽しく進めましょう 🎉'),
     section(
       { goal: 'foo します' },
@@ -578,7 +581,7 @@ test('decorative emoji outside signaling surface emits a note', async () => {
 
 test('signalling emoji (✅) inside Checkpoint is allowed', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       action({ img: './a.png' }, paragraph('進めます')),
@@ -599,7 +602,7 @@ test('TUTORIAL_LINT_STRICT=1 promotes warnings into build-failing errors', async
   const { default: plugin } = await import(pluginModulePath);
   // Use a warn-level violation (section-no-hrule) because notes are
   // never promoted to errors, only warnings are.
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       { type: 'thematicBreak' },
@@ -620,7 +623,7 @@ test('TUTORIAL_LINT_STRICT=1 promotes warnings into build-failing errors', async
 test('TUTORIAL_LINT_STRICT does NOT promote notes to errors', async () => {
   const { default: plugin } = await import(pluginModulePath);
   // decorative-emoji is a note, so strict mode must leave it as a note.
-  const tree = root(
+  const tree = tutorialRoot(
     paragraph('楽しく進めましょう 🎉'),
     section(
       { goal: 'foo します' },
@@ -646,7 +649,7 @@ test('TUTORIAL_LINT_STRICT does NOT promote notes to errors', async () => {
 
 test('TUTORIAL_LINT_STRICT unset leaves warnings as warnings', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     section(
       { goal: 'foo します' },
       { type: 'thematicBreak' },
@@ -668,7 +671,7 @@ test('TUTORIAL_LINT_COLLECT=1 fails once when warnings + notes are mixed', async
   const { default: plugin } = await import(pluginModulePath);
   // Mix a warning (section-no-hrule) with notes so collect-all has to
   // aggregate and fail once (because a warning is present).
-  const tree = root(
+  const tree = tutorialRoot(
     paragraph('この教材は Unreal Engine の入門資料です'), // note
     paragraph('受講者が操作を行います'), // note
     paragraph('楽しく 🎉'), // note
@@ -710,7 +713,7 @@ test('TUTORIAL_LINT_COLLECT=1 fails once when warnings + notes are mixed', async
 test('TUTORIAL_LINT_COLLECT=1 does NOT fail when only notes are found', async () => {
   const { default: plugin } = await import(pluginModulePath);
   // Notes-only tree: all the below rules are notes.
-  const tree = root(
+  const tree = tutorialRoot(
     paragraph('この教材は 〜 です'), // note: page-opens-with-doc-description
     paragraph('受講者が 〜'), // note: third-person-reader
     paragraph('🎉'), // note: decorative-emoji
@@ -739,7 +742,7 @@ test('TUTORIAL_LINT_COLLECT=1 does NOT fail when only notes are found', async ()
 
 test('TUTORIAL_LINT_COLLECT=1 passes clean documents without throwing', async () => {
   const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
+  const tree = tutorialRoot(
     paragraph('ここで Unreal Engine を起動しましょう'),
     section(
       { goal: 'foo します' },
@@ -787,7 +790,7 @@ test('invalid authoringMode value fails fast', async () => {
   assert.throws(() => plugin()(tree, file), /page-authoring-mode-invalid/);
 });
 
-test('pages with implicit tutorial mode still lint but emit migration note', async () => {
+test('pages with <Section> but no authoringMode fail because default mode is non-tutorial', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section(
@@ -797,12 +800,8 @@ test('pages with implicit tutorial mode still lint but emit migration note', asy
       jsxElement('Checkpoint', {}, paragraph('done')),
     ),
   );
-  const stub = createVFileStub();
-  assert.doesNotThrow(() => plugin()(tree, stub.file));
-  assert.ok(
-    stub.notes.some((n) => /page-mode-implicit-tutorial/.test(n)),
-    'legacy Section inference should emit a migration note',
-  );
+  const { file } = createVFileStub();
+  assert.throws(() => plugin()(tree, file), /page-mode-non-tutorial-has-section/);
 });
 
 test('mdx metadata export can declare tutorial mode explicitly', async () => {
@@ -818,10 +817,7 @@ test('mdx metadata export can declare tutorial mode explicitly', async () => {
   );
   const stub = createVFileStub();
   assert.doesNotThrow(() => plugin()(tree, stub.file));
-  assert.ok(
-    !stub.notes.some((n) => /page-mode-implicit-tutorial/.test(n)),
-    'explicit mdx export metadata should suppress the migration note',
-  );
+  assert.deepEqual(stub.warnings, []);
 });
 
 test('pages without <Section> are treated as non-tutorials and skipped', async () => {

@@ -46,7 +46,6 @@ import { resolvePageAuthoringMode } from './page-authoring-mode.js';
  *  - tutorial/concept-length            (note)  — numeric threshold
  *  - tutorial/concept-placement         (note)  — judgement
  *  - tutorial/decorative-emoji          (note)  — allowlist heuristic
- *  - tutorial/page-mode-implicit-tutorial (note) — migration guidance
  *
  * Severity handling:
  *  - Errors call `file.fail()` which throws and fails the MDX compile.
@@ -526,12 +525,10 @@ export default function remarkTutorialLint() {
 
     if (pageMode.mode === 'non-tutorial') {
       if (pageMode.hasTutorialSection) {
-        emitError(
-          file,
-          'Page declares `authoringMode: non-tutorial` but still uses <Section>; keep short procedural blocks inline or split the tutorial into its own page',
-          tree,
-          'page-mode-non-tutorial-has-section',
-        );
+        const reason = pageMode.explicit
+          ? 'Page declares `authoringMode: non-tutorial` but still uses <Section>; keep short procedural blocks inline or split the tutorial into its own page'
+          : 'Page uses <Section> but omits `authoringMode`; pages without `authoringMode` default to `non-tutorial`, so add `authoringMode: tutorial` or remove <Section>';
+        emitError(file, reason, tree, 'page-mode-non-tutorial-has-section');
         flushCollection(file);
         return;
       }
@@ -550,15 +547,6 @@ export default function remarkTutorialLint() {
       );
       flushCollection(file);
       return;
-    }
-
-    if (!pageMode.explicit) {
-      emitNote(
-        file,
-        'Page uses <Section> but does not declare frontmatter `authoringMode: tutorial`; add it so tutorial/non-tutorial classification is explicit at the page boundary during migration',
-        tree,
-        'page-mode-implicit-tutorial',
-      );
     }
 
     // Page-level checks that need the full tree root.
