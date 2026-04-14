@@ -165,6 +165,8 @@ local Next dev server is already using the default Playwright port. Set
 
 ## Documentation
 
+- [Authoring Modes](./docs/authoring-modes.md)
+- [Tutorial Shot Editor](./docs/tutorial-shot-editor.md)
 - [LICENSE](./LICENSE)
 - [SECURITY.md](./SECURITY.md)
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
@@ -180,3 +182,6 @@ local Next dev server is already using the default Playwright port. Set
 - Cross-repo workflow dispatch uses the `COURSE_CONTENT_REDEPLOY_TOKEN` Actions secret in this repository.
 - `@metyatech/course-docs-platform` is pinned in `package.json` / `package-lock.json`, so platform-only changes
   do not reach production until this repo updates the pinned commit and `main` passes `CI`.
+- Content repos should use the two-mode authoring boundary documented in
+  [Authoring Modes](./docs/authoring-modes.md): **Tutorial** for sequential
+  build/do flows, **Non-tutorial** for explanation/reference pages.
