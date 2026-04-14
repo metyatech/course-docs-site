@@ -34,6 +34,9 @@ import type { Node } from 'unist';
  *  - Warnings call `file.message()` AND emit `console.warn(...)` so they
  *    surface in both `npm run dev` and `npm run build` output regardless
  *    of the loader's vfile-message handling.
+ *  - Strict mode: setting `TUTORIAL_LINT_STRICT=1` (or `1`/`true`) at
+ *    build time promotes every warning into a build-failing error. CI
+ *    pipelines should enable this to prevent warning drift.
  */
 
 const RULE_ORIGIN = 'tutorial-lint';
@@ -349,8 +352,21 @@ const isReferenceImageOnly = (node: MdxJsxElement): boolean => {
   });
 };
 
+const isStrictMode = (): boolean => {
+  const raw = process?.env?.TUTORIAL_LINT_STRICT;
+  if (!raw) return false;
+  return raw === '1' || raw.toLowerCase() === 'true';
+};
+
 const emitWarning = (file: VFileLike, reason: string, place: Node, ruleId: string) => {
   const origin = `${RULE_ORIGIN}:${ruleId}`;
+  if (isStrictMode()) {
+    // Strict mode promotes warnings into build-failing errors so CI can
+    // catch authoring drift. The message body is identical so rule IDs
+    // remain matchable.
+    file.fail(`${reason} (${ruleId}) [strict]`, place, origin);
+    return;
+  }
   file.message(reason, place, origin);
   const where = file.path ?? 'unknown';
 

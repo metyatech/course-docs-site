@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import process from 'node:process';
 
 const pluginModulePath = '../dist/mdx/tutorial/remark-tutorial-lint.js';
 
@@ -518,4 +519,48 @@ test('signalling emoji (✅) inside Checkpoint is allowed', async () => {
     !warnings.some((w) => /decorative-emoji/.test(w.origin ?? '')),
     '✅ inside Checkpoint should not warn',
   );
+});
+
+test('TUTORIAL_LINT_STRICT=1 promotes warnings into build-failing errors', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    paragraph('楽しく進めましょう 🎉'),
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file } = createVFileStub();
+  const prev = process.env.TUTORIAL_LINT_STRICT;
+  process.env.TUTORIAL_LINT_STRICT = '1';
+  try {
+    assert.throws(() => plugin()(tree, file), /decorative-emoji.*\[strict\]/);
+  } finally {
+    if (prev === undefined) delete process.env.TUTORIAL_LINT_STRICT;
+    else process.env.TUTORIAL_LINT_STRICT = prev;
+  }
+});
+
+test('TUTORIAL_LINT_STRICT unset leaves warnings as warnings', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(
+    paragraph('楽しく進めましょう 🎉'),
+    section(
+      { goal: 'foo します' },
+      action({ img: './a.png' }, paragraph('進めます')),
+      jsxElement('Verify', {}, paragraph('成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const { file, warnings } = createVFileStub();
+  const prev = process.env.TUTORIAL_LINT_STRICT;
+  delete process.env.TUTORIAL_LINT_STRICT;
+  try {
+    assert.doesNotThrow(() => plugin()(tree, file));
+    assert.ok(warnings.some((w) => /decorative-emoji/.test(w.origin ?? '')));
+  } finally {
+    if (prev !== undefined) process.env.TUTORIAL_LINT_STRICT = prev;
+  }
 });
