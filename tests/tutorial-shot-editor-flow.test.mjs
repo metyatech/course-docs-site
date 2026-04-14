@@ -194,6 +194,22 @@ const getAnnotationCanvasBox = async (page) => {
   return canvasBox;
 };
 
+const dragAnnotationCanvas = async (
+  page,
+  {
+    startX,
+    startY,
+    endX,
+    endY,
+  },
+) => {
+  const canvasBox = await getAnnotationCanvasBox(page);
+  await page.mouse.move(canvasBox.x + startX, canvasBox.y + startY);
+  await page.mouse.down();
+  await page.mouse.move(canvasBox.x + endX, canvasBox.y + endY, { steps: 12 });
+  await page.mouse.up();
+};
+
 const waitForAnnotationCanvasReady = async (page) => {
   await waitFor(
     async () =>
@@ -464,6 +480,104 @@ test(
       await page.locator('li[data-selected="true"]').count(),
       0,
       "Clicking empty canvas space should clear the selection.",
+    );
+  },
+);
+
+test(
+  "tutorial shot editor moves the whole arrow when dragging the arrow body",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-arrow-"));
+    const fixtureCourse = path.join(tempRoot, "course");
+    const overrideCourse = path.join(tempRoot, "override-course");
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+    await writeFixtureCourseRepo(overrideCourse, {
+      logoText: "Override Tutorial Shot Fixture",
+      firstImageName: "override-startup",
+      secondImageName: "override-missing-output",
+    });
+
+    const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "tutorial-shot-editor-arrow-drag",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Tutorial shot editor did not become ready.",
+      },
+    );
+
+    const browser = await chromium.launch({ headless: true });
+    t.after(async () => {
+      await browser.close();
+    });
+    const page = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+
+    await openTutorialShotEditor(page, overrideCourseRelativePath);
+    await page.getByRole("button", { name: "枠を追加" }).click();
+    await page.getByRole("button", { name: "矢印を追加" }).click();
+
+    const dragOffset = { x: 64, y: 44 };
+    await dragAnnotationCanvas(page, {
+      startX: 124,
+      startY: 58,
+      endX: 124 + dragOffset.x,
+      endY: 58 + dragOffset.y,
+    });
+
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await page.getByText("保存しました").waitFor();
+
+    const startupManifestPath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "shots",
+      "override-startup.shot.json",
+    );
+    const startupManifest = JSON.parse(await fs.readFile(startupManifestPath, "utf8"));
+    const arrow = startupManifest.annotations.find((annotation) => annotation.type === "arrow");
+
+    assert.deepEqual(
+      arrow,
+      {
+        id: arrow.id,
+        type: "arrow",
+        fromX: 72 + dragOffset.x,
+        fromY: 32 + dragOffset.y,
+        toX: 173 + dragOffset.x,
+        toY: 85 + dragOffset.y,
+      },
+      "Dragging the arrow body should move both endpoints together.",
     );
   },
 );

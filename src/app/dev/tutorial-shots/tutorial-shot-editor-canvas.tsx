@@ -42,6 +42,9 @@ export default function TutorialShotEditorCanvas({
   selectedAnnotationId,
 }: Props) {
   const [imageElement, setImageElement] = useState<HTMLImageElement | null>(null);
+  const [arrowDragOffsets, setArrowDragOffsets] = useState<
+    Record<string, { x: number; y: number }>
+  >({});
   const nodeRefs = useRef<Record<string, Konva.Rect | null>>({});
   const transformerRef = useRef<Konva.Transformer | null>(null);
   const scale = useMemo(() => Math.min(1, 960 / Math.max(1, imageWidth)), [imageWidth]);
@@ -82,6 +85,30 @@ export default function TutorialShotEditorCanvas({
         annotation.id === annotationId ? updater(annotation) : annotation,
       ),
     );
+  };
+
+  const updateArrowDragOffset = (annotationId: string, x: number, y: number) => {
+    setArrowDragOffsets((current) => {
+      const existingOffset = current[annotationId];
+      if (existingOffset?.x === x && existingOffset?.y === y) {
+        return current;
+      }
+      return {
+        ...current,
+        [annotationId]: { x, y },
+      };
+    });
+  };
+
+  const clearArrowDragOffset = (annotationId: string) => {
+    setArrowDragOffsets((current) => {
+      if (!(annotationId in current)) {
+        return current;
+      }
+      const nextOffsets = { ...current };
+      delete nextOffsets[annotationId];
+      return nextOffsets;
+    });
   };
 
   return (
@@ -125,9 +152,10 @@ export default function TutorialShotEditorCanvas({
 
         {annotations.map((annotation, annotationIndex) => {
           if (annotation.type === "box") {
-            const boxNumber = annotationMode === "callout"
-              ? annotations.filter((a, i) => a.type === "box" && i <= annotationIndex).length
-              : 0;
+            const boxNumber =
+              annotationMode === "callout"
+                ? annotations.filter((a, i) => a.type === "box" && i <= annotationIndex).length
+                : 0;
             return (
               <Group
                 draggable
@@ -206,17 +234,48 @@ export default function TutorialShotEditorCanvas({
           }
 
           if (annotation.type === "arrow") {
+            const arrowDragOffset = arrowDragOffsets[annotation.id] ?? { x: 0, y: 0 };
             return (
               <Group key={annotation.id}>
                 <Arrow
+                  draggable
                   fill="#ff6b00"
+                  hitStrokeWidth={20}
                   onClick={() => onSelect(annotation.id)}
+                  onDragEnd={(event) => {
+                    const offsetX = Math.round(event.target.x());
+                    const offsetY = Math.round(event.target.y());
+                    event.target.x(0);
+                    event.target.y(0);
+                    clearArrowDragOffset(annotation.id);
+                    updateAnnotation(annotation.id, (current) =>
+                      current.type === "arrow"
+                        ? {
+                            ...current,
+                            fromX: current.fromX + offsetX,
+                            fromY: current.fromY + offsetY,
+                            toX: current.toX + offsetX,
+                            toY: current.toY + offsetY,
+                          }
+                        : current,
+                    );
+                  }}
+                  onDragMove={(event) => {
+                    onSelect(annotation.id);
+                    updateArrowDragOffset(annotation.id, event.target.x(), event.target.y());
+                  }}
+                  onDragStart={() => {
+                    onSelect(annotation.id);
+                    updateArrowDragOffset(annotation.id, 0, 0);
+                  }}
                   onTap={() => onSelect(annotation.id)}
                   points={[annotation.fromX, annotation.fromY, annotation.toX, annotation.toY]}
                   pointerLength={16}
                   pointerWidth={16}
                   stroke="#ff6b00"
                   strokeWidth={4}
+                  x={arrowDragOffset.x}
+                  y={arrowDragOffset.y}
                 />
                 {selectedAnnotationId === annotation.id ? (
                   <>
@@ -240,8 +299,8 @@ export default function TutorialShotEditorCanvas({
                       radius={8}
                       stroke="#ff6b00"
                       strokeWidth={3}
-                      x={annotation.fromX}
-                      y={annotation.fromY}
+                      x={annotation.fromX + arrowDragOffset.x}
+                      y={annotation.fromY + arrowDragOffset.y}
                     />
                     <Circle
                       draggable
@@ -263,8 +322,8 @@ export default function TutorialShotEditorCanvas({
                       radius={8}
                       stroke="#ff6b00"
                       strokeWidth={3}
-                      x={annotation.toX}
-                      y={annotation.toY}
+                      x={annotation.toX + arrowDragOffset.x}
+                      y={annotation.toY + arrowDragOffset.y}
                     />
                   </>
                 ) : null}
