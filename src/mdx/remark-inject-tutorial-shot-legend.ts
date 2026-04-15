@@ -87,7 +87,13 @@ const buildLegendNode = (): Node =>
   ({
     type: 'mdxJsxFlowElement',
     name: 'Concept',
-    attributes: [],
+    attributes: [
+      {
+        type: 'mdxJsxAttribute',
+        name: 'title',
+        value: '画像のボックスの見方',
+      },
+    ],
     children: [
       {
         type: 'paragraph',

@@ -187,6 +187,27 @@ test('injects only once even when multiple mixed-role shots appear on the page',
   fs.rmSync(shot2.dir, { recursive: true, force: true });
 });
 
+test('Concept has a title attribute so the summary is not empty', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const { dir, imgAttr, mdxPath } = makeShotFixture({
+    annotations: [{ role: 'verify' }, { role: 'action' }],
+  });
+  const tree = root(action({ img: imgAttr }, paragraph('text')));
+  plugin()(tree, { path: mdxPath });
+
+  const [concept] = findConcepts(tree);
+  assert.ok(concept, 'Concept was injected');
+
+  const titleAttr = concept.attributes.find((a) => a.name === 'title');
+  assert.ok(titleAttr, 'Concept has a title attribute');
+  assert.ok(
+    typeof titleAttr.value === 'string' && titleAttr.value.length > 0,
+    'title is a non-empty string',
+  );
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('Concept children contain verify and action descriptions', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const { dir, imgAttr, mdxPath } = makeShotFixture({
