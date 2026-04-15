@@ -17,6 +17,10 @@ import type {
   TutorialShotAnnotation,
   TutorialShotAnnotationMode,
 } from "../../../lib/tutorial-shots-types";
+import {
+  getTutorialShotCanvasLayout,
+  TUTORIAL_SHOT_EDITOR_WORKSPACE_PADDING,
+} from "../../../lib/tutorial-shots-shared.mjs";
 
 type Props = {
   annotationMode: TutorialShotAnnotationMode;
@@ -47,7 +51,18 @@ export default function TutorialShotEditorCanvas({
   >({});
   const nodeRefs = useRef<Record<string, Konva.Rect | null>>({});
   const transformerRef = useRef<Konva.Transformer | null>(null);
-  const scale = useMemo(() => Math.min(1, 960 / Math.max(1, imageWidth)), [imageWidth]);
+  const layout = useMemo(
+    () =>
+      getTutorialShotCanvasLayout({
+        imageWidth,
+        imageHeight,
+        annotations,
+        annotationMode,
+        workspacePadding: TUTORIAL_SHOT_EDITOR_WORKSPACE_PADDING,
+      }),
+    [annotationMode, annotations, imageHeight, imageWidth],
+  );
+  const scale = useMemo(() => Math.min(1, 960 / Math.max(1, layout.width)), [layout.width]);
 
   useEffect(() => {
     const image = new window.Image();
@@ -113,7 +128,7 @@ export default function TutorialShotEditorCanvas({
 
   return (
     <Stage
-      height={Math.round(imageHeight * scale)}
+      height={Math.round(layout.height * scale)}
       onMouseDown={(event) => {
         const targetClassName = event.target.getClassName();
         if (
@@ -136,203 +151,205 @@ export default function TutorialShotEditorCanvas({
       }}
       scaleX={scale}
       scaleY={scale}
-      width={Math.round(imageWidth * scale)}
+      width={Math.round(layout.width * scale)}
     >
       <Layer>
-        {imageElement ? (
-          <KonvaImage
-            image={imageElement}
-            listening={false}
-            x={0}
-            y={0}
-            width={imageWidth}
-            height={imageHeight}
-          />
-        ) : null}
+        <Group x={layout.imageX} y={layout.imageY}>
+          {imageElement ? (
+            <KonvaImage
+              image={imageElement}
+              listening={false}
+              x={0}
+              y={0}
+              width={imageWidth}
+              height={imageHeight}
+            />
+          ) : null}
 
-        {annotations.map((annotation, annotationIndex) => {
-          if (annotation.type === "box") {
-            const boxNumber =
-              annotationMode === "callout"
-                ? annotations.filter((a, i) => a.type === "box" && i <= annotationIndex).length
-                : 0;
-            return (
-              <Group
-                draggable
-                key={annotation.id}
-                onDragStart={() => onSelect(annotation.id)}
-                onDragEnd={(event) =>
-                  updateAnnotation(annotation.id, (current) => ({
-                    ...current,
-                    x: Math.round(event.target.x()),
-                    y: Math.round(event.target.y()),
-                  }))
-                }
-                x={annotation.x}
-                y={annotation.y}
-              >
-                <Rect
-                  cornerRadius={10}
-                  height={annotation.height}
-                  onClick={() => onSelect(annotation.id)}
-                  onTap={() => onSelect(annotation.id)}
-                  onTransformEnd={(event) => {
-                    const node = event.target;
-                    const parent = node.getParent();
-                    const scaleX = node.scaleX();
-                    const scaleY = node.scaleY();
-                    const nextX = Math.round((parent?.x() ?? 0) + node.x());
-                    const nextY = Math.round((parent?.y() ?? 0) + node.y());
-                    node.scaleX(1);
-                    node.scaleY(1);
-                    node.x(0);
-                    node.y(0);
+          {annotations.map((annotation, annotationIndex) => {
+            if (annotation.type === "box") {
+              const boxNumber =
+                annotationMode === "callout"
+                  ? annotations.filter((a, i) => a.type === "box" && i <= annotationIndex).length
+                  : 0;
+              return (
+                <Group
+                  draggable
+                  key={annotation.id}
+                  onDragStart={() => onSelect(annotation.id)}
+                  onDragEnd={(event) =>
                     updateAnnotation(annotation.id, (current) => ({
                       ...current,
-                      x: nextX,
-                      y: nextY,
-                      width: Math.max(12, Math.round(node.width() * scaleX)),
-                      height: Math.max(12, Math.round(node.height() * scaleY)),
-                    }));
-                  }}
-                  ref={(node) => {
-                    nodeRefs.current[annotation.id] = node;
-                  }}
-                  stroke="#ff6b00"
-                  strokeWidth={4}
-                  width={annotation.width}
-                  x={0}
-                  y={0}
-                />
-                {boxNumber > 0 ? (
-                  <>
-                    <Circle
-                      fill="#ff6b00"
-                      listening={false}
-                      radius={CALLOUT_BADGE_RADIUS}
-                      stroke="#ffffff"
-                      strokeWidth={2.5}
-                      x={0}
-                      y={0}
-                    />
-                    <Text
-                      align="center"
-                      fill="#ffffff"
-                      fontFamily="Arial, sans-serif"
-                      fontSize={18}
-                      fontStyle="bold"
-                      listening={false}
-                      text={String(boxNumber)}
-                      width={CALLOUT_BADGE_RADIUS * 2}
-                      x={-CALLOUT_BADGE_RADIUS}
-                      y={-9}
-                    />
-                  </>
-                ) : null}
-              </Group>
-            );
-          }
+                      x: Math.round(event.target.x()),
+                      y: Math.round(event.target.y()),
+                    }))
+                  }
+                  x={annotation.x}
+                  y={annotation.y}
+                >
+                  <Rect
+                    cornerRadius={10}
+                    height={annotation.height}
+                    onClick={() => onSelect(annotation.id)}
+                    onTap={() => onSelect(annotation.id)}
+                    onTransformEnd={(event) => {
+                      const node = event.target;
+                      const parent = node.getParent();
+                      const scaleX = node.scaleX();
+                      const scaleY = node.scaleY();
+                      const nextX = Math.round((parent?.x() ?? 0) + node.x());
+                      const nextY = Math.round((parent?.y() ?? 0) + node.y());
+                      node.scaleX(1);
+                      node.scaleY(1);
+                      node.x(0);
+                      node.y(0);
+                      updateAnnotation(annotation.id, (current) => ({
+                        ...current,
+                        x: nextX,
+                        y: nextY,
+                        width: Math.max(12, Math.round(node.width() * scaleX)),
+                        height: Math.max(12, Math.round(node.height() * scaleY)),
+                      }));
+                    }}
+                    ref={(node) => {
+                      nodeRefs.current[annotation.id] = node;
+                    }}
+                    stroke="#ff6b00"
+                    strokeWidth={4}
+                    width={annotation.width}
+                    x={0}
+                    y={0}
+                  />
+                  {boxNumber > 0 ? (
+                    <>
+                      <Circle
+                        fill="#ff6b00"
+                        listening={false}
+                        radius={CALLOUT_BADGE_RADIUS}
+                        stroke="#ffffff"
+                        strokeWidth={2.5}
+                        x={0}
+                        y={0}
+                      />
+                      <Text
+                        align="center"
+                        fill="#ffffff"
+                        fontFamily="Arial, sans-serif"
+                        fontSize={18}
+                        fontStyle="bold"
+                        listening={false}
+                        text={String(boxNumber)}
+                        width={CALLOUT_BADGE_RADIUS * 2}
+                        x={-CALLOUT_BADGE_RADIUS}
+                        y={-9}
+                      />
+                    </>
+                  ) : null}
+                </Group>
+              );
+            }
 
-          if (annotation.type === "arrow") {
-            const arrowDragOffset = arrowDragOffsets[annotation.id] ?? { x: 0, y: 0 };
-            return (
-              <Group key={annotation.id}>
-                <Arrow
-                  draggable
-                  fill="#ff6b00"
-                  hitStrokeWidth={20}
-                  onClick={() => onSelect(annotation.id)}
-                  onDragEnd={(event) => {
-                    const offsetX = Math.round(event.target.x());
-                    const offsetY = Math.round(event.target.y());
-                    event.target.x(0);
-                    event.target.y(0);
-                    clearArrowDragOffset(annotation.id);
-                    updateAnnotation(annotation.id, (current) =>
-                      current.type === "arrow"
-                        ? {
+            if (annotation.type === "arrow") {
+              const arrowDragOffset = arrowDragOffsets[annotation.id] ?? { x: 0, y: 0 };
+              return (
+                <Group key={annotation.id}>
+                  <Arrow
+                    draggable
+                    fill="#ff6b00"
+                    hitStrokeWidth={20}
+                    onClick={() => onSelect(annotation.id)}
+                    onDragEnd={(event) => {
+                      const offsetX = Math.round(event.target.x());
+                      const offsetY = Math.round(event.target.y());
+                      event.target.x(0);
+                      event.target.y(0);
+                      clearArrowDragOffset(annotation.id);
+                      updateAnnotation(annotation.id, (current) =>
+                        current.type === "arrow"
+                          ? {
+                              ...current,
+                              fromX: current.fromX + offsetX,
+                              fromY: current.fromY + offsetY,
+                              toX: current.toX + offsetX,
+                              toY: current.toY + offsetY,
+                            }
+                          : current,
+                      );
+                    }}
+                    onDragMove={(event) => {
+                      onSelect(annotation.id);
+                      updateArrowDragOffset(annotation.id, event.target.x(), event.target.y());
+                    }}
+                    onDragStart={() => {
+                      onSelect(annotation.id);
+                      updateArrowDragOffset(annotation.id, 0, 0);
+                    }}
+                    onTap={() => onSelect(annotation.id)}
+                    points={[annotation.fromX, annotation.fromY, annotation.toX, annotation.toY]}
+                    pointerLength={16}
+                    pointerWidth={16}
+                    stroke="#ff6b00"
+                    strokeWidth={4}
+                    x={arrowDragOffset.x}
+                    y={arrowDragOffset.y}
+                  />
+                  {selectedAnnotationId === annotation.id ? (
+                    <>
+                      <Circle
+                        draggable
+                        fill="#ffffff"
+                        onDragMove={(event) =>
+                          updateAnnotation(annotation.id, (current) => ({
                             ...current,
-                            fromX: current.fromX + offsetX,
-                            fromY: current.fromY + offsetY,
-                            toX: current.toX + offsetX,
-                            toY: current.toY + offsetY,
-                          }
-                        : current,
-                    );
-                  }}
-                  onDragMove={(event) => {
-                    onSelect(annotation.id);
-                    updateArrowDragOffset(annotation.id, event.target.x(), event.target.y());
-                  }}
-                  onDragStart={() => {
-                    onSelect(annotation.id);
-                    updateArrowDragOffset(annotation.id, 0, 0);
-                  }}
-                  onTap={() => onSelect(annotation.id)}
-                  points={[annotation.fromX, annotation.fromY, annotation.toX, annotation.toY]}
-                  pointerLength={16}
-                  pointerWidth={16}
-                  stroke="#ff6b00"
-                  strokeWidth={4}
-                  x={arrowDragOffset.x}
-                  y={arrowDragOffset.y}
-                />
-                {selectedAnnotationId === annotation.id ? (
-                  <>
-                    <Circle
-                      draggable
-                      fill="#ffffff"
-                      onDragMove={(event) =>
-                        updateAnnotation(annotation.id, (current) => ({
-                          ...current,
-                          fromX: Math.round(event.target.x()),
-                          fromY: Math.round(event.target.y()),
-                        }))
-                      }
-                      onDragEnd={(event) =>
-                        updateAnnotation(annotation.id, (current) => ({
-                          ...current,
-                          fromX: Math.round(event.target.x()),
-                          fromY: Math.round(event.target.y()),
-                        }))
-                      }
-                      radius={8}
-                      stroke="#ff6b00"
-                      strokeWidth={3}
-                      x={annotation.fromX + arrowDragOffset.x}
-                      y={annotation.fromY + arrowDragOffset.y}
-                    />
-                    <Circle
-                      draggable
-                      fill="#ffffff"
-                      onDragMove={(event) =>
-                        updateAnnotation(annotation.id, (current) => ({
-                          ...current,
-                          toX: Math.round(event.target.x()),
-                          toY: Math.round(event.target.y()),
-                        }))
-                      }
-                      onDragEnd={(event) =>
-                        updateAnnotation(annotation.id, (current) => ({
-                          ...current,
-                          toX: Math.round(event.target.x()),
-                          toY: Math.round(event.target.y()),
-                        }))
-                      }
-                      radius={8}
-                      stroke="#ff6b00"
-                      strokeWidth={3}
-                      x={annotation.toX + arrowDragOffset.x}
-                      y={annotation.toY + arrowDragOffset.y}
-                    />
-                  </>
-                ) : null}
-              </Group>
-            );
-          }
+                            fromX: Math.round(event.target.x()),
+                            fromY: Math.round(event.target.y()),
+                          }))
+                        }
+                        onDragEnd={(event) =>
+                          updateAnnotation(annotation.id, (current) => ({
+                            ...current,
+                            fromX: Math.round(event.target.x()),
+                            fromY: Math.round(event.target.y()),
+                          }))
+                        }
+                        radius={8}
+                        stroke="#ff6b00"
+                        strokeWidth={3}
+                        x={annotation.fromX + arrowDragOffset.x}
+                        y={annotation.fromY + arrowDragOffset.y}
+                      />
+                      <Circle
+                        draggable
+                        fill="#ffffff"
+                        onDragMove={(event) =>
+                          updateAnnotation(annotation.id, (current) => ({
+                            ...current,
+                            toX: Math.round(event.target.x()),
+                            toY: Math.round(event.target.y()),
+                          }))
+                        }
+                        onDragEnd={(event) =>
+                          updateAnnotation(annotation.id, (current) => ({
+                            ...current,
+                            toX: Math.round(event.target.x()),
+                            toY: Math.round(event.target.y()),
+                          }))
+                        }
+                        radius={8}
+                        stroke="#ff6b00"
+                        strokeWidth={3}
+                        x={annotation.toX + arrowDragOffset.x}
+                        y={annotation.toY + arrowDragOffset.y}
+                      />
+                    </>
+                  ) : null}
+                </Group>
+              );
+            }
 
-          return null;
-        })}
+            return null;
+          })}
+        </Group>
 
         <Transformer
           anchorSize={10}

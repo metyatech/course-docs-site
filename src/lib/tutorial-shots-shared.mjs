@@ -244,6 +244,17 @@ export const getTutorialShotWarnings = (manifest) => {
 };
 
 const renderArrowHead = ({ fromX, fromY, toX, toY, strokeWidth }) => {
+  const points = getArrowHeadPoints({ fromX, fromY, toX, toY, strokeWidth });
+  return points.map(({ x, y }) => `${x},${y}`).join(" ");
+};
+
+const OVERLAY_STROKE_WIDTH = 4;
+const OVERLAY_STROKE_MARGIN = OVERLAY_STROKE_WIDTH / 2;
+const CALLOUT_BADGE_STROKE_WIDTH = 2.5;
+const CALLOUT_BADGE_STROKE_MARGIN = CALLOUT_BADGE_STROKE_WIDTH / 2;
+export const TUTORIAL_SHOT_EDITOR_WORKSPACE_PADDING = 96;
+
+const getArrowHeadPoints = ({ fromX, fromY, toX, toY, strokeWidth }) => {
   const angle = Math.atan2(toY - fromY, toX - fromX);
   const headLength = Math.max(12, strokeWidth * 4);
   const spread = Math.PI / 8;
@@ -252,7 +263,11 @@ const renderArrowHead = ({ fromX, fromY, toX, toY, strokeWidth }) => {
   const x2 = toX - headLength * Math.cos(angle + spread);
   const y2 = toY - headLength * Math.sin(angle + spread);
 
-  return `${toX},${toY} ${x1},${y1} ${x2},${y2}`;
+  return [
+    { x: toX, y: toY },
+    { x: x1, y: y1 },
+    { x: x2, y: y2 },
+  ];
 };
 
 const CALLOUT_BADGE_RADIUS = 16;
@@ -265,7 +280,97 @@ const renderCalloutBadge = ({ cx, cy, number }) => {
   ].join("");
 };
 
-export const renderTutorialShotOverlaySvg = ({ width, height, annotations, annotationMode = "focal" }) => {
+const expandBounds = (current, { minX, minY, maxX, maxY }) =>
+  current
+    ? {
+        minX: Math.min(current.minX, minX),
+        minY: Math.min(current.minY, minY),
+        maxX: Math.max(current.maxX, maxX),
+        maxY: Math.max(current.maxY, maxY),
+      }
+    : { minX, minY, maxX, maxY };
+
+export const getTutorialShotAnnotationBounds = ({
+  annotations,
+  annotationMode = "focal",
+}) => {
+  let bounds = null;
+
+  for (const annotation of annotations ?? []) {
+    if (annotation.type === "box") {
+      bounds = expandBounds(bounds, {
+        minX: annotation.x - OVERLAY_STROKE_MARGIN,
+        minY: annotation.y - OVERLAY_STROKE_MARGIN,
+        maxX: annotation.x + annotation.width + OVERLAY_STROKE_MARGIN,
+        maxY: annotation.y + annotation.height + OVERLAY_STROKE_MARGIN,
+      });
+
+      if (annotationMode === "callout") {
+        bounds = expandBounds(bounds, {
+          minX: annotation.x - CALLOUT_BADGE_RADIUS - CALLOUT_BADGE_STROKE_MARGIN,
+          minY: annotation.y - CALLOUT_BADGE_RADIUS - CALLOUT_BADGE_STROKE_MARGIN,
+          maxX: annotation.x + CALLOUT_BADGE_RADIUS + CALLOUT_BADGE_STROKE_MARGIN,
+          maxY: annotation.y + CALLOUT_BADGE_RADIUS + CALLOUT_BADGE_STROKE_MARGIN,
+        });
+      }
+
+      continue;
+    }
+
+    if (annotation.type === "arrow") {
+      const arrowHeadPoints = getArrowHeadPoints({
+        fromX: annotation.fromX,
+        fromY: annotation.fromY,
+        toX: annotation.toX,
+        toY: annotation.toY,
+        strokeWidth: OVERLAY_STROKE_WIDTH,
+      });
+      const xs = [annotation.fromX, ...arrowHeadPoints.map((point) => point.x)];
+      const ys = [annotation.fromY, ...arrowHeadPoints.map((point) => point.y)];
+      bounds = expandBounds(bounds, {
+        minX: Math.min(...xs) - OVERLAY_STROKE_MARGIN,
+        minY: Math.min(...ys) - OVERLAY_STROKE_MARGIN,
+        maxX: Math.max(...xs) + OVERLAY_STROKE_MARGIN,
+        maxY: Math.max(...ys) + OVERLAY_STROKE_MARGIN,
+      });
+    }
+  }
+
+  return bounds ?? { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+};
+
+export const getTutorialShotCanvasLayout = ({
+  imageWidth,
+  imageHeight,
+  annotations,
+  annotationMode = "focal",
+  workspacePadding = 0,
+}) => {
+  const safeImageWidth = Math.max(1, Math.round(Number(imageWidth) || 0));
+  const safeImageHeight = Math.max(1, Math.round(Number(imageHeight) || 0));
+  const safePadding = Math.max(0, Math.round(Number(workspacePadding) || 0));
+  const annotationBounds = getTutorialShotAnnotationBounds({ annotations, annotationMode });
+  const contentMinX = Math.min(0, Math.floor(annotationBounds.minX));
+  const contentMinY = Math.min(0, Math.floor(annotationBounds.minY));
+  const contentMaxX = Math.max(safeImageWidth, Math.ceil(annotationBounds.maxX));
+  const contentMaxY = Math.max(safeImageHeight, Math.ceil(annotationBounds.maxY));
+
+  return {
+    height: contentMaxY - contentMinY + safePadding * 2,
+    imageX: -contentMinX + safePadding,
+    imageY: -contentMinY + safePadding,
+    width: contentMaxX - contentMinX + safePadding * 2,
+  };
+};
+
+export const renderTutorialShotOverlaySvg = ({
+  width,
+  height,
+  annotations,
+  annotationMode = "focal",
+  offsetX = 0,
+  offsetY = 0,
+}) => {
   const shapes = [];
   let calloutIndex = 0;
 
@@ -300,5 +405,10 @@ export const renderTutorialShotOverlaySvg = ({ width, height, annotations, annot
     }
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${shapes.join("")}</svg>`;
+  const translatedShapes =
+    offsetX !== 0 || offsetY !== 0
+      ? `<g transform="translate(${offsetX} ${offsetY})">${shapes.join("")}</g>`
+      : shapes.join("");
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${translatedShapes}</svg>`;
 };

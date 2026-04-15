@@ -10,6 +10,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import sharp from "sharp";
+import { TUTORIAL_SHOT_EDITOR_WORKSPACE_PADDING } from "../src/lib/tutorial-shots-shared.mjs";
 import { createRunDevTestEnv, killProcessTree } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -184,26 +185,12 @@ const toDataUrl = (buffer, mimeType = "image/png") =>
 const getAnnotationCanvas = (page) =>
   page.locator('[data-testid="annotation-stage"] canvas').first();
 
+const annotationWorkspacePadding = TUTORIAL_SHOT_EDITOR_WORKSPACE_PADDING;
+
 const getAnnotationCanvasBox = async (page) => {
   const canvasBox = await getAnnotationCanvas(page).boundingBox();
   assert.ok(canvasBox, "Annotation canvas should have a bounding box.");
   return canvasBox;
-};
-
-const dragAnnotationCanvas = async (
-  page,
-  {
-    startX,
-    startY,
-    endX,
-    endY,
-  },
-) => {
-  const canvasBox = await getAnnotationCanvasBox(page);
-  await page.mouse.move(canvasBox.x + startX, canvasBox.y + startY);
-  await page.mouse.down();
-  await page.mouse.move(canvasBox.x + endX, canvasBox.y + endY, { steps: 12 });
-  await page.mouse.up();
 };
 
 const waitForAnnotationCanvasReady = async (page) => {
@@ -511,6 +498,14 @@ test(
     assert.match(source, /targetClassName === "Layer"/);
     assert.match(source, /onMouseDown=\{\(event\) => \{[\s\S]*onSelect\(null\);/);
     assert.match(source, /<Group[\s\S]*draggable[\s\S]*onDragStart=\{\(\) => onSelect\(annotation\.id\)\}/);
+    assert.match(
+      source,
+      /<Arrow[\s\S]*draggable[\s\S]*onDragEnd=\{\(event\) => \{[\s\S]*fromX: current\.fromX \+ offsetX,[\s\S]*toY: current\.toY \+ offsetY,/,
+    );
+    assert.match(
+      source,
+      /<Arrow[\s\S]*onDragMove=\{\(event\) => \{[\s\S]*updateArrowDragOffset\(annotation\.id, event\.target\.x\(\), event\.target\.y\(\)\);/,
+    );
     assert.match(source, /<Circle[\s\S]*x=\{0\}[\s\S]*y=\{0\}/);
     assert.match(source, /<Text[\s\S]*x=\{-CALLOUT_BADGE_RADIUS\}[\s\S]*y=\{-9\}/);
   },
@@ -592,10 +587,12 @@ test(
 );
 
 test(
-  "tutorial shot editor moves the whole arrow when dragging the arrow body",
+  "tutorial shot editor shows a wider canvas when saved annotations overflow the image",
   { timeout: 3 * 60_000 },
   async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-arrow-"));
+    const tempRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "course-tutorial-shot-editor-overflow-"),
+    );
     const fixtureCourse = path.join(tempRoot, "course");
     const overrideCourse = path.join(tempRoot, "override-course");
     const port = await getFreePort();
@@ -607,13 +604,72 @@ test(
       firstImageName: "override-startup",
       secondImageName: "override-missing-output",
     });
+    const outputImagePath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "img",
+      "override-startup.png",
+    );
+    const rawImagePath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "shots",
+      "override-startup.raw.png",
+    );
+    const manifestPath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "shots",
+      "override-startup.shot.json",
+    );
+    await fs.mkdir(path.dirname(rawImagePath), { recursive: true });
+    await fs.copyFile(outputImagePath, rawImagePath);
+    await fs.writeFile(
+      manifestPath,
+      `${JSON.stringify(
+        {
+          alt: "override startup",
+          annotationMode: "focal",
+          annotations: [
+            {
+              id: "box-left-overflow",
+              type: "box",
+              x: -40,
+              y: 24,
+              width: 120,
+              height: 64,
+            },
+          ],
+          crop: {
+            x: 0,
+            y: 0,
+            width: 640,
+            height: 360,
+          },
+          id: "override-startup",
+          outputImagePath: "content/docs/tutorial/img/override-startup.png",
+          pagePath: "content/docs/tutorial/index.mdx",
+          rawImagePath: "content/docs/tutorial/shots/override-startup.raw.png",
+          version: 1,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
 
     const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       cwd: projectRoot,
       env: createRunDevTestEnv({
-        label: "tutorial-shot-editor-arrow-drag",
+        label: "tutorial-shot-editor-overflow",
         env: process.env,
         overrides: {
           COURSE_CONTENT_SOURCE: fixtureCourse,
@@ -649,43 +705,12 @@ test(
     });
 
     await openTutorialShotEditor(page, overrideCourseRelativePath);
-    await page.getByRole("button", { name: "枠を追加" }).click();
-    await page.getByRole("button", { name: "矢印を追加" }).click();
-
-    const dragOffset = { x: 64, y: 44 };
-    await dragAnnotationCanvas(page, {
-      startX: 124,
-      startY: 58,
-      endX: 124 + dragOffset.x,
-      endY: 58 + dragOffset.y,
-    });
-
-    await page.getByRole("button", { name: "保存", exact: true }).click();
-    await page.getByText("保存しました").waitFor();
-
-    const startupManifestPath = path.join(
-      overrideCourse,
-      "content",
-      "docs",
-      "tutorial",
-      "shots",
-      "override-startup.shot.json",
+    const canvasBox = await getAnnotationCanvasBox(page);
+    assert.ok(
+      canvasBox.width > 640 + annotationWorkspacePadding * 2,
+      "Overflow annotations should expand the editor canvas beyond the image-plus-workspace width.",
     );
-    const startupManifest = JSON.parse(await fs.readFile(startupManifestPath, "utf8"));
-    const arrow = startupManifest.annotations.find((annotation) => annotation.type === "arrow");
-
-    assert.deepEqual(
-      arrow,
-      {
-        id: arrow.id,
-        type: "arrow",
-        fromX: 72 + dragOffset.x,
-        fromY: 32 + dragOffset.y,
-        toX: 173 + dragOffset.x,
-        toY: 85 + dragOffset.y,
-      },
-      "Dragging the arrow body should move both endpoints together.",
-    );
+    await page.getByText("枠 1/1 ・ 矢印 0/1").waitFor();
   },
 );
 

@@ -6,6 +6,7 @@ import {
   deriveTutorialShotPaths,
   extractActionImageRefsFromMdx,
   getTutorialShotAnnotationErrors,
+  getTutorialShotCanvasLayout,
   getTutorialShotWarnings,
   normalizePosixPath,
   normalizeTutorialShotManifest,
@@ -421,22 +422,53 @@ export const saveTutorialShot = async ({
     width: metadata.width,
     height: metadata.height,
   });
-  const overlaySvg = renderTutorialShotOverlaySvg({
-    width: crop.width,
-    height: crop.height,
+  const outputLayout = getTutorialShotCanvasLayout({
+    imageWidth: crop.width,
+    imageHeight: crop.height,
     annotations: manifest.annotations,
     annotationMode: manifest.annotationMode,
   });
-
-  await ensureParentDir(outputAbsPath);
-  await rawImage
+  const overlaySvg = renderTutorialShotOverlaySvg({
+    width: outputLayout.width,
+    height: outputLayout.height,
+    annotations: manifest.annotations,
+    annotationMode: manifest.annotationMode,
+    offsetX: outputLayout.imageX,
+    offsetY: outputLayout.imageY,
+  });
+  const croppedImageBuffer = await rawImage
+    .clone()
     .extract({
       left: crop.x,
       top: crop.y,
       width: crop.width,
       height: crop.height,
     })
-    .composite([{ input: Buffer.from(overlaySvg, "utf8") }])
+    .png()
+    .toBuffer();
+
+  await ensureParentDir(outputAbsPath);
+  await sharp({
+    create: {
+      width: outputLayout.width,
+      height: outputLayout.height,
+      channels: 4,
+      background: {
+        r: 0,
+        g: 0,
+        b: 0,
+        alpha: 0,
+      },
+    },
+  })
+    .composite([
+      {
+        input: croppedImageBuffer,
+        left: outputLayout.imageX,
+        top: outputLayout.imageY,
+      },
+      { input: Buffer.from(overlaySvg, "utf8") },
+    ])
     .png()
     .toFile(outputAbsPath);
 

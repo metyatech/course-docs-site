@@ -467,6 +467,84 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
   assert.deepEqual(rescannedShots[0].warnings, []);
 });
 
+test("saveTutorialShot expands the output canvas when annotations overflow the crop", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-overflow-"));
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+
+  const result = await saveTutorialShot({
+    sourceRoot,
+    bootstrapFromOutput: true,
+    manifestInput: {
+      ...manifest,
+      crop: {
+        x: 40,
+        y: 30,
+        width: 280,
+        height: 160,
+      },
+      annotations: [
+        {
+          id: "box-left-top",
+          type: "box",
+          x: -40,
+          y: -20,
+          width: 120,
+          height: 64,
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.manifest.annotations, [
+    {
+      id: "box-left-top",
+      type: "box",
+      x: -40,
+      y: -20,
+      width: 120,
+      height: 64,
+    },
+  ]);
+
+  const outputImagePath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "img",
+    "startup.png",
+  );
+  const outputMetadata = await sharp(outputImagePath).metadata();
+  assert.equal(outputMetadata.width, 322);
+  assert.equal(outputMetadata.height, 182);
+
+  const { data, info } = await sharp(outputImagePath)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const readPixel = (x, y) => {
+    const offset = (y * info.width + x) * info.channels;
+    return Array.from(data.subarray(offset, offset + info.channels));
+  };
+
+  assert.equal(readPixel(0, 0)[3], 0, "Outside the shifted image should stay transparent.");
+  assert.deepEqual(
+    readPixel(42, 22),
+    [219, 228, 240, 255],
+    "The cropped screenshot should be shifted right/down instead of being clipped.",
+  );
+});
+
 test("saveTutorialShot accepts no annotations for result-confirmation shots", async (t) => {
   const sourceRoot = await fs.mkdtemp(
     path.join(os.tmpdir(), "course-tutorial-shots-no-annotations-"),
