@@ -999,7 +999,7 @@ test("saveTutorialShot rejects a box annotation without a role", async (t) => {
   );
 });
 
-test("renderTutorialShotOverlaySvg draws verify boxes with a dashed stroke", () => {
+test("renderTutorialShotOverlaySvg draws verify boxes with gray dashed stroke and action boxes with orange solid stroke", () => {
   const svg = renderTutorialShotOverlaySvg({
     width: 200,
     height: 100,
@@ -1010,18 +1010,35 @@ test("renderTutorialShotOverlaySvg draws verify boxes with a dashed stroke", () 
     ],
   });
 
+  // verify box: gray (#64748b) + dashed stroke
   const dashMatches = svg.match(/stroke-dasharray="12 8"/gu) ?? [];
   assert.equal(dashMatches.length, 1, "exactly one rect should be dashed (the verify one)");
 
-  const verifyRectPattern = /<rect[^>]*x="70"[^>]*stroke-dasharray="12 8"[^>]*\/>/u;
-  assert.match(svg, verifyRectPattern);
+  const verifyRectPattern =
+    /<rect[^>]*x="70"[^>]*stroke="#64748b"[^>]*stroke-dasharray="12 8"[^>]*\/>/u;
+  assert.match(svg, verifyRectPattern, "verify rect must use gray color with dashed stroke");
 
-  const actionRectPattern = /<rect x="10"[^>]*stroke-width="4"\s*\/>/u;
+  // action box: orange (#ff6b00) + solid stroke
+  const actionRectPattern = /<rect x="10"[^>]*stroke="#ff6b00"[^>]*stroke-width="4"\s*\/>/u;
   assert.match(
     svg,
     actionRectPattern,
-    "action rect must not carry a stroke-dasharray attribute",
+    "action rect must use orange color without stroke-dasharray",
   );
+
+  // verify badge: white fill, gray stroke/text
+  const verifyBadgeCirclePattern = /<circle[^>]*fill="#ffffff"[^>]*stroke="#64748b"[^>]*\/>/u;
+  assert.match(svg, verifyBadgeCirclePattern, "verify badge circle must be white-fill gray-stroke");
+
+  const verifyBadgeTextPattern = /<text[^>]*fill="#64748b"[^>]*>2<\/text>/u;
+  assert.match(svg, verifyBadgeTextPattern, "verify badge text must be gray");
+
+  // action badge: orange fill, white text
+  const actionBadgeCirclePattern = /<circle[^>]*fill="#ff6b00"[^>]*stroke="#ffffff"[^>]*\/>/u;
+  assert.match(svg, actionBadgeCirclePattern, "action badge circle must be orange-fill white-stroke");
+
+  const actionBadgeTextPattern = /<text[^>]*fill="#ffffff"[^>]*>1<\/text>/u;
+  assert.match(svg, actionBadgeTextPattern, "action badge text must be white");
 });
 
 test("saveTutorialShot rejects arrows in callout mode", async (t) => {

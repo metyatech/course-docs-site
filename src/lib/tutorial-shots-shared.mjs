@@ -432,8 +432,14 @@ const getArrowHeadPoints = ({ fromX, fromY, toX, toY, strokeWidth }) => {
 
 const CALLOUT_BADGE_RADIUS = 16;
 
-const renderCalloutBadge = ({ cx, cy, number }) => {
+const renderCalloutBadge = ({ cx, cy, number, role = "action" }) => {
   const r = CALLOUT_BADGE_RADIUS;
+  if (role === "verify") {
+    return [
+      `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#ffffff" stroke="#64748b" stroke-width="2.5" />`,
+      `<text x="${cx}" y="${cy + 6}" text-anchor="middle" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="18" font-weight="700" fill="#64748b">${number}</text>`,
+    ].join("");
+  }
   return [
     `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#ff6b00" stroke="#ffffff" stroke-width="2.5" />`,
     `<text x="${cx}" y="${cy + 6}" text-anchor="middle" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="18" font-weight="700" fill="#ffffff">${number}</text>`,
@@ -536,15 +542,17 @@ export const renderTutorialShotOverlaySvg = ({
 
   for (const annotation of annotations ?? []) {
     if (annotation.type === "box") {
-      const strokeDash = annotation.role === "verify" ? ` stroke-dasharray="12 8"` : "";
+      const isVerify = annotation.role === "verify";
+      const strokeColor = isVerify ? "#64748b" : "#ff6b00";
+      const strokeDash = isVerify ? ` stroke-dasharray="12 8"` : "";
       shapes.push(
-        `<rect x="${annotation.x}" y="${annotation.y}" width="${annotation.width}" height="${annotation.height}" rx="10" ry="10" fill="none" stroke="#ff6b00" stroke-width="4"${strokeDash} />`,
+        `<rect x="${annotation.x}" y="${annotation.y}" width="${annotation.width}" height="${annotation.height}" rx="10" ry="10" fill="none" stroke="${strokeColor}" stroke-width="4"${strokeDash} />`,
       );
       if (annotationMode === "callout") {
         calloutIndex += 1;
         const cx = annotation.x;
         const cy = annotation.y;
-        shapes.push(renderCalloutBadge({ cx, cy, number: calloutIndex }));
+        shapes.push(renderCalloutBadge({ cx, cy, number: calloutIndex, role: annotation.role }));
       }
       continue;
     }

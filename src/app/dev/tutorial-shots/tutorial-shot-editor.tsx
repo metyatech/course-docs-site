@@ -1139,7 +1139,7 @@ export default function TutorialShotEditor() {
                                     onClick={() => toggleBoxRole(annotation.id)}
                                     type="button"
                                   >
-                                    {annotation.role === "verify" ? "確認（破線）" : "アクション（実線）"}
+                                    {annotation.role === "verify" ? "確認（グレー破線）" : "アクション（オレンジ実線）"}
                                   </button>
                                 ) : null}
                                 <button
