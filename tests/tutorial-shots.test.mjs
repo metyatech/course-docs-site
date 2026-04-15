@@ -999,7 +999,7 @@ test("saveTutorialShot rejects a box annotation without a role", async (t) => {
   );
 });
 
-test("renderTutorialShotOverlaySvg draws verify boxes with gray dashed stroke and action boxes with orange solid stroke", () => {
+test("renderTutorialShotOverlaySvg draws verify boxes with white dashed stroke and action boxes with orange solid stroke", () => {
   const svg = renderTutorialShotOverlaySvg({
     width: 200,
     height: 100,
@@ -1010,13 +1010,13 @@ test("renderTutorialShotOverlaySvg draws verify boxes with gray dashed stroke an
     ],
   });
 
-  // verify box: gray (#64748b) + dashed stroke
+  // verify box: white (#ffffff) + dashed stroke
   const dashMatches = svg.match(/stroke-dasharray="12 8"/gu) ?? [];
   assert.equal(dashMatches.length, 1, "exactly one rect should be dashed (the verify one)");
 
   const verifyRectPattern =
-    /<rect[^>]*x="70"[^>]*stroke="#64748b"[^>]*stroke-dasharray="12 8"[^>]*\/>/u;
-  assert.match(svg, verifyRectPattern, "verify rect must use gray color with dashed stroke");
+    /<rect[^>]*x="70"[^>]*stroke="#ffffff"[^>]*stroke-dasharray="12 8"[^>]*\/>/u;
+  assert.match(svg, verifyRectPattern, "verify rect must use white color with dashed stroke");
 
   // action box: orange (#ff6b00) + solid stroke
   const actionRectPattern = /<rect x="10"[^>]*stroke="#ff6b00"[^>]*stroke-width="4"\s*\/>/u;

@@ -543,7 +543,7 @@ export const renderTutorialShotOverlaySvg = ({
   for (const annotation of annotations ?? []) {
     if (annotation.type === "box") {
       const isVerify = annotation.role === "verify";
-      const strokeColor = isVerify ? "#64748b" : "#ff6b00";
+      const strokeColor = isVerify ? "#ffffff" : "#ff6b00";
       const strokeDash = isVerify ? ` stroke-dasharray="12 8"` : "";
       shapes.push(
         `<rect x="${annotation.x}" y="${annotation.y}" width="${annotation.width}" height="${annotation.height}" rx="10" ry="10" fill="none" stroke="${strokeColor}" stroke-width="4"${strokeDash} />`,
