@@ -8,6 +8,7 @@ import {
   getTutorialShotAnnotationErrors,
   getTutorialShotCanvasLayout,
   getTutorialShotWarnings,
+  normalizeDecodedPosixPath,
   normalizePosixPath,
   normalizeTutorialShotManifest,
   renderTutorialShotOverlaySvg,
@@ -55,7 +56,7 @@ const ensureInsideRoot = ({ rootDir, resolvedPath }) => {
 };
 
 const assertContentRelativePath = (value, pattern = IMAGE_PATH_PATTERN) => {
-  const normalized = normalizePosixPath(value ?? "");
+  const normalized = normalizeDecodedPosixPath(value ?? "");
   if (!pattern.test(normalized)) {
     throw new Error(`Invalid content-relative path: ${value}`);
   }

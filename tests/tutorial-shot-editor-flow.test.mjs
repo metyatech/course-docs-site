@@ -90,6 +90,9 @@ const writeFixtureCourseRepo = async (
     logoText = "Tutorial Shot Fixture",
     firstImageName = "startup",
     secondImageName = "missing-output",
+    firstActionImageSrc = `./img/${firstImageName}.png`,
+    secondActionImageSrc = `./img/${secondImageName}.png`,
+    firstImageFileName = `${firstImageName}.png`,
   } = {},
 ) => {
   const siteConfig = `export const siteConfig = {
@@ -129,10 +132,10 @@ title: Tutorial
 ---
 
 <Section title="Step 1" goal="最初のショットを保存できる状態">
-  <Action img="./img/${firstImageName}.png">
+  <Action img="${firstActionImageSrc}">
     **${firstImageName}** を確認します
   </Action>
-  <Action img="./img/${secondImageName}.png">
+  <Action img="${secondActionImageSrc}">
     **${secondImageName}** を確認します
   </Action>
 </Section>
@@ -159,7 +162,7 @@ title: Tutorial
     },
   })
     .png()
-    .toFile(path.join(imageDir, `${firstImageName}.png`));
+    .toFile(path.join(imageDir, firstImageFileName));
 };
 
 const sha256File = async (filePath) => {
@@ -215,7 +218,11 @@ const waitForAnnotationCanvasReady = async (page) => {
   );
 };
 
-const openTutorialShotEditor = async (page, overrideCourseRelativePath) => {
+const openTutorialShotEditor = async (
+  page,
+  overrideCourseRelativePath,
+  { firstShotButtonName = /override-startup/i } = {},
+) => {
   await page.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "チュートリアル画像エディタ" }).waitFor();
   await page.getByRole("button", { name: "別のリポジトリに切り替え" }).click();
@@ -223,7 +230,7 @@ const openTutorialShotEditor = async (page, overrideCourseRelativePath) => {
   await page.getByRole("button", { name: "切り替える" }).click();
   // The server rescans the override-course directory on click; on Windows
   // this can exceed Playwright's 30 s default under heavy disk/CPU load.
-  await page.getByRole("button", { name: /override-startup/i }).waitFor({ timeout: 60_000 });
+  await page.getByRole("button", { name: firstShotButtonName }).waitFor({ timeout: 60_000 });
   await page.getByRole("heading", { name: "必要なら注釈を追加" }).scrollIntoViewIfNeeded();
   await waitForAnnotationCanvasReady(page);
 };
@@ -380,6 +387,103 @@ test(
 
     const startupRawHash = await sha256File(startupRawPath);
     assert.equal(startupRawHash, startupOutputHashBefore);
+  },
+);
+
+test(
+  "tutorial shot editor can edit an Action image whose filename contains spaces",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-space-"));
+    const fixtureCourse = path.join(tempRoot, "course");
+    const overrideCourse = path.join(tempRoot, "override-course");
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+    await writeFixtureCourseRepo(overrideCourse, {
+      logoText: "Override Tutorial Shot Fixture",
+      firstImageName: "override Event ActorBeginOverlap",
+      firstActionImageSrc: "./img/override%20Event%20ActorBeginOverlap.png",
+      firstImageFileName: "override Event ActorBeginOverlap.png",
+      secondImageName: "override-missing-output",
+    });
+
+    const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
+    const decodedRawPath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "shots",
+      "override Event ActorBeginOverlap.raw.png",
+    );
+    const decodedManifestPath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "shots",
+      "override Event ActorBeginOverlap.shot.json",
+    );
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "tutorial-shot-editor-space-filename",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Tutorial shot editor did not become ready.",
+      },
+    );
+
+    const browser = await chromium.launch({ headless: true });
+    t.after(async () => {
+      await browser.close();
+    });
+    const page = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+
+    await openTutorialShotEditor(page, overrideCourseRelativePath, {
+      firstShotButtonName: /override-event-actorbeginoverlap/i,
+    });
+
+    const spaceNamedShotButton = page.getByRole("button", {
+      name: /override-event-actorbeginoverlap/i,
+    });
+    await assert.equal(
+      await spaceNamedShotButton.getByText("画像未設定").count(),
+      0,
+      "Space-named existing output images must stay editable instead of showing the unset badge.",
+    );
+    await page.locator('[data-testid="crop-stage"] img').waitFor();
+    await page.getByLabel("画像の説明（Alt テキスト）").fill("空白入りファイル名の画像");
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await page.getByText("保存しました").waitFor();
+
+    await assert.doesNotReject(() => fs.stat(decodedRawPath));
+    await assert.doesNotReject(() => fs.stat(decodedManifestPath));
   },
 );
 

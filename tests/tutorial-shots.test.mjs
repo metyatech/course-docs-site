@@ -16,11 +16,18 @@ import {
 } from "../src/lib/tutorial-shot-editor-crop-state.mjs";
 import {
   getTutorialShotAuthoringContext,
+  readTutorialShotImage,
   saveTutorialShot,
   scanTutorialShots,
 } from "../src/lib/tutorial-shots-server.mjs";
 
-const writeTutorialFixture = async (rootDir) => {
+const writeTutorialFixture = async (
+  rootDir,
+  {
+    actionImageSrc = "./img/startup.png",
+    imageFileName = "startup.png",
+  } = {},
+) => {
   const pageDir = path.join(rootDir, "content", "docs", "student-guide");
   const imageDir = path.join(pageDir, "img");
   await fs.mkdir(imageDir, { recursive: true });
@@ -32,7 +39,7 @@ title: Student Guide
 ---
 
 <Section title="Step 1" goal="Unreal Editor を開いた状態">
-  <Action img="./img/startup.png">
+  <Action img="${actionImageSrc}">
     **起動** を確認します
   </Action>
 </Section>
@@ -49,7 +56,7 @@ title: Student Guide
     },
   })
     .png()
-    .toFile(path.join(imageDir, "startup.png"));
+    .toFile(path.join(imageDir, imageFileName));
 };
 
 test("extractActionImageRefsFromMdx derives output, raw, and manifest paths", () => {
@@ -83,6 +90,44 @@ test("extractActionImageRefsFromMdx derives output, raw, and manifest paths", ()
         outputImagePath: "content/docs/student-guide/img/open-menu.webp",
         rawImagePath: "content/docs/student-guide/shots/open-menu.raw.webp",
         manifestPath: "content/docs/student-guide/shots/open-menu.shot.json",
+      },
+    ],
+  );
+});
+
+test("extractActionImageRefsFromMdx decodes URL-encoded Action image filenames", () => {
+  const refs = extractActionImageRefsFromMdx({
+    pagePath: "content/docs/student-guide/index.mdx",
+    sourceText: `
+<Section title="Step 1" goal="ready">
+  <Action img="./img/node-Event%20ActorBeginOverlap.png">A</Action>
+  <Action img="./img/connect-Score%2B1-SetScore.png">B</Action>
+</Section>
+`,
+  });
+
+  assert.deepEqual(
+    refs.map((ref) => ({
+      id: ref.id,
+      sourceImagePath: ref.sourceImagePath,
+      outputImagePath: ref.outputImagePath,
+      rawImagePath: ref.rawImagePath,
+      manifestPath: ref.manifestPath,
+    })),
+    [
+      {
+        id: "node-event-actorbeginoverlap",
+        sourceImagePath: "img/node-Event ActorBeginOverlap.png",
+        outputImagePath: "content/docs/student-guide/img/node-Event ActorBeginOverlap.png",
+        rawImagePath: "content/docs/student-guide/shots/node-Event ActorBeginOverlap.raw.png",
+        manifestPath: "content/docs/student-guide/shots/node-Event ActorBeginOverlap.shot.json",
+      },
+      {
+        id: "connect-score-1-setscore",
+        sourceImagePath: "img/connect-Score+1-SetScore.png",
+        outputImagePath: "content/docs/student-guide/img/connect-Score+1-SetScore.png",
+        rawImagePath: "content/docs/student-guide/shots/connect-Score+1-SetScore.raw.png",
+        manifestPath: "content/docs/student-guide/shots/connect-Score+1-SetScore.shot.json",
       },
     ],
   );
@@ -466,6 +511,99 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
   assert.equal(rescannedShots[0].hasManifest, true);
   assert.deepEqual(rescannedShots[0].warnings, []);
 });
+
+test(
+  "scanTutorialShots and saveTutorialShot treat URL-encoded Action image filenames as real local files",
+  async (t) => {
+    const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-encoded-"));
+
+    t.after(async () => {
+      await fs.rm(sourceRoot, { recursive: true, force: true });
+    });
+
+    await writeTutorialFixture(sourceRoot, {
+      actionImageSrc: "./img/node-Event%20ActorBeginOverlap.png",
+      imageFileName: "node-Event ActorBeginOverlap.png",
+    });
+
+    const initialShots = await scanTutorialShots({ sourceRoot });
+    assert.equal(initialShots.length, 1);
+    assert.equal(
+      initialShots[0].id,
+      "node-event-actorbeginoverlap",
+      "The shot id should come from the decoded filename, not the %20 escape.",
+    );
+    assert.equal(
+      initialShots[0].outputImagePath,
+      "content/docs/student-guide/img/node-Event ActorBeginOverlap.png",
+    );
+    assert.equal(initialShots[0].hasOutputImage, true);
+
+    const encodedPath = "content/docs/student-guide/img/node-Event%20ActorBeginOverlap.png";
+    const decodedRawPath = path.join(
+      sourceRoot,
+      "content",
+      "docs",
+      "student-guide",
+      "shots",
+      "node-Event ActorBeginOverlap.raw.png",
+    );
+    const encodedRawPath = path.join(
+      sourceRoot,
+      "content",
+      "docs",
+      "student-guide",
+      "shots",
+      "node-Event%20ActorBeginOverlap.raw.png",
+    );
+    const decodedManifestPath = path.join(
+      sourceRoot,
+      "content",
+      "docs",
+      "student-guide",
+      "shots",
+      "node-Event ActorBeginOverlap.shot.json",
+    );
+
+    const image = await readTutorialShotImage({
+      sourceRoot,
+      contentRelativePath: encodedPath,
+    });
+    assert.equal(image.contentType, "image/png");
+    assert.ok(image.bytes.length > 0);
+
+    const manifest = createDefaultTutorialShotManifest({
+      pagePath: "content/docs/student-guide/index.mdx",
+      outputImagePath: encodedPath,
+    });
+    const result = await saveTutorialShot({
+      sourceRoot,
+      bootstrapFromOutput: true,
+      manifestInput: {
+        ...manifest,
+        crop: {
+          x: 24,
+          y: 20,
+          width: 280,
+          height: 160,
+        },
+        annotations: [],
+      },
+    });
+
+    assert.equal(
+      result.manifest.outputImagePath,
+      "content/docs/student-guide/img/node-Event ActorBeginOverlap.png",
+    );
+    assert.equal(
+      result.manifest.rawImagePath,
+      "content/docs/student-guide/shots/node-Event ActorBeginOverlap.raw.png",
+    );
+    await assert.doesNotReject(() => fs.stat(decodedRawPath));
+    await assert.doesNotReject(() => fs.stat(decodedManifestPath));
+    await assert.rejects(() => fs.stat(encodedRawPath));
+  },
+);
 
 test("saveTutorialShot expands the output canvas when annotations overflow the crop", async (t) => {
   const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-overflow-"));

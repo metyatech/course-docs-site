@@ -10,6 +10,24 @@ export const normalizePosixPath = (value) =>
     .replace(/\/{2,}/gu, "/")
     .replace(/^\.\//u, "");
 
+const decodePathSegment = (segment) => {
+  if (!segment || segment === "." || segment === "..") {
+    return segment;
+  }
+
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+};
+
+export const normalizeDecodedPosixPath = (value) =>
+  normalizePosixPath(value)
+    .split("/")
+    .map(decodePathSegment)
+    .join("/");
+
 const splitPosixSegments = (value) =>
   normalizePosixPath(value)
     .split("/")
@@ -62,7 +80,7 @@ export const sanitizeShotId = (value) =>
 
 export const deriveTutorialShotPaths = ({ pagePath, outputImagePath }) => {
   const normalizedPagePath = normalizePosixPath(pagePath);
-  const normalizedOutputPath = normalizePosixPath(outputImagePath);
+  const normalizedOutputPath = normalizeDecodedPosixPath(outputImagePath);
   const pageDir = posixDirname(normalizedPagePath);
   const outputBasename = posixBasename(normalizedOutputPath);
   const outputExtension = posixExtname(outputBasename) || ".png";
@@ -77,13 +95,14 @@ export const deriveTutorialShotPaths = ({ pagePath, outputImagePath }) => {
 };
 
 export const createDefaultTutorialShotManifest = ({ pagePath, outputImagePath }) => {
-  const derived = deriveTutorialShotPaths({ pagePath, outputImagePath });
+  const normalizedOutputPath = normalizeDecodedPosixPath(outputImagePath);
+  const derived = deriveTutorialShotPaths({ pagePath, outputImagePath: normalizedOutputPath });
 
   return {
     version: TUTORIAL_SHOT_MANIFEST_VERSION,
     id: derived.id,
     pagePath: normalizePosixPath(pagePath),
-    outputImagePath: normalizePosixPath(outputImagePath),
+    outputImagePath: normalizedOutputPath,
     rawImagePath: derived.rawImagePath,
     crop: null,
     annotations: [],
@@ -109,7 +128,8 @@ export const extractActionImageRefsFromMdx = ({ pagePath, sourceText }) => {
       continue;
     }
 
-    const outputImagePath = joinPosixPath(pageDir, rawSrc);
+    const sourceImagePath = normalizeDecodedPosixPath(rawSrc);
+    const outputImagePath = normalizeDecodedPosixPath(joinPosixPath(pageDir, rawSrc));
     const line = sourceText.slice(0, match.index ?? 0).split(/\r?\n/gu).length;
     const derived = deriveTutorialShotPaths({ pagePath: normalizedPagePath, outputImagePath });
 
@@ -117,7 +137,7 @@ export const extractActionImageRefsFromMdx = ({ pagePath, sourceText }) => {
       id: derived.id,
       line,
       pagePath: normalizedPagePath,
-      sourceImagePath: rawSrc,
+      sourceImagePath,
       outputImagePath,
       manifestPath: derived.manifestPath,
       rawImagePath: derived.rawImagePath,
@@ -171,8 +191,10 @@ export const normalizeTutorialShotManifest = (manifest) => {
         ? sanitizeShotId(manifest.id)
         : normalized.id,
     pagePath: normalizePosixPath(manifest?.pagePath ?? normalized.pagePath),
-    outputImagePath: normalizePosixPath(manifest?.outputImagePath ?? normalized.outputImagePath),
-    rawImagePath: normalizePosixPath(manifest?.rawImagePath ?? normalized.rawImagePath),
+    outputImagePath: normalizeDecodedPosixPath(
+      manifest?.outputImagePath ?? normalized.outputImagePath,
+    ),
+    rawImagePath: normalizeDecodedPosixPath(manifest?.rawImagePath ?? normalized.rawImagePath),
     annotationMode:
       TUTORIAL_SHOT_ANNOTATION_MODES.includes(manifest?.annotationMode)
         ? manifest.annotationMode
