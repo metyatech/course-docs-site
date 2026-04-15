@@ -96,10 +96,6 @@
 /* --- Verify -------------------------------------------------------------- */
 
 .tutorial-verify {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    font-weight: 600;
     margin: 0.75rem 0 1.25rem;
     padding: 0.5rem 0.75rem;
     background: hsl(145 60% 95%);
@@ -108,6 +104,22 @@
 
 .dark .tutorial-verify {
     background: hsl(145 30% 15%);
+}
+
+/* Optional result-state screenshot: shown above the arrow + text line. */
+.tutorial-verify__img {
+    display: block;
+    max-width: min(600px, 100%);
+    border-radius: 6px;
+    margin: 0 0 0.5rem;
+}
+
+/* Arrow + result text row. */
+.tutorial-verify__body {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-weight: 600;
 }
 
 .tutorial-verify__arrow {

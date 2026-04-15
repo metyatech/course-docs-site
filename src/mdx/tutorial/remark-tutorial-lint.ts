@@ -46,6 +46,7 @@ import { resolvePageAuthoringMode } from './page-authoring-mode.js';
  *  - tutorial/concept-length            (note)  — numeric threshold
  *  - tutorial/concept-placement         (note)  — judgement
  *  - tutorial/decorative-emoji          (note)  — allowlist heuristic
+ *  - tutorial/verify-visual-workaround-as-action (note) — pattern list heuristic
  *
  * Severity handling:
  *  - Errors call `file.fail()` which throws and fails the MDX compile.
@@ -165,6 +166,31 @@ const VERIFY_INTERNAL_MECHANICS_PATTERNS: Array<{ pattern: RegExp; label: string
   { pattern: /が(発火|トリガー)/, label: 'が発火/トリガー' },
   { pattern: /が fire/i, label: 'fire (英語)' },
   { pattern: /が trigger/i, label: 'trigger (英語)' },
+];
+
+// Feedback / Segmenting: <Action img="..."> whose text uses result-check
+// language (conditional/observational phrasing) rather than an imperative
+// command. This indicates the Action is being used as a <Verify> workaround
+// because the author needs a result-state image that <Verify> previously
+// could not carry. Now that <Verify> supports img, these should be migrated.
+// Pattern list is heuristic so this is advisory (note level).
+const VERIFY_WORKAROUND_AS_ACTION_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
+  {
+    pattern: /になれば[^。]{0,20}(?:成功|完了|OK)[。]?/,
+    label: '〜になれば成功 (result-check language in <Action>)',
+  },
+  {
+    pattern: /ていれば[^。]{0,20}(?:成功|完了|OK)[。]?/,
+    label: '〜ていれば成功 (result-check language in <Action>)',
+  },
+  {
+    pattern: /[てでに]いることを確認/,
+    label: '〜ていることを確認 (state-observation language in <Action>)',
+  },
+  {
+    pattern: /このように[^。]{0,30}なっていれば/,
+    label: 'このように〜なっていれば (state-check language in <Action>)',
+  },
 ];
 
 // Pre-training: Concept length limits.
@@ -694,6 +720,23 @@ function validateAction(file: VFileLike, node: MdxJsxElement) {
       'verify-internal-mechanics',
     );
   }
+
+  // Feedback / Segmenting: <Action img> with result-check language suggests
+  // the author is working around <Verify>'s former lack of an img prop.
+  // Now that <Verify img> is supported, migrate these to <Verify img>.
+  // Only fires when the Action has an img prop (text-only Actions can
+  // legitimately say "confirm that X" as inline result).
+  if (imgAttr) {
+    const workaround = detectVerifyWorkaround(bodyText);
+    if (workaround) {
+      emitNote(
+        file,
+        `<Action img="..."> body uses result-check language ("${workaround}") — this looks like a <Verify> workaround. Use <Verify img="..."> instead so the result state carries its intended feedback semantics. Pattern list is heuristic`,
+        node,
+        'verify-visual-workaround-as-action',
+      );
+    }
+  }
 }
 
 function validateVerify(file: VFileLike, node: MdxJsxElement) {
@@ -727,6 +770,13 @@ function validateVerify(file: VFileLike, node: MdxJsxElement) {
 
 function detectInternalMechanics(text: string): string | null {
   for (const { pattern, label } of VERIFY_INTERNAL_MECHANICS_PATTERNS) {
+    if (pattern.test(text)) return label;
+  }
+  return null;
+}
+
+function detectVerifyWorkaround(text: string): string | null {
+  for (const { pattern, label } of VERIFY_WORKAROUND_AS_ACTION_PATTERNS) {
     if (pattern.test(text)) return label;
   }
   return null;

@@ -851,3 +851,44 @@ test('pages without <Section> skip even in strict/collect modes', async () => {
     else process.env.TUTORIAL_LINT_COLLECT = prevCollect;
   }
 });
+
+test('<Action img> with result-check language emits verify-visual-workaround-as-action note', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = tutorialRoot(
+    section(
+      { goal: 'foo します' },
+      // img + "〜ていることを確認" phrasing = verify workaround
+      action(
+        { img: './img/result.png' },
+        paragraph('コンパイルアイコンが緑のチェックになっていることを確認します'),
+      ),
+      jsxElement('Verify', {}, paragraph('成功です')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
+  assert.ok(
+    stub.notes.some((n) => /verify-visual-workaround-as-action/.test(n)),
+    'expected verify-visual-workaround-as-action note',
+  );
+});
+
+test('<Action> without img with confirm language does not emit verify-visual-workaround-as-action', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = tutorialRoot(
+    section(
+      { goal: 'foo します' },
+      // No img prop — text-only Actions can legitimately say "confirm"
+      action({}, paragraph('グラフの形になっていることを確認します')),
+      jsxElement('Verify', {}, paragraph('成功です')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
+  assert.ok(
+    !stub.notes.some((n) => /verify-visual-workaround-as-action/.test(n)),
+    '<Action> without img should not emit verify-visual-workaround-as-action',
+  );
+});
