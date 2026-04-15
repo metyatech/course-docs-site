@@ -83,7 +83,6 @@ const tryFetchStatus = async (url) => {
   }
 };
 
-
 const writeFixtureCourseRepo = async (
   rootDir,
   {
@@ -140,6 +139,8 @@ authoringMode: tutorial
     **${secondImageName}** を確認します
   </Action>
 </Section>
+
+![保存反映確認](./img/${firstImageFileName})
 `;
 
   const pageDir = path.join(rootDir, "content", "docs", "tutorial");
@@ -251,6 +252,35 @@ const pasteImageIntoEditor = async (page, imageDataUrl) => {
     window.dispatchEvent(pasteEvent);
   }, imageDataUrl);
 };
+
+const getPreviewProbeImage = (page) => page.locator('img[alt="保存反映確認"]:visible').first();
+
+const isTutorialShotHighlightPixel = (pixel) =>
+  Array.isArray(pixel) &&
+  pixel.length === 4 &&
+  pixel[0] >= 250 &&
+  pixel[1] >= 100 &&
+  pixel[1] <= 110 &&
+  pixel[2] <= 10 &&
+  pixel[3] === 255;
+
+const readPreviewProbePixel = async (page, { x = 8, y = 8 } = {}) =>
+  getPreviewProbeImage(page).evaluate((image, coordinates) => {
+    if (!(image instanceof HTMLImageElement) || !image.complete || image.naturalWidth === 0) {
+      return null;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return null;
+    }
+
+    context.drawImage(image, 0, 0);
+    return Array.from(context.getImageData(coordinates.x, coordinates.y, 1, 1).data);
+  }, { x, y });
 
 test(
   "tutorial shot editor saves one boxed focal point with an optional arrow",
@@ -578,6 +608,97 @@ test(
     await assert.doesNotReject(() => fs.stat(pastedRawPath));
     await assert.doesNotReject(() => fs.stat(pastedOutputPath));
     assert.equal(Buffer.compare(await fs.readFile(pastedRawPath), pastedImageBuffer), 0);
+  },
+);
+
+test(
+  "tutorial shot editor save refreshes the open dev tutorial page to the latest image",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "course-tutorial-shot-editor-live-refresh-"),
+    );
+    const fixtureCourse = path.join(tempRoot, "course");
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "tutorial-shot-editor-live-refresh",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/docs/tutorial/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Tutorial preview page did not become ready.",
+      },
+    );
+
+    const browser = await chromium.launch({ headless: true });
+    t.after(async () => {
+      await browser.close();
+    });
+
+    const previewPage = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+    const editorPage = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+
+    await previewPage.goto("/docs/tutorial/", { waitUntil: "domcontentloaded" });
+    await getPreviewProbeImage(previewPage).waitFor();
+
+    const initialProbePixel = await readPreviewProbePixel(previewPage, { x: 129, y: 74 });
+    assert.deepEqual(
+      initialProbePixel,
+      [203, 213, 225, 255],
+      "The box border position should start from the original tutorial image color.",
+    );
+
+    await editorPage.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
+    await editorPage.getByRole("heading", { name: "チュートリアル画像エディタ" }).waitFor();
+    await editorPage.getByRole("button", { name: /startup/i }).waitFor({ timeout: 60_000 });
+    await editorPage.getByRole("heading", { name: "必要なら注釈を追加" }).scrollIntoViewIfNeeded();
+    await waitForAnnotationCanvasReady(editorPage);
+
+    await editorPage.getByRole("button", { name: "枠を追加" }).click();
+    await editorPage.getByRole("button", { name: "矢印を追加" }).click();
+    await editorPage.getByRole("button", { name: "保存", exact: true }).click();
+    await editorPage.getByText("保存しました").waitFor();
+
+    await waitFor(
+      async () => {
+        const pixel = await readPreviewProbePixel(previewPage, { x: 129, y: 74 });
+        return isTutorialShotHighlightPixel(pixel);
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 250,
+        onTimeoutMessage: "The open tutorial preview page did not refresh to the saved annotation image.",
+      },
+    );
   },
 );
 

@@ -152,6 +152,12 @@ const ensureParentDir = async (filePath) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 };
 
+const rewritePageSourceForDevRefresh = async ({ pageAbsPath, sourceText }) => {
+  // Rewriting the page with identical contents makes the synced MDX page update
+  // after the generated image file, so the open dev preview reloads the latest image.
+  await fs.writeFile(pageAbsPath, sourceText, "utf8");
+};
+
 const hydrateManifest = (manifestInput) => {
   const normalized = normalizeTutorialShotManifest(manifestInput);
   const defaults = createDefaultTutorialShotManifest({
@@ -490,6 +496,10 @@ export const saveTutorialShot = async ({
   await fs.writeFile(manifestAbsPath, `${JSON.stringify(savedManifest, null, 2)}\n`, "utf8");
 
   const pageSourceText = await fs.readFile(pageAbsPath, "utf8");
+  await rewritePageSourceForDevRefresh({
+    pageAbsPath,
+    sourceText: pageSourceText,
+  });
   const pageModeWarnings = getTutorialPageModeWarnings({ sourceText: pageSourceText });
 
   return {
