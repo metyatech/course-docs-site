@@ -251,7 +251,10 @@ if (courseSource.kind === "local") {
   }
 } else {
   fs.mkdirSync(workRoot, { recursive: true });
-  const repoUrl = `https://github.com/${courseSource.repo}.git`;
+  const ghToken = process.env.GH_TOKEN?.trim();
+  const repoUrl = ghToken
+    ? `https://x-access-token:${ghToken}@github.com/${courseSource.repo}.git`
+    : `https://github.com/${courseSource.repo}.git`;
   const headSha = resolveRemoteHeadSha({ repoUrl, ref: courseSource.ref });
   activeSourceId = `repo:${courseSource.repo}#${courseSource.ref}@${headSha}`;
 

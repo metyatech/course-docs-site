@@ -15,6 +15,10 @@ const COURSE_DEFAULTS = {
   "javascript-course-docs": {
     enableSubmissions: false,
   },
+  "open-campus-unreal-90min": {
+    enableSubmissions: false,
+    enableCodePreview: false,
+  },
 };
 
 const normalizeSourceText = (sourceText) =>

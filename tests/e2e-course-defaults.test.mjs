@@ -24,3 +24,11 @@ test("javascript-course-docs keeps submissions disabled", () => {
   assert.equal(config.enableSubmissions, false);
   assert.equal(config.enableCodePreview, true);
 });
+
+test("open-campus-unreal-90min disables submissions and code preview", () => {
+  const config = resolveCourseSuiteConfig("../open-campus-unreal-90min");
+
+  assert.equal(config.docsIntroPath, "/docs/intro");
+  assert.equal(config.enableSubmissions, false);
+  assert.equal(config.enableCodePreview, false);
+});

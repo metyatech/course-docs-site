@@ -24,6 +24,16 @@ const courses = [
     sourceEnv: "E2E_JAVASCRIPT_CONTENT_SOURCE",
     defaultSource: "github:metyatech/javascript-course-docs#master",
   },
+  {
+    name: "open-campus-unreal-90min",
+    sourceEnv: "E2E_OPEN_CAMPUS_CONTENT_SOURCE",
+    // Default to the local workspace checkout; omit to skip if absent.
+    defaultSource: "../open-campus-unreal-90min",
+    // optional: when true and the source cannot be resolved, skip with a
+    // warning instead of throwing. Useful for private repos that may not
+    // be present in every environment.
+    optional: true,
+  },
 ];
 
 const run = (command, args, env) =>
@@ -97,6 +107,9 @@ const resolveCourseEnv = (course) => {
   if (source.kind === "local") {
     const localPath = path.resolve(projectRoot, source.localDir);
     if (!fs.existsSync(localPath) || !fs.statSync(localPath).isDirectory()) {
+      if (course.optional) {
+        return null;
+      }
       throw new Error(`${course.sourceEnv} points to a non-directory path: ${source.localDir}`);
     }
 
@@ -114,7 +127,12 @@ const resolveCourseEnv = (course) => {
 loadEnvDefaults();
 
 for (const course of courses) {
-  const { env: sourceEnv, sourceLabel } = resolveCourseEnv(course);
+  const resolved = resolveCourseEnv(course);
+  if (resolved === null) {
+    console.log(`\n=== Skipping ${course.name} (source not available, set ${course.sourceEnv} to override) ===`);
+    continue;
+  }
+  const { env: sourceEnv, sourceLabel } = resolved;
   const env = { ...sourceEnv };
   env.E2E_PORT = String(await resolveMatrixE2ePort(env));
   env.COURSE_DOCS_NEXT_DIST_DIR = createIsolatedNextDistDir(`playwright-${course.name}`);
