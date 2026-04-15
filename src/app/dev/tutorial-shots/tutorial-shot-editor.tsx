@@ -215,6 +215,7 @@ const createInitialCrop = (image: HTMLImageElement, manifest: TutorialShotManife
 const createDefaultBox = (width: number, height: number): TutorialShotBoxAnnotation => ({
   id: crypto.randomUUID(),
   type: "box",
+  role: "action",
   x: Math.max(16, Math.round(width * 0.2)),
   y: Math.max(16, Math.round(height * 0.2)),
   width: Math.max(80, Math.round(width * 0.35)),
@@ -489,6 +490,19 @@ export default function TutorialShotEditor() {
     const next = createArrowForBox(primaryBox);
     updateAnnotations([...draftManifest.annotations, next]);
     setSelectedAnnotationId(next.id);
+  };
+
+  const toggleBoxRole = (annotationId: string) => {
+    if (!draftManifest) {
+      return;
+    }
+    updateAnnotations(
+      draftManifest.annotations.map((annotation) =>
+        annotation.id === annotationId && annotation.type === "box"
+          ? { ...annotation, role: annotation.role === "verify" ? "action" : "verify" }
+          : annotation,
+      ),
+    );
   };
 
   const removeAnnotation = (annotationId: string) => {
@@ -1119,6 +1133,15 @@ export default function TutorialShotEditor() {
                                     </span>
                                   )}
                                 </button>
+                                {annotation.type === "box" ? (
+                                  <button
+                                    className={styles.annotationItemRole}
+                                    onClick={() => toggleBoxRole(annotation.id)}
+                                    type="button"
+                                  >
+                                    {annotation.role === "verify" ? "確認（破線）" : "アクション（実線）"}
+                                  </button>
+                                ) : null}
                                 <button
                                   className={styles.annotationItemDelete}
                                   onClick={() => removeAnnotation(annotation.id)}

@@ -1,5 +1,6 @@
 export const TUTORIAL_SHOT_MANIFEST_VERSION = 1;
 export const TUTORIAL_SHOT_ANNOTATION_MODES = ["focal", "callout"];
+export const TUTORIAL_SHOT_BOX_ROLES = ["action", "verify"];
 
 const ACTION_TAG_PATTERN = /<Action\b[\s\S]*?>/gu;
 const SECTION_TAG_PATTERN = /<Section\b/u;
@@ -284,9 +285,15 @@ const normalizeAnnotation = (annotation) => {
   }
 
   if (annotation.type === "box") {
+    if (!TUTORIAL_SHOT_BOX_ROLES.includes(annotation.role)) {
+      throw new Error(
+        `box annotation に role が必要です（"action" または "verify"）。対象 id: ${annotation.id ?? "(unknown)"}`,
+      );
+    }
     return {
       id: typeof annotation.id === "string" ? annotation.id : crypto.randomUUID(),
       type: "box",
+      role: annotation.role,
       x: Number(annotation.x) || 0,
       y: Number(annotation.y) || 0,
       width: Math.max(1, Number(annotation.width) || 0),
@@ -529,8 +536,9 @@ export const renderTutorialShotOverlaySvg = ({
 
   for (const annotation of annotations ?? []) {
     if (annotation.type === "box") {
+      const strokeDash = annotation.role === "verify" ? ` stroke-dasharray="12 8"` : "";
       shapes.push(
-        `<rect x="${annotation.x}" y="${annotation.y}" width="${annotation.width}" height="${annotation.height}" rx="10" ry="10" fill="none" stroke="#ff6b00" stroke-width="4" />`,
+        `<rect x="${annotation.x}" y="${annotation.y}" width="${annotation.width}" height="${annotation.height}" rx="10" ry="10" fill="none" stroke="#ff6b00" stroke-width="4"${strokeDash} />`,
       );
       if (annotationMode === "callout") {
         calloutIndex += 1;

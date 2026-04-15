@@ -1,6 +1,9 @@
+export type TutorialShotBoxRole = "action" | "verify";
+
 export type TutorialShotBoxAnnotation = {
   id: string;
   type: "box";
+  role: TutorialShotBoxRole;
   x: number;
   y: number;
   width: number;

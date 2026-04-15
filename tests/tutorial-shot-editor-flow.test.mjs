@@ -398,6 +398,7 @@ test(
       {
         id: startupManifest.annotations[0].id,
         type: "box",
+        role: "action",
         x: 128,
         y: 72,
         width: 224,
@@ -866,6 +867,7 @@ test(
             {
               id: "box-left-overflow",
               type: "box",
+              role: "action",
               x: -40,
               y: 24,
               width: 120,

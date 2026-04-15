@@ -9,6 +9,7 @@ import {
   extractActionImageRefsFromMdx,
   getTutorialPageModeWarnings,
   getTutorialShotWarnings,
+  renderTutorialShotOverlaySvg,
 } from "../src/lib/tutorial-shots-shared.mjs";
 import {
   getStoredTutorialShotCropState,
@@ -152,6 +153,7 @@ test("getTutorialShotWarnings validates focal mode annotations", () => {
       {
         id: "box-1",
         type: "box",
+        role: "action",
         x: 0,
         y: 0,
         width: 10,
@@ -160,6 +162,7 @@ test("getTutorialShotWarnings validates focal mode annotations", () => {
       {
         id: "box-2",
         type: "box",
+        role: "action",
         x: 20,
         y: 20,
         width: 10,
@@ -190,9 +193,9 @@ test("getTutorialShotWarnings validates callout mode annotations", () => {
     getTutorialShotWarnings({
       annotationMode: "callout",
       annotations: [
-        { id: "box-1", type: "box", x: 0, y: 0, width: 80, height: 40 },
-        { id: "box-2", type: "box", x: 100, y: 50, width: 80, height: 40 },
-        { id: "box-3", type: "box", x: 200, y: 100, width: 80, height: 40 },
+        { id: "box-1", type: "box", role: "action", x: 0, y: 0, width: 80, height: 40 },
+        { id: "box-2", type: "box", role: "action", x: 100, y: 50, width: 80, height: 40 },
+        { id: "box-3", type: "box", role: "action", x: 200, y: 100, width: 80, height: 40 },
       ],
     }),
     [],
@@ -203,7 +206,7 @@ test("getTutorialShotWarnings validates callout mode annotations", () => {
     getTutorialShotWarnings({
       annotationMode: "callout",
       annotations: [
-        { id: "box-1", type: "box", x: 0, y: 0, width: 80, height: 40 },
+        { id: "box-1", type: "box", role: "action", x: 0, y: 0, width: 80, height: 40 },
         { id: "arrow-1", type: "arrow", fromX: 10, fromY: 10, toX: 20, toY: 20 },
       ],
     }),
@@ -468,6 +471,7 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
         {
           id: "box-1",
           type: "box",
+          role: "action",
           x: 32,
           y: 24,
           width: 120,
@@ -531,6 +535,7 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
     {
       id: "box-1",
       type: "box",
+      role: "action",
       x: 32,
       y: 24,
       width: 120,
@@ -782,6 +787,7 @@ test("saveTutorialShot expands the output canvas when annotations overflow the c
         {
           id: "box-left-top",
           type: "box",
+          role: "action",
           x: -40,
           y: -20,
           width: 120,
@@ -796,6 +802,7 @@ test("saveTutorialShot expands the output canvas when annotations overflow the c
     {
       id: "box-left-top",
       type: "box",
+      role: "action",
       x: -40,
       y: -20,
       width: 120,
@@ -895,6 +902,7 @@ test("saveTutorialShot accepts a single box without an arrow", async (t) => {
         {
           id: "box-1",
           type: "box",
+          role: "action",
           x: 24,
           y: 24,
           width: 120,
@@ -909,6 +917,7 @@ test("saveTutorialShot accepts a single box without an arrow", async (t) => {
     {
       id: "box-1",
       type: "box",
+      role: "action",
       x: 24,
       y: 24,
       width: 120,
@@ -944,9 +953,9 @@ test("saveTutorialShot accepts multiple boxes in callout mode", async (t) => {
         height: 180,
       },
       annotations: [
-        { id: "box-1", type: "box", x: 10, y: 10, width: 80, height: 40 },
-        { id: "box-2", type: "box", x: 120, y: 60, width: 80, height: 40 },
-        { id: "box-3", type: "box", x: 220, y: 110, width: 80, height: 40 },
+        { id: "box-1", type: "box", role: "action", x: 10, y: 10, width: 80, height: 40 },
+        { id: "box-2", type: "box", role: "action", x: 120, y: 60, width: 80, height: 40 },
+        { id: "box-3", type: "box", role: "action", x: 220, y: 110, width: 80, height: 40 },
       ],
     },
   });
@@ -954,6 +963,65 @@ test("saveTutorialShot accepts multiple boxes in callout mode", async (t) => {
   assert.deepEqual(result.warnings, []);
   assert.equal(result.manifest.annotationMode, "callout");
   assert.equal(result.manifest.annotations.length, 3);
+});
+
+test("saveTutorialShot rejects a box annotation without a role", async (t) => {
+  const sourceRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "course-tutorial-shots-role-missing-"),
+  );
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+
+  await assert.rejects(
+    () =>
+      saveTutorialShot({
+        sourceRoot,
+        bootstrapFromOutput: true,
+        manifestInput: {
+          ...manifest,
+          annotationMode: "callout",
+          crop: { x: 0, y: 0, width: 320, height: 180 },
+          annotations: [
+            { id: "box-role-less", type: "box", x: 10, y: 10, width: 80, height: 40 },
+          ],
+        },
+      }),
+    /role が必要です/u,
+  );
+});
+
+test("renderTutorialShotOverlaySvg draws verify boxes with a dashed stroke", () => {
+  const svg = renderTutorialShotOverlaySvg({
+    width: 200,
+    height: 100,
+    annotationMode: "callout",
+    annotations: [
+      { id: "a", type: "box", role: "action", x: 10, y: 10, width: 40, height: 20 },
+      { id: "v", type: "box", role: "verify", x: 70, y: 40, width: 40, height: 20 },
+    ],
+  });
+
+  const dashMatches = svg.match(/stroke-dasharray="12 8"/gu) ?? [];
+  assert.equal(dashMatches.length, 1, "exactly one rect should be dashed (the verify one)");
+
+  const verifyRectPattern = /<rect[^>]*x="70"[^>]*stroke-dasharray="12 8"[^>]*\/>/u;
+  assert.match(svg, verifyRectPattern);
+
+  const actionRectPattern = /<rect x="10"[^>]*stroke-width="4"\s*\/>/u;
+  assert.match(
+    svg,
+    actionRectPattern,
+    "action rect must not carry a stroke-dasharray attribute",
+  );
 });
 
 test("saveTutorialShot rejects arrows in callout mode", async (t) => {
@@ -982,7 +1050,7 @@ test("saveTutorialShot rejects arrows in callout mode", async (t) => {
           annotationMode: "callout",
           crop: { x: 0, y: 0, width: 320, height: 180 },
           annotations: [
-            { id: "box-1", type: "box", x: 10, y: 10, width: 80, height: 40 },
+            { id: "box-1", type: "box", role: "action", x: 10, y: 10, width: 80, height: 40 },
             { id: "arrow-1", type: "arrow", fromX: 10, fromY: 10, toX: 40, toY: 30 },
           ],
         },
@@ -1017,6 +1085,7 @@ test("saveTutorialShot rejects unsupported annotation combinations", async (t) =
         {
           id: "box-1",
           type: "box",
+          role: "action",
           x: 16,
           y: 16,
           width: 80,
@@ -1025,6 +1094,7 @@ test("saveTutorialShot rejects unsupported annotation combinations", async (t) =
         {
           id: "box-2",
           type: "box",
+          role: "action",
           x: 120,
           y: 64,
           width: 80,
@@ -1039,6 +1109,7 @@ test("saveTutorialShot rejects unsupported annotation combinations", async (t) =
         {
           id: "box-1",
           type: "box",
+          role: "action",
           x: 16,
           y: 16,
           width: 80,
@@ -1118,6 +1189,7 @@ test("saveTutorialShot keeps reporting a missing raw image once annotations are 
             {
               id: "box-1",
               type: "box",
+              role: "action",
               x: 24,
               y: 24,
               width: 96,

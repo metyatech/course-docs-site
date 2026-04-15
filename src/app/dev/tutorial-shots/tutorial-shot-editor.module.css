@@ -585,6 +585,22 @@
   background: rgb(254 226 226);
 }
 
+.annotationItemRole {
+  border: 1px solid rgb(203 213 225);
+  background: rgb(248 250 252);
+  color: rgb(51 65 85);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
+  margin-right: 0.4rem;
+}
+
+.annotationItemRole:hover {
+  background: rgb(226 232 240);
+}
+
 /* ── Warnings ───────────────────────────────────────── */
 
 .warningCard {
