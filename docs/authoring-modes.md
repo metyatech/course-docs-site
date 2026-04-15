@@ -40,6 +40,12 @@ Tutorial pages should use the tutorial-authoring structure from
 `@metyatech/course-docs-platform` and be reviewed against the tutorial
 principles.
 
+If a site-owned local fixture or authoring tool targets a tutorial page that
+uses `<Section>`, that page should also declare `authoringMode: tutorial`.
+The Course Docs Site tutorial-shot editor warns when a scanned page still uses
+`<Section>` without that declaration so fixture drift is visible alongside the
+build-failing platform enforcement now consumed in this repository.
+
 ## Non-tutorial
 
 Choose Non-tutorial mode when the page's main value is understanding or

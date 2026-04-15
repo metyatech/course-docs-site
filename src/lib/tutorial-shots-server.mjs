@@ -5,6 +5,7 @@ import {
   createDefaultTutorialShotManifest,
   deriveTutorialShotPaths,
   extractActionImageRefsFromMdx,
+  getTutorialPageModeWarnings,
   getTutorialShotAnnotationErrors,
   getTutorialShotCanvasLayout,
   getTutorialShotWarnings,
@@ -285,6 +286,7 @@ export const scanTutorialShots = async ({ sourceRoot }) => {
   for (const filePath of pageFiles) {
     const relativePath = normalizePosixPath(path.relative(sourceRoot, filePath));
     const sourceText = await fs.readFile(filePath, "utf8");
+    const pageModeWarnings = getTutorialPageModeWarnings({ sourceText });
     const refs = extractActionImageRefsFromMdx({
       pagePath: relativePath,
       sourceText,
@@ -317,6 +319,7 @@ export const scanTutorialShots = async ({ sourceRoot }) => {
       );
 
       const warnings = getTutorialShotWarnings(manifest);
+      const mergedWarnings = [...new Set([...pageModeWarnings, ...warnings])];
       const hasManifest = rawManifest !== null;
       const hasRawImage = await fs
         .stat(rawImagePath)
@@ -330,7 +333,7 @@ export const scanTutorialShots = async ({ sourceRoot }) => {
       shots.push({
         ...ref,
         manifest,
-        warnings,
+        warnings: mergedWarnings,
         hasManifest,
         hasRawImage,
         hasOutputImage,
@@ -380,6 +383,11 @@ export const saveTutorialShot = async ({
     sourceRoot,
     contentRelativePath: derivedPaths.manifestPath,
     pattern: /^content\/.+\/shots\/.+\.shot\.json$/iu,
+  });
+  const pageAbsPath = resolveSourcePath({
+    sourceRoot,
+    contentRelativePath: manifest.pagePath,
+    pattern: PAGE_PATH_PATTERN,
   });
 
   if (rawImageDataUrl) {
@@ -481,9 +489,12 @@ export const saveTutorialShot = async ({
   await ensureParentDir(manifestAbsPath);
   await fs.writeFile(manifestAbsPath, `${JSON.stringify(savedManifest, null, 2)}\n`, "utf8");
 
+  const pageSourceText = await fs.readFile(pageAbsPath, "utf8");
+  const pageModeWarnings = getTutorialPageModeWarnings({ sourceText: pageSourceText });
+
   return {
     manifest: savedManifest,
-    warnings: getTutorialShotWarnings(savedManifest),
+    warnings: [...new Set([...pageModeWarnings, ...getTutorialShotWarnings(savedManifest)])],
   };
 };
 

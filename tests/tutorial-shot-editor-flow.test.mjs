@@ -129,6 +129,7 @@ export default meta;
 
   const tutorialPage = `---
 title: Tutorial
+authoringMode: tutorial
 ---
 
 <Section title="Step 1" goal="最初のショットを保存できる状態">

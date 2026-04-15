@@ -96,6 +96,11 @@ you want to keep that output path stable while editing:
 - box / arrow / short label annotations
 - generated page-local output image
 
+The editor also warns when the scanned page still uses `<Section>` without
+declaring `authoringMode: tutorial`, so local fixtures and in-progress course
+repos surface page-mode drift in the same repo where the stricter platform
+enforcement now runs.
+
 See [Tutorial Shot Editor](./docs/tutorial-shot-editor.md) for the architecture,
 canonical files, and authoring rules.
 

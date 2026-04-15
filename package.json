@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@mdx-js/react": "^3.1.1",
-    "@metyatech/course-docs-platform": "github:metyatech/course-docs-platform#b558854",
+    "@metyatech/course-docs-platform": "github:metyatech/course-docs-platform#9ad8cfd",
     "dotenv": "^17.2.3",
     "konva": "^10.2.3",
     "next": "^15.5.14",
@@ -90,14 +90,14 @@
     "@chevrotain/utils": "11.1.2",
     "@mermaid-js/parser": "1.1.0",
     "@xmldom/xmldom": "0.9.9",
-    "brace-expansion": "5.0.5",
+    "brace-expansion": "2.1.0",
     "chevrotain": "11.1.2",
     "dompurify": "3.3.3",
     "flatted": "3.4.2",
     "lodash": "4.18.1",
     "lodash-es": "4.18.1",
     "mermaid": "11.14.0",
-    "minimatch": "10.2.5",
+    "minimatch": "9.0.9",
     "micromatch": {
       "picomatch": "2.3.2"
     },

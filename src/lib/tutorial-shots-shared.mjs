@@ -2,7 +2,10 @@ export const TUTORIAL_SHOT_MANIFEST_VERSION = 1;
 export const TUTORIAL_SHOT_ANNOTATION_MODES = ["focal", "callout"];
 
 const ACTION_TAG_PATTERN = /<Action\b[\s\S]*?>/gu;
+const SECTION_TAG_PATTERN = /<Section\b/u;
 const IMG_PROP_PATTERN = /\bimg=(["'])(.*?)\1/u;
+const YAML_FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---/u;
+const TOML_FRONTMATTER_PATTERN = /^\+\+\+\r?\n([\s\S]*?)\r?\n\+\+\+/u;
 
 export const normalizePosixPath = (value) =>
   value
@@ -145,6 +148,134 @@ export const extractActionImageRefsFromMdx = ({ pagePath, sourceText }) => {
   }
 
   return refs;
+};
+
+const normalizeAuthoringModeValue = (value) =>
+  value
+    .trim()
+    .replace(/^['"`]/, "")
+    .replace(/['"`]$/, "")
+    .trim()
+    .toLowerCase();
+
+const toAuthoringMode = (value) => {
+  const normalized = normalizeAuthoringModeValue(value);
+  if (normalized === "tutorial") {
+    return "tutorial";
+  }
+  if (normalized === "non-tutorial") {
+    return "non-tutorial";
+  }
+  return null;
+};
+
+const extractYamlLikeAuthoringMode = (source, separator) => {
+  for (const rawLine of source.split(/\r?\n/gu)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+
+    const pattern =
+      separator === ":"
+        ? /^authoringMode\s*:\s*(.+?)\s*(?:#.*)?$/u
+        : /^authoringMode\s*=\s*(.+?)\s*(?:#.*)?$/u;
+    const match = pattern.exec(line);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return null;
+};
+
+const extractExplicitAuthoringMode = (sourceText) => {
+  const yamlMatch = YAML_FRONTMATTER_PATTERN.exec(sourceText);
+  if (yamlMatch) {
+    const rawValue = extractYamlLikeAuthoringMode(yamlMatch[1], ":");
+    if (rawValue !== null) {
+      return {
+        explicit: true,
+        mode: toAuthoringMode(rawValue),
+        rawValue,
+      };
+    }
+  }
+
+  const tomlMatch = TOML_FRONTMATTER_PATTERN.exec(sourceText);
+  if (tomlMatch) {
+    const rawValue = extractYamlLikeAuthoringMode(tomlMatch[1], "=");
+    if (rawValue !== null) {
+      return {
+        explicit: true,
+        mode: toAuthoringMode(rawValue),
+        rawValue,
+      };
+    }
+  }
+
+  const directExportMatch =
+    /export\s+const\s+authoringMode\s*=\s*(['"`])([^'"`]+)\1/u.exec(sourceText);
+  if (directExportMatch) {
+    const rawValue = directExportMatch[2];
+    return {
+      explicit: true,
+      mode: toAuthoringMode(rawValue),
+      rawValue,
+    };
+  }
+
+  const metadataExportMatch =
+    /export\s+const\s+metadata\s*=\s*\{[\s\S]*?\bauthoringMode\s*:\s*(['"`])([^'"`]+)\1[\s\S]*?\}/u.exec(
+      sourceText,
+    );
+  if (metadataExportMatch) {
+    const rawValue = metadataExportMatch[2];
+    return {
+      explicit: true,
+      mode: toAuthoringMode(rawValue),
+      rawValue,
+    };
+  }
+
+  return {
+    explicit: false,
+    mode: null,
+    rawValue: null,
+  };
+};
+
+export const getTutorialPageModeWarnings = ({ sourceText }) => {
+  const warnings = [];
+  const hasSection = SECTION_TAG_PATTERN.test(sourceText ?? "");
+
+  if (!hasSection) {
+    return warnings;
+  }
+
+  const authoringMode = extractExplicitAuthoringMode(sourceText ?? "");
+
+  if (authoringMode.explicit && authoringMode.mode === null) {
+    warnings.push(
+      `このページの authoringMode は "${authoringMode.rawValue}" ですが、有効なのは "tutorial" / "non-tutorial" だけです。`,
+    );
+    return warnings;
+  }
+
+  if (!authoringMode.explicit) {
+    warnings.push(
+      "このページは <Section> を使っていますが `authoringMode: tutorial` がありません。course-docs-platform の新ルールに合わせて frontmatter か metadata export に追加してください。",
+    );
+    return warnings;
+  }
+
+  if (authoringMode.mode === "non-tutorial") {
+    warnings.push(
+      "このページは `authoringMode: non-tutorial` ですが <Section> を使っています。tutorial ページとして分けるか、ページ構成を見直してください。",
+    );
+  }
+
+  return warnings;
 };
 
 const normalizeAnnotation = (annotation) => {
