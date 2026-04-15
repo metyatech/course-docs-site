@@ -40,6 +40,8 @@ jobs:
             e2ePort: 3101
           - courseSource: "github:metyatech/programming-course-docs#master"
             e2ePort: 3102
+          - courseSource: "github:metyatech/open-campus-unreal-90min#main"
+            e2ePort: 3103
     env:
       COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
       E2E_PORT: ${{ matrix.e2ePort }}
@@ -68,59 +70,4 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Verify course matrix entry
-        run: npm run verify:course
-
-  check-open-campus-token:
-    # Outputs whether the OPEN_CAMPUS_GH_TOKEN secret is configured so the
-    # dependent job can be skipped rather than fail when the secret is absent.
-    runs-on: ubuntu-latest
-    outputs:
-      available: ${{ steps.check.outputs.available }}
-    steps:
-      - id: check
-        env:
-          TOKEN: ${{ secrets.OPEN_CAMPUS_GH_TOKEN }}
-        run: |
-          if [ -n "$TOKEN" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  verify-open-campus:
-    # Requires OPEN_CAMPUS_GH_TOKEN secret (PAT with read access to
-    # metyatech/open-campus-unreal-90min). Job is skipped when the secret is
-    # absent so forks and PRs without the secret still pass CI.
-    needs: check-open-campus-token
-    if: needs.check-open-campus-token.outputs.available == 'true'
-    runs-on: ubuntu-latest
-    env:
-      COURSE_CONTENT_SOURCE: "github:metyatech/open-campus-unreal-90min#main"
-      GH_TOKEN: ${{ secrets.OPEN_CAMPUS_GH_TOKEN }}
-      E2E_PORT: "3103"
-      PLAYWRIGHT_MAX_FAILURES: "1"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: package-lock.json
-
-      - name: Cache Playwright Chromium
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
-
-      - name: Install
-        run: npm ci
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Verify open-campus course
         run: npm run verify:course
