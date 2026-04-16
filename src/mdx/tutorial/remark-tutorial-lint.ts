@@ -579,6 +579,8 @@ export default function remarkTutorialLint() {
     validatePageOpener(file, tree);
     validateThirdPersonReader(file, tree);
     validateDecorativeEmoji(file, tree);
+    validatePrerequisitesPlacement(file, tree);
+    validateNextStepsPlacement(file, tree);
 
     const walk = (node: Node, stepContext: StepContext | null, sectionDepth: number) => {
       if (!hasChildren(node)) return;
@@ -1030,5 +1032,65 @@ function validateCheckpointPlacement(file: VFileLike, step: StepContext) {
       'checkpoint-placement',
     );
     return;
+  }
+}
+
+/**
+ * Warn if <Prerequisites> appears after a <Section> (it should be at the page top).
+ * Severity: warn — placement before first Section has solid pedagogical rationale
+ * (ISO 26514 §10 preliminary information; ミニマリズム P1 action-orientation).
+ */
+function validatePrerequisitesPlacement(file: VFileLike, tree: Node) {
+  if (!hasChildren(tree)) return;
+
+  let firstSectionIndex = -1;
+  for (let i = 0; i < tree.children.length; i += 1) {
+    if (isJsxElement(tree.children[i], 'Section')) {
+      firstSectionIndex = i;
+      break;
+    }
+  }
+
+  for (let i = 0; i < tree.children.length; i += 1) {
+    const child = tree.children[i];
+    if (isJsxElement(child, 'Prerequisites')) {
+      if (firstSectionIndex >= 0 && i > firstSectionIndex) {
+        emitWarning(
+          file,
+          '<Prerequisites> should appear before the first <Section>; learners need to verify requirements before starting',
+          child,
+          'prerequisites-placement',
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Note if <NextSteps> appears before the last <Section> or is absent.
+ * Severity: note — presence and placement are advisory (not all tutorials
+ * need next-steps guidance).
+ */
+function validateNextStepsPlacement(file: VFileLike, tree: Node) {
+  if (!hasChildren(tree)) return;
+
+  let lastSectionIndex = -1;
+  const nextStepsIndices: number[] = [];
+
+  for (let i = 0; i < tree.children.length; i += 1) {
+    const child = tree.children[i];
+    if (isJsxElement(child, 'Section')) lastSectionIndex = i;
+    if (isJsxElement(child, 'NextSteps')) nextStepsIndices.push(i);
+  }
+
+  for (const nsIndex of nextStepsIndices) {
+    if (lastSectionIndex >= 0 && nsIndex < lastSectionIndex) {
+      emitNote(
+        file,
+        '<NextSteps> appears before the last <Section>; typically it belongs at the very end of the tutorial',
+        tree.children[nsIndex],
+        'nextsteps-placement',
+      );
+    }
   }
 }

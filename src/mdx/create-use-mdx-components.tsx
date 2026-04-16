@@ -13,6 +13,8 @@ import {
   Reference,
   Recovery,
   Checkpoint,
+  Prerequisites,
+  NextSteps,
 } from './tutorial/index.js';
 
 type WrapperProps = {
@@ -39,6 +41,8 @@ const baseComponents: MDXComponents = {
   Reference,
   Recovery,
   Checkpoint,
+  Prerequisites,
+  NextSteps,
 };
 
 export function createUseMDXComponents(extra: MDXComponents = {}) {
