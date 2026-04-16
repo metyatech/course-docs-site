@@ -67,3 +67,4 @@
 {"id":"mzMEaEof","description":"Add shotSource field and Verify editor lock to tutorial shot editor (course-docs-site)","stage":"done","createdAt":"2026-04-16T10:58:18.937Z","updatedAt":"2026-04-16T10:59:44.242Z","committedEventId":"aJkqdT2Zd4SwvJM1"}
 {"id":"FVj4eRrR","description":"Show verify-shot-action-role warning in editor UI and sidebar (course-docs-site)","stage":"done","createdAt":"2026-04-16T12:34:21.411Z","updatedAt":"2026-04-16T12:35:50.578Z","committedEventId":"3s6DnrLliLtf5E1h"}
 {"id":"D9YjsgRc","description":"Add multi-focal annotation mode to tutorial shot editor","stage":"committed","createdAt":"2026-04-16T13:07:50.449Z","updatedAt":"2026-04-16T13:08:24.284Z","committedEventId":"WGri7SB0MhZyBfcy"}
+{"id":"q2012Y47","description":"Bump course-docs-platform SHA to pick up Exercise depth boundary fix in remark-section-headings","stage":"committed","createdAt":"2026-04-16T15:28:39.284Z","updatedAt":"2026-04-16T15:28:39.284Z"}
