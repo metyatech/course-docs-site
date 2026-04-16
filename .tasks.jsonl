@@ -11,3 +11,4 @@
 {"id":"KDCMaCgg","description":"Fix missing title prop in auto-injected Concept legend","stage":"committed","createdAt":"2026-04-15T17:05:43.572Z","updatedAt":"2026-04-15T17:05:53.885Z","committedEventId":"YN1o0JzBe-paVv4i"}
 {"id":"YkkZqJbW","description":"Add Prerequisites and NextSteps MDX components with lint rules","stage":"done","createdAt":"2026-04-16T02:31:43.003Z","updatedAt":"2026-04-16T02:34:42.864Z","committedEventId":"jNEkeYnA-k_vO3C9"}
 {"id":"v5pLXEu9","description":"Rewrite auto-injected image legend text in remarkInjectTutorialShotLegend","stage":"done","createdAt":"2026-04-16T08:18:48.770Z","updatedAt":"2026-04-16T08:57:07.714Z"}
+{"id":"pjDPLrnv","description":"Add verify-shot-action-role lint rule to remark-tutorial-lint (course-docs-platform)","stage":"done","createdAt":"2026-04-16T10:49:17.988Z","updatedAt":"2026-04-16T10:51:28.399Z","committedEventId":"oB8WmGdjA845EW3r"}
