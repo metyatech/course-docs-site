@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { bumpRevision } from "../../../../../lib/dev-reload-bus";
 import {
   getTutorialShotAuthoringContext,
   saveTutorialShot,
@@ -26,6 +27,13 @@ export async function POST(request: Request) {
       rawImageDataUrl: typeof body.rawImageDataUrl === "string" ? body.rawImageDataUrl : null,
       bootstrapFromOutput: body.bootstrapFromOutput === true,
     });
+
+    // Bump the SSE revision so all connected docs pages reload via DevAutoReload.
+    // This is more reliable than depending solely on the Next.js HMR chain
+    // triggered by rewritePageSourceForDevRefresh, which does not always fire
+    // a full page reload for <Verify img> or <Action img> when the rendered
+    // output image changes but the MDX module cache still holds the old URL.
+    bumpRevision();
 
     return NextResponse.json(
       {

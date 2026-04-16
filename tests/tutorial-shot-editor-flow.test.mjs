@@ -704,6 +704,192 @@ test(
 );
 
 test(
+  "tutorial shot editor save refreshes the open dev tutorial page after saving a Verify image",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "course-tutorial-shot-editor-verify-reload-"),
+    );
+    const fixtureCourse = path.join(tempRoot, "course");
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    // Write a fixture that includes a <Verify img="..."> on the tutorial page
+    // plus a plain Markdown image (used as the pixel probe for the test).
+    const verifyImageName = "startup-result";
+    const verifyImageFileName = `${verifyImageName}.png`;
+    const siteConfig = `export const siteConfig = {
+  logoText: "Verify Reload Fixture",
+  projectLink: "https://example.invalid",
+  docsRepositoryBase: "https://example.invalid",
+  description: "verify reload fixture",
+  faviconHref: "/img/favicon.ico",
+} as const;
+`;
+    const rootMeta = `const meta = {
+  "*": { type: "page", theme: { timestamp: false } },
+  index: { display: "hidden" },
+  docs: "Docs",
+};
+export default meta;
+`;
+    const docsMeta = `const meta = { tutorial: {} };
+export default meta;
+`;
+    const tutorialPage = `---
+title: Tutorial
+authoringMode: tutorial
+---
+
+<Section title="Step 1" goal="Verify 画像を保存できる状態">
+  <Action img="./img/startup.png">
+    **起動** を確認します
+  </Action>
+  <Verify img="./img/${verifyImageFileName}">
+    画面がこの状態になれば成功
+  </Verify>
+</Section>
+
+![Verify保存反映確認](./img/${verifyImageFileName})
+`;
+
+    const courseDir = fixtureCourse;
+    const pageDir = path.join(courseDir, "content", "docs", "tutorial");
+    const imageDir = path.join(pageDir, "img");
+    await fs.mkdir(imageDir, { recursive: true });
+    await fs.mkdir(path.join(courseDir, "public", "img"), { recursive: true });
+    await fs.writeFile(path.join(courseDir, "site.config.ts"), siteConfig, "utf8");
+    await fs.writeFile(path.join(courseDir, "content", "_meta.ts"), rootMeta, "utf8");
+    await fs.writeFile(path.join(courseDir, "content", "docs", "_meta.ts"), docsMeta, "utf8");
+    await fs.writeFile(path.join(pageDir, "index.mdx"), tutorialPage, "utf8");
+    await fs.writeFile(path.join(courseDir, "public", "img", "favicon.ico"), "", "utf8");
+
+    // Action image (startup.png) — needs to exist so the Action shot can be
+    // bootstrapped from output when there is no raw image yet.
+    await sharp({
+      create: { width: 640, height: 360, channels: 4, background: "#cbd5e1" },
+    })
+      .png()
+      .toFile(path.join(imageDir, "startup.png"));
+
+    // Verify image — initial solid blue; after save it will have an orange box.
+    await sharp({
+      create: { width: 640, height: 360, channels: 4, background: "#cbd5e1" },
+    })
+      .png()
+      .toFile(path.join(imageDir, verifyImageFileName));
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "tutorial-shot-editor-verify-reload",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/docs/tutorial/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Tutorial preview page did not become ready.",
+      },
+    );
+
+    const browser = await chromium.launch({ headless: true });
+    t.after(async () => {
+      await browser.close();
+    });
+
+    const previewPage = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+    const editorPage = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+
+    await previewPage.goto("/docs/tutorial/", { waitUntil: "domcontentloaded" });
+
+    // Locate the Markdown probe image (![Verify保存反映確認](...)).
+    const verifyProbeImage = previewPage
+      .locator('img[alt="Verify保存反映確認"]:visible')
+      .first();
+    await verifyProbeImage.waitFor();
+
+    const readVerifyProbePixel = async (x = 8, y = 8) =>
+      verifyProbeImage.evaluate((image, coordinates) => {
+        if (!(image instanceof HTMLImageElement) || !image.complete || image.naturalWidth === 0) {
+          return null;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          return null;
+        }
+        context.drawImage(image, 0, 0);
+        return Array.from(context.getImageData(coordinates.x, coordinates.y, 1, 1).data);
+      }, { x, y });
+
+    const initialPixel = await readVerifyProbePixel(129, 74);
+    assert.deepEqual(
+      initialPixel,
+      [203, 213, 225, 255],
+      "Verify probe pixel should start from the original (un-annotated) image color.",
+    );
+
+    await editorPage.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
+    await editorPage.getByRole("heading", { name: "チュートリアル画像エディタ" }).waitFor();
+
+    // Select the Verify shot (startup-result) in the sidebar.
+    await editorPage
+      .getByRole("button", { name: new RegExp(verifyImageName, "i") })
+      .waitFor({ timeout: 60_000 });
+    await editorPage
+      .getByRole("button", { name: new RegExp(verifyImageName, "i") })
+      .click();
+
+    await editorPage.getByRole("heading", { name: "必要なら注釈を追加" }).scrollIntoViewIfNeeded();
+    await waitForAnnotationCanvasReady(editorPage);
+
+    // Add a box annotation and save.
+    await editorPage.getByRole("button", { name: "枠を追加" }).click();
+    await editorPage.getByRole("button", { name: "保存", exact: true }).click();
+    await editorPage.getByText("保存しました").waitFor();
+
+    // The docs page should reload automatically via the SSE revision bump,
+    // showing the newly annotated Verify image (orange box = highlight pixel).
+    await waitFor(
+      async () => {
+        const pixel = await readVerifyProbePixel(129, 74);
+        return isTutorialShotHighlightPixel(pixel);
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 250,
+        onTimeoutMessage:
+          "The open tutorial preview page did not refresh after saving a Verify image.",
+      },
+    );
+  },
+);
+
+test(
   "tutorial shot editor canvas keeps PowerPoint-like resize and callout drag behavior wired in",
   async () => {
     const canvasSourcePath = path.join(

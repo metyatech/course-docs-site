@@ -1,26 +1,18 @@
 import { NextResponse } from 'next/server';
+import { getRevision, subscribe } from '../../../../../lib/dev-reload-bus';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
-  const revision = process.env.COURSE_DOCS_SITE_DEV_REVISION ?? '';
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const send = (text: string) => controller.enqueue(encoder.encode(text));
 
-      // Speed up reconnection after dev server restart.
-      send('retry: 1000\n');
-      send(`data: ${JSON.stringify({ revision })}\n\n`);
-
-      const keepAlive = setInterval(() => {
-        // Comment frame (ignored by clients).
-        send(':keep-alive\n\n');
-      }, 30_000);
-
       const abort = () => {
+        unsubscribe();
         clearInterval(keepAlive);
         try {
           controller.close();
@@ -28,6 +20,32 @@ export async function GET(request: Request) {
           // ignore
         }
       };
+
+      // Speed up reconnection after dev server restart.
+      send('retry: 1000\n');
+      // Send the current revision immediately on connect so the client can
+      // track the baseline and detect any bump that occurred before this
+      // connection was established.
+      send(`data: ${JSON.stringify({ revision: getRevision() })}\n\n`);
+
+      // Push a new revision to this client whenever bumpRevision() is called
+      // (e.g. after a successful tutorial shot save).
+      const unsubscribe = subscribe((revision) => {
+        try {
+          send(`data: ${JSON.stringify({ revision })}\n\n`);
+        } catch {
+          abort();
+        }
+      });
+
+      const keepAlive = setInterval(() => {
+        // Comment frame (ignored by clients).
+        try {
+          send(':keep-alive\n\n');
+        } catch {
+          abort();
+        }
+      }, 30_000);
 
       if (request.signal.aborted) {
         abort();
@@ -45,4 +63,3 @@ export async function GET(request: Request) {
     },
   });
 }
-
