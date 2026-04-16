@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Node } from 'unist';
 import { resolvePageAuthoringMode } from './page-authoring-mode.js';
 
@@ -31,6 +33,7 @@ import { resolvePageAuthoringMode } from './page-authoring-mode.js';
  *  - tutorial/checkpoint-placement      (warn)  — structure rule
  *  - tutorial/section-no-hrule          (warn)  — structure convention
  *  - tutorial/verify-no-duplicate-arrow (warn)  — render bug
+ *  - tutorial/verify-shot-action-role   (error) — Verify shot has role="action" annotation
  *  - tutorial/action-positional-prefix  (warn)  — Redundancy (strong)
  *  - tutorial/section-lacks-feedback    (warn)  — Feedback (strong)
  *
@@ -69,6 +72,36 @@ import { resolvePageAuthoringMode } from './page-authoring-mode.js';
  */
 
 const RULE_ORIGIN = 'tutorial-lint';
+
+// ─── Tutorial shot manifest helpers ──────────────────────────────────────────
+
+type ShotAnnotation = { role?: 'verify' | 'action' };
+type ShotManifest = { annotations?: ShotAnnotation[] };
+
+/**
+ * Derives the .shot.json path from an img attribute value of the form
+ * "./img/<stem>.<ext>" → "<mdxDir>/shots/<stem>.shot.json".
+ * Returns null when the format does not match.
+ */
+const deriveShotJsonPath = (mdxDir: string, imgAttr: string): string | null => {
+  const m = /^\.\/img\/(.+)\.[^.]+$/.exec(imgAttr);
+  if (!m) return null;
+  return path.join(mdxDir, 'shots', `${m[1]}.shot.json`);
+};
+
+/**
+ * Reads a .shot.json manifest synchronously. Returns null when the file does
+ * not exist or cannot be parsed (both are non-error conditions at lint time).
+ */
+const readShotManifest = (shotPath: string): ShotManifest | null => {
+  try {
+    return JSON.parse(fs.readFileSync(shotPath, 'utf-8')) as ShotManifest;
+  } catch {
+    return null;
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 type MdxAttributeValue =
   | string
@@ -643,7 +676,7 @@ export default function remarkTutorialLint() {
         }
 
         if (isJsxElement(child, 'Verify')) {
-          validateVerify(file, child);
+          validateVerify(file, child, file.path);
         }
 
         if (isJsxElement(child, 'Reference')) {
@@ -741,7 +774,31 @@ function validateAction(file: VFileLike, node: MdxJsxElement) {
   }
 }
 
-function validateVerify(file: VFileLike, node: MdxJsxElement) {
+function validateVerify(file: VFileLike, node: MdxJsxElement, vfilePath?: string) {
+  // ── verify-shot-action-role ───────────────────────────────────────────────
+  // A <Verify img="..."> shot must not have role="action" annotations in its
+  // .shot.json manifest. Verify screenshots show expected *result* state only;
+  // action markers (orange solid boxes) belong in <Action> shots.
+  const imgAttr = getStringAttribute(node, 'img');
+  if (imgAttr && vfilePath) {
+    const mdxDir = path.dirname(vfilePath);
+    const shotPath = deriveShotJsonPath(mdxDir, imgAttr);
+    if (shotPath) {
+      const manifest = readShotManifest(shotPath);
+      if (manifest) {
+        const hasActionRole = (manifest.annotations ?? []).some((a) => a.role === 'action');
+        if (hasActionRole) {
+          emitError(
+            file,
+            `<Verify img="${imgAttr}"> の .shot.json にアクション（role="action"）のアノテーションが含まれています。Verify 画像には確認（role="verify"、白い破線）のみ使用できます。<Action> コンポーネントと画像を分けてください`,
+            node,
+            'verify-shot-action-role',
+          );
+        }
+      }
+    }
+  }
+
   const body = collectText(node).trimStart();
   if (body.length === 0) return;
   // The <Verify> component renders its own leading "→" arrow. Authors who

@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import process from 'node:process';
 
@@ -1016,5 +1019,143 @@ test('tutorial without <NextSteps> does not emit a note', async () => {
   assert.ok(
     !stub.notes.some((n) => /nextsteps-placement/.test(n)),
     'absent NextSteps should not trigger a note',
+  );
+});
+
+// ── verify-shot-action-role ──────────────────────────────────────────────────
+
+test('<Verify img="..."> with role="action" annotation in .shot.json fails build', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tutorial-lint-verify-action-'));
+  const imgDir = path.join(tempDir, 'img');
+  const shotsDir = path.join(tempDir, 'shots');
+  await fs.mkdir(imgDir, { recursive: true });
+  await fs.mkdir(shotsDir, { recursive: true });
+
+  const manifest = {
+    version: 1,
+    id: 'result',
+    pagePath: 'content/docs/tutorial/index.mdx',
+    outputImagePath: 'content/docs/tutorial/img/result.png',
+    rawImagePath: 'content/docs/tutorial/shots/result.raw.png',
+    crop: null,
+    annotations: [{ id: 'a1', type: 'box', role: 'action', x: 0, y: 0, width: 100, height: 50 }],
+    annotationMode: 'focal',
+    alt: '',
+  };
+  await fs.writeFile(
+    path.join(shotsDir, 'result.shot.json'),
+    JSON.stringify(manifest, null, 2),
+    'utf-8',
+  );
+
+  const mdxFilePath = path.join(tempDir, 'index.mdx');
+  const tree = tutorialRoot(
+    section(
+      { goal: 'done' },
+      jsxElement('Verify', { img: './img/result.png' }, paragraph('画面がこの状態になれば成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+
+  const { file } = createVFileStub(mdxFilePath);
+  assert.throws(
+    () => plugin()(tree, file),
+    (err) => {
+      assert.ok(
+        /verify-shot-action-role/.test(err.message),
+        `Expected verify-shot-action-role in error, got: ${err.message}`,
+      );
+      return true;
+    },
+    'Should throw with verify-shot-action-role when Verify shot has action annotation',
+  );
+
+  await fs.rm(tempDir, { recursive: true, force: true });
+});
+
+test('<Verify img="..."> with only role="verify" annotations passes lint', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tutorial-lint-verify-ok-'));
+  const imgDir = path.join(tempDir, 'img');
+  const shotsDir = path.join(tempDir, 'shots');
+  await fs.mkdir(imgDir, { recursive: true });
+  await fs.mkdir(shotsDir, { recursive: true });
+
+  const manifest = {
+    version: 1,
+    id: 'result',
+    pagePath: 'content/docs/tutorial/index.mdx',
+    outputImagePath: 'content/docs/tutorial/img/result.png',
+    rawImagePath: 'content/docs/tutorial/shots/result.raw.png',
+    crop: null,
+    annotations: [{ id: 'v1', type: 'box', role: 'verify', x: 0, y: 0, width: 100, height: 50 }],
+    annotationMode: 'focal',
+    alt: '',
+  };
+  await fs.writeFile(
+    path.join(shotsDir, 'result.shot.json'),
+    JSON.stringify(manifest, null, 2),
+    'utf-8',
+  );
+
+  const mdxFilePath = path.join(tempDir, 'index.mdx');
+  const tree = tutorialRoot(
+    section(
+      { goal: 'done' },
+      jsxElement('Verify', { img: './img/result.png' }, paragraph('画面がこの状態になれば成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+
+  const { file } = createVFileStub(mdxFilePath);
+  assert.doesNotThrow(
+    () => plugin()(tree, file),
+    'Should not throw when Verify shot has only verify-role annotations',
+  );
+
+  await fs.rm(tempDir, { recursive: true, force: true });
+});
+
+test('<Verify img="..."> with no .shot.json file is silently skipped', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tutorial-lint-verify-noshot-'));
+  const mdxFilePath = path.join(tempDir, 'index.mdx');
+
+  const tree = tutorialRoot(
+    section(
+      { goal: 'done' },
+      jsxElement('Verify', { img: './img/result.png' }, paragraph('画面がこの状態になれば成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+
+  const { file } = createVFileStub(mdxFilePath);
+  assert.doesNotThrow(
+    () => plugin()(tree, file),
+    'Should not throw when .shot.json does not exist yet',
+  );
+
+  await fs.rm(tempDir, { recursive: true, force: true });
+});
+
+test('<Verify> without img attr is not affected by verify-shot-action-role', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+
+  const tree = tutorialRoot(
+    section(
+      { goal: 'done' },
+      jsxElement('Verify', {}, paragraph('画面がこの状態になれば成功')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+
+  const { file } = createVFileStub('test.mdx');
+  assert.doesNotThrow(
+    () => plugin()(tree, file),
+    'Verify without img should not trigger verify-shot-action-role',
   );
 });
