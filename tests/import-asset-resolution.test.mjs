@@ -7,7 +7,6 @@ import path from "node:path";
 import process from "node:process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { normalizeNextEnvDts } from "../scripts/next-dist-dir.mjs";
 import { createRunDevTestEnv, killProcessTree } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -166,7 +165,6 @@ test(
 
     t.after(async () => {
       await killProcessTree(server);
-      normalizeNextEnvDts({ projectRoot });
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 

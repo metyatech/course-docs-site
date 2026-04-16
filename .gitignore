@@ -28,3 +28,6 @@
 
 # TypeScript incremental
 *.tsbuildinfo
+
+# Next.js generated (regenerated on every next dev/build/typegen run)
+next-env.d.ts

@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 
 export const DEFAULT_NEXT_DIST_DIR = ".next";
@@ -38,21 +37,3 @@ export const createIsolatedNextDistDir = (scope) => {
   return TEST_NEXT_DIST_DIR;
 };
 
-export const normalizeNextEnvDts = ({ projectRoot }) => {
-  const nextEnvPath = path.join(projectRoot, "next-env.d.ts");
-  if (!fs.existsSync(nextEnvPath)) {
-    return;
-  }
-
-  const current = fs.readFileSync(nextEnvPath, "utf8");
-  const normalized = current
-    .replace(/\/\/\/ <reference types="next\/image-types\/global" \/>\r?\n/, "")
-    .replace(
-      /\/\/\/ <reference path="\.\/[^"]+\/types\/routes\.d\.ts" \/>/,
-      `/// <reference path="./${DEFAULT_NEXT_DIST_DIR}/types/routes.d.ts" />`,
-    );
-
-  if (normalized !== current) {
-    fs.writeFileSync(nextEnvPath, normalized, "utf8");
-  }
-};

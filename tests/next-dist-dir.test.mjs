@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import net from "node:net";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -9,7 +7,6 @@ import {
   createIsolatedNextDistDir,
   DEFAULT_NEXT_DIST_DIR,
   TEST_NEXT_DIST_DIR,
-  normalizeNextEnvDts,
   resolveNextDistDir,
   resolveNextDistDirPath,
 } from "../scripts/next-dist-dir.mjs";
@@ -111,33 +108,4 @@ test("findFirstFreePort skips an occupied preferred port", async () => {
   }
 });
 
-test("normalizeNextEnvDts restores the canonical typed-route header", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "course-docs-next-env-"));
-  const nextEnvPath = path.join(tempRoot, "next-env.d.ts");
 
-  try {
-    fs.writeFileSync(
-      nextEnvPath,
-      [
-        '/// <reference types="next" />',
-        '/// <reference types="next/image-types/global" />',
-        '/// <reference path="./.next-test/types/routes.d.ts" />',
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-
-    normalizeNextEnvDts({ projectRoot: tempRoot });
-
-    assert.equal(
-      fs.readFileSync(nextEnvPath, "utf8"),
-      [
-        '/// <reference types="next" />',
-        '/// <reference path="./.next/types/routes.d.ts" />',
-        "",
-      ].join("\n"),
-    );
-  } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-});

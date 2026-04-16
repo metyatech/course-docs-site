@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { normalizeNextEnvDts } from "./next-dist-dir.mjs";
 
 const require = createRequire(import.meta.url);
 const playwrightCli = require.resolve("@playwright/test/cli");
@@ -21,11 +20,5 @@ const run = () =>
     child.on("exit", (code) => resolve(code ?? 1));
   });
 
-try {
-  const exitCode = await run();
-  normalizeNextEnvDts({ projectRoot });
-  process.exit(exitCode);
-} catch (error) {
-  normalizeNextEnvDts({ projectRoot });
-  throw error;
-}
+const exitCode = await run();
+process.exit(exitCode);
