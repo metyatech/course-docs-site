@@ -274,6 +274,8 @@ authoringMode: tutorial
     assert.ok(verifyShot, "Verify shot is present");
     assert.equal(actionShot.outputImagePath, "content/docs/student-guide/img/startup.png");
     assert.equal(verifyShot.outputImagePath, "content/docs/student-guide/img/startup-result.png");
+    assert.equal(actionShot.shotSource, "action", "Action shot has shotSource='action'");
+    assert.equal(verifyShot.shotSource, "verify", "Verify shot has shotSource='verify'");
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });
   }

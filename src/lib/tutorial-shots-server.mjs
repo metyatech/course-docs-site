@@ -295,8 +295,14 @@ export const scanTutorialShots = async ({ sourceRoot }) => {
     const sourceText = await fs.readFile(filePath, "utf8");
     const pageModeWarnings = getTutorialPageModeWarnings({ sourceText });
     const refs = [
-      ...extractActionImageRefsFromMdx({ pagePath: relativePath, sourceText }),
-      ...extractVerifyImageRefsFromMdx({ pagePath: relativePath, sourceText }),
+      ...extractActionImageRefsFromMdx({ pagePath: relativePath, sourceText }).map((ref) => ({
+        ...ref,
+        shotSource: "action",
+      })),
+      ...extractVerifyImageRefsFromMdx({ pagePath: relativePath, sourceText }).map((ref) => ({
+        ...ref,
+        shotSource: "verify",
+      })),
     ];
 
     for (const ref of refs) {

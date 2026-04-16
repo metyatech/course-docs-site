@@ -45,6 +45,9 @@ export type TutorialShotManifest = {
   updatedAt?: string;
 };
 
+/** Which MDX component this shot image is referenced from. */
+export type TutorialShotSource = "action" | "verify";
+
 export type TutorialShotItem = {
   id: string;
   line: number;
@@ -53,6 +56,8 @@ export type TutorialShotItem = {
   outputImagePath: string;
   manifestPath: string;
   rawImagePath: string;
+  /** Whether this shot is referenced by <Action img="..."> or <Verify img="...">. */
+  shotSource: TutorialShotSource;
   manifest: TutorialShotManifest;
   warnings: string[];
   hasManifest: boolean;

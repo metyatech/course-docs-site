@@ -136,6 +136,21 @@ const getShotFlags = (shot: TutorialShotItem) => {
     title: string;
   }> = [];
 
+  // shotSource badge: always show whether this is an Action or Verify shot.
+  if (shot.shotSource === "verify") {
+    flags.push({
+      className: styles.flagVerify,
+      label: "Verify",
+      title: "<Verify img=\"...\"> コンポーネントの画像です。確認（白い破線）アノテーションのみ使用できます。",
+    });
+  } else {
+    flags.push({
+      className: styles.flagAction,
+      label: "Action",
+      title: "<Action img=\"...\"> コンポーネントの画像です。",
+    });
+  }
+
   if (!shot.hasOutputImage) {
     flags.push({
       className: styles.flagMuted,
@@ -212,10 +227,14 @@ const createInitialCrop = (image: HTMLImageElement, manifest: TutorialShotManife
         height: image.naturalHeight,
       };
 
-const createDefaultBox = (width: number, height: number): TutorialShotBoxAnnotation => ({
+const createDefaultBox = (
+  width: number,
+  height: number,
+  role: TutorialShotBoxAnnotation["role"] = "action",
+): TutorialShotBoxAnnotation => ({
   id: crypto.randomUUID(),
   type: "box",
-  role: "action",
+  role,
   x: Math.max(16, Math.round(width * 0.2)),
   y: Math.max(16, Math.round(height * 0.2)),
   width: Math.max(80, Math.round(width * 0.35)),
@@ -291,8 +310,10 @@ export default function TutorialShotEditor() {
   const canAddBox =
     hasAnnotationSurface &&
     (annotationMode === "callout" || annotationSummary.boxCount === 0);
+  const isVerifyShot = selectedShot?.shotSource === "verify";
   const canAddArrow =
     hasAnnotationSurface &&
+    !isVerifyShot &&
     annotationMode === "focal" &&
     Boolean(primaryBox) &&
     annotationSummary.arrowCount === 0;
@@ -477,7 +498,11 @@ export default function TutorialShotEditor() {
       return;
     }
 
-    const next = createDefaultBox(completedCrop.width, completedCrop.height);
+    const next = createDefaultBox(
+      completedCrop.width,
+      completedCrop.height,
+      isVerifyShot ? "verify" : "action",
+    );
     updateAnnotations([...draftManifest.annotations, next]);
     setSelectedAnnotationId(next.id);
   };
@@ -880,7 +905,23 @@ export default function TutorialShotEditor() {
             <>
               <header className={styles.shotHeader}>
                 <div className={styles.shotHeaderMain}>
-                  <h2 className={styles.shotTitle}>{draftManifest.id}</h2>
+                  <h2 className={styles.shotTitle}>
+                    {draftManifest.id}
+                    <span
+                      className={
+                        selectedShot.shotSource === "verify"
+                          ? styles.shotSourceBadgeVerify
+                          : styles.shotSourceBadgeAction
+                      }
+                      title={
+                        selectedShot.shotSource === "verify"
+                          ? "<Verify img=\"...\"> の画像 — 確認（白い破線）アノテーションのみ使用できます"
+                          : "<Action img=\"...\"> の画像"
+                      }
+                    >
+                      {selectedShot.shotSource === "verify" ? "Verify" : "Action"}
+                    </span>
+                  </h2>
                   <div className={styles.shotSubtitle}>
                     <code>{draftManifest.pagePath}</code>
                     <span className={styles.dot} aria-hidden>
@@ -1133,7 +1174,7 @@ export default function TutorialShotEditor() {
                                     </span>
                                   )}
                                 </button>
-                                {annotation.type === "box" ? (
+                                {annotation.type === "box" && !isVerifyShot ? (
                                   <button
                                     className={styles.annotationItemRole}
                                     onClick={() => toggleBoxRole(annotation.id)}
@@ -1141,6 +1182,10 @@ export default function TutorialShotEditor() {
                                   >
                                     {annotation.role === "verify" ? "確認（白い破線）" : "アクション（オレンジ実線）"}
                                   </button>
+                                ) : annotation.type === "box" && isVerifyShot ? (
+                                  <span className={styles.annotationItemRole}>
+                                    確認（白い破線）
+                                  </span>
                                 ) : null}
                                 <button
                                   className={styles.annotationItemDelete}
