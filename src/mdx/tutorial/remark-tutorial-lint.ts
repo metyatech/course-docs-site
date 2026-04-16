@@ -33,7 +33,7 @@ import { resolvePageAuthoringMode } from './page-authoring-mode.js';
  *  - tutorial/checkpoint-placement      (warn)  — structure rule
  *  - tutorial/section-no-hrule          (warn)  — structure convention
  *  - tutorial/verify-no-duplicate-arrow (warn)  — render bug
- *  - tutorial/verify-shot-action-role   (error) — Verify shot has role="action" annotation
+ *  - tutorial/verify-shot-action-role   (warn)  — Verify shot has role="action" annotation
  *  - tutorial/action-positional-prefix  (warn)  — Redundancy (strong)
  *  - tutorial/section-lacks-feedback    (warn)  — Feedback (strong)
  *
@@ -788,9 +788,9 @@ function validateVerify(file: VFileLike, node: MdxJsxElement, vfilePath?: string
       if (manifest) {
         const hasActionRole = (manifest.annotations ?? []).some((a) => a.role === 'action');
         if (hasActionRole) {
-          emitError(
+          emitWarning(
             file,
-            `<Verify img="${imgAttr}"> の .shot.json にアクション（role="action"）のアノテーションが含まれています。Verify 画像には確認（role="verify"、白い破線）のみ使用できます。<Action> コンポーネントと画像を分けてください`,
+            `<Verify img="${imgAttr}"> の .shot.json にアクション（role="action"）のアノテーションが含まれています。Verify 画像には確認（role="verify"、白い破線）のみ使用できます。/dev/tutorial-shots/ でショットを開いてロールを修正してください`,
             node,
             'verify-shot-action-role',
           );

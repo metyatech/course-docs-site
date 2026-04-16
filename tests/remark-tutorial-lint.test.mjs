@@ -1024,7 +1024,7 @@ test('tutorial without <NextSteps> does not emit a note', async () => {
 
 // ── verify-shot-action-role ──────────────────────────────────────────────────
 
-test('<Verify img="..."> with role="action" annotation in .shot.json fails build', async () => {
+test('<Verify img="..."> with role="action" annotation in .shot.json emits a warning (not an error)', async () => {
   const { default: plugin } = await import(pluginModulePath);
 
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tutorial-lint-verify-action-'));
@@ -1059,17 +1059,18 @@ test('<Verify img="..."> with role="action" annotation in .shot.json fails build
     ),
   );
 
-  const { file } = createVFileStub(mdxFilePath);
-  assert.throws(
+  const { file, warnings } = createVFileStub(mdxFilePath);
+
+  // Rule is warn, not error — build should continue (no throw).
+  assert.doesNotThrow(
     () => plugin()(tree, file),
-    (err) => {
-      assert.ok(
-        /verify-shot-action-role/.test(err.message),
-        `Expected verify-shot-action-role in error, got: ${err.message}`,
-      );
-      return true;
-    },
-    'Should throw with verify-shot-action-role when Verify shot has action annotation',
+    'Should NOT throw — verify-shot-action-role is a warning, not a build-failing error',
+  );
+
+  const ruleWarning = warnings.find((w) => /verify-shot-action-role/.test(w.origin ?? ''));
+  assert.ok(
+    ruleWarning,
+    `Expected a warning with origin containing 'verify-shot-action-role', got: ${JSON.stringify(warnings)}`,
   );
 
   await fs.rm(tempDir, { recursive: true, force: true });
