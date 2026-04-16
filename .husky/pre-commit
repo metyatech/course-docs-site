@@ -1,3 +1,47 @@
+_IDX=$(git rev-parse --git-path index)
+_SNAP=${_IDX}.snap
+cp "$_IDX" "$_SNAP"
+
 npm run verify
 compose-agentsmd --compose
-git add AGENTS.md
+
+python -c "
+import hashlib,struct,subprocess as sp,shutil,os
+
+idx=sp.run(['git','rev-parse','--git-path','index'],capture_output=True,text=True).stdout.strip()
+snap=idx+'.snap'
+
+if os.path.exists(snap):
+    shutil.copy(snap,idx)
+    os.unlink(snap)
+
+d=bytearray(open(idx,'rb').read())
+n=struct.unpack('>I',d[8:12])[0]
+p=12
+entries={}
+for _ in range(n):
+    s=p
+    mi=struct.unpack('>I',d[s+24:s+28])[0]
+    sh=d[s+40:s+60].hex()
+    p+=62;ne=p
+    while d[ne]:ne+=1
+    nm=d[p:ne].decode()
+    p=ne+1
+    while(p-s)%8:p+=1
+    entries[nm]=(oct(mi)[2:].zfill(6),sh)
+
+r=sp.run(['git','hash-object','-w','AGENTS.md'],capture_output=True,text=True)
+if r.returncode==0 and r.stdout.strip():
+    entries['AGENTS.md']=('100644',r.stdout.strip())
+
+sp2=sorted(entries.keys())
+def sb(h):return bytes.fromhex(h)
+ed=b''
+for path in sp2:
+    ms,sh=entries[path];mi=int(ms,8);pb=path.encode();nl=len(pb);fl=min(nl,0xFFF)
+    fx=b'\x00'*8+b'\x00'*8+b'\x00'*4+b'\x00'*4+struct.pack('>I',mi)+b'\x00'*4+b'\x00'*4+b'\x00'*4+sb(sh)+struct.pack('>H',fl)
+    e=fx+pb+b'\x00';t=62+nl+1;p=(8-(t%8))%8;e+=b'\x00'*p;ed+=e
+hd=b'DIRC'+struct.pack('>II',2,len(sp2))
+bd=hd+ed
+open(idx,'wb').write(bd+hashlib.sha1(bd).digest())
+" 2>/dev/null

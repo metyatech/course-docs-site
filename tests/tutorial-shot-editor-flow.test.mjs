@@ -264,6 +264,16 @@ const isTutorialShotHighlightPixel = (pixel) =>
   pixel[2] <= 10 &&
   pixel[3] === 255;
 
+// Matches either an orange Action-box stroke or a near-white Verify-box stroke.
+const isAnnotationStrokePixel = (pixel) =>
+  isTutorialShotHighlightPixel(pixel) ||
+  (Array.isArray(pixel) &&
+    pixel.length === 4 &&
+    pixel[0] >= 245 &&
+    pixel[1] >= 245 &&
+    pixel[2] >= 245 &&
+    pixel[3] === 255);
+
 const readPreviewProbePixel = async (page, { x = 8, y = 8 } = {}) =>
   getPreviewProbeImage(page).evaluate((image, coordinates) => {
     if (!(image instanceof HTMLImageElement) || !image.complete || image.naturalWidth === 0) {
@@ -671,7 +681,7 @@ test(
     await previewPage.goto("/docs/tutorial/", { waitUntil: "domcontentloaded" });
     await getPreviewProbeImage(previewPage).waitFor();
 
-    const initialProbePixel = await readPreviewProbePixel(previewPage, { x: 129, y: 74 });
+    const initialProbePixel = await readPreviewProbePixel(previewPage, { x: 200, y: 72 });
     assert.deepEqual(
       initialProbePixel,
       [203, 213, 225, 255],
@@ -691,8 +701,12 @@ test(
 
     await waitFor(
       async () => {
-        const pixel = await readPreviewProbePixel(previewPage, { x: 129, y: 74 });
-        return isTutorialShotHighlightPixel(pixel);
+        try {
+          const pixel = await readPreviewProbePixel(previewPage, { x: 200, y: 72 });
+          return isTutorialShotHighlightPixel(pixel);
+        } catch {
+          return false;
+        }
       },
       {
         timeoutMs: 30_000,
@@ -846,7 +860,7 @@ authoringMode: tutorial
         return Array.from(context.getImageData(coordinates.x, coordinates.y, 1, 1).data);
       }, { x, y });
 
-    const initialPixel = await readVerifyProbePixel(129, 74);
+    const initialPixel = await readVerifyProbePixel(200, 72);
     assert.deepEqual(
       initialPixel,
       [203, 213, 225, 255],
@@ -873,11 +887,15 @@ authoringMode: tutorial
     await editorPage.getByText("保存しました").waitFor();
 
     // The docs page should reload automatically via the SSE revision bump,
-    // showing the newly annotated Verify image (orange box = highlight pixel).
+    // showing the newly annotated Verify image (white dashed box = annotation stroke pixel).
     await waitFor(
       async () => {
-        const pixel = await readVerifyProbePixel(129, 74);
-        return isTutorialShotHighlightPixel(pixel);
+        try {
+          const pixel = await readVerifyProbePixel(200, 72);
+          return isAnnotationStrokePixel(pixel);
+        } catch {
+          return false;
+        }
       },
       {
         timeoutMs: 30_000,

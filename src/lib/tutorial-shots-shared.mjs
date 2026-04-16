@@ -1,5 +1,5 @@
 export const TUTORIAL_SHOT_MANIFEST_VERSION = 1;
-export const TUTORIAL_SHOT_ANNOTATION_MODES = ["focal", "callout"];
+export const TUTORIAL_SHOT_ANNOTATION_MODES = ["focal", "multi-focal", "callout"];
 export const TUTORIAL_SHOT_BOX_ROLES = ["action", "verify"];
 
 const ACTION_TAG_PATTERN = /<Action\b[\s\S]*?>/gu;
@@ -387,8 +387,15 @@ export const getTutorialShotAnnotationErrors = (annotations, annotationMode = "f
     return errors;
   }
 
+  if (annotationMode === "multi-focal") {
+    if (arrowCount > 0) {
+      errors.push("同種複数モードでは矢印は使えません。不要な矢印を削除してください。");
+    }
+    return errors;
+  }
+
   if (boxCount > 1) {
-    errors.push("注目点モードの枠は 1 つだけです。複数の場所を示すには番号コールアウトモードに切り替えてください。");
+    errors.push("注目点モードの枠は 1 つだけです。複数の場所を示すには同種複数か番号コールアウトモードに切り替えてください。");
   }
 
   if (arrowCount > 1) {

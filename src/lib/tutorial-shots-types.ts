@@ -19,7 +19,7 @@ export type TutorialShotArrowAnnotation = {
   toY: number;
 };
 
-export type TutorialShotAnnotationMode = "focal" | "callout";
+export type TutorialShotAnnotationMode = "focal" | "multi-focal" | "callout";
 
 export type TutorialShotAnnotation =
   | TutorialShotBoxAnnotation

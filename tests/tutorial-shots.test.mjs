@@ -309,7 +309,7 @@ test("getTutorialShotWarnings validates focal mode annotations", () => {
   });
 
   assert.deepEqual(warnings, [
-    "注目点モードの枠は 1 つだけです。複数の場所を示すには番号コールアウトモードに切り替えてください。",
+    "注目点モードの枠は 1 つだけです。複数の場所を示すには同種複数か番号コールアウトモードに切り替えてください。",
     "矢印は 1 本だけにしてください。",
   ]);
 
@@ -356,6 +356,32 @@ test("getTutorialShotWarnings validates callout mode annotations", () => {
     }),
     [],
     "callout mode allows no annotations",
+  );
+});
+
+test("getTutorialShotWarnings validates multi-focal mode annotations", () => {
+  assert.deepEqual(
+    getTutorialShotWarnings({
+      annotationMode: "multi-focal",
+      annotations: [
+        { id: "box-1", type: "box", role: "action", x: 0, y: 0, width: 80, height: 40 },
+        { id: "box-2", type: "box", role: "action", x: 100, y: 50, width: 80, height: 40 },
+      ],
+    }),
+    [],
+    "multi-focal mode allows multiple boxes",
+  );
+
+  assert.deepEqual(
+    getTutorialShotWarnings({
+      annotationMode: "multi-focal",
+      annotations: [
+        { id: "box-1", type: "box", role: "action", x: 0, y: 0, width: 80, height: 40 },
+        { id: "arrow-1", type: "arrow", fromX: 10, fromY: 10, toX: 20, toY: 20 },
+      ],
+    }),
+    ["同種複数モードでは矢印は使えません。不要な矢印を削除してください。"],
+    "multi-focal mode rejects arrows",
   );
 });
 
@@ -1250,6 +1276,81 @@ test("saveTutorialShot rejects arrows in callout mode", async (t) => {
         },
       }),
     /番号コールアウトモードでは矢印は使えません/u,
+  );
+});
+
+test("saveTutorialShot accepts multiple boxes in multi-focal mode", async (t) => {
+  const sourceRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "course-tutorial-shots-multi-focal-"),
+  );
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+
+  const result = await saveTutorialShot({
+    sourceRoot,
+    bootstrapFromOutput: true,
+    manifestInput: {
+      ...manifest,
+      annotationMode: "multi-focal",
+      crop: {
+        x: 16,
+        y: 16,
+        width: 320,
+        height: 180,
+      },
+      annotations: [
+        { id: "box-1", type: "box", role: "action", x: 10, y: 10, width: 80, height: 40 },
+        { id: "box-2", type: "box", role: "action", x: 120, y: 60, width: 80, height: 40 },
+      ],
+    },
+  });
+
+  assert.deepEqual(result.warnings, []);
+  assert.equal(result.manifest.annotationMode, "multi-focal");
+  assert.equal(result.manifest.annotations.length, 2);
+});
+
+test("saveTutorialShot rejects arrows in multi-focal mode", async (t) => {
+  const sourceRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "course-tutorial-shots-multi-focal-arrow-"),
+  );
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+
+  await assert.rejects(
+    () =>
+      saveTutorialShot({
+        sourceRoot,
+        bootstrapFromOutput: true,
+        manifestInput: {
+          ...manifest,
+          annotationMode: "multi-focal",
+          crop: { x: 0, y: 0, width: 320, height: 180 },
+          annotations: [
+            { id: "box-1", type: "box", role: "action", x: 10, y: 10, width: 80, height: 40 },
+            { id: "arrow-1", type: "arrow", fromX: 10, fromY: 10, toX: 40, toY: 30 },
+          ],
+        },
+      }),
+    /同種複数モードでは矢印は使えません/u,
   );
 });
 

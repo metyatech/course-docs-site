@@ -312,7 +312,7 @@ export default function TutorialShotEditor() {
   const hasAnnotationSurface = Boolean(croppedPreviewSrc) && Boolean(completedCrop);
   const canAddBox =
     hasAnnotationSurface &&
-    (annotationMode === "callout" || annotationSummary.boxCount === 0);
+    (annotationMode === "callout" || annotationMode === "multi-focal" || annotationSummary.boxCount === 0);
   const isVerifyShot = selectedShot?.shotSource === "verify";
   const canAddArrow =
     hasAnnotationSurface &&
@@ -324,18 +324,24 @@ export default function TutorialShotEditor() {
   const annotationPanelTitle =
     annotationMode === "callout"
       ? `番号コールアウト ・ 枠 ${annotationSummary.boxCount} 個`
-      : `枠 ${annotationSummary.boxCount}/1 ・ 矢印 ${annotationSummary.arrowCount}/1`;
+      : annotationMode === "multi-focal"
+        ? `同種複数 ・ 枠 ${annotationSummary.boxCount} 個`
+        : `枠 ${annotationSummary.boxCount}/1 ・ 矢印 ${annotationSummary.arrowCount}/1`;
   const annotationPanelHint =
     annotationErrors[0] ??
     (annotationMode === "callout"
       ? annotationSummary.boxCount === 0
         ? "設定項目など複数の場所を示す画像に使います。枠を追加すると自動で番号が付きます。"
         : "保存できます。枠をさらに追加できます。"
-      : annotationSummary.boxCount === 0
-        ? "特に示したい場所がなければ、このまま保存できます。"
-        : annotationSummary.arrowCount > 0
-          ? "保存できます。矢印は不要なら削除できます。"
-          : "保存できます。必要なら矢印を追加できます。");
+      : annotationMode === "multi-focal"
+        ? annotationSummary.boxCount === 0
+          ? "同じ種類の要素が複数ある画像に使います。枠を追加してください。"
+          : "保存できます。枠をさらに追加できます。"
+        : annotationSummary.boxCount === 0
+          ? "特に示したい場所がなければ、このまま保存できます。"
+          : annotationSummary.arrowCount > 0
+            ? "保存できます。矢印は不要なら削除できます。"
+            : "保存できます。必要なら矢印を追加できます。");
 
   useEffect(() => {
     const savedOverride = window.localStorage.getItem(SOURCE_OVERRIDE_STORAGE_KEY) ?? "";
@@ -1101,6 +1107,13 @@ export default function TutorialShotEditor() {
                         type="button"
                       >
                         注目点
+                      </button>
+                      <button
+                        className={`${styles.modeButton} ${annotationMode === "multi-focal" ? styles.modeButtonActive : ""}`}
+                        onClick={() => switchAnnotationMode("multi-focal")}
+                        type="button"
+                      >
+                        同種複数
                       </button>
                       <button
                         className={`${styles.modeButton} ${annotationMode === "callout" ? styles.modeButtonActive : ""}`}
