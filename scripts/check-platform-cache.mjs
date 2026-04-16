@@ -59,13 +59,16 @@ if (!currentSha) {
 
 const previousSha = readTextIfExists(statePath);
 
-if (previousSha && previousSha !== currentSha) {
+if (previousSha !== currentSha) {
   const nextDistDirPath = resolveNextDistDirPath({ projectRoot });
   if (fs.existsSync(nextDistDirPath)) {
     rmIfExists(nextDistDirPath);
+    const reason = previousSha
+      ? `changed from ${previousSha} to ${currentSha}`
+      : `first run (no previous SHA on record)`;
     console.log(
       `Cleared ${path.relative(projectRoot, nextDistDirPath)} — ` +
-        `course-docs-platform changed from ${previousSha} to ${currentSha}`,
+        `course-docs-platform ${reason}`,
     );
   }
 }

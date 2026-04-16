@@ -138,17 +138,17 @@ test("check-platform-cache keeps .next when platform SHA matches", async (t) => 
   );
 });
 
-test("check-platform-cache does not clear .next on first run (no previous SHA)", async (t) => {
+test("check-platform-cache clears .next on first run (no previous SHA) to flush pre-existing stale cache", async (t) => {
   const originalSha = await saveOriginalSha();
   withCleanState(t, { originalSha });
 
-  // Remove state file to simulate first run.
+  // Remove state file to simulate first run after the script is introduced.
   await fs.rm(stateFile, { force: true });
 
   await fs.mkdir(distDirPath, { recursive: true });
   await fs.writeFile(
-    path.join(distDirPath, "first-run.txt"),
-    "keep",
+    path.join(distDirPath, "stale-from-old-platform.txt"),
+    "stale",
     "utf8",
   );
 
@@ -158,8 +158,8 @@ test("check-platform-cache does not clear .next on first run (no previous SHA)",
   assert.equal(exitCode, 0);
   assert.equal(
     await fileExists(distDirPath),
-    true,
-    ".next should NOT be cleared on first run",
+    false,
+    ".next should be cleared on first run to flush stale cache",
   );
 
   const newSha = (await fs.readFile(stateFile, "utf8")).trim();
