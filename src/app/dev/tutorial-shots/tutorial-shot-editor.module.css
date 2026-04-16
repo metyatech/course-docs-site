@@ -899,6 +899,11 @@
   color: rgb(30 64 175);
 }
 
+.flagOk {
+  background: rgb(220 252 231);
+  color: rgb(22 101 52);
+}
+
 /* Shot header title badge */
 .shotSourceBadgeAction,
 .shotSourceBadgeVerify {

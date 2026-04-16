@@ -359,6 +359,48 @@ test("getTutorialShotWarnings validates callout mode annotations", () => {
   );
 });
 
+test("getTutorialShotWarnings emits verify-role warning for Verify shots with action annotations", () => {
+  const actionBox = { id: "a1", type: "box", role: "action", x: 0, y: 0, width: 80, height: 40 };
+  const verifyBox = { id: "v1", type: "box", role: "verify", x: 0, y: 0, width: 80, height: 40 };
+
+  // Verify shot with an action box → warning
+  const warnings = getTutorialShotWarnings(
+    { annotationMode: "focal", annotations: [actionBox] },
+    { shotSource: "verify" },
+  );
+  assert.ok(
+    warnings.some((w) => w.includes("アクション（オレンジ実線）")),
+    "Should warn about action role in a Verify shot",
+  );
+
+  // Verify shot with only verify boxes → no role warning
+  assert.deepEqual(
+    getTutorialShotWarnings(
+      { annotationMode: "focal", annotations: [verifyBox] },
+      { shotSource: "verify" },
+    ),
+    [],
+    "Verify shot with only verify boxes should have no warnings",
+  );
+
+  // Action shot with an action box → no role warning (action boxes are fine)
+  assert.deepEqual(
+    getTutorialShotWarnings(
+      { annotationMode: "focal", annotations: [actionBox] },
+      { shotSource: "action" },
+    ),
+    [],
+    "Action shot with action boxes should have no role warning",
+  );
+
+  // No shotSource option → backward-compatible, no role warning
+  assert.deepEqual(
+    getTutorialShotWarnings({ annotationMode: "focal", annotations: [actionBox] }),
+    [],
+    "Missing shotSource should not trigger role warning",
+  );
+});
+
 test("getTutorialPageModeWarnings warns when a Section page omits authoringMode", () => {
   const warnings = getTutorialPageModeWarnings({
     sourceText: `---

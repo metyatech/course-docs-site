@@ -331,7 +331,7 @@ export const scanTutorialShots = async ({ sourceRoot }) => {
           }),
       );
 
-      const warnings = getTutorialShotWarnings(manifest);
+      const warnings = getTutorialShotWarnings(manifest, { shotSource: ref.shotSource });
       const mergedWarnings = [...new Set([...pageModeWarnings, ...warnings])];
       const hasManifest = rawManifest !== null;
       const hasRawImage = await fs

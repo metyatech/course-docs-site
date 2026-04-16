@@ -167,6 +167,15 @@ const getShotFlags = (shot: TutorialShotItem) => {
     });
   }
 
+  // Show an explicit OK badge when the shot is fully set up and has no warnings.
+  if (shot.hasOutputImage && shot.warnings.length === 0) {
+    flags.push({
+      className: styles.flagOk,
+      label: "問題なし",
+      title: "出力画像が設定済みで、確認が必要な問題はありません。",
+    });
+  }
+
   return flags;
 };
 
@@ -290,8 +299,11 @@ export default function TutorialShotEditor() {
     [selectedKey, shots],
   );
   const warnings = useMemo(
-    () => (draftManifest ? getTutorialShotWarnings(draftManifest) : []),
-    [draftManifest],
+    () =>
+      draftManifest
+        ? getTutorialShotWarnings(draftManifest, { shotSource: selectedShot?.shotSource })
+        : [],
+    [draftManifest, selectedShot?.shotSource],
   );
   const annotationSummary = useMemo(
     () => summarizeTutorialShotAnnotations(draftManifest?.annotations ?? []),

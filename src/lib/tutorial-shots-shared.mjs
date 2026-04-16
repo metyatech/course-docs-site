@@ -402,12 +402,37 @@ export const getTutorialShotAnnotationErrors = (annotations, annotationMode = "f
   return errors;
 };
 
-export const getTutorialShotWarnings = (manifest) => {
+/**
+ * Returns warning strings for a tutorial shot manifest.
+ *
+ * @param {object} manifest - The shot manifest.
+ * @param {{ shotSource?: "action" | "verify" }} [options]
+ *   shotSource: whether the shot comes from <Action img> or <Verify img>.
+ *   When "verify", any annotation with role="action" is a violation because
+ *   Verify screenshots must only use verify-role (white dashed) boxes.
+ */
+export const getTutorialShotWarnings = (manifest, { shotSource } = {}) => {
   const annotations = Array.isArray(manifest?.annotations) ? manifest.annotations : [];
   const annotationMode = TUTORIAL_SHOT_ANNOTATION_MODES.includes(manifest?.annotationMode)
     ? manifest.annotationMode
     : "focal";
-  return getTutorialShotAnnotationErrors(annotations, annotationMode);
+
+  const errors = getTutorialShotAnnotationErrors(annotations, annotationMode);
+
+  // Verify shots must not have role="action" (orange solid) annotations.
+  // These are visible in /dev/tutorial-shots/ — open the shot and change the
+  // annotation role to 確認（白い破線）.
+  if (shotSource === "verify") {
+    const hasActionRole = annotations.some((a) => a.type === "box" && a.role === "action");
+    if (hasActionRole) {
+      errors.push(
+        "Verify 画像にアクション（オレンジ実線）の枠が含まれています。" +
+          "確認（白い破線）に変更してください。",
+      );
+    }
+  }
+
+  return errors;
 };
 
 const renderArrowHead = ({ fromX, fromY, toX, toY, strokeWidth }) => {
