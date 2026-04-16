@@ -892,3 +892,129 @@ test('<Action> without img with confirm language does not emit verify-visual-wor
     '<Action> without img should not emit verify-visual-workaround-as-action',
   );
 });
+
+// --- Prerequisites placement ------------------------------------------------
+
+test('<Prerequisites> after first <Section> emits a warning', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = tutorialRoot(
+    section(
+      { goal: 'foo します' },
+      action({}, paragraph('click')),
+      jsxElement('Verify', {}, paragraph('ok')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+    // Prerequisites placed AFTER Section — wrong placement
+    jsxElement('Prerequisites', {}, paragraph('Node.js 20 以上')),
+  );
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
+  assert.ok(
+    stub.warnings.some((w) => w.origin?.includes('prerequisites-placement')),
+    'expected prerequisites-placement warning when Prerequisites follows Section',
+  );
+});
+
+test('<Prerequisites> before first <Section> does not warn', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = tutorialRoot(
+    // Prerequisites placed BEFORE Section — correct placement
+    jsxElement('Prerequisites', {}, paragraph('Node.js 20 以上')),
+    section(
+      { goal: 'foo します' },
+      action({}, paragraph('click')),
+      jsxElement('Verify', {}, paragraph('ok')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
+  assert.ok(
+    !stub.warnings.some((w) => w.origin?.includes('prerequisites-placement')),
+    '<Prerequisites> before Section should not warn',
+  );
+});
+
+test('tutorial without <Prerequisites> does not warn', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = tutorialRoot(
+    section(
+      { goal: 'foo します' },
+      action({}, paragraph('click')),
+      jsxElement('Verify', {}, paragraph('ok')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
+  assert.ok(
+    !stub.warnings.some((w) => w.origin?.includes('prerequisites-placement')),
+    'absent Prerequisites should not trigger a warning',
+  );
+});
+
+// --- NextSteps placement ----------------------------------------------------
+
+test('<NextSteps> before last <Section> emits a note', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = tutorialRoot(
+    section(
+      { goal: 'step1 します' },
+      action({}, paragraph('click')),
+      jsxElement('Verify', {}, paragraph('ok')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+    // NextSteps placed BEFORE last Section — wrong placement
+    jsxElement('NextSteps', {}, paragraph('次のチュートリアルへ')),
+    section(
+      { goal: 'step2 します' },
+      action({}, paragraph('click')),
+      jsxElement('Verify', {}, paragraph('ok')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
+  assert.ok(
+    stub.notes.some((n) => /nextsteps-placement/.test(n)),
+    'expected nextsteps-placement note when NextSteps precedes last Section',
+  );
+});
+
+test('<NextSteps> after last <Section> does not emit a note', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = tutorialRoot(
+    section(
+      { goal: 'foo します' },
+      action({}, paragraph('click')),
+      jsxElement('Verify', {}, paragraph('ok')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+    // NextSteps placed AFTER last Section — correct placement
+    jsxElement('NextSteps', {}, paragraph('次のチュートリアルへ')),
+  );
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
+  assert.ok(
+    !stub.notes.some((n) => /nextsteps-placement/.test(n)),
+    '<NextSteps> after last Section should not emit note',
+  );
+});
+
+test('tutorial without <NextSteps> does not emit a note', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = tutorialRoot(
+    section(
+      { goal: 'foo します' },
+      action({}, paragraph('click')),
+      jsxElement('Verify', {}, paragraph('ok')),
+      jsxElement('Checkpoint', {}, paragraph('done')),
+    ),
+  );
+  const stub = createVFileStub();
+  plugin()(tree, stub.file);
+  assert.ok(
+    !stub.notes.some((n) => /nextsteps-placement/.test(n)),
+    'absent NextSteps should not trigger a note',
+  );
+});
