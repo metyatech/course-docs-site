@@ -405,7 +405,25 @@ export default function TutorialShotEditor() {
       currentCropStates: cropStatesByShotRef.current,
       shotKey: selectedShot.outputImagePath,
     }) as TutorialShotEditorStoredCropState | null;
-    setDraftManifest(normalizeTutorialShotManifest(selectedShot.manifest) as TutorialShotManifest);
+    // When loading a Verify shot, automatically fix any legacy role="action" boxes
+    // to role="verify". This handles .shot.json files that were created before the
+    // Verify-only enforcement was introduced, and prevents a deadlock where the
+    // UI shows "確認（白い破線）" (because the toggle is hidden for Verify shots)
+    // but the data still has role="action", causing a persistent warning that the
+    // user cannot dismiss through the UI.
+    const rawManifest = normalizeTutorialShotManifest(selectedShot.manifest) as TutorialShotManifest;
+    const initialManifest =
+      selectedShot.shotSource === "verify"
+        ? {
+            ...rawManifest,
+            annotations: rawManifest.annotations.map((annotation) =>
+              annotation.type === "box" && annotation.role === "action"
+                ? { ...annotation, role: "verify" as const }
+                : annotation,
+            ),
+          }
+        : rawManifest;
+    setDraftManifest(initialManifest);
     setSelectedAnnotationId(null);
     setPendingRawDataUrl(null);
     setBootstrapFromOutput(selectedShot.hasOutputImage && !selectedShot.hasRawImage);
