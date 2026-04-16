@@ -228,8 +228,8 @@ test('Concept children contain verify and action descriptions', async () => {
 
   assert.ok(text.includes('白い破線'), 'Concept mentions verify visual (白い破線)');
   assert.ok(text.includes('オレンジの実線'), 'Concept mentions action visual (オレンジの実線)');
-  assert.ok(text.includes('確認項目'), 'Concept mentions verify role');
-  assert.ok(text.includes('操作項目'), 'Concept mentions action role');
+  assert.ok(text.includes('確認します'), 'Concept mentions verify action');
+  assert.ok(text.includes('入力をします'), 'Concept mentions action operation');
 
   fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -91,7 +91,7 @@ const buildLegendNode = (): Node =>
       {
         type: 'mdxJsxAttribute',
         name: 'title',
-        value: '画像のボックスの見方',
+        value: '画像内のマーカーの見方',
       },
     ],
     children: [
@@ -100,8 +100,7 @@ const buildLegendNode = (): Node =>
         children: [
           {
             type: 'text',
-            value:
-              'この手順では、画像のボックスの線の種類で「確認する項目」と「操作する項目」を区別しています。',
+            value: 'マーカーの種類に注目して、これからの手順を進めましょう。',
           },
         ],
       },
@@ -113,22 +112,12 @@ const buildLegendNode = (): Node =>
           {
             type: 'listItem',
             spread: false,
-            children: [
-              boldParagraph(
-                VERIFY_VISUAL,
-                'のボックス → 確認項目（画像と同じ状態になっているか見比べます）',
-              ),
-            ],
+            children: [boldParagraph(VERIFY_VISUAL, ' → 画像と同じ状態になっているか確認します')],
           },
           {
             type: 'listItem',
             spread: false,
-            children: [
-              boldParagraph(
-                ACTION_VISUAL,
-                'のボックス → 操作項目（実際に入力またはクリックします）',
-              ),
-            ],
+            children: [boldParagraph(ACTION_VISUAL, ' → 実際にクリックや入力をします')],
           },
         ],
       },
