@@ -3,6 +3,7 @@ export const TUTORIAL_SHOT_ANNOTATION_MODES = ["focal", "callout"];
 export const TUTORIAL_SHOT_BOX_ROLES = ["action", "verify"];
 
 const ACTION_TAG_PATTERN = /<Action\b[\s\S]*?>/gu;
+const VERIFY_TAG_PATTERN = /<Verify\b[\s\S]*?>/gu;
 const SECTION_TAG_PATTERN = /<Section\b/u;
 const IMG_PROP_PATTERN = /\bimg=(["'])(.*?)\1/u;
 const YAML_FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---/u;
@@ -115,12 +116,12 @@ export const createDefaultTutorialShotManifest = ({ pagePath, outputImagePath })
   };
 };
 
-export const extractActionImageRefsFromMdx = ({ pagePath, sourceText }) => {
+const extractImageRefsFromMdxTag = ({ pagePath, sourceText, tagPattern }) => {
   const normalizedPagePath = normalizePosixPath(pagePath);
   const pageDir = posixDirname(normalizedPagePath);
   const refs = [];
 
-  for (const match of sourceText.matchAll(ACTION_TAG_PATTERN)) {
+  for (const match of sourceText.matchAll(tagPattern)) {
     const tag = match[0];
     const imgMatch = tag.match(IMG_PROP_PATTERN);
     if (!imgMatch) {
@@ -150,6 +151,12 @@ export const extractActionImageRefsFromMdx = ({ pagePath, sourceText }) => {
 
   return refs;
 };
+
+export const extractActionImageRefsFromMdx = ({ pagePath, sourceText }) =>
+  extractImageRefsFromMdxTag({ pagePath, sourceText, tagPattern: ACTION_TAG_PATTERN });
+
+export const extractVerifyImageRefsFromMdx = ({ pagePath, sourceText }) =>
+  extractImageRefsFromMdxTag({ pagePath, sourceText, tagPattern: VERIFY_TAG_PATTERN });
 
 const normalizeAuthoringModeValue = (value) =>
   value

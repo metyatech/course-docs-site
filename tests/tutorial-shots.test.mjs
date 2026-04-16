@@ -7,6 +7,7 @@ import sharp from "sharp";
 import {
   createDefaultTutorialShotManifest,
   extractActionImageRefsFromMdx,
+  extractVerifyImageRefsFromMdx,
   getTutorialPageModeWarnings,
   getTutorialShotWarnings,
   renderTutorialShotOverlaySvg,
@@ -144,6 +145,138 @@ authoringMode: tutorial
       },
     ],
   );
+});
+
+test("extractVerifyImageRefsFromMdx derives output, raw, and manifest paths", () => {
+  const refs = extractVerifyImageRefsFromMdx({
+    pagePath: "content/docs/student-guide/index.mdx",
+    sourceText: `
+---
+title: Tutorial
+authoringMode: tutorial
+---
+
+<Section title="Step 1" goal="ready">
+  <Action img="./img/startup.png">A</Action>
+  <Verify img="./img/result.png">画面がこの状態になれば成功</Verify>
+  <Verify img="https://example.com/external.png">外部画像は除外</Verify>
+  <Verify img="./img/done.webp">完了状態</Verify>
+  <Verify>imgなしのVerifyは除外</Verify>
+</Section>
+`,
+  });
+
+  assert.deepEqual(
+    refs.map((ref) => ({
+      id: ref.id,
+      outputImagePath: ref.outputImagePath,
+      rawImagePath: ref.rawImagePath,
+      manifestPath: ref.manifestPath,
+    })),
+    [
+      {
+        id: "result",
+        outputImagePath: "content/docs/student-guide/img/result.png",
+        rawImagePath: "content/docs/student-guide/shots/result.raw.png",
+        manifestPath: "content/docs/student-guide/shots/result.shot.json",
+      },
+      {
+        id: "done",
+        outputImagePath: "content/docs/student-guide/img/done.webp",
+        rawImagePath: "content/docs/student-guide/shots/done.raw.webp",
+        manifestPath: "content/docs/student-guide/shots/done.shot.json",
+      },
+    ],
+  );
+});
+
+test("extractVerifyImageRefsFromMdx decodes URL-encoded Verify image filenames", () => {
+  const refs = extractVerifyImageRefsFromMdx({
+    pagePath: "content/docs/student-guide/index.mdx",
+    sourceText: `
+---
+title: Tutorial
+authoringMode: tutorial
+---
+
+<Section title="Step 1" goal="ready">
+  <Verify img="./img/result%20state.png">完了状態</Verify>
+</Section>
+`,
+  });
+
+  assert.deepEqual(
+    refs.map((ref) => ({
+      id: ref.id,
+      sourceImagePath: ref.sourceImagePath,
+      outputImagePath: ref.outputImagePath,
+      rawImagePath: ref.rawImagePath,
+      manifestPath: ref.manifestPath,
+    })),
+    [
+      {
+        id: "result-state",
+        sourceImagePath: "img/result state.png",
+        outputImagePath: "content/docs/student-guide/img/result state.png",
+        rawImagePath: "content/docs/student-guide/shots/result state.raw.png",
+        manifestPath: "content/docs/student-guide/shots/result state.shot.json",
+      },
+    ],
+  );
+});
+
+test("scanTutorialShots includes Verify img references alongside Action img references", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "verify-shot-scan-"));
+
+  try {
+    const pageDir = path.join(rootDir, "content", "docs", "student-guide");
+    const imageDir = path.join(pageDir, "img");
+    await fs.mkdir(imageDir, { recursive: true });
+
+    await fs.writeFile(
+      path.join(pageDir, "index.mdx"),
+      `---
+title: Student Guide
+authoringMode: tutorial
+---
+
+<Section title="Step 1" goal="Unreal Editor を開いた状態">
+  <Action img="./img/startup.png">
+    **起動** を確認します
+  </Action>
+  <Verify img="./img/startup-result.png">画面がこの状態になれば成功</Verify>
+</Section>
+`,
+      "utf8",
+    );
+
+    await sharp({
+      create: { width: 640, height: 360, channels: 4, background: "#dbe4f0" },
+    })
+      .png()
+      .toFile(path.join(imageDir, "startup.png"));
+
+    await sharp({
+      create: { width: 640, height: 360, channels: 4, background: "#e0f0db" },
+    })
+      .png()
+      .toFile(path.join(imageDir, "startup-result.png"));
+
+    const { scanTutorialShots } = await import("../src/lib/tutorial-shots-server.mjs");
+    const shots = await scanTutorialShots({ sourceRoot: rootDir });
+
+    assert.equal(shots.length, 2, "Action shot and Verify shot are both returned");
+
+    const actionShot = shots.find((s) => s.id === "startup");
+    const verifyShot = shots.find((s) => s.id === "startup-result");
+
+    assert.ok(actionShot, "Action shot is present");
+    assert.ok(verifyShot, "Verify shot is present");
+    assert.equal(actionShot.outputImagePath, "content/docs/student-guide/img/startup.png");
+    assert.equal(verifyShot.outputImagePath, "content/docs/student-guide/img/startup-result.png");
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
 });
 
 test("getTutorialShotWarnings validates focal mode annotations", () => {

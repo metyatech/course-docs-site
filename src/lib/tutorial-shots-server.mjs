@@ -5,6 +5,7 @@ import {
   createDefaultTutorialShotManifest,
   deriveTutorialShotPaths,
   extractActionImageRefsFromMdx,
+  extractVerifyImageRefsFromMdx,
   getTutorialPageModeWarnings,
   getTutorialShotAnnotationErrors,
   getTutorialShotCanvasLayout,
@@ -293,10 +294,10 @@ export const scanTutorialShots = async ({ sourceRoot }) => {
     const relativePath = normalizePosixPath(path.relative(sourceRoot, filePath));
     const sourceText = await fs.readFile(filePath, "utf8");
     const pageModeWarnings = getTutorialPageModeWarnings({ sourceText });
-    const refs = extractActionImageRefsFromMdx({
-      pagePath: relativePath,
-      sourceText,
-    });
+    const refs = [
+      ...extractActionImageRefsFromMdx({ pagePath: relativePath, sourceText }),
+      ...extractVerifyImageRefsFromMdx({ pagePath: relativePath, sourceText }),
+    ];
 
     for (const ref of refs) {
       const manifestPath = resolveSourcePath({
