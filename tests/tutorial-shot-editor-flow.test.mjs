@@ -255,6 +255,14 @@ const pasteImageIntoEditor = async (page, imageDataUrl) => {
 
 const getPreviewProbeImage = (page) => page.locator('img[alt="保存反映確認"]:visible').first();
 
+const readAnnotationListSummary = (page) =>
+  page.evaluate(() =>
+    Array.from(document.querySelectorAll('li[data-selected]')).map((item) => ({
+      selected: item.getAttribute("data-selected"),
+      label: item.querySelector("button")?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+    })),
+  );
+
 const isTutorialShotHighlightPixel = (pixel) =>
   Array.isArray(pixel) &&
   pixel.length === 4 &&
@@ -944,6 +952,122 @@ test("tutorial shot editor canvas keeps PowerPoint-like resize and callout drag 
   assert.match(source, /<Circle[\s\S]*x=\{0\}[\s\S]*y=\{0\}/);
   assert.match(source, /<Text[\s\S]*x=\{-CALLOUT_BADGE_RADIUS\}[\s\S]*y=\{-9\}/);
 });
+
+test(
+  "tutorial shot editor reorders callout numbers from the sidebar list",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "course-tutorial-shot-editor-callout-reorder-"),
+    );
+    const fixtureCourse = path.join(tempRoot, "course");
+    const overrideCourse = path.join(tempRoot, "override-course");
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+    await writeFixtureCourseRepo(overrideCourse, {
+      logoText: "Override Tutorial Shot Fixture",
+      firstImageName: "override-startup",
+      secondImageName: "override-missing-output",
+    });
+
+    const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "tutorial-shot-editor-callout-reorder",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Tutorial shot editor did not become ready.",
+      },
+    );
+
+    const browser = await chromium.launch({ headless: true });
+    t.after(async () => {
+      await browser.close();
+    });
+    const page = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+
+    await openTutorialShotEditor(page, overrideCourseRelativePath);
+    await page.getByRole("button", { name: "番号コールアウト" }).click();
+    await page.getByRole("button", { name: "枠を追加" }).click();
+    await page.getByRole("button", { name: "枠を追加" }).click();
+    await page.getByRole("button", { name: "枠を追加" }).click();
+
+    const annotationItems = page.locator('li[data-selected]');
+    await assert.equal(await annotationItems.count(), 3);
+
+    await annotationItems.nth(1).locator("button").first().click();
+    await waitFor(
+      async () => {
+        const summary = await readAnnotationListSummary(page);
+        return summary[1]?.selected === "true";
+      },
+      {
+        timeoutMs: 10_000,
+        intervalMs: 100,
+        onTimeoutMessage: "The second callout row did not become selected.",
+      },
+    );
+
+    const before = await readAnnotationListSummary(page);
+    assert.match(
+      before[1]?.label ?? "",
+      /^② 枠 2/,
+      "The selected second row should start as callout number 2 before reordering.",
+    );
+
+    await annotationItems.nth(1).dragTo(annotationItems.nth(0));
+
+    await waitFor(
+      async () => {
+        const summary = await readAnnotationListSummary(page);
+        return summary[0]?.selected === "true";
+      },
+      {
+        timeoutMs: 10_000,
+        intervalMs: 100,
+        onTimeoutMessage: "Dragging the second callout row to the top did not reorder the list.",
+      },
+    );
+
+    const after = await readAnnotationListSummary(page);
+    assert.match(
+      after[0]?.label ?? "",
+      /^① 枠 1/,
+      "The dragged callout should become number 1 after moving to the top of the list.",
+    );
+    assert.equal(
+      after[0]?.selected,
+      "true",
+      "The same selected callout should remain selected after reordering.",
+    );
+  },
+);
 
 test(
   "tutorial shot editor clears selection on empty canvas clicks",
