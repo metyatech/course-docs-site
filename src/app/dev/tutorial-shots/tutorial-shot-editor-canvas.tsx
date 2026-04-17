@@ -28,6 +28,7 @@ type Props = {
   imageHeight: number;
   imageSrc: string;
   imageWidth: number;
+  maxStageWidth?: number;
   onChange: (annotations: TutorialShotAnnotation[]) => void;
   onSelect: (annotationId: string | null) => void;
   selectedAnnotationId: string | null;
@@ -41,6 +42,7 @@ export default function TutorialShotEditorCanvas({
   imageHeight,
   imageSrc,
   imageWidth,
+  maxStageWidth = 960,
   onChange,
   onSelect,
   selectedAnnotationId,
@@ -62,7 +64,10 @@ export default function TutorialShotEditorCanvas({
       }),
     [annotationMode, annotations, imageHeight, imageWidth],
   );
-  const scale = useMemo(() => Math.min(1, 960 / Math.max(1, layout.width)), [layout.width]);
+  const scale = useMemo(
+    () => Math.min(1, Math.max(1, maxStageWidth) / Math.max(1, layout.width)),
+    [layout.width, maxStageWidth],
+  );
 
   useEffect(() => {
     const image = new window.Image();

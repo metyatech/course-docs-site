@@ -141,13 +141,14 @@ const getShotFlags = (shot: TutorialShotItem) => {
     flags.push({
       className: styles.flagVerify,
       label: "Verify",
-      title: "<Verify img=\"...\"> コンポーネントの画像です。確認（白い破線）アノテーションのみ使用できます。",
+      title:
+        '<Verify img="..."> コンポーネントの画像です。確認（白い破線）アノテーションのみ使用できます。',
     });
   } else {
     flags.push({
       className: styles.flagAction,
       label: "Action",
-      title: "<Action img=\"...\"> コンポーネントの画像です。",
+      title: '<Action img="..."> コンポーネントの画像です。',
     });
   }
 
@@ -261,6 +262,25 @@ type TutorialShotEditorStoredCropState = {
 
 type TutorialShotEditorStoredCropStateMap = Record<string, TutorialShotEditorStoredCropState>;
 
+const toNaturalCrop = (renderedCrop: PixelCrop, scale: number): PixelCrop => ({
+  unit: "px",
+  x: Math.round(renderedCrop.x * scale),
+  y: Math.round(renderedCrop.y * scale),
+  width: Math.round(renderedCrop.width * scale),
+  height: Math.round(renderedCrop.height * scale),
+});
+
+const toRenderedCrop = (naturalCrop: PixelCrop, scale: number): PixelCrop => {
+  if (scale <= 1) return naturalCrop;
+  return {
+    unit: "px",
+    x: Math.round(naturalCrop.x / scale),
+    y: Math.round(naturalCrop.y / scale),
+    width: Math.round(naturalCrop.width / scale),
+    height: Math.round(naturalCrop.height / scale),
+  };
+};
+
 export default function TutorialShotEditor() {
   const [response, setResponse] = useState<TutorialShotResponse | null>(null);
   const [sourceOverride, setSourceOverride] = useState<string | null>(null);
@@ -282,7 +302,13 @@ export default function TutorialShotEditor() {
   const [pendingRawDataUrl, setPendingRawDataUrl] = useState<string | null>(null);
   const [bootstrapFromOutput, setBootstrapFromOutput] = useState(false);
   const [isSourceEditorOpen, setIsSourceEditorOpen] = useState(false);
+  const [cropDetailsOpen, setCropDetailsOpen] = useState(false);
+  const [annotationStageWidth, setAnnotationStageWidth] = useState(960);
+  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cropDisplayScaleRef = useRef(1);
+  const [annotationStageElement, setAnnotationStageElement] = useState<HTMLDivElement | null>(null);
 
   const shots = useMemo(() => (response && response.enabled ? response.shots : []), [response]);
   const selectedShot = useMemo(
@@ -312,7 +338,9 @@ export default function TutorialShotEditor() {
   const hasAnnotationSurface = Boolean(croppedPreviewSrc) && Boolean(completedCrop);
   const canAddBox =
     hasAnnotationSurface &&
-    (annotationMode === "callout" || annotationMode === "multi-focal" || annotationSummary.boxCount === 0);
+    (annotationMode === "callout" ||
+      annotationMode === "multi-focal" ||
+      annotationSummary.boxCount === 0);
   const isVerifyShot = selectedShot?.shotSource === "verify";
   const canAddArrow =
     hasAnnotationSurface &&
@@ -404,6 +432,7 @@ export default function TutorialShotEditor() {
       setSourceImageElement(null);
       setPendingRawDataUrl(null);
       setBootstrapFromOutput(false);
+      setCropDetailsOpen(false);
       return;
     }
 
@@ -417,7 +446,9 @@ export default function TutorialShotEditor() {
     // UI shows "確認（白い破線）" (because the toggle is hidden for Verify shots)
     // but the data still has role="action", causing a persistent warning that the
     // user cannot dismiss through the UI.
-    const rawManifest = normalizeTutorialShotManifest(selectedShot.manifest) as TutorialShotManifest;
+    const rawManifest = normalizeTutorialShotManifest(
+      selectedShot.manifest,
+    ) as TutorialShotManifest;
     const initialManifest =
       selectedShot.shotSource === "verify"
         ? {
@@ -443,6 +474,7 @@ export default function TutorialShotEditor() {
         ? buildImageUrl(nextImagePath, sourceImageRevision, sourceOverride ?? "")
         : null,
     );
+    setCropDetailsOpen(!nextImagePath);
     setSourceImageElement(null);
     setCrop(storedCropState?.crop ?? undefined);
     setCompletedCrop(storedCropState?.completedCrop ?? null);
@@ -493,6 +525,18 @@ export default function TutorialShotEditor() {
       cancelled = true;
     };
   }, [completedCrop, sourceImageSrc]);
+
+  useEffect(() => {
+    if (!annotationStageElement) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = Math.round(entry.contentRect.width);
+        if (width > 0) setAnnotationStageWidth(width);
+      }
+    });
+    observer.observe(annotationStageElement);
+    return () => observer.disconnect();
+  }, [annotationStageElement]);
 
   const updateAnnotations = (nextAnnotations: TutorialShotAnnotation[]) => {
     setDraftManifest((current) =>
@@ -575,6 +619,14 @@ export default function TutorialShotEditor() {
       ),
     );
     setSelectedAnnotationId(null);
+  };
+
+  const moveAnnotation = (fromIndex: number, toIndex: number) => {
+    if (!draftManifest || fromIndex === toIndex) return;
+    const next = [...draftManifest.annotations];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    updateAnnotations(next);
   };
 
   const save = async () => {
@@ -672,6 +724,7 @@ export default function TutorialShotEditor() {
         setCroppedPreviewSrc(null);
         setSourceImageSrc(dataUrl);
         setBootstrapFromOutput(false);
+        setCropDetailsOpen(true);
         setStatusText(
           `${statusPrefix}を読み込みました（${getReadableImageName(file, fallbackFileName)}）`,
         );
@@ -942,8 +995,8 @@ export default function TutorialShotEditor() {
                       }
                       title={
                         selectedShot.shotSource === "verify"
-                          ? "<Verify img=\"...\"> の画像 — 確認（白い破線）アノテーションのみ使用できます"
-                          : "<Action img=\"...\"> の画像"
+                          ? '<Verify img="..."> の画像 — 確認（白い破線）アノテーションのみ使用できます'
+                          : '<Action img="..."> の画像'
                       }
                     >
                       {selectedShot.shotSource === "verify" ? "Verify" : "Action"}
@@ -1008,90 +1061,111 @@ export default function TutorialShotEditor() {
               </div>
 
               <article className={styles.workCard}>
-                <header className={styles.workCardHeader}>
-                  <div>
-                    <h3 className={styles.workCardTitle}>元画像と切り抜き範囲</h3>
-                    <p className={styles.workCardHint}>
-                      ドラッグで囲んだ範囲が公開画像になります。ファイルを選ぶ代わりに、
-                      この画面で <code>Ctrl + V</code> でも貼り付けられます。
-                    </p>
-                  </div>
-                  <div className={styles.workCardTools}>
-                    <button
-                      className={styles.ghostButton}
-                      onClick={() => fileInputRef.current?.click()}
-                      type="button"
+                <details
+                  className={styles.cropDetails}
+                  open={cropDetailsOpen || undefined}
+                  onToggle={(event) =>
+                    setCropDetailsOpen((event.target as HTMLDetailsElement).open)
+                  }
+                >
+                  <summary className={styles.cropSummary}>
+                    <span className={styles.cropSummaryTitle}>元画像と切り抜き範囲</span>
+                    <span className={styles.cropSummaryHint}>
+                      <code>Ctrl + V</code> でも貼り付け可能
+                    </span>
+                    <span
+                      className={styles.cropSummaryTools}
+                      onClick={(event) => event.stopPropagation()}
                     >
-                      {sourceImageSrc ? "元画像を差し替え" : "元画像をアップロード"}
-                    </button>
-                    {sourceImageSrc ? (
                       <button
                         className={styles.ghostButton}
-                        disabled={!sourceImageElement}
-                        onClick={resetCropToFull}
+                        onClick={() => fileInputRef.current?.click()}
                         type="button"
                       >
-                        切り抜きをリセット
+                        {sourceImageSrc ? "元画像を差し替え" : "元画像をアップロード"}
                       </button>
-                    ) : null}
-                    <input
-                      accept="image/png,image/jpeg,image/webp"
-                      className={styles.fileInputHidden}
-                      onChange={(event) => handleRawUpload(event.target.files?.[0] ?? null)}
-                      ref={fileInputRef}
-                      type="file"
-                    />
-                  </div>
-                </header>
+                      {sourceImageSrc ? (
+                        <button
+                          className={styles.ghostButton}
+                          disabled={!sourceImageElement}
+                          onClick={resetCropToFull}
+                          type="button"
+                        >
+                          切り抜きをリセット
+                        </button>
+                      ) : null}
+                    </span>
+                  </summary>
+                  <input
+                    accept="image/png,image/jpeg,image/webp"
+                    className={styles.fileInputHidden}
+                    onChange={(event) => handleRawUpload(event.target.files?.[0] ?? null)}
+                    ref={fileInputRef}
+                    type="file"
+                  />
 
-                {sourceImageSrc ? (
-                  <div className={styles.imageStage} data-testid="crop-stage">
-                    <div className={styles.stageSurface}>
-                      <ReactCrop
-                        crop={crop}
-                        onChange={(nextCrop) => {
-                          setCrop(nextCrop);
-                          setCropOwnerKey(selectedShot.outputImagePath);
-                        }}
-                        onComplete={(nextCrop) => {
-                          setCompletedCrop(nextCrop);
-                          setCropOwnerKey(selectedShot.outputImagePath);
-                        }}
-                      >
-                        {/* ReactCrop requires a plain img element so the crop box matches the source pixels exactly. */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          alt=""
-                          className={styles.sourceImage}
-                          onLoad={(event) => {
-                            const image = event.currentTarget;
-                            const nextCropState = getTutorialShotCropStateForImage({
-                              currentCropStates: cropStatesByShotRef.current,
-                              shotKey: selectedShot.outputImagePath,
-                              manifestCrop: draftManifest.crop,
-                              imageWidth: image.naturalWidth,
-                              imageHeight: image.naturalHeight,
-                            }) as TutorialShotEditorStoredCropState;
-                            setSourceImageElement(image);
+                  {sourceImageSrc ? (
+                    <div className={styles.imageStage} data-testid="crop-stage">
+                      <div className={styles.stageSurface}>
+                        <ReactCrop
+                          crop={
+                            crop ? toRenderedCrop(crop, cropDisplayScaleRef.current) : undefined
+                          }
+                          onChange={(nextCrop) => {
+                            if (sourceImageElement) {
+                              const cw = sourceImageElement.clientWidth;
+                              cropDisplayScaleRef.current =
+                                cw > 0 ? sourceImageElement.naturalWidth / cw : 1;
+                            }
+                            setCrop(toNaturalCrop(nextCrop, cropDisplayScaleRef.current));
                             setCropOwnerKey(selectedShot.outputImagePath);
-                            setCrop(nextCropState.crop ?? createInitialCrop(image, draftManifest));
-                            setCompletedCrop(nextCropState.completedCrop);
                           }}
-                          src={sourceImageSrc}
-                        />
-                      </ReactCrop>
+                          onComplete={(nextCrop) => {
+                            if (sourceImageElement) {
+                              const cw = sourceImageElement.clientWidth;
+                              cropDisplayScaleRef.current =
+                                cw > 0 ? sourceImageElement.naturalWidth / cw : 1;
+                            }
+                            setCompletedCrop(toNaturalCrop(nextCrop, cropDisplayScaleRef.current));
+                            setCropOwnerKey(selectedShot.outputImagePath);
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            alt=""
+                            className={styles.sourceImage}
+                            onLoad={(event) => {
+                              const image = event.currentTarget;
+                              const cw = image.clientWidth;
+                              cropDisplayScaleRef.current = cw > 0 ? image.naturalWidth / cw : 1;
+                              const nextCropState = getTutorialShotCropStateForImage({
+                                currentCropStates: cropStatesByShotRef.current,
+                                shotKey: selectedShot.outputImagePath,
+                                manifestCrop: draftManifest.crop,
+                                imageWidth: image.naturalWidth,
+                                imageHeight: image.naturalHeight,
+                              }) as TutorialShotEditorStoredCropState;
+                              setSourceImageElement(image);
+                              setCropOwnerKey(selectedShot.outputImagePath);
+                              setCrop(
+                                nextCropState.crop ?? createInitialCrop(image, draftManifest),
+                              );
+                              setCompletedCrop(nextCropState.completedCrop);
+                            }}
+                            src={sourceImageSrc}
+                          />
+                        </ReactCrop>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className={styles.stageEmpty}>
-                    {bootstrapFromOutput
-                      ? "元画像がありません。アップロードするか、このまま保存して現在の出力画像を元画像にします。"
-                      : "元画像をアップロードしてください。"}
-                  </div>
-                )}
-              </article>
+                  ) : (
+                    <div className={styles.stageEmpty}>
+                      {bootstrapFromOutput
+                        ? "元画像がありません。アップロードするか、このまま保存して現在の出力画像を元画像にします。"
+                        : "元画像をアップロードしてください。"}
+                    </div>
+                  )}
+                </details>
 
-              <article className={styles.workCard}>
                 <header className={styles.workCardHeader}>
                   <div>
                     <h3 className={styles.workCardTitle}>必要なら注釈を追加</h3>
@@ -1152,7 +1226,11 @@ export default function TutorialShotEditor() {
                   </div>
                 ) : (
                   <div className={styles.annotateGrid}>
-                    <div className={styles.imageStage} data-testid="annotation-stage">
+                    <div
+                      className={styles.imageStage}
+                      data-testid="annotation-stage"
+                      ref={setAnnotationStageElement}
+                    >
                       <div className={styles.stageSurface}>
                         <AnnotationCanvas
                           annotationMode={annotationMode}
@@ -1160,6 +1238,7 @@ export default function TutorialShotEditor() {
                           imageHeight={completedCrop.height}
                           imageSrc={croppedPreviewSrc}
                           imageWidth={completedCrop.width}
+                          maxStageWidth={annotationStageWidth}
                           onChange={updateAnnotations}
                           onSelect={setSelectedAnnotationId}
                           selectedAnnotationId={selectedAnnotationId}
@@ -1177,19 +1256,50 @@ export default function TutorialShotEditor() {
                         <ul className={styles.annotationList}>
                           {draftManifest.annotations.map((annotation, index) => {
                             const isSelected = annotation.id === selectedAnnotationId;
-                            const boxNumber = annotationMode === "callout" && annotation.type === "box"
-                              ? draftManifest.annotations
-                                  .filter((a, i) => a.type === "box" && i <= index)
-                                  .length
-                              : 0;
+                            const isDraggable = annotationMode === "callout";
+                            const boxNumber =
+                              annotationMode === "callout" && annotation.type === "box"
+                                ? draftManifest.annotations.filter(
+                                    (a, i) => a.type === "box" && i <= index,
+                                  ).length
+                                : 0;
                             return (
                               <li
                                 className={`${styles.annotationItem} ${
                                   isSelected ? styles.annotationItemSelected : ""
+                                } ${dragSourceIndex === index ? styles.annotationItemDragging : ""} ${
+                                  dragOverIndex === index ? styles.annotationItemDragOver : ""
                                 }`}
                                 data-selected={isSelected ? "true" : "false"}
+                                draggable={isDraggable || undefined}
                                 key={annotation.id}
+                                onDragEnd={() => {
+                                  if (
+                                    dragSourceIndex !== null &&
+                                    dragOverIndex !== null &&
+                                    dragSourceIndex !== dragOverIndex
+                                  ) {
+                                    moveAnnotation(dragSourceIndex, dragOverIndex);
+                                  }
+                                  setDragSourceIndex(null);
+                                  setDragOverIndex(null);
+                                }}
+                                onDragOver={(event) => {
+                                  if (dragSourceIndex === null) return;
+                                  event.preventDefault();
+                                  setDragOverIndex(index);
+                                }}
+                                onDragStart={(event) => {
+                                  if (!isDraggable) return;
+                                  setDragSourceIndex(index);
+                                  event.dataTransfer.effectAllowed = "move";
+                                }}
                               >
+                                {isDraggable ? (
+                                  <span className={styles.annotationItemDragHandle} aria-hidden>
+                                    ⠿
+                                  </span>
+                                ) : null}
                                 <button
                                   className={styles.annotationItemSelect}
                                   onClick={() => setSelectedAnnotationId(annotation.id)}
@@ -1214,7 +1324,9 @@ export default function TutorialShotEditor() {
                                     onClick={() => toggleBoxRole(annotation.id)}
                                     type="button"
                                   >
-                                    {annotation.role === "verify" ? "確認（白い破線）" : "アクション（オレンジ実線）"}
+                                    {annotation.role === "verify"
+                                      ? "確認（白い破線）"
+                                      : "アクション（オレンジ実線）"}
                                   </button>
                                 ) : annotation.type === "box" && isVerifyShot ? (
                                   <span className={styles.annotationItemRole}>

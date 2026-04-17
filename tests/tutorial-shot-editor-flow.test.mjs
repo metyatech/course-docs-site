@@ -275,22 +275,25 @@ const isAnnotationStrokePixel = (pixel) =>
     pixel[3] === 255);
 
 const readPreviewProbePixel = async (page, { x = 8, y = 8 } = {}) =>
-  getPreviewProbeImage(page).evaluate((image, coordinates) => {
-    if (!(image instanceof HTMLImageElement) || !image.complete || image.naturalWidth === 0) {
-      return null;
-    }
+  getPreviewProbeImage(page).evaluate(
+    (image, coordinates) => {
+      if (!(image instanceof HTMLImageElement) || !image.complete || image.naturalWidth === 0) {
+        return null;
+      }
 
-    const canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    const context = canvas.getContext("2d");
-    if (!context) {
-      return null;
-    }
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        return null;
+      }
 
-    context.drawImage(image, 0, 0);
-    return Array.from(context.getImageData(coordinates.x, coordinates.y, 1, 1).data);
-  }, { x, y });
+      context.drawImage(image, 0, 0);
+      return Array.from(context.getImageData(coordinates.x, coordinates.y, 1, 1).data);
+    },
+    { x, y },
+  );
 
 test(
   "tutorial shot editor saves one boxed focal point with an optional arrow",
@@ -519,7 +522,7 @@ test(
       0,
       "Space-named existing output images must stay editable instead of showing the unset badge.",
     );
-    await page.locator('[data-testid="crop-stage"] img').waitFor();
+    await getAnnotationCanvas(page).waitFor({ timeout: 30_000 });
     await page.getByLabel("画像の説明（Alt テキスト）").fill("空白入りファイル名の画像");
     await page.getByRole("button", { name: "保存", exact: true }).click();
     await page.getByText("保存しました").waitFor();
@@ -711,7 +714,8 @@ test(
       {
         timeoutMs: 30_000,
         intervalMs: 250,
-        onTimeoutMessage: "The open tutorial preview page did not refresh to the saved annotation image.",
+        onTimeoutMessage:
+          "The open tutorial preview page did not refresh to the saved annotation image.",
       },
     );
   },
@@ -839,26 +843,27 @@ authoringMode: tutorial
     await previewPage.goto("/docs/tutorial/", { waitUntil: "domcontentloaded" });
 
     // Locate the Markdown probe image (![Verify保存反映確認](...)).
-    const verifyProbeImage = previewPage
-      .locator('img[alt="Verify保存反映確認"]:visible')
-      .first();
+    const verifyProbeImage = previewPage.locator('img[alt="Verify保存反映確認"]:visible').first();
     await verifyProbeImage.waitFor();
 
     const readVerifyProbePixel = async (x = 8, y = 8) =>
-      verifyProbeImage.evaluate((image, coordinates) => {
-        if (!(image instanceof HTMLImageElement) || !image.complete || image.naturalWidth === 0) {
-          return null;
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = image.naturalWidth;
-        canvas.height = image.naturalHeight;
-        const context = canvas.getContext("2d");
-        if (!context) {
-          return null;
-        }
-        context.drawImage(image, 0, 0);
-        return Array.from(context.getImageData(coordinates.x, coordinates.y, 1, 1).data);
-      }, { x, y });
+      verifyProbeImage.evaluate(
+        (image, coordinates) => {
+          if (!(image instanceof HTMLImageElement) || !image.complete || image.naturalWidth === 0) {
+            return null;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = image.naturalWidth;
+          canvas.height = image.naturalHeight;
+          const context = canvas.getContext("2d");
+          if (!context) {
+            return null;
+          }
+          context.drawImage(image, 0, 0);
+          return Array.from(context.getImageData(coordinates.x, coordinates.y, 1, 1).data);
+        },
+        { x, y },
+      );
 
     const initialPixel = await readVerifyProbePixel(200, 72);
     assert.deepEqual(
@@ -874,9 +879,7 @@ authoringMode: tutorial
     await editorPage
       .getByRole("button", { name: new RegExp(verifyImageName, "i") })
       .waitFor({ timeout: 60_000 });
-    await editorPage
-      .getByRole("button", { name: new RegExp(verifyImageName, "i") })
-      .click();
+    await editorPage.getByRole("button", { name: new RegExp(verifyImageName, "i") }).click();
 
     await editorPage.getByRole("heading", { name: "必要なら注釈を追加" }).scrollIntoViewIfNeeded();
     await waitForAnnotationCanvasReady(editorPage);
@@ -907,40 +910,40 @@ authoringMode: tutorial
   },
 );
 
-test(
-  "tutorial shot editor canvas keeps PowerPoint-like resize and callout drag behavior wired in",
-  async () => {
-    const canvasSourcePath = path.join(
-      projectRoot,
-      "src",
-      "app",
-      "dev",
-      "tutorial-shots",
-      "tutorial-shot-editor-canvas.tsx",
-    );
-    const source = await fs.readFile(canvasSourcePath, "utf8");
+test("tutorial shot editor canvas keeps PowerPoint-like resize and callout drag behavior wired in", async () => {
+  const canvasSourcePath = path.join(
+    projectRoot,
+    "src",
+    "app",
+    "dev",
+    "tutorial-shots",
+    "tutorial-shot-editor-canvas.tsx",
+  );
+  const source = await fs.readFile(canvasSourcePath, "utf8");
 
-    assert.match(
-      source,
-      /enabledAnchors=\{\[\s*"top-left",\s*"top-center",\s*"top-right",\s*"middle-left",\s*"middle-right",\s*"bottom-left",\s*"bottom-center",\s*"bottom-right",\s*\]\}/s,
-    );
-    assert.match(source, /keepRatio=\{false\}/);
-    assert.match(source, /targetClassName === "Image"/);
-    assert.match(source, /targetClassName === "Layer"/);
-    assert.match(source, /onMouseDown=\{\(event\) => \{[\s\S]*onSelect\(null\);/);
-    assert.match(source, /<Group[\s\S]*draggable[\s\S]*onDragStart=\{\(\) => onSelect\(annotation\.id\)\}/);
-    assert.match(
-      source,
-      /<Arrow[\s\S]*draggable[\s\S]*onDragEnd=\{\(event\) => \{[\s\S]*fromX: current\.fromX \+ offsetX,[\s\S]*toY: current\.toY \+ offsetY,/,
-    );
-    assert.match(
-      source,
-      /<Arrow[\s\S]*onDragMove=\{\(event\) => \{[\s\S]*updateArrowDragOffset\(annotation\.id, event\.target\.x\(\), event\.target\.y\(\)\);/,
-    );
-    assert.match(source, /<Circle[\s\S]*x=\{0\}[\s\S]*y=\{0\}/);
-    assert.match(source, /<Text[\s\S]*x=\{-CALLOUT_BADGE_RADIUS\}[\s\S]*y=\{-9\}/);
-  },
-);
+  assert.match(
+    source,
+    /enabledAnchors=\{\[\s*"top-left",\s*"top-center",\s*"top-right",\s*"middle-left",\s*"middle-right",\s*"bottom-left",\s*"bottom-center",\s*"bottom-right",\s*\]\}/s,
+  );
+  assert.match(source, /keepRatio=\{false\}/);
+  assert.match(source, /targetClassName === "Image"/);
+  assert.match(source, /targetClassName === "Layer"/);
+  assert.match(source, /onMouseDown=\{\(event\) => \{[\s\S]*onSelect\(null\);/);
+  assert.match(
+    source,
+    /<Group[\s\S]*draggable[\s\S]*onDragStart=\{\(\) => onSelect\(annotation\.id\)\}/,
+  );
+  assert.match(
+    source,
+    /<Arrow[\s\S]*draggable[\s\S]*onDragEnd=\{\(event\) => \{[\s\S]*fromX: current\.fromX \+ offsetX,[\s\S]*toY: current\.toY \+ offsetY,/,
+  );
+  assert.match(
+    source,
+    /<Arrow[\s\S]*onDragMove=\{\(event\) => \{[\s\S]*updateArrowDragOffset\(annotation\.id, event\.target\.x\(\), event\.target\.y\(\)\);/,
+  );
+  assert.match(source, /<Circle[\s\S]*x=\{0\}[\s\S]*y=\{0\}/);
+  assert.match(source, /<Text[\s\S]*x=\{-CALLOUT_BADGE_RADIUS\}[\s\S]*y=\{-9\}/);
+});
 
 test(
   "tutorial shot editor clears selection on empty canvas clicks",
@@ -1133,7 +1136,7 @@ test(
     });
     const page = await browser.newPage({
       baseURL: baseUrl,
-      viewport: { width: 1440, height: 1100 },
+      viewport: { width: 1920, height: 1100 },
     });
 
     await openTutorialShotEditor(page, overrideCourseRelativePath);

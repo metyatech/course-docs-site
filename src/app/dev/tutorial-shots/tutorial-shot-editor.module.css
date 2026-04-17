@@ -458,15 +458,12 @@
   border: 1px solid rgb(226 232 240);
   border-radius: 0.625rem;
   padding: 0.75rem;
-  overflow: auto;
+  overflow: hidden;
   min-height: 14rem;
 }
 
 .stageSurface {
-  min-width: 100%;
-  width: max-content;
   display: flex;
-  justify-content: center;
   align-items: flex-start;
 }
 
@@ -485,6 +482,81 @@
   color: rgb(71 85 105);
   font-size: 0.875rem;
   line-height: 1.6;
+}
+
+/* ── Crop collapsible section ──────────────────────── */
+
+.cropDetails {
+  border-bottom: 1px solid rgb(241 245 249);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cropDetails[open] {
+  padding-bottom: 1.25rem;
+}
+
+.cropSummary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.cropSummary::-webkit-details-marker {
+  display: none;
+}
+
+.cropSummaryTitle {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cropSummaryTitle::before {
+  content: "▸";
+  display: inline-block;
+  transition: transform 0.15s ease;
+  font-size: 0.75rem;
+  color: rgb(100 116 139);
+}
+
+.cropDetails[open] > .cropSummary .cropSummaryTitle::before {
+  transform: rotate(90deg);
+}
+
+.cropSummaryHint {
+  font-size: 0.75rem;
+  color: rgb(148 163 184);
+}
+
+.cropSummaryTools {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.cropToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Section divider ──────────────────────────────── */
+
+.sectionDivider {
+  border: none;
+  border-top: 1px solid rgb(241 245 249);
+  margin: 0 0 1rem;
 }
 
 /* ── Annotate area ──────────────────────────────────── */
@@ -599,6 +671,32 @@
 
 .annotationItemRole:hover {
   background: rgb(226 232 240);
+}
+
+/* ── Drag reorder ──────────────────────────────────── */
+
+.annotationItemDragHandle {
+  cursor: grab;
+  color: rgb(148 163 184);
+  font-size: 0.85rem;
+  padding: 0.1rem 0.2rem;
+  border: 0;
+  background: transparent;
+  line-height: 1;
+  touch-action: none;
+}
+
+.annotationItemDragHandle:active {
+  cursor: grabbing;
+}
+
+.annotationItemDragging {
+  opacity: 0.4;
+}
+
+.annotationItemDragOver {
+  border-color: rgb(37 99 235);
+  box-shadow: 0 -2px 0 0 rgb(37 99 235);
 }
 
 /* ── Warnings ───────────────────────────────────────── */
