@@ -36,6 +36,22 @@ const importNextConfig = async (envOverrides = {}) => {
   }
 };
 
+const createWebpackConfig = () => ({
+  watchOptions: {
+    ignored: /(\.(git|next)|node_modules)/,
+  },
+  module: {
+    rules: [{ oneOf: [{ test: /\.css$/i }] }],
+  },
+  output: {
+    path: "/tmp/out",
+  },
+  resolve: {
+    alias: {},
+    modules: [],
+  },
+});
+
 test("next config disables static image wrappers for course asset imports", async () => {
   const nextConfig = await importNextConfig();
   assert.equal(nextConfig.images?.disableStaticImages, true);
@@ -61,4 +77,24 @@ test("verified builds can skip duplicate lint and typecheck passes", async () =>
   });
   assert.equal(nextConfig.eslint?.ignoreDuringBuilds, true);
   assert.equal(nextConfig.typescript?.ignoreBuildErrors, true);
+});
+
+test("next config treats arbitrary files inside content assets directories as resource assets", async () => {
+  const nextConfig = await importNextConfig();
+  const updated = nextConfig.webpack(createWebpackConfig(), {
+    isServer: false,
+    defaultLoaders: { babel: {} },
+  });
+  const arbitraryAssetRule = updated.module.rules.find(
+    (rule) =>
+      rule?.type === "asset/resource" &&
+      rule.test instanceof RegExp &&
+      rule.test.source === /[\\/]content[\\/].*[\\/]assets[\\/]/i.source &&
+      rule.test.flags === "i",
+  );
+
+  assert.ok(arbitraryAssetRule, "Expected a fallback resource rule for content/**/assets/** paths.");
+  assert.match("/tmp/project/content/docs/models/assets/Item.fbx", arbitraryAssetRule.test);
+  assert.doesNotMatch("/tmp/project/content/docs/models/Item.fbx", arbitraryAssetRule.test);
+  assert.match("theme.css", arbitraryAssetRule.exclude);
 });

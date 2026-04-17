@@ -5,11 +5,12 @@ import {
   applyCourseAssetWebpackRules,
   courseMdxOptions,
 } from "@metyatech/course-docs-platform/next";
-import { resolveNextDistDir } from "./scripts/next-dist-dir.mjs";
+import { resolveNextDistDir, resolveNextDistDirPath } from "./scripts/next-dist-dir.mjs";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 const skipBuildLint = process.env.COURSE_DOCS_SKIP_BUILD_LINT === "1";
 const skipBuildTypecheck = process.env.COURSE_DOCS_SKIP_BUILD_TYPECHECK === "1";
+const contentAssetPathPattern = /[\\/]content[\\/].*[\\/]assets[\\/]/i;
 
 const withNextra = nextra({
   defaultShowCopyCode: true,
@@ -21,6 +22,39 @@ const withNextra = nextra({
     ...courseMdxOptions,
   },
 });
+
+const hasArbitraryAssetDirectoryRule = (config) =>
+  config.module.rules.some(
+    (rule) =>
+      rule?.type === "asset/resource" &&
+      rule.test instanceof RegExp &&
+      rule.test.source === contentAssetPathPattern.source &&
+      rule.test.flags === contentAssetPathPattern.flags,
+  );
+
+const applyArbitraryAssetDirectoryFallbackRule = (config, { isServer }) => {
+  if (hasArbitraryAssetDirectoryRule(config)) {
+    return config;
+  }
+
+  const nextOutputRoot = resolveNextDistDirPath({ projectRoot, env: process.env });
+  const staticMediaOutputPath = isServer
+    ? path.relative(config.output.path, nextOutputRoot)
+    : undefined;
+
+  config.module.rules.push({
+    test: contentAssetPathPattern,
+    exclude: /\.css$/i,
+    type: "asset/resource",
+    generator: {
+      filename: "static/media/[name].[hash][ext]",
+      publicPath: "/_next/",
+      outputPath: staticMediaOutputPath,
+    },
+  });
+
+  return config;
+};
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -63,7 +97,8 @@ const nextConfig = {
       config.resolve.modules.unshift(rootNodeModules);
     }
 
-    return applyCourseAssetWebpackRules(config, { isServer, projectRoot });
+    applyCourseAssetWebpackRules(config, { isServer, projectRoot });
+    return applyArbitraryAssetDirectoryFallbackRule(config, { isServer });
   },
 };
 
