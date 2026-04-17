@@ -60,13 +60,46 @@ test('webpack asset rule matches pdf and video assets', async () => {
     projectRoot: '/tmp/project',
   });
 
-  const assetRule = updated.module.rules.at(-1);
-  assert.ok(assetRule?.test instanceof RegExp);
-  assert.match('file.pdf', assetRule.test);
-  assert.match('video.mp4', assetRule.test);
-  assert.match('clip.mov', assetRule.test);
-  assert.match('preview.webm', assetRule.test);
-  assert.doesNotMatch('script.js', assetRule.test);
+  const extensionRule = updated.module.rules.at(-2);
+  assert.ok(extensionRule?.test instanceof RegExp);
+  assert.match('file.pdf', extensionRule.test);
+  assert.match('video.mp4', extensionRule.test);
+  assert.match('clip.mov', extensionRule.test);
+  assert.match('preview.webm', extensionRule.test);
+  assert.doesNotMatch('script.js', extensionRule.test);
+});
+
+test('webpack asset rule matches arbitrary assets inside content asset directories', async () => {
+  const { applyCourseAssetWebpackRules } = await import(webpackModulePath);
+
+  const config = {
+    module: {
+      rules: [{ oneOf: [{ test: /\.css$/i }] }],
+    },
+    output: {
+      path: '/tmp/out',
+    },
+  };
+
+  const updated = applyCourseAssetWebpackRules(config, {
+    isServer: false,
+    projectRoot: '/tmp/project',
+  });
+
+  const assetDirectoryRule = updated.module.rules.at(-1);
+  assert.ok(assetDirectoryRule?.test instanceof RegExp);
+  assert.match('/tmp/project/content/docs/models/assets/item.fbx', assetDirectoryRule.test);
+  assert.match(
+    'C:\\tmp\\project\\content\\docs\\models\\assets\\item.blend',
+    assetDirectoryRule.test,
+  );
+  assert.doesNotMatch('/tmp/project/content/docs/models/item.fbx', assetDirectoryRule.test);
+
+  if (!(assetDirectoryRule?.exclude instanceof RegExp)) {
+    throw new Error('Expected arbitrary asset directory rule to exclude css files.');
+  }
+
+  assert.match('style.css', assetDirectoryRule.exclude);
 });
 
 test('webpack asset rule honors custom Next dist dirs for server output', async () => {
@@ -91,7 +124,7 @@ test('webpack asset rule honors custom Next dist dirs for server output', async 
       projectRoot,
     });
 
-    const assetRule = updated.module.rules.at(-1);
+    const assetRule = updated.module.rules.at(-2);
     assert.equal(
       assetRule?.generator?.outputPath,
       path.relative(config.output.path, path.join(projectRoot, '.next-test', 'custom-server')),

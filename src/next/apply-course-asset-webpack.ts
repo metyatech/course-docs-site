@@ -44,6 +44,7 @@ const normalizeBasePath = (basePath: string | undefined) => {
 export function applyCourseAssetWebpackRules(config: WebpackConfigLike, options: ApplyOptions) {
   const basePath = normalizeBasePath(options.basePath);
   const assetCssPattern = /[\\/]content[\\/].*[\\/]assets[\\/].*\.css$/i;
+  const contentAssetPathPattern = /[\\/]content[\\/].*[\\/]assets[\\/]/i;
   const importableAssetPattern = createAssetExtensionRegex(IMPORTABLE_STATIC_ASSET_EXTENSIONS);
   const staticMediaFilename = 'static/media/[name].[hash][ext]';
   const staticMediaPublicPath = `${basePath}/_next/`;
@@ -90,6 +91,17 @@ export function applyCourseAssetWebpackRules(config: WebpackConfigLike, options:
 
   config.module.rules.push({
     test: importableAssetPattern,
+    type: 'asset/resource',
+    generator: {
+      filename: staticMediaFilename,
+      publicPath: staticMediaPublicPath,
+      outputPath: staticMediaOutputPath,
+    },
+  });
+
+  config.module.rules.push({
+    test: contentAssetPathPattern,
+    exclude: /\.css$/i,
     type: 'asset/resource',
     generator: {
       filename: staticMediaFilename,
