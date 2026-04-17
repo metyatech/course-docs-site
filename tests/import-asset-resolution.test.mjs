@@ -110,9 +110,11 @@ title: Import Assets
 import archiveUrl from './assets/packet.zip';
 import handoutUrl from './assets/handout.pdf';
 import demoVideoUrl from './assets/demo.mp4';
+import modelUrl from './assets/Item.fbx';
 
 <DownloadLink file={archiveUrl} filename="packet.zip" />
 <DownloadLink file={handoutUrl} filename="handout.pdf" />
+<DownloadLink file={modelUrl} filename="Item.fbx" />
 
 <video controls width="100%">
   <source src={demoVideoUrl} type="video/mp4" />
@@ -125,7 +127,7 @@ import demoVideoUrl from './assets/demo.mp4';
     "000000206674797069736f6d0000020069736f6d69736f32617663316d703431",
     "hex",
   );
-
+  const tinyFbx = Buffer.from("; FBX 7.3.0 project file\n; placeholder - replace with actual asset\n", "utf8");
   await fs.mkdir(path.join(rootDir, "content", "docs", "imports", "assets"), { recursive: true });
   await fs.mkdir(path.join(rootDir, "public", "img"), { recursive: true });
 
@@ -148,6 +150,10 @@ import demoVideoUrl from './assets/demo.mp4';
   await fs.writeFile(
     path.join(rootDir, "content", "docs", "imports", "assets", "demo.mp4"),
     tinyMp4,
+  );
+  await fs.writeFile(
+    path.join(rootDir, "content", "docs", "imports", "assets", "Item.fbx"),
+    tinyFbx,
   );
   await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
@@ -243,6 +249,19 @@ test(
     assert.match(
       zipResponse.headers.get("content-disposition") ?? "",
       /filename\*=UTF-8''packet\.zip/i,
+    );
+
+    const fbxMatch = pageHtml.match(
+      /<a[^>]*href="([^"]*download-asset[^"]*filename=Item\.fbx[^"]*)"[^>]*>Item\.fbx<\/a>/i,
+    );
+    assert.ok(fbxMatch, "Could not find imported FBX link in /docs/imports/ HTML.");
+    const fbxUrl = new URL(decodeHtmlAttribute(fbxMatch[1]), `${baseUrl}/docs/imports/`).toString();
+    const fbxResponse = await fetchResponse(fbxUrl);
+    assert.equal(fbxResponse.status, 200);
+    assert.equal(fbxResponse.headers.get("content-type"), "application/octet-stream");
+    assert.match(
+      fbxResponse.headers.get("content-disposition") ?? "",
+      /filename\*=UTF-8''Item\.fbx/i,
     );
 
     const videoMatch = pageHtml.match(/<source[^>]*src="([^"]*demo[^"]*)"[^>]*type="video\/mp4"/i);
