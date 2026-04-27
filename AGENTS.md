@@ -66,6 +66,24 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/web/web-ui-and-testing.m
   user approval before skipping.
 - Use established icon libraries; do not handcraft custom icons or inline SVGs.
 
+Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-authoring.md
+
+# Educational Question Authoring
+
+- Educational questions MUST align with the intended learning target, learner
+  level, and already-taught scope.
+- Each question MUST focus on one concept, skill, judgment, or misconception.
+- Prompts MUST be answerable from the question context without relying on
+  hidden classroom-event memory.
+- Questions MUST have a single defensible answer, or explicitly state the
+  accepted answer range.
+- Multiple-choice distractors MUST be plausible and based on likely
+  misconceptions or mistakes.
+- Fill-in questions MUST specify the expected answer format and any forbidden or
+  equivalent answers when ambiguity is likely.
+- Explanations MUST state the reasoning, concept, procedure, or misconception
+  behind the answer.
+
 Source: agent-rules-private/rules/course-site-metadata.md
 
 ## Course site metadata / sidebar rules
@@ -273,12 +291,9 @@ Write these rules in a way that keeps learning outcomes (clarity, sequencing, re
 
 ## Assessments (exam questions written in Markdown)
 
-- Write questions so there is a single interpretation and a single correct answer.
-- Avoid ambiguous verbs like “switch”; specify the exact state transition.
 - For UI behavior questions, include a visual target (GIF/image) when feasible.
-- For fill-in-the-blank questions, specify the expected answer format and any forbidden answers.
-- For external-system blanks, use `${answer}` (multiple answers: `${/regex/}`); do not convert to custom placeholders (e.g. `【1】`).
-- If multiple answers are allowed, describe the allowed range explicitly (e.g. `textContent` or `innerText`).
+- For external-system blanks, use `${answer}` (multiple answers: `${/regex/}`);
+  do not convert to custom placeholders (e.g. `【1】`).
 
 ## Tutorial-shot images in `<Action>` components
 

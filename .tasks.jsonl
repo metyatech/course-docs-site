@@ -70,3 +70,4 @@
 {"id":"q2012Y47","description":"Bump course-docs-platform SHA to pick up Exercise depth boundary fix in remark-section-headings","stage":"committed","createdAt":"2026-04-16T15:28:39.284Z","updatedAt":"2026-04-16T15:28:39.284Z"}
 {"id":"DLfgkfdX","description":"Add .fbx regression coverage for DownloadLink arbitrary asset imports in course-docs-site","stage":"committed","createdAt":"2026-04-17T01:40:27.137Z","updatedAt":"2026-04-17T07:24:17.476Z","committedEventId":"MugZ5y0fjFHyjp0B"}
 {"id":"VukPYxTl","description":"Fix teacher-profile-docs CI pagefind binary resolution via course-docs-site","stage":"committed","createdAt":"2026-04-19T07:19:47.987Z","updatedAt":"2026-04-19T07:39:25.006Z","committedEventId":"H4YOrxmgQxa1ibmn"}
+{"id":"bGOFUw-e","description":"Compose education question authoring rules","stage":"committed","createdAt":"2026-04-27T11:27:52.191Z","updatedAt":"2026-04-27T11:27:52.374Z","committedEventId":"ZAi0hk8yye4_-1z7"}
