@@ -24,6 +24,75 @@
     0 6px 18px rgb(15 23 42 / 0.22);
 }
 
+/* Keep @metyatech/exercise content readable inside Course Docs dark mode. */
+.dark .rensyuBlock {
+  --course-exercise-dark-surface: #0f172a;
+  --course-exercise-dark-surface-muted: #1e293b;
+  --course-exercise-dark-text: #f8fafc;
+  --course-exercise-dark-text-muted: #e2e8f0;
+  --course-exercise-dark-border: #94a3b8;
+  --course-exercise-dark-divider: #64748b;
+  --course-exercise-dark-accent: #93c5fd;
+  --course-exercise-dark-focus: #facc15;
+
+  color: var(--course-exercise-dark-text);
+  background-color: var(--course-exercise-dark-surface);
+  border-color: var(--course-exercise-dark-border);
+}
+
+.dark .rensyuBlock :where(.rensyuNaiyou, .rensyuKaitou, p, li, dd, dt) {
+  color: var(--course-exercise-dark-text);
+}
+
+.dark .rensyuBlock :where(ul, ol) {
+  color: var(--course-exercise-dark-text);
+}
+
+.dark .rensyuBlock :where(a) {
+  color: var(--course-exercise-dark-accent);
+}
+
+.dark .rensyuBlock :where(code, kbd, samp) {
+  color: var(--course-exercise-dark-text);
+  background-color: var(--course-exercise-dark-surface-muted);
+  border-color: var(--course-exercise-dark-border);
+}
+
+.dark .rensyuBlock :where(pre) {
+  color: var(--course-exercise-dark-text);
+  background-color: var(--course-exercise-dark-surface-muted);
+  border-color: var(--course-exercise-dark-border);
+}
+
+.dark .rensyuBlock :where(pre code) {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.dark .rensyuBlock :where(.rensyuKaitou, details, summary) {
+  color: var(--course-exercise-dark-text);
+  border-color: var(--course-exercise-dark-divider);
+}
+
+.dark .rensyuBlock :where(summary) {
+  color: var(--course-exercise-dark-accent);
+}
+
+.dark .rensyuBlock :where(input, textarea, select, .rensyuBlank, .rensyuTag) {
+  color: var(--course-exercise-dark-text);
+  background-color: var(--course-exercise-dark-surface-muted);
+  border-color: var(--course-exercise-dark-border);
+}
+
+.dark .rensyuBlock :where(input, textarea, select, summary, .rensyuBlank):focus-visible {
+  outline: 2px solid var(--course-exercise-dark-focus);
+  outline-offset: 2px;
+}
+
+.dark .rensyuBlock :where(hr, table, th, td) {
+  border-color: var(--course-exercise-dark-divider);
+}
+
 .course-footer-row {
   display: flex;
   align-items: center;
