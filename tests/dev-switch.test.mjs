@@ -223,6 +223,8 @@ test(
     );
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "dev-switch-course-content",
@@ -339,6 +341,8 @@ test(
     );
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs"], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "dev-switch-port-selection",
@@ -428,6 +432,8 @@ test(
     );
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs"], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "dev-switch-revision",
@@ -516,6 +522,8 @@ test(
     );
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "dev-watch-local-source",

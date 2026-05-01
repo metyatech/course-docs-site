@@ -125,6 +125,8 @@ test(
     await writeFixtureCourseRepo(fixtureCourse);
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+    detached: process.platform !== "win32",
+    windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "intro-image-resolution",

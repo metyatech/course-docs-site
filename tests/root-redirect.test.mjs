@@ -213,6 +213,8 @@ test(
       });
 
       const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+    detached: process.platform !== "win32",
+    windowsHide: true,
         cwd: projectRoot,
         env: createRunDevTestEnv({
           label: `root-redirect-${scenario.name}`,

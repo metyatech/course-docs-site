@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import sharp from "sharp";
 import { TUTORIAL_SHOT_EDITOR_WORKSPACE_PADDING } from "../src/lib/tutorial-shots-shared.mjs";
-import { createRunDevTestEnv, killProcessTree } from "./test-harness-env.mjs";
+import { closeBrowserBounded, createRunDevTestEnv, killProcessTree } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const envCourseLocalPath = path.join(projectRoot, ".env.course.local");
@@ -332,6 +332,8 @@ test(
     const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "tutorial-shot-editor-flow",
@@ -362,7 +364,7 @@ test(
 
     const browser = await chromium.launch({ headless: true });
     t.after(async () => {
-      await browser.close();
+      await closeBrowserBounded(browser);
     });
     const page = await browser.newPage({
       baseURL: baseUrl,
@@ -481,6 +483,8 @@ test(
     );
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "tutorial-shot-editor-space-filename",
@@ -511,7 +515,7 @@ test(
 
     const browser = await chromium.launch({ headless: true });
     t.after(async () => {
-      await browser.close();
+      await closeBrowserBounded(browser);
     });
     const page = await browser.newPage({
       baseURL: baseUrl,
@@ -561,6 +565,8 @@ test(
     const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "tutorial-shot-editor-paste",
@@ -591,7 +597,7 @@ test(
 
     const browser = await chromium.launch({ headless: true });
     t.after(async () => {
-      await browser.close();
+      await closeBrowserBounded(browser);
     });
     const page = await browser.newPage({
       baseURL: baseUrl,
@@ -647,6 +653,8 @@ test(
     await writeFixtureCourseRepo(fixtureCourse);
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "tutorial-shot-editor-live-refresh",
@@ -677,7 +685,7 @@ test(
 
     const browser = await chromium.launch({ headless: true });
     t.after(async () => {
-      await browser.close();
+      await closeBrowserBounded(browser);
     });
 
     const previewPage = await browser.newPage({
@@ -806,6 +814,8 @@ authoringMode: tutorial
       .toFile(path.join(imageDir, verifyImageFileName));
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "tutorial-shot-editor-verify-reload",
@@ -836,7 +846,7 @@ authoringMode: tutorial
 
     const browser = await chromium.launch({ headless: true });
     t.after(async () => {
-      await browser.close();
+      await closeBrowserBounded(browser);
     });
 
     const previewPage = await browser.newPage({
@@ -975,6 +985,8 @@ test(
     const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "tutorial-shot-editor-callout-reorder",
@@ -1005,7 +1017,7 @@ test(
 
     const browser = await chromium.launch({ headless: true });
     t.after(async () => {
-      await browser.close();
+      await closeBrowserBounded(browser);
     });
     const page = await browser.newPage({
       baseURL: baseUrl,
@@ -1089,6 +1101,8 @@ test(
     const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "tutorial-shot-editor-gui",
@@ -1119,7 +1133,7 @@ test(
 
     const browser = await chromium.launch({ headless: true });
     t.after(async () => {
-      await browser.close();
+      await closeBrowserBounded(browser);
     });
     const page = await browser.newPage({
       baseURL: baseUrl,
@@ -1226,6 +1240,8 @@ test(
     const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
         label: "tutorial-shot-editor-overflow",
@@ -1256,7 +1272,7 @@ test(
 
     const browser = await chromium.launch({ headless: true });
     t.after(async () => {
-      await browser.close();
+      await closeBrowserBounded(browser);
     });
     const page = await browser.newPage({
       baseURL: baseUrl,
@@ -1298,6 +1314,8 @@ test(
     delete childEnv.COURSE_CONTENT_SOURCE;
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
       cwd: projectRoot,
       env: childEnv,
       stdio: "inherit",
