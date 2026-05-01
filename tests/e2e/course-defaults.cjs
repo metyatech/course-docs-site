@@ -3,6 +3,7 @@ const GENERIC_DEFAULTS = {
   submissionsPath: "/submissions",
   codePreviewPath: "/docs/basics/array-intro",
   codePreviewExpectedText: "schools",
+  exerciseContrastPaths: [],
   enableSubmissions: true,
   enableCodePreview: true,
 };
@@ -13,6 +14,11 @@ const COURSE_DEFAULTS = {
     codePreviewExpectedText: "<body>",
   },
   "javascript-course-docs": {
+    exerciseContrastPaths: [
+      "/docs/ui-components/show-more",
+      "/docs/ui-components/drawer-menu",
+      "/docs/basics/dom-css-transition",
+    ],
     enableSubmissions: false,
   },
   "open-campus-unreal-90min": {

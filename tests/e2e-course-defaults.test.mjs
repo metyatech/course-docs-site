@@ -12,6 +12,7 @@ test("programming-course-docs uses the html basics code preview route", () => {
   assert.equal(config.submissionsPath, "/submissions");
   assert.equal(config.codePreviewPath, "/docs/html-basics/introduction");
   assert.equal(config.codePreviewExpectedText, "<body>");
+  assert.deepEqual(config.exerciseContrastPaths, []);
   assert.equal(config.enableSubmissions, true);
   assert.equal(config.enableCodePreview, true);
 });
@@ -21,6 +22,11 @@ test("javascript-course-docs keeps submissions disabled", () => {
 
   assert.equal(config.codePreviewPath, "/docs/basics/array-intro");
   assert.equal(config.codePreviewExpectedText, "schools");
+  assert.deepEqual(config.exerciseContrastPaths, [
+    "/docs/ui-components/show-more",
+    "/docs/ui-components/drawer-menu",
+    "/docs/basics/dom-css-transition",
+  ]);
   assert.equal(config.enableSubmissions, false);
   assert.equal(config.enableCodePreview, true);
 });
@@ -29,6 +35,7 @@ test("open-campus-unreal-90min disables submissions and code preview", () => {
   const config = resolveCourseSuiteConfig("../open-campus-unreal-90min");
 
   assert.equal(config.docsIntroPath, "/docs/intro");
+  assert.deepEqual(config.exerciseContrastPaths, []);
   assert.equal(config.enableSubmissions, false);
   assert.equal(config.enableCodePreview, false);
 });

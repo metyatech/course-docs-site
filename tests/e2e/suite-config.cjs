@@ -57,6 +57,25 @@ const parseBoolean = (fileKey, envKey, fallback) => {
   return fallback;
 };
 
+const parseStringList = (fileKey, envKey, fallback) => {
+  const fileValue = fileConfig[fileKey];
+  if (Array.isArray(fileValue)) {
+    return fileValue
+      .filter((value) => typeof value === "string" && value.trim())
+      .map((value) => value.trim());
+  }
+
+  const envValue = process.env[envKey];
+  if (typeof envValue !== "string" || !envValue.trim()) {
+    return fallback;
+  }
+
+  return envValue
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+};
+
 const suiteConfig = {
   docsIntroPath: readString(
     "docsIntroPath",
@@ -77,6 +96,11 @@ const suiteConfig = {
     "codePreviewExpectedText",
     "E2E_CODE_PREVIEW_EXPECT_TEXT",
     defaultSuiteConfig.codePreviewExpectedText,
+  ),
+  exerciseContrastPaths: parseStringList(
+    "exerciseContrastPaths",
+    "E2E_EXERCISE_CONTRAST_PATHS",
+    defaultSuiteConfig.exerciseContrastPaths,
   ),
   enableSubmissions: parseBoolean(
     "enableSubmissions",

@@ -1,70 +1,70 @@
-.dark [class*='x:bg-red-100'] {
+.dark [class*="x:bg-red-100"] {
   background-color: rgba(127, 29, 29, 0.88) !important;
   border-color: rgba(248, 113, 113, 0.85) !important;
   color: #fee2e2 !important;
 }
 
-.dark [class*='x:bg-red-100'] b,
-.dark [class*='x:bg-red-100'] strong,
-.dark [class*='x:bg-red-100'] [class*='x:leading-7'] {
+.dark [class*="x:bg-red-100"] b,
+.dark [class*="x:bg-red-100"] strong,
+.dark [class*="x:bg-red-100"] [class*="x:leading-7"] {
   color: #fff5f5 !important;
 }
 
-[class*='x:bg-nextra-bg'][class*='x:font-mono'][class*='nextra-border'] {
+[class*="x:bg-nextra-bg"][class*="x:font-mono"][class*="nextra-border"] {
   border-color: #64748b !important;
 }
 
-.dark [class*='x:bg-nextra-bg'][class*='x:font-mono'][class*='nextra-border'] {
+.dark [class*="x:bg-nextra-bg"][class*="x:font-mono"][class*="nextra-border"] {
   border-color: #93c5fd !important;
   background-color: #0f172a !important;
   color: #e2e8f0 !important;
 }
 
-[class*='x:bg-primary-100'][class*='x:text-primary-800'] {
+[class*="x:bg-primary-100"][class*="x:text-primary-800"] {
   background-color: #dbeafe !important;
   border-color: #60a5fa !important;
 }
 
-.dark [class*='x:dark:bg-primary-400/10'],
-.dark [class*='x:bg-primary-100'][class*='x:text-primary-800'] {
+.dark [class*="x:dark:bg-primary-400/10"],
+.dark [class*="x:bg-primary-100"][class*="x:text-primary-800"] {
   background-color: rgba(96, 165, 250, 0.22) !important;
   border-color: rgba(147, 197, 253, 0.72) !important;
   color: #dbeafe !important;
 }
 
-[class*='submissions_controls__'],
-[class*='submissions_card__'] {
+[class*="submissions_controls__"],
+[class*="submissions_card__"] {
   border-color: #4b5563 !important;
 }
 
-.dark [class*='submissions_controls__'],
-.dark [class*='submissions_card__'] {
+.dark [class*="submissions_controls__"],
+.dark [class*="submissions_card__"] {
   border-color: #93c5fd !important;
   background-color: rgba(15, 23, 42, 0.85) !important;
 }
 
-[class*='x:group'][class*='x:overflow-x-auto'][class*='x:bg-white'] {
+[class*="x:group"][class*="x:overflow-x-auto"][class*="x:bg-white"] {
   border: 1px solid #64748b !important;
 }
 
-.dark [class*='x:group'][class*='x:overflow-x-auto'][class*='x:dark:bg-black'] {
+.dark [class*="x:group"][class*="x:overflow-x-auto"][class*="x:dark:bg-black"] {
   border: 1px solid #93c5fd !important;
 }
 
-[class*='styles-module__codePreviewContainer__'] {
+[class*="styles-module__codePreviewContainer__"] {
   border-color: #5f7da8 !important;
 }
 
-.dark [class*='styles-module__codePreviewContainer__'] {
+.dark [class*="styles-module__codePreviewContainer__"] {
   border-color: #8fb3e6 !important;
 }
 
-[class*='styles-module__sectionHeader__'] {
+[class*="styles-module__sectionHeader__"] {
   color: #1e293b !important;
   border-color: #5f7da8 !important;
 }
 
-.dark [class*='styles-module__sectionHeader__'] {
+.dark [class*="styles-module__sectionHeader__"] {
   color: #e2e8f0 !important;
   background-color: #16233a !important;
   border-color: #8fb3e6 !important;
@@ -80,16 +80,80 @@
   background-color: rgba(15, 23, 42, 0.92) !important;
 }
 
-[class*='styles-module__consoleSection__'] {
+.rensyuBlock a code {
+  color: #1e3a8a !important;
+  background-color: #dbeafe !important;
+  border-color: #60a5fa !important;
+}
+
+.rensyuBlock .monaco-editor .mtk4 {
+  color: #5b21b6 !important;
+}
+
+.rensyuBlock .monaco-editor [class*="mtk"] {
+  color: #1e293b !important;
+}
+
+.dark .rensyuBlock,
+.dark .rensyuBlock :where(.rensyuNaiyou, .rensyuKaitou, p, li, dd, dt),
+.dark .rensyuBlock :where(ul, ol) {
+  color: #f8fafc !important;
+}
+
+.dark .rensyuBlock :where(a, summary) {
+  color: #93c5fd !important;
+}
+
+.dark .rensyuBlock :where(code, kbd, samp, pre) {
+  color: #f8fafc !important;
+  background-color: #1e293b !important;
+  border-color: #94a3b8 !important;
+}
+
+.dark .rensyuBlock .monaco-editor,
+.dark .rensyuBlock .monaco-editor .monaco-editor-background,
+.dark .rensyuBlock .monaco-editor .lines-content,
+.dark .rensyuBlock .monaco-editor .view-line {
+  background-color: #0f172a !important;
+}
+
+.dark .rensyuBlock .monaco-editor .view-line span .mtk4,
+.dark .rensyuBlock .monaco-editor .mtk4,
+.dark .rensyuBlock .monaco-editor [class*="mtk"] {
+  color: #e2e8f0 !important;
+}
+
+.dark .rensyuBlock :where(pre code, pre code span) {
+  color: #f8fafc !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+.dark .rensyuBlock :where(.rensyuKaitou, details, summary, hr, table, th, td) {
+  border-color: #64748b !important;
+}
+
+.dark .rensyuBlock :where(input, textarea, select, .rensyuBlank, .rensyuTag) {
+  color: #f8fafc !important;
+  background-color: #1e293b !important;
+  border-color: #94a3b8 !important;
+}
+
+.dark .rensyuBlock :where(input, textarea, select, summary, .rensyuBlank):focus-visible {
+  outline: 2px solid #facc15 !important;
+  outline-offset: 2px;
+}
+
+[class*="styles-module__consoleSection__"] {
   border-top-color: #5f7da8 !important;
 }
 
-.dark [class*='styles-module__consoleSection__'] {
+.dark [class*="styles-module__consoleSection__"] {
   border-top-color: #1f2a44 !important;
   background-color: #1f2937 !important;
 }
 
-.dark [class*='styles-module__editorContainer__'] section > div:first-child {
+.dark [class*="styles-module__editorContainer__"] section > div:first-child {
   color: #e2e8f0 !important;
   background-color: #1f2937 !important;
 }

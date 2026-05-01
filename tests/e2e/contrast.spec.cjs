@@ -1,17 +1,17 @@
-const { expect, test } = require('@playwright/test');
-const AxeBuilder = require('@axe-core/playwright').default;
-const { suiteConfig } = require('./suite-config.cjs');
+const { expect, test } = require("@playwright/test");
+const AxeBuilder = require("@axe-core/playwright").default;
+const { suiteConfig } = require("./suite-config.cjs");
 
-const THEMES = ['light', 'dark'];
+const THEMES = ["light", "dark"];
 const INTERACTIVE_SELECTOR = 'main a, main button, main [role="button"], header a, header button';
-const BOUNDARY_SELECTOR = 'body *';
+const BOUNDARY_SELECTOR = "body *";
 const MAX_ELEMENTS_PER_PAGE = 5;
 const MIN_BACKGROUND_CONTRAST = 1.1;
 const MIN_BORDER_CONTRAST = 3;
 const MIN_BOUNDARY_AREA = 600;
 const MAX_BOUNDARY_ISSUES_PER_PAGE = 120;
 const MAX_DISCOVERED_PATHS = 4;
-const HOST = process.env.E2E_HOST ?? 'localhost';
+const HOST = process.env.E2E_HOST ?? "localhost";
 const PORT_FROM_ENV = process.env.E2E_PORT ? Number(process.env.E2E_PORT) : 3101;
 const PORT = Number.isFinite(PORT_FROM_ENV) ? PORT_FROM_ENV : 3101;
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://${HOST}:${PORT}`;
@@ -22,51 +22,60 @@ function extractPathsFromSitemap(xmlText) {
 }
 
 function normalizePath(pathname) {
-  if (!pathname || pathname === '/') {
-    return '/';
+  if (!pathname || pathname === "/") {
+    return "/";
   }
-  const withoutHash = pathname.split('#')[0];
-  return withoutHash.endsWith('/') ? withoutHash : `${withoutHash}/`;
+  const withoutHash = pathname.split("#")[0];
+  return withoutHash.endsWith("/") ? withoutHash : `${withoutHash}/`;
 }
 
 async function setThemeAndOpen(page, path, theme) {
   await page.addInitScript((currentTheme) => {
-    localStorage.setItem('theme', currentTheme);
-    localStorage.setItem('vitepress-theme-appearance', currentTheme);
+    localStorage.setItem("theme", currentTheme);
+    localStorage.setItem("vitepress-theme-appearance", currentTheme);
   }, theme);
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
+  await page.goto(path, { waitUntil: "domcontentloaded" });
   try {
-    await page.waitForSelector('main', { timeout: 3000 });
+    await page.waitForSelector("main", { timeout: 3000 });
     return true;
   } catch {
     return false;
   }
 }
 
-async function runContrastCheck(page, includeSelector) {
-  const builder = new AxeBuilder({ page }).withRules(['color-contrast']);
+async function runContrastCheck(page, includeSelector, excludeSelector) {
+  const builder = new AxeBuilder({ page }).withRules(["color-contrast"]);
   if (includeSelector) {
     builder.include(includeSelector);
+  }
+  if (excludeSelector) {
+    builder.exclude(excludeSelector);
   }
   return builder.analyze();
 }
 
-async function collectBoundaryIssues(page, path, theme) {
+async function collectBoundaryIssues(page, path, theme, selector = BOUNDARY_SELECTOR) {
   const issues = await page.evaluate(
-    ({ selector, minBackgroundContrast, minBorderContrast, minBoundaryArea, maxBoundaryIssuesPerPage }) => {
+    ({
+      selector,
+      minBackgroundContrast,
+      minBorderContrast,
+      minBoundaryArea,
+      maxBoundaryIssuesPerPage,
+    }) => {
       const candidates = [...document.querySelectorAll(selector)].filter(
-        (node) => node instanceof HTMLElement
+        (node) => node instanceof HTMLElement,
       );
-      const colorProbe = document.createElement('span');
+      const colorProbe = document.createElement("span");
 
       const parseColor = (colorText) => {
         if (!colorText) {
           return null;
         }
-        colorProbe.style.color = '';
+        colorProbe.style.color = "";
         colorProbe.style.color = colorText;
         const normalized = colorProbe.style.color || colorText;
-        if (normalized === 'transparent') {
+        if (normalized === "transparent") {
           return { red: 0, green: 0, blue: 0, alpha: 0 };
         }
 
@@ -74,7 +83,7 @@ async function collectBoundaryIssues(page, path, theme) {
         if (!match) {
           return null;
         }
-        const parts = match[1].split(',').map((part) => part.trim());
+        const parts = match[1].split(",").map((part) => part.trim());
         if (parts.length < 3) {
           return null;
         }
@@ -89,16 +98,15 @@ async function collectBoundaryIssues(page, path, theme) {
       };
 
       const extractColorTokens = (text) => {
-        if (!text || text === 'none') {
+        if (!text || text === "none") {
           return [];
         }
         const tokenPattern = /rgba?\([^)]*\)|#[0-9a-fA-F]{3,8}|transparent/g;
         return text.match(tokenPattern) || [];
       };
 
-      const parseColorList = (tokens) => tokens
-        .map((token) => parseColor(token))
-        .filter((color) => color && color.alpha > 0);
+      const parseColorList = (tokens) =>
+        tokens.map((token) => parseColor(token)).filter((color) => color && color.alpha > 0);
 
       const averageColors = (colors) => {
         if (!colors.length) {
@@ -121,7 +129,7 @@ async function collectBoundaryIssues(page, path, theme) {
           red: redTotal / weightTotal,
           green: greenTotal / weightTotal,
           blue: blueTotal / weightTotal,
-          alpha: Math.min(1, alphaTotal / colors.length)
+          alpha: Math.min(1, alphaTotal / colors.length),
         };
       };
 
@@ -131,10 +139,19 @@ async function collectBoundaryIssues(page, path, theme) {
           return { red: 0, green: 0, blue: 0, alpha: 0 };
         }
         return {
-          red: (foreground.red * foreground.alpha + background.red * background.alpha * (1 - foreground.alpha)) / alpha,
-          green: (foreground.green * foreground.alpha + background.green * background.alpha * (1 - foreground.alpha)) / alpha,
-          blue: (foreground.blue * foreground.alpha + background.blue * background.alpha * (1 - foreground.alpha)) / alpha,
-          alpha
+          red:
+            (foreground.red * foreground.alpha +
+              background.red * background.alpha * (1 - foreground.alpha)) /
+            alpha,
+          green:
+            (foreground.green * foreground.alpha +
+              background.green * background.alpha * (1 - foreground.alpha)) /
+            alpha,
+          blue:
+            (foreground.blue * foreground.alpha +
+              background.blue * background.alpha * (1 - foreground.alpha)) /
+            alpha,
+          alpha,
         };
       };
 
@@ -143,9 +160,10 @@ async function collectBoundaryIssues(page, path, theme) {
         return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
       };
 
-      const luminance = (color) => (
-        0.2126 * toLinear(color.red) + 0.7152 * toLinear(color.green) + 0.0722 * toLinear(color.blue)
-      );
+      const luminance = (color) =>
+        0.2126 * toLinear(color.red) +
+        0.7152 * toLinear(color.green) +
+        0.0722 * toLinear(color.blue);
 
       const contrast = (first, second) => {
         const bright = luminance(first);
@@ -155,7 +173,9 @@ async function collectBoundaryIssues(page, path, theme) {
       };
 
       const resolveBaseColor = () => {
-        const htmlColor = parseColor(window.getComputedStyle(document.documentElement).backgroundColor);
+        const htmlColor = parseColor(
+          window.getComputedStyle(document.documentElement).backgroundColor,
+        );
         if (htmlColor && htmlColor.alpha > 0) {
           return htmlColor;
         }
@@ -163,7 +183,7 @@ async function collectBoundaryIssues(page, path, theme) {
         if (bodyColor && bodyColor.alpha > 0) {
           return bodyColor;
         }
-        return document.documentElement.classList.contains('dark')
+        return document.documentElement.classList.contains("dark")
           ? { red: 9, green: 17, blue: 32, alpha: 1 }
           : { red: 255, green: 255, blue: 255, alpha: 1 };
       };
@@ -185,28 +205,28 @@ async function collectBoundaryIssues(page, path, theme) {
           {
             width: Number.parseFloat(style.borderTopWidth) || 0,
             style: style.borderTopStyle,
-            color: parseColor(style.borderTopColor)
+            color: parseColor(style.borderTopColor),
           },
           {
             width: Number.parseFloat(style.borderRightWidth) || 0,
             style: style.borderRightStyle,
-            color: parseColor(style.borderRightColor)
+            color: parseColor(style.borderRightColor),
           },
           {
             width: Number.parseFloat(style.borderBottomWidth) || 0,
             style: style.borderBottomStyle,
-            color: parseColor(style.borderBottomColor)
+            color: parseColor(style.borderBottomColor),
           },
           {
             width: Number.parseFloat(style.borderLeftWidth) || 0,
             style: style.borderLeftStyle,
-            color: parseColor(style.borderLeftColor)
-          }
+            color: parseColor(style.borderLeftColor),
+          },
         ];
 
         let visibleBorderSides = 0;
         for (const border of borderSides) {
-          if (border.width <= 0 || border.style === 'none') {
+          if (border.width <= 0 || border.style === "none") {
             continue;
           }
           if (border.color && border.color.alpha > 0) {
@@ -217,7 +237,7 @@ async function collectBoundaryIssues(page, path, theme) {
 
         let hasOutlineCue = false;
         const outlineWidth = Number.parseFloat(style.outlineWidth) || 0;
-        if (outlineWidth > 0 && style.outlineStyle !== 'none') {
+        if (outlineWidth > 0 && style.outlineStyle !== "none") {
           const outlineColor = parseColor(style.outlineColor);
           if (outlineColor && outlineColor.alpha > 0) {
             hasOutlineCue = true;
@@ -229,7 +249,7 @@ async function collectBoundaryIssues(page, path, theme) {
         edgeColors.push(...shadowColors);
         return {
           edgeColors,
-          hasContainerEdgeCue: visibleBorderSides >= 2 || hasOutlineCue || shadowColors.length > 0
+          hasContainerEdgeCue: visibleBorderSides >= 2 || hasOutlineCue || shadowColors.length > 0,
         };
       };
 
@@ -238,7 +258,7 @@ async function collectBoundaryIssues(page, path, theme) {
           style.borderTopLeftRadius,
           style.borderTopRightRadius,
           style.borderBottomRightRadius,
-          style.borderBottomLeftRadius
+          style.borderBottomLeftRadius,
         ].map((value) => Number.parseFloat(value) || 0);
         return Math.max(...radii) >= 3;
       };
@@ -272,24 +292,24 @@ async function collectBoundaryIssues(page, path, theme) {
 
         const candidateStyle = window.getComputedStyle(candidate);
         if (
-          candidateStyle.display === 'none' ||
-          candidateStyle.visibility !== 'visible' ||
+          candidateStyle.display === "none" ||
+          candidateStyle.visibility !== "visible" ||
           Number.parseFloat(candidateStyle.opacity) < 0.05
         ) {
           continue;
         }
 
         const candidateTagName = candidate.tagName.toLowerCase();
-        const candidateClassName = String(candidate.className || '');
+        const candidateClassName = String(candidate.className || "");
         const isNextDevToolsButton =
-          candidateTagName === 'button' &&
-          (candidate.id === 'next-logo' || candidate.hasAttribute('data-nextjs-dev-tools-button'));
-        const isLineHighlight = candidateClassName.includes('current-line');
+          candidateTagName === "button" &&
+          (candidate.id === "next-logo" || candidate.hasAttribute("data-nextjs-dev-tools-button"));
+        const isLineHighlight = candidateClassName.includes("current-line");
         const isProseList =
-          (candidateTagName === 'ul' || candidateTagName === 'ol') &&
-          (candidateClassName.includes('x:list-disc') ||
-            candidateClassName.includes('x:list-decimal') ||
-            candidateClassName.includes('x:list-none'));
+          (candidateTagName === "ul" || candidateTagName === "ol") &&
+          (candidateClassName.includes("x:list-disc") ||
+            candidateClassName.includes("x:list-decimal") ||
+            candidateClassName.includes("x:list-none"));
         if (isNextDevToolsButton || isLineHighlight || isProseList) {
           continue;
         }
@@ -344,7 +364,7 @@ async function collectBoundaryIssues(page, path, theme) {
             tagName: candidateTagName,
             className: candidateClassName,
             backgroundContrast: Number(backgroundContrast.toFixed(2)),
-            borderContrast: Number(borderContrast.toFixed(2))
+            borderContrast: Number(borderContrast.toFixed(2)),
           });
           if (results.length >= maxBoundaryIssuesPerPage) {
             break;
@@ -355,20 +375,20 @@ async function collectBoundaryIssues(page, path, theme) {
       return results;
     },
     {
-      selector: BOUNDARY_SELECTOR,
+      selector,
       minBackgroundContrast: MIN_BACKGROUND_CONTRAST,
       minBorderContrast: MIN_BORDER_CONTRAST,
       minBoundaryArea: MIN_BOUNDARY_AREA,
-      maxBoundaryIssuesPerPage: MAX_BOUNDARY_ISSUES_PER_PAGE
-    }
+      maxBoundaryIssuesPerPage: MAX_BOUNDARY_ISSUES_PER_PAGE,
+    },
   );
 
   return issues.map((issue) => ({
     path,
     theme,
-    state: 'boundary',
-    id: 'container-boundary-contrast',
-    description: `tag=${issue.tagName} class=${issue.className} bg=${issue.backgroundContrast} border=${issue.borderContrast}`
+    state: "boundary",
+    id: "container-boundary-contrast",
+    description: `tag=${issue.tagName} class=${issue.className} bg=${issue.backgroundContrast} border=${issue.borderContrast}`,
   }));
 }
 
@@ -377,8 +397,8 @@ async function collectStateIssues(page, path, theme) {
     const targets = violation.nodes
       .flatMap((node) => node.target || [])
       .slice(0, 3)
-      .join(' | ');
-    const targetText = targets ? ` targets: ${targets}` : '';
+      .join(" | ");
+    const targetText = targets ? ` targets: ${targets}` : "";
     return `${violation.description}${targetText}`;
   };
 
@@ -388,9 +408,9 @@ async function collectStateIssues(page, path, theme) {
     issues.push({
       path,
       theme,
-      state: 'default',
+      state: "default",
       id: violation.id,
-      description: formatViolation(violation)
+      description: formatViolation(violation),
     });
   }
 
@@ -401,8 +421,8 @@ async function collectStateIssues(page, path, theme) {
     if (!(await element.isVisible())) {
       continue;
     }
-    const markerName = 'data-contrast-target';
-    await element.evaluate((node, attrName) => node.setAttribute(attrName, '1'), markerName);
+    const markerName = "data-contrast-target";
+    await element.evaluate((node, attrName) => node.setAttribute(attrName, "1"), markerName);
     try {
       await element.hover({ force: true });
       await page.waitForTimeout(80);
@@ -411,9 +431,9 @@ async function collectStateIssues(page, path, theme) {
         issues.push({
           path,
           theme,
-          state: 'hover',
+          state: "hover",
           id: violation.id,
-          description: formatViolation(violation)
+          description: formatViolation(violation),
         });
       }
 
@@ -424,9 +444,9 @@ async function collectStateIssues(page, path, theme) {
         issues.push({
           path,
           theme,
-          state: 'focus',
+          state: "focus",
           id: violation.id,
-          description: formatViolation(violation)
+          description: formatViolation(violation),
         });
       }
     } finally {
@@ -439,13 +459,15 @@ async function collectStateIssues(page, path, theme) {
 
 function formatIssues(issues) {
   return issues
-    .map((issue) => `${issue.theme} ${issue.path} [${issue.state}] ${issue.id}: ${issue.description}`)
-    .join('\n');
+    .map(
+      (issue) => `${issue.theme} ${issue.path} [${issue.state}] ${issue.id}: ${issue.description}`,
+    )
+    .join("\n");
 }
 
-test('color and boundary contrast are valid on core routes', async ({ browser }) => {
+test("color and boundary contrast are valid on core routes", async ({ browser }) => {
   test.setTimeout(240000);
-  const seedPaths = ['/', normalizePath(suiteConfig.docsIntroPath)];
+  const seedPaths = ["/", normalizePath(suiteConfig.docsIntroPath)];
   if (suiteConfig.enableCodePreview) {
     seedPaths.push(normalizePath(suiteConfig.codePreviewPath));
   }
@@ -456,7 +478,7 @@ test('color and boundary contrast are valid on core routes', async ({ browser })
   for (const theme of THEMES) {
     const context = await browser.newContext({
       baseURL: BASE_URL,
-      colorScheme: theme
+      colorScheme: theme,
     });
 
     try {
@@ -470,6 +492,72 @@ test('color and boundary contrast are valid on core routes', async ({ browser })
           const stateIssues = await collectStateIssues(page, path, theme);
           const boundaryIssues = await collectBoundaryIssues(page, path, theme);
           allIssues.push(...stateIssues);
+          allIssues.push(...boundaryIssues);
+        } finally {
+          await page.close();
+        }
+      }
+    } finally {
+      await context.close();
+    }
+  }
+
+  expect(allIssues, formatIssues(allIssues)).toEqual([]);
+});
+
+test("Exercise color and boundary contrast are valid on configured routes", async ({ browser }) => {
+  test.setTimeout(240000);
+  const targetPaths = suiteConfig.exerciseContrastPaths.map(normalizePath);
+  test.skip(targetPaths.length === 0, "No Exercise contrast routes are configured for this course");
+
+  const allIssues = [];
+  for (const theme of THEMES) {
+    const context = await browser.newContext({
+      baseURL: BASE_URL,
+      colorScheme: theme,
+    });
+
+    try {
+      for (const path of targetPaths) {
+        const page = await context.newPage();
+        try {
+          const loaded = await setThemeAndOpen(page, path, theme);
+          if (!loaded) {
+            continue;
+          }
+
+          const exerciseBlocks = await page.locator(".rensyuBlock").count();
+          expect(exerciseBlocks, `${path} must contain Exercise blocks`).toBeGreaterThan(0);
+
+          const summaries = page.locator(".rensyuBlock summary");
+          const summaryCount = await summaries.count();
+          for (let index = 0; index < summaryCount; index += 1) {
+            const summary = summaries.nth(index);
+            if (await summary.isVisible()) {
+              await summary.click();
+            }
+          }
+
+          const axeResult = await runContrastCheck(page, ".rensyuBlock", ".rensyuBlock iframe");
+          for (const violation of axeResult.violations) {
+            allIssues.push({
+              path,
+              theme,
+              state: "exercise",
+              id: violation.id,
+              description: violation.nodes
+                .flatMap((node) => node.target || [])
+                .slice(0, 3)
+                .join(" | "),
+            });
+          }
+
+          const boundaryIssues = await collectBoundaryIssues(
+            page,
+            path,
+            theme,
+            ".rensyuBlock, .rensyuBlock *",
+          );
           allIssues.push(...boundaryIssues);
         } finally {
           await page.close();
