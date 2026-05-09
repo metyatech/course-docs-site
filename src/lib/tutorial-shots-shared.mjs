@@ -1,6 +1,97 @@
 export const TUTORIAL_SHOT_MANIFEST_VERSION = 1;
 export const TUTORIAL_SHOT_ANNOTATION_MODES = ["focal", "multi-focal", "callout"];
 export const TUTORIAL_SHOT_BOX_ROLES = ["action", "verify"];
+export const TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS = [
+  {
+    label: "PNG",
+    mimeTypes: ["image/png"],
+    extensions: [".png"],
+  },
+  {
+    label: "APNG",
+    mimeTypes: ["image/apng"],
+    extensions: [".apng"],
+  },
+  {
+    label: "JPEG",
+    mimeTypes: ["image/jpeg", "image/pjpeg"],
+    extensions: [".jpg", ".jpeg", ".jfif", ".jpe", ".jif"],
+  },
+  {
+    label: "GIF",
+    mimeTypes: ["image/gif"],
+    extensions: [".gif"],
+  },
+  {
+    label: "WebP",
+    mimeTypes: ["image/webp"],
+    extensions: [".webp"],
+  },
+  {
+    label: "AVIF",
+    mimeTypes: ["image/avif"],
+    extensions: [".avif"],
+  },
+  {
+    label: "SVG",
+    mimeTypes: ["image/svg+xml", "image/svg"],
+    extensions: [".svg"],
+  },
+  {
+    label: "BMP",
+    mimeTypes: ["image/bmp", "image/x-bmp", "image/x-ms-bmp", "image/x-windows-bmp"],
+    extensions: [".bmp", ".dib"],
+  },
+  {
+    label: "ICO/CUR",
+    mimeTypes: [
+      "image/x-icon",
+      "image/vnd.microsoft.icon",
+      "image/ico",
+      "image/icon",
+      "image/x-ico",
+      "image/cursor",
+      "image/x-cursor",
+    ],
+    extensions: [".ico", ".cur"],
+  },
+];
+export const TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL = TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS.map(
+  (format) => format.label,
+).join("/");
+
+const TUTORIAL_SHOT_SOURCE_IMAGE_MIME_TYPES = new Set(
+  TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS.flatMap((format) => format.mimeTypes),
+);
+const TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSIONS = new Set(
+  TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS.flatMap((format) => format.extensions),
+);
+
+export const TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT = TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS.flatMap(
+  (format) => [...format.mimeTypes, ...format.extensions],
+).join(",");
+
+const normalizeMimeType = (value) =>
+  String(value ?? "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+
+const getFileExtension = (value) => {
+  const basename = String(value ?? "").split(/[\\/]/u).at(-1) ?? "";
+  const index = basename.lastIndexOf(".");
+  return index <= 0 ? "" : basename.slice(index).toLowerCase();
+};
+
+export const isTutorialShotSourceImageMimeType = (mimeType) =>
+  TUTORIAL_SHOT_SOURCE_IMAGE_MIME_TYPES.has(normalizeMimeType(mimeType));
+
+export const isTutorialShotSourceImageFileName = (fileName) =>
+  TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSIONS.has(getFileExtension(fileName));
+
+export const isTutorialShotSourceImageFile = (file) =>
+  Boolean(file) &&
+  (isTutorialShotSourceImageMimeType(file.type) || isTutorialShotSourceImageFileName(file.name));
 
 const ACTION_TAG_PATTERN = /<Action\b[\s\S]*?>/gu;
 const VERIFY_TAG_PATTERN = /<Verify\b[\s\S]*?>/gu;

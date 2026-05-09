@@ -10,7 +10,12 @@ import {
   extractVerifyImageRefsFromMdx,
   getTutorialPageModeWarnings,
   getTutorialShotWarnings,
+  isTutorialShotSourceImageFile,
+  isTutorialShotSourceImageFileName,
+  isTutorialShotSourceImageMimeType,
   renderTutorialShotOverlaySvg,
+  TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT,
+  TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL,
 } from "../src/lib/tutorial-shots-shared.mjs";
 import {
   getStoredTutorialShotCropState,
@@ -62,6 +67,194 @@ authoringMode: tutorial
     .png()
     .toFile(path.join(imageDir, imageFileName));
 };
+
+const toDataUrl = (buffer, mimeType = "image/png") =>
+  `data:${mimeType};base64,${buffer.toString("base64")}`;
+
+test("tutorial shot source image accept contract lists browser-viewable image formats", () => {
+  const acceptedTokens = TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT.split(",");
+
+  for (const token of [
+    "image/png",
+    ".png",
+    "image/apng",
+    ".apng",
+    "image/jpeg",
+    ".jpg",
+    ".jpeg",
+    ".jfif",
+    ".jpe",
+    ".jif",
+    "image/gif",
+    ".gif",
+    "image/webp",
+    ".webp",
+    "image/avif",
+    ".avif",
+    "image/svg+xml",
+    ".svg",
+    "image/bmp",
+    "image/x-ms-bmp",
+    ".bmp",
+    ".dib",
+    "image/x-icon",
+    "image/vnd.microsoft.icon",
+    "image/ico",
+    "image/icon",
+    "image/x-ico",
+    "image/cursor",
+    "image/x-cursor",
+    ".ico",
+    ".cur",
+  ]) {
+    assert.ok(acceptedTokens.includes(token), `accept should include ${token}`);
+  }
+
+  for (const token of [
+    "image/tiff",
+    ".tif",
+    ".tiff",
+    ".svgz",
+    "image/heic",
+    "image/heif",
+    ".heic",
+    ".heif",
+    "image/jxl",
+    ".jxl",
+    "application/pdf",
+    ".pdf",
+  ]) {
+    assert.equal(acceptedTokens.includes(token), false, `accept should exclude ${token}`);
+  }
+
+  assert.equal(TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL, "PNG/APNG/JPEG/GIF/WebP/AVIF/SVG/BMP/ICO/CUR");
+});
+
+test("tutorial shot source image helpers accept by MIME type or extension", () => {
+  assert.equal(isTutorialShotSourceImageMimeType("image/avif"), true);
+  assert.equal(isTutorialShotSourceImageMimeType("image/svg+xml; charset=utf-8"), true);
+  assert.equal(isTutorialShotSourceImageMimeType("image/tiff"), false);
+
+  assert.equal(isTutorialShotSourceImageFileName("screenshot.JFIF"), true);
+  assert.equal(isTutorialShotSourceImageFileName("cursor.CUR"), true);
+  assert.equal(isTutorialShotSourceImageFileName("compressed.svgz"), false);
+  assert.equal(isTutorialShotSourceImageFileName("diagram.tiff"), false);
+
+  assert.equal(
+    isTutorialShotSourceImageFile({ name: "missing-type.avif", type: "" }),
+    true,
+    "empty MIME type should still pass when the extension is accepted",
+  );
+  assert.equal(
+    isTutorialShotSourceImageFile({ name: "no-extension", type: "image/bmp" }),
+    true,
+    "accepted MIME type should pass even when the filename has no extension",
+  );
+  assert.equal(
+    isTutorialShotSourceImageFile({ name: "photo.heic", type: "" }),
+    false,
+  );
+});
+
+test("saveTutorialShot rejects non-image raw uploads before writing raw files", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-upload-"));
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+  const rawPath = path.join(sourceRoot, "content", "docs", "student-guide", "shots", "startup.raw.png");
+
+  await assert.rejects(
+    () =>
+      saveTutorialShot({
+        sourceRoot,
+        manifestInput: manifest,
+        rawImageDataUrl: toDataUrl(Buffer.from("not an image"), "text/plain"),
+      }),
+    /形式が対応していません/u,
+  );
+  await assert.rejects(() => fs.stat(rawPath), /ENOENT/u);
+});
+
+test("saveTutorialShot normalizes accepted raw uploads before persisting", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-upload-"));
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+  const uploadedImageBuffer = await sharp({
+    create: {
+      width: 320,
+      height: 180,
+      channels: 4,
+      background: "#38bdf8",
+    },
+  })
+    .png()
+    .toBuffer();
+
+  await saveTutorialShot({
+    sourceRoot,
+    manifestInput: manifest,
+    rawImageDataUrl: toDataUrl(uploadedImageBuffer, "image/png"),
+  });
+
+  const rawPath = path.join(sourceRoot, "content", "docs", "student-guide", "shots", "startup.raw.png");
+  const rawMetadata = await sharp(rawPath).metadata();
+  assert.equal(rawMetadata.width, 320);
+  assert.equal(rawMetadata.height, 180);
+});
+
+test("saveTutorialShot rejects MIME-spoofed unsupported raw uploads", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-upload-"));
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot);
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.png",
+  });
+  const tiffImageBuffer = await sharp({
+    create: {
+      width: 16,
+      height: 16,
+      channels: 4,
+      background: "#f97316",
+    },
+  })
+    .tiff()
+    .toBuffer();
+  const rawPath = path.join(sourceRoot, "content", "docs", "student-guide", "shots", "startup.raw.png");
+
+  await assert.rejects(
+    () =>
+      saveTutorialShot({
+        sourceRoot,
+        manifestInput: manifest,
+        rawImageDataUrl: toDataUrl(tiffImageBuffer, "image/png"),
+      }),
+    /形式が対応していません/u,
+  );
+  await assert.rejects(() => fs.stat(rawPath), /ENOENT/u);
+});
 
 test("extractActionImageRefsFromMdx derives output, raw, and manifest paths", () => {
   const refs = extractActionImageRefsFromMdx({

@@ -14,10 +14,14 @@ import {
   normalizePosixPath,
   normalizeTutorialShotManifest,
   renderTutorialShotOverlaySvg,
+  isTutorialShotSourceImageMimeType,
 } from "./tutorial-shots-shared.mjs";
 
 const IMAGE_PATH_PATTERN = /^content\/.+\.(png|jpe?g|webp)$/iu;
 const PAGE_PATH_PATTERN = /^content\/.+\/index\.mdx?$/iu;
+const MAX_RAW_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024;
+const SHARP_INPUT_PIXEL_LIMIT = 100_000_000;
+const SUPPORTED_RAW_UPLOAD_FORMATS = new Set(["png", "jpeg", "webp", "gif", "avif", "svg"]);
 
 const isLocalPathLike = (value) =>
   value.startsWith(".") ||
@@ -185,10 +189,40 @@ const parseDataUrl = (value) => {
     throw new Error("アップロード画像の形式が不正です。");
   }
 
+  const mimeType = match[1] ?? "application/octet-stream";
+  if (!isTutorialShotSourceImageMimeType(mimeType)) {
+    throw new Error("アップロード画像の形式が対応していません。");
+  }
+
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.byteLength > MAX_RAW_IMAGE_UPLOAD_BYTES) {
+    throw new Error("アップロード画像が大きすぎます。25MB 以下の画像を選んでください。");
+  }
+
   return {
-    mimeType: match[1] ?? "application/octet-stream",
-    buffer: Buffer.from(match[2], "base64"),
+    mimeType,
+    buffer,
   };
+};
+
+const normalizeUploadedRawImageBuffer = async ({ buffer, rawAbsPath }) => {
+  const sourceImage = sharp(buffer, { limitInputPixels: SHARP_INPUT_PIXEL_LIMIT });
+  const metadata = await sourceImage.metadata();
+  if (!metadata.width || !metadata.height) {
+    throw new Error("アップロード画像のサイズを取得できませんでした。");
+  }
+  if (!metadata.format || !SUPPORTED_RAW_UPLOAD_FORMATS.has(metadata.format)) {
+    throw new Error("アップロード画像の形式が対応していません。");
+  }
+
+  const extension = path.extname(rawAbsPath).toLowerCase();
+  if (extension === ".jpg" || extension === ".jpeg") {
+    return sourceImage.clone().jpeg().toBuffer();
+  }
+  if (extension === ".webp") {
+    return sourceImage.clone().webp().toBuffer();
+  }
+  return sourceImage.clone().png().toBuffer();
 };
 
 const normalizeCrop = ({ crop, width, height }) => {
@@ -405,8 +439,9 @@ export const saveTutorialShot = async ({
 
   if (rawImageDataUrl) {
     const { buffer } = parseDataUrl(rawImageDataUrl);
+    const normalizedRawBuffer = await normalizeUploadedRawImageBuffer({ buffer, rawAbsPath });
     await ensureParentDir(rawAbsPath);
-    await fs.writeFile(rawAbsPath, buffer);
+    await fs.writeFile(rawAbsPath, normalizedRawBuffer);
   } else if (bootstrapFromOutput) {
     const outputExists = await fs
       .stat(outputAbsPath)
