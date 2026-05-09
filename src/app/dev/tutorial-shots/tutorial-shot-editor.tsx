@@ -1,14 +1,17 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import ReactCrop, { type PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import {
   getTutorialShotAnnotationErrors,
   summarizeTutorialShotAnnotations,
   getTutorialShotWarnings,
+  isTutorialShotSourceImageFile,
   normalizeTutorialShotManifest,
+  TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT,
+  TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL,
 } from "../../../lib/tutorial-shots-shared.mjs";
 import {
   getStoredTutorialShotCropState,
@@ -72,6 +75,35 @@ const getReadableImageName = (file: File, fallbackFileName: string) => {
   return trimmed || fallbackFileName;
 };
 
+const getUnsupportedSourceImageMessage = (file: File) =>
+  `${getReadableImageName(file, "選択したファイル")} は読み込めません。読み込める画像は ${TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL} です。`;
+
+const hasFileTransfer = (dataTransfer: DataTransfer | null) =>
+  Boolean(dataTransfer?.files.length) ||
+  Array.from(dataTransfer?.types ?? []).includes("Files") ||
+  Array.from(dataTransfer?.items ?? []).some((item) => item.kind === "file");
+
+const getSourceImageFile = (dataTransfer: DataTransfer | null) => {
+  for (const file of Array.from(dataTransfer?.files ?? [])) {
+    if (isTutorialShotSourceImageFile(file)) {
+      return file;
+    }
+  }
+
+  for (const item of Array.from(dataTransfer?.items ?? [])) {
+    if (item.kind !== "file") {
+      continue;
+    }
+
+    const file = item.getAsFile();
+    if (file && isTutorialShotSourceImageFile(file)) {
+      return file;
+    }
+  }
+
+  return null;
+};
+
 const isTextEditableElement = (element: Element | null) => {
   if (!element) {
     return false;
@@ -102,20 +134,22 @@ const readImageFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-const getClipboardImageFile = (clipboardData: DataTransfer | null) => {
-  for (const item of Array.from(clipboardData?.items ?? [])) {
-    if (item.kind !== "file" || !item.type.startsWith("image/")) {
-      continue;
-    }
-
-    const file = item.getAsFile();
-    if (file) {
-      return file;
-    }
+const normalizeImageDataUrlToPng = async (dataUrl: string) => {
+  const image = await loadImageElement(dataUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("画像ファイルを読み込めませんでした。");
   }
 
-  return null;
+  context.drawImage(image, 0, 0);
+  return canvas.toDataURL("image/png");
 };
+
+const getClipboardImageFile = (clipboardData: DataTransfer | null) =>
+  getSourceImageFile(clipboardData);
 
 const getAnnotationTypeLabel = (type: TutorialShotAnnotation["type"]) => {
   if (type === "box") {
@@ -303,6 +337,7 @@ export default function TutorialShotEditor() {
   const [bootstrapFromOutput, setBootstrapFromOutput] = useState(false);
   const [isSourceEditorOpen, setIsSourceEditorOpen] = useState(false);
   const [cropDetailsOpen, setCropDetailsOpen] = useState(false);
+  const [isSourceDropActive, setIsSourceDropActive] = useState(false);
   const [annotationStageWidth, setAnnotationStageWidth] = useState(960);
   const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -717,12 +752,18 @@ export default function TutorialShotEditor() {
       statusPrefix: string;
       fallbackFileName: string;
     }) => {
+      if (!isTutorialShotSourceImageFile(file)) {
+        setStatusText(getUnsupportedSourceImageMessage(file));
+        return;
+      }
+
       try {
         const dataUrl = await readImageFileAsDataUrl(file);
-        setPendingRawDataUrl(dataUrl);
+        const normalizedDataUrl = await normalizeImageDataUrlToPng(dataUrl);
+        setPendingRawDataUrl(normalizedDataUrl);
         setSourceImageElement(null);
         setCroppedPreviewSrc(null);
-        setSourceImageSrc(dataUrl);
+        setSourceImageSrc(normalizedDataUrl);
         setBootstrapFromOutput(false);
         setCropDetailsOpen(true);
         setStatusText(
@@ -760,6 +801,13 @@ export default function TutorialShotEditor() {
       }
 
       const pastedImage = getClipboardImageFile(event.clipboardData);
+      if (!pastedImage && hasFileTransfer(event.clipboardData)) {
+        event.preventDefault();
+        setStatusText(
+          `読み込める画像は ${TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL} です。`,
+        );
+        return;
+      }
       if (!pastedImage) {
         return;
       }
@@ -777,6 +825,53 @@ export default function TutorialShotEditor() {
       window.removeEventListener("paste", handleWindowPaste);
     };
   }, [importRawImage, selectedShot]);
+
+  const handleSourceDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    if (!hasFileTransfer(event.dataTransfer)) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setIsSourceDropActive(true);
+  };
+
+  const handleSourceDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!hasFileTransfer(event.dataTransfer)) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setIsSourceDropActive(true);
+  };
+
+  const handleSourceDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    const { relatedTarget } = event;
+    if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
+      return;
+    }
+    setIsSourceDropActive(false);
+  };
+
+  const handleSourceDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!hasFileTransfer(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsSourceDropActive(false);
+
+    const droppedImage = getSourceImageFile(event.dataTransfer);
+    if (!droppedImage) {
+      setStatusText(`読み込める画像は ${TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL} です。`);
+      return;
+    }
+
+    void importRawImage({
+      file: droppedImage,
+      statusPrefix: "ドロップした画像",
+      fallbackFileName: "dropped-image.png",
+    });
+  };
 
   const resetCropToFull = () => {
     if (!sourceImageElement) {
@@ -1071,7 +1166,7 @@ export default function TutorialShotEditor() {
                   <summary className={styles.cropSummary}>
                     <span className={styles.cropSummaryTitle}>元画像と切り抜き範囲</span>
                     <span className={styles.cropSummaryHint}>
-                      <code>Ctrl + V</code> でも貼り付け可能
+                      ドラッグ＆ドロップ、ボタン、<code>Ctrl + V</code> で読み込み
                     </span>
                     <span
                       className={styles.cropSummaryTools}
@@ -1097,73 +1192,94 @@ export default function TutorialShotEditor() {
                     </span>
                   </summary>
                   <input
-                    accept="image/png,image/jpeg,image/webp"
+                    accept={TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT}
                     className={styles.fileInputHidden}
                     onChange={(event) => handleRawUpload(event.target.files?.[0] ?? null)}
                     ref={fileInputRef}
                     type="file"
                   />
 
-                  {sourceImageSrc ? (
-                    <div className={styles.imageStage} data-testid="crop-stage">
-                      <div className={styles.stageSurface}>
-                        <ReactCrop
-                          crop={
-                            crop ? toRenderedCrop(crop, cropDisplayScaleRef.current) : undefined
-                          }
-                          onChange={(nextCrop) => {
-                            if (sourceImageElement) {
-                              const cw = sourceImageElement.clientWidth;
-                              cropDisplayScaleRef.current =
-                                cw > 0 ? sourceImageElement.naturalWidth / cw : 1;
-                            }
-                            setCrop(toNaturalCrop(nextCrop, cropDisplayScaleRef.current));
-                            setCropOwnerKey(selectedShot.outputImagePath);
-                          }}
-                          onComplete={(nextCrop) => {
-                            if (sourceImageElement) {
-                              const cw = sourceImageElement.clientWidth;
-                              cropDisplayScaleRef.current =
-                                cw > 0 ? sourceImageElement.naturalWidth / cw : 1;
-                            }
-                            setCompletedCrop(toNaturalCrop(nextCrop, cropDisplayScaleRef.current));
-                            setCropOwnerKey(selectedShot.outputImagePath);
-                          }}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            alt=""
-                            className={styles.sourceImage}
-                            onLoad={(event) => {
-                              const image = event.currentTarget;
-                              const cw = image.clientWidth;
-                              cropDisplayScaleRef.current = cw > 0 ? image.naturalWidth / cw : 1;
-                              const nextCropState = getTutorialShotCropStateForImage({
-                                currentCropStates: cropStatesByShotRef.current,
-                                shotKey: selectedShot.outputImagePath,
-                                manifestCrop: draftManifest.crop,
-                                imageWidth: image.naturalWidth,
-                                imageHeight: image.naturalHeight,
-                              }) as TutorialShotEditorStoredCropState;
-                              setSourceImageElement(image);
-                              setCropOwnerKey(selectedShot.outputImagePath);
-                              setCrop(
-                                nextCropState.crop ?? createInitialCrop(image, draftManifest),
-                              );
-                              setCompletedCrop(nextCropState.completedCrop);
-                            }}
-                            src={sourceImageSrc}
-                          />
-                        </ReactCrop>
+                  <div
+                    className={`${styles.sourceDropZone} ${
+                      isSourceDropActive ? styles.sourceDropZoneActive : ""
+                    }`}
+                    data-testid="source-image-drop-zone"
+                    onDragEnter={handleSourceDragEnter}
+                    onDragLeave={handleSourceDragLeave}
+                    onDragOver={handleSourceDragOver}
+                    onDrop={handleSourceDrop}
+                  >
+                    <p className={styles.sourceImportHelp}>
+                      元画像はここへドラッグ＆ドロップできます。ボタンで選ぶか、
+                      <code>Ctrl + V</code> で貼り付けても読み込めます。
+                    </p>
+                    {isSourceDropActive ? (
+                      <div className={styles.sourceDropNotice} role="status">
+                        ここに画像をドロップして読み込みます
                       </div>
-                    </div>
-                  ) : (
-                    <div className={styles.stageEmpty}>
-                      {bootstrapFromOutput
-                        ? "元画像がありません。アップロードするか、このまま保存して現在の出力画像を元画像にします。"
-                        : "元画像をアップロードしてください。"}
-                    </div>
-                  )}
+                    ) : null}
+
+                    {sourceImageSrc ? (
+                      <div className={styles.imageStage} data-testid="crop-stage">
+                        <div className={styles.stageSurface}>
+                          <ReactCrop
+                            crop={
+                              crop ? toRenderedCrop(crop, cropDisplayScaleRef.current) : undefined
+                            }
+                            onChange={(nextCrop) => {
+                              if (sourceImageElement) {
+                                const cw = sourceImageElement.clientWidth;
+                                cropDisplayScaleRef.current =
+                                  cw > 0 ? sourceImageElement.naturalWidth / cw : 1;
+                              }
+                              setCrop(toNaturalCrop(nextCrop, cropDisplayScaleRef.current));
+                              setCropOwnerKey(selectedShot.outputImagePath);
+                            }}
+                            onComplete={(nextCrop) => {
+                              if (sourceImageElement) {
+                                const cw = sourceImageElement.clientWidth;
+                                cropDisplayScaleRef.current =
+                                  cw > 0 ? sourceImageElement.naturalWidth / cw : 1;
+                              }
+                              setCompletedCrop(toNaturalCrop(nextCrop, cropDisplayScaleRef.current));
+                              setCropOwnerKey(selectedShot.outputImagePath);
+                            }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              alt=""
+                              className={styles.sourceImage}
+                              onLoad={(event) => {
+                                const image = event.currentTarget;
+                                const cw = image.clientWidth;
+                                cropDisplayScaleRef.current = cw > 0 ? image.naturalWidth / cw : 1;
+                                const nextCropState = getTutorialShotCropStateForImage({
+                                  currentCropStates: cropStatesByShotRef.current,
+                                  shotKey: selectedShot.outputImagePath,
+                                  manifestCrop: draftManifest.crop,
+                                  imageWidth: image.naturalWidth,
+                                  imageHeight: image.naturalHeight,
+                                }) as TutorialShotEditorStoredCropState;
+                                setSourceImageElement(image);
+                                setCropOwnerKey(selectedShot.outputImagePath);
+                                setCrop(
+                                  nextCropState.crop ?? createInitialCrop(image, draftManifest),
+                                );
+                                setCompletedCrop(nextCropState.completedCrop);
+                              }}
+                              src={sourceImageSrc}
+                            />
+                          </ReactCrop>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={styles.stageEmpty}>
+                        {bootstrapFromOutput
+                          ? "元画像がありません。アップロードするか、このまま保存して現在の出力画像を元画像にします。"
+                          : "元画像をアップロードしてください。"}
+                      </div>
+                    )}
+                  </div>
                 </details>
 
                 <header className={styles.workCardHeader}>

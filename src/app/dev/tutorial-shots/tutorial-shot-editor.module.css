@@ -130,6 +130,29 @@
   padding-top: 0.4rem;
 }
 
+.textInput {
+  width: 100%;
+  border: 1px solid rgb(203 213 225);
+  background: white;
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  color: rgb(15 23 42);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.textInput:hover {
+  border-color: rgb(148 163 184);
+}
+
+.textInput:focus {
+  outline: none;
+  border-color: rgb(37 99 235);
+  box-shadow: 0 0 0 3px rgb(191 219 254);
+}
+
 .sourceEditor .textInput {
   flex: 1 1 18rem;
   min-width: 12rem;
@@ -551,6 +574,61 @@
   margin-bottom: 0.75rem;
 }
 
+.sourceDropZone {
+  margin-top: 0.75rem;
+  border: 2px dashed transparent;
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.75rem;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.sourceDropZoneActive {
+  background: rgb(239 246 255);
+  border-color: rgb(37 99 235);
+  box-shadow: 0 0 0 3px rgb(191 219 254);
+  padding: 0.5rem;
+}
+
+.sourceImportHelp {
+  margin: 0;
+  color: rgb(71 85 105);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.sourceImportHelp code,
+.cropSummaryHint code {
+  background: rgb(241 245 249);
+  border: 1px solid rgb(226 232 240);
+  border-radius: 0.3rem;
+  color: rgb(15 23 42);
+  font-size: 0.72rem;
+  padding: 0.05rem 0.25rem;
+}
+
+.sourceDropNotice {
+  align-items: center;
+  background: rgb(219 234 254);
+  border: 1px solid rgb(96 165 250);
+  border-radius: 0.5rem;
+  color: rgb(30 64 175);
+  display: flex;
+  font-size: 0.85rem;
+  font-weight: 700;
+  gap: 0.4rem;
+  justify-content: center;
+  padding: 0.65rem 0.75rem;
+}
+
+.sourceDropNotice::before {
+  content: "↓";
+  font-size: 1rem;
+}
+
 /* ── Section divider ──────────────────────────────── */
 
 .sectionDivider {
@@ -826,29 +904,6 @@
 .fieldRow .textInput {
   flex: 1 1 16rem;
   min-width: 12rem;
-}
-
-.textInput {
-  width: 100%;
-  border: 1px solid rgb(203 213 225);
-  background: white;
-  border-radius: 0.5rem;
-  padding: 0.55rem 0.75rem;
-  font: inherit;
-  color: rgb(15 23 42);
-  transition:
-    border-color 0.12s ease,
-    box-shadow 0.12s ease;
-}
-
-.textInput:hover {
-  border-color: rgb(148 163 184);
-}
-
-.textInput:focus {
-  outline: none;
-  border-color: rgb(37 99 235);
-  box-shadow: 0 0 0 3px rgb(191 219 254);
 }
 
 .fileInputHidden {

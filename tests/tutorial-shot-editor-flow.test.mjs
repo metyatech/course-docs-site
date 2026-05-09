@@ -10,7 +10,10 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import sharp from "sharp";
-import { TUTORIAL_SHOT_EDITOR_WORKSPACE_PADDING } from "../src/lib/tutorial-shots-shared.mjs";
+import {
+  TUTORIAL_SHOT_EDITOR_WORKSPACE_PADDING,
+  TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT,
+} from "../src/lib/tutorial-shots-shared.mjs";
 import { closeBrowserBounded, createRunDevTestEnv, killProcessTree } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -184,6 +187,36 @@ const createSolidPngBuffer = async ({ background = "#38bdf8", width = 640, heigh
     .png()
     .toBuffer();
 
+const createSolidBmpBuffer = ({ width = 320, height = 180 } = {}) => {
+  const rowSize = Math.floor((24 * width + 31) / 32) * 4;
+  const pixelArraySize = rowSize * height;
+  const fileSize = 54 + pixelArraySize;
+  const buffer = Buffer.alloc(fileSize);
+
+  buffer.write("BM", 0, "ascii");
+  buffer.writeUInt32LE(fileSize, 2);
+  buffer.writeUInt32LE(54, 10);
+  buffer.writeUInt32LE(40, 14);
+  buffer.writeInt32LE(width, 18);
+  buffer.writeInt32LE(height, 22);
+  buffer.writeUInt16LE(1, 26);
+  buffer.writeUInt16LE(24, 28);
+  buffer.writeUInt32LE(0, 30);
+  buffer.writeUInt32LE(pixelArraySize, 34);
+
+  for (let y = 0; y < height; y += 1) {
+    const rowOffset = 54 + y * rowSize;
+    for (let x = 0; x < width; x += 1) {
+      const pixelOffset = rowOffset + x * 3;
+      buffer[pixelOffset] = 0x22;
+      buffer[pixelOffset + 1] = 0xc5;
+      buffer[pixelOffset + 2] = 0x5e;
+    }
+  }
+
+  return buffer;
+};
+
 const toDataUrl = (buffer, mimeType = "image/png") =>
   `data:${mimeType};base64,${buffer.toString("base64")}`;
 
@@ -251,6 +284,42 @@ const pasteImageIntoEditor = async (page, imageDataUrl) => {
     });
     window.dispatchEvent(pasteEvent);
   }, imageDataUrl);
+};
+
+const dragImageOverEditor = async (page, imageDataUrl) => {
+  await page.evaluate(async (dataUrl) => {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    const file = new File([blob], "drag-preview.png", { type: blob.type || "image/png" });
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    const dropZone = document.querySelector('[data-testid="source-image-drop-zone"]');
+    if (!dropZone) {
+      throw new Error("Source image drop zone was not found.");
+    }
+
+    dropZone.dispatchEvent(
+      new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer }),
+    );
+  }, imageDataUrl);
+};
+
+const dropImageIntoEditor = async (page, imageDataUrl, fileName = "dropped.png") => {
+  await page.evaluate(async ({ dataUrl, fileName: droppedFileName }) => {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    const file = new File([blob], droppedFileName, { type: blob.type || "image/png" });
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    const dropZone = document.querySelector('[data-testid="source-image-drop-zone"]');
+    if (!dropZone) {
+      throw new Error("Source image drop zone was not found.");
+    }
+
+    dropZone.dispatchEvent(
+      new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer }),
+    );
+  }, { dataUrl: imageDataUrl, fileName });
 };
 
 const getPreviewProbeImage = (page) => page.locator('img[alt="保存反映確認"]:visible').first();
@@ -605,9 +674,15 @@ test(
     });
 
     await openTutorialShotEditor(page, overrideCourseRelativePath);
-    await page.getByText("Ctrl + V").waitFor();
+    assert.equal(
+      await page.locator('input[type="file"]').getAttribute("accept"),
+      TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT,
+    );
+    await page.getByText("ドロップ、ボタン、").waitFor();
+    await page.getByText("Ctrl + V").first().waitFor();
     await page.getByRole("button", { name: /override-missing-output/i }).click();
     await page.getByText("元画像をアップロードしてください。").waitFor();
+    await page.getByText("元画像はここへドラッグ＆ドロップできます。ボタンで選ぶか、").waitFor();
 
     await pasteImageIntoEditor(page, toDataUrl(pastedImageBuffer));
     await page.getByText("クリップボードの画像を読み込みました").waitFor();
@@ -635,7 +710,194 @@ test(
 
     await assert.doesNotReject(() => fs.stat(pastedRawPath));
     await assert.doesNotReject(() => fs.stat(pastedOutputPath));
-    assert.equal(Buffer.compare(await fs.readFile(pastedRawPath), pastedImageBuffer), 0);
+    const pastedRawMetadata = await sharp(pastedRawPath).metadata();
+    assert.equal(pastedRawMetadata.width, 640);
+    assert.equal(pastedRawMetadata.height, 360);
+  },
+);
+
+test(
+  "tutorial shot editor imports a dropped source image",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-drop-"));
+    const fixtureCourse = path.join(tempRoot, "course");
+    const overrideCourse = path.join(tempRoot, "override-course");
+    const droppedImageBuffer = await createSolidPngBuffer({ background: "#22c55e" });
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+    await writeFixtureCourseRepo(overrideCourse, {
+      logoText: "Override Tutorial Shot Fixture",
+      firstImageName: "override-startup",
+      secondImageName: "override-missing-output",
+    });
+
+    const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "tutorial-shot-editor-drop",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Tutorial shot editor did not become ready.",
+      },
+    );
+
+    const browser = await chromium.launch({ headless: true });
+    t.after(async () => {
+      await closeBrowserBounded(browser);
+    });
+    const page = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+
+    await openTutorialShotEditor(page, overrideCourseRelativePath);
+    await page.getByRole("button", { name: /override-missing-output/i }).click();
+    await page.getByText("元画像をアップロードしてください。").waitFor();
+
+    await dragImageOverEditor(page, toDataUrl(droppedImageBuffer));
+    await page.getByText("ここに画像をドロップして読み込みます").waitFor();
+
+    await dropImageIntoEditor(page, toDataUrl(droppedImageBuffer));
+    await page.getByText("ドロップした画像を読み込みました（dropped.png）").waitFor();
+    await page.locator('[data-testid="crop-stage"] img').waitFor();
+
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await page.getByText("保存しました").waitFor();
+
+    const droppedRawPath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "shots",
+      "override-missing-output.raw.png",
+    );
+    const droppedOutputPath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "img",
+      "override-missing-output.png",
+    );
+
+    await assert.doesNotReject(() => fs.stat(droppedRawPath));
+    await assert.doesNotReject(() => fs.stat(droppedOutputPath));
+    const droppedRawMetadata = await sharp(droppedRawPath).metadata();
+    assert.equal(droppedRawMetadata.width, 640);
+    assert.equal(droppedRawMetadata.height, 360);
+  },
+);
+
+test(
+  "tutorial shot editor normalizes a dropped browser source image to PNG before save",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-bmp-drop-"));
+    const fixtureCourse = path.join(tempRoot, "course");
+    const overrideCourse = path.join(tempRoot, "override-course");
+    const droppedImageBuffer = createSolidBmpBuffer();
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+    await writeFixtureCourseRepo(overrideCourse, {
+      logoText: "Override Tutorial Shot Fixture",
+      firstImageName: "override-startup",
+      secondImageName: "override-missing-output",
+    });
+
+    const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "tutorial-shot-editor-bmp-drop",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTree(dev);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Tutorial shot editor did not become ready.",
+      },
+    );
+
+    const browser = await chromium.launch({ headless: true });
+    t.after(async () => {
+      await closeBrowserBounded(browser);
+    });
+    const page = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+
+    await openTutorialShotEditor(page, overrideCourseRelativePath);
+    await page.getByRole("button", { name: /override-missing-output/i }).click();
+    await page.getByText("元画像をアップロードしてください。").waitFor();
+
+    await dropImageIntoEditor(page, toDataUrl(droppedImageBuffer, "image/bmp"), "dropped.bmp");
+    await page.getByText("ドロップした画像を読み込みました（dropped.bmp）").waitFor();
+    await page.locator('[data-testid="crop-stage"] img').waitFor();
+
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await page.getByText("保存しました").waitFor();
+
+    const droppedRawPath = path.join(
+      overrideCourse,
+      "content",
+      "docs",
+      "tutorial",
+      "shots",
+      "override-missing-output.raw.png",
+    );
+    const droppedRawMetadata = await sharp(droppedRawPath).metadata();
+    assert.equal(droppedRawMetadata.format, "png");
+    assert.equal(droppedRawMetadata.width, 320);
+    assert.equal(droppedRawMetadata.height, 180);
   },
 );
 
