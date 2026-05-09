@@ -5,7 +5,7 @@ Local authoring tool for step-by-step tutorial screenshots.
 The editor keeps learner-facing `Action img="./img/...png"` usage intact while
 moving the editable source of truth to:
 
-- raw screenshot: `content/**/shots/*.raw.png`
+- editable source image: `content/**/shots/*.raw.png`
 - shot manifest: `content/**/shots/*.shot.json`
 - generated learner-facing image: `content/**/img/*.png`
 
@@ -68,6 +68,8 @@ project-contract:
     - generated img/*.png is overwritten from manifest on save
   validation:
     - client and server validation per annotation mode (focal: 0–1 box + 0–1 arrow; callout: N boxes, no arrows)
+    - source-image imports accept browser-viewable PNG/APNG/JPEG/GIF/WebP/AVIF/SVG/BMP/ICO/CUR files
+    - uploaded source images are decoded and normalized before raw files are persisted
     - server path validation before read/write
     - repo tests for scan/save behavior
   generated_artifacts:
@@ -122,6 +124,7 @@ MVP goals:
 
 - detect existing `Action img="./img/...png"` references without MDX migration
 - bootstrap a raw source from the current output image when needed
+- import source images through the upload button, drag-and-drop, or `Ctrl + V`
 - save crop + annotations beside the page in `shots/`
 - regenerate the existing `img/*.png` file in place
 - warn when screenshot text drifts away from tutorial-authoring rules

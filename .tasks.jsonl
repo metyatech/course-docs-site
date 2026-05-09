@@ -77,3 +77,4 @@
 {"id":"QWkk8G-M","description":"Apply non-breaking npm audit fix in course-docs-site (postcss/uuid path)","stage":"committed","createdAt":"2026-05-02T07:46:23.306Z","updatedAt":"2026-05-02T07:46:33.807Z","committedEventId":"3YIMh94LvxzGd2Ws"}
 {"id":"VatML8MS","description":"Investigate tutorial-shot-editor-flow Windows pre-commit sequential-run flake","stage":"pending","createdAt":"2026-05-02T07:46:23.455Z","updatedAt":"2026-05-02T07:46:23.455Z"}
 {"id":"sirHf381","description":"Document upstream-blocked dependency advisories in course-docs-site SECURITY.md","stage":"committed","createdAt":"2026-05-02T11:04:23.845Z","updatedAt":"2026-05-02T11:04:31.462Z","committedEventId":"r1wYjIqUiIr7UhAf"}
+{"id":"ORdlJ_O7","description":"Add tutorial-shot editor image format and drag-drop source image support","stage":"committed","createdAt":"2026-05-09T10:26:43.644Z","updatedAt":"2026-05-09T13:56:40.987Z","committedEventId":"olOsJW5GLR17ieiM"}
