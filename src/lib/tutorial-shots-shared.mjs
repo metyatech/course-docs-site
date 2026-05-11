@@ -1,6 +1,30 @@
 export const TUTORIAL_SHOT_MANIFEST_VERSION = 1;
 export const TUTORIAL_SHOT_ANNOTATION_MODES = ["focal", "multi-focal", "callout"];
 export const TUTORIAL_SHOT_BOX_ROLES = ["action", "verify"];
+export const TUTORIAL_SHOT_STATIC_RASTER_OUTPUT_FORMAT = {
+  label: "WebP",
+  mimeType: "image/webp",
+  extension: ".webp",
+  sharpFormat: "webp-lossless",
+};
+export const TUTORIAL_SHOT_DEFAULT_OUTPUT_IMAGE_EXTENSION =
+  TUTORIAL_SHOT_STATIC_RASTER_OUTPUT_FORMAT.extension;
+export const TUTORIAL_SHOT_GENERATED_IMAGE_FORMATS = [
+  TUTORIAL_SHOT_STATIC_RASTER_OUTPUT_FORMAT,
+  {
+    label: "PNG",
+    mimeType: "image/png",
+    extension: ".png",
+    sharpFormat: "png",
+  },
+  {
+    label: "JPEG",
+    mimeType: "image/jpeg",
+    extension: ".jpg",
+    aliases: [".jpeg"],
+    sharpFormat: "jpeg",
+  },
+];
 export const TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS = [
   {
     label: "PNG",
@@ -66,6 +90,12 @@ const TUTORIAL_SHOT_SOURCE_IMAGE_MIME_TYPES = new Set(
 const TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSIONS = new Set(
   TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS.flatMap((format) => format.extensions),
 );
+const TUTORIAL_SHOT_GENERATED_IMAGE_EXTENSIONS = new Set(
+  TUTORIAL_SHOT_GENERATED_IMAGE_FORMATS.flatMap((format) => [
+    format.extension,
+    ...(format.aliases ?? []),
+  ]),
+);
 
 export const TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT = TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS.flatMap(
   (format) => [...format.mimeTypes, ...format.extensions],
@@ -77,21 +107,90 @@ const normalizeMimeType = (value) =>
     .trim()
     .toLowerCase();
 
-const getFileExtension = (value) => {
-  const basename = String(value ?? "").split(/[\\/]/u).at(-1) ?? "";
+const TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSION_BY_MIME_TYPE = new Map(
+  TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS.flatMap((format) =>
+    format.mimeTypes.map((mimeType) => [normalizeMimeType(mimeType), format.extensions[0]]),
+  ),
+);
+const TUTORIAL_SHOT_GENERATED_IMAGE_FORMAT_BY_EXTENSION = new Map(
+  TUTORIAL_SHOT_GENERATED_IMAGE_FORMATS.flatMap((format) =>
+    [format.extension, ...(format.aliases ?? [])].map((extension) => [extension, format]),
+  ),
+);
+const TUTORIAL_SHOT_IMAGE_CONTENT_TYPE_BY_EXTENSION = new Map([
+  ...TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS.flatMap((format) =>
+    format.extensions.map((extension) => [extension, normalizeMimeType(format.mimeTypes[0])]),
+  ),
+  ...TUTORIAL_SHOT_GENERATED_IMAGE_FORMATS.flatMap((format) =>
+    [format.extension, ...(format.aliases ?? [])].map((extension) => [extension, format.mimeType]),
+  ),
+]);
+
+export const getTutorialShotFileExtension = (value) => {
+  const basename =
+    String(value ?? "")
+      .split(/[\\/]/u)
+      .at(-1) ?? "";
   const index = basename.lastIndexOf(".");
   return index <= 0 ? "" : basename.slice(index).toLowerCase();
+};
+
+const getFormatByMimeType = (formats, mimeType) => {
+  const normalized = normalizeMimeType(mimeType);
+  return formats.find((format) => format.mimeTypes.includes(normalized));
 };
 
 export const isTutorialShotSourceImageMimeType = (mimeType) =>
   TUTORIAL_SHOT_SOURCE_IMAGE_MIME_TYPES.has(normalizeMimeType(mimeType));
 
+export const getTutorialShotSourceImageExtensionForMimeType = (mimeType) =>
+  getFormatByMimeType(TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS, mimeType)?.extensions[0] ?? "";
+
+export const getTutorialShotSourceImageExtensionForFileName = (fileName) => {
+  const extension = getTutorialShotFileExtension(fileName);
+  return TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSIONS.has(extension) ? extension : "";
+};
+
 export const isTutorialShotSourceImageFileName = (fileName) =>
-  TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSIONS.has(getFileExtension(fileName));
+  TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSIONS.has(getTutorialShotFileExtension(fileName));
 
 export const isTutorialShotSourceImageFile = (file) =>
   Boolean(file) &&
   (isTutorialShotSourceImageMimeType(file.type) || isTutorialShotSourceImageFileName(file.name));
+
+export const getTutorialShotSourceImageExtension = ({
+  fileName = "",
+  mimeType = "",
+  fallbackExtension = "",
+} = {}) => {
+  const fileExtension = getTutorialShotFileExtension(fileName);
+  if (TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSIONS.has(fileExtension)) {
+    return fileExtension;
+  }
+
+  const mimeExtension = TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSION_BY_MIME_TYPE.get(
+    normalizeMimeType(mimeType),
+  );
+  if (mimeExtension) {
+    return mimeExtension;
+  }
+
+  const normalizedFallback = String(fallbackExtension ?? "").toLowerCase();
+  if (TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSIONS.has(normalizedFallback)) {
+    return normalizedFallback;
+  }
+
+  return TUTORIAL_SHOT_DEFAULT_OUTPUT_IMAGE_EXTENSION;
+};
+
+export const getTutorialShotGeneratedImageFormat = (fileName) => {
+  const extension =
+    getTutorialShotFileExtension(fileName) || TUTORIAL_SHOT_DEFAULT_OUTPUT_IMAGE_EXTENSION;
+  return TUTORIAL_SHOT_GENERATED_IMAGE_FORMAT_BY_EXTENSION.get(extension) ?? null;
+};
+
+export const getTutorialShotImageContentType = (fileName) =>
+  TUTORIAL_SHOT_IMAGE_CONTENT_TYPE_BY_EXTENSION.get(getTutorialShotFileExtension(fileName)) ?? null;
 
 const ACTION_TAG_PATTERN = /<Action\b[\s\S]*?>/gu;
 const VERIFY_TAG_PATTERN = /<Verify\b[\s\S]*?>/gu;
@@ -119,10 +218,12 @@ const decodePathSegment = (segment) => {
 };
 
 export const normalizeDecodedPosixPath = (value) =>
-  normalizePosixPath(value)
-    .split("/")
-    .map(decodePathSegment)
-    .join("/");
+  normalizePosixPath(value).split("/").map(decodePathSegment).join("/");
+
+export const isTutorialShotSourceImagePath = (value) => {
+  const normalized = normalizeDecodedPosixPath(value ?? "");
+  return /^content\/.+/u.test(normalized) && isTutorialShotSourceImageFileName(normalized);
+};
 
 const splitPosixSegments = (value) =>
   normalizePosixPath(value)
@@ -166,6 +267,68 @@ const posixExtname = (value) => {
   return index <= 0 ? "" : basename.slice(index);
 };
 
+export const replaceTutorialShotPathExtension = (value, extension) => {
+  const normalized = normalizeDecodedPosixPath(value);
+  const normalizedExtension = extension.startsWith(".") ? extension : `.${extension}`;
+  const currentExtension = posixExtname(normalized);
+  if (!currentExtension) {
+    return `${normalized}${normalizedExtension}`;
+  }
+
+  return `${normalized.slice(0, -currentExtension.length)}${normalizedExtension}`;
+};
+
+export const applyTutorialShotStaticRasterOutputPolicy = (outputImagePath) =>
+  replaceTutorialShotPathExtension(
+    outputImagePath,
+    TUTORIAL_SHOT_STATIC_RASTER_OUTPUT_FORMAT.extension,
+  );
+
+const isSafeContentRelativePath = (value) => {
+  const normalized = normalizeDecodedPosixPath(value ?? "");
+  return normalized.startsWith("content/") && !splitPosixSegments(normalized).includes("..");
+};
+
+export const isTutorialShotGeneratedImagePath = (value) => {
+  const normalized = normalizeDecodedPosixPath(value ?? "");
+  return (
+    isSafeContentRelativePath(normalized) &&
+    TUTORIAL_SHOT_GENERATED_IMAGE_EXTENSIONS.has(posixExtname(normalized).toLowerCase())
+  );
+};
+
+export const isTutorialShotOutputImagePath = (value) => {
+  const normalized = normalizeDecodedPosixPath(value ?? "");
+  return (
+    isSafeContentRelativePath(normalized) &&
+    posixExtname(normalized) === TUTORIAL_SHOT_DEFAULT_OUTPUT_IMAGE_EXTENSION
+  );
+};
+
+export const isTutorialShotRawImagePath = (value) => {
+  const normalized = normalizeDecodedPosixPath(value ?? "");
+  return (
+    isSafeContentRelativePath(normalized) &&
+    /^content\/.+\/shots\/.+\.raw\.[^/.]+$/u.test(normalized) &&
+    isTutorialShotSourceImageFileName(normalized)
+  );
+};
+
+export const isTutorialShotReadableImagePath = (value) => {
+  const normalized = normalizeDecodedPosixPath(value ?? "");
+  return (
+    isSafeContentRelativePath(normalized) && getTutorialShotImageContentType(normalized) !== null
+  );
+};
+
+export const isTutorialShotManifestPath = (value) => {
+  const normalized = normalizeDecodedPosixPath(value ?? "");
+  return (
+    isSafeContentRelativePath(normalized) &&
+    /^content\/.+\/shots\/.+\.shot\.json$/u.test(normalized)
+  );
+};
+
 export const sanitizeShotId = (value) =>
   value
     .trim()
@@ -174,31 +337,75 @@ export const sanitizeShotId = (value) =>
     .replace(/^-+/u, "")
     .replace(/-+$/u, "") || "shot";
 
-export const deriveTutorialShotPaths = ({ pagePath, outputImagePath }) => {
+export const deriveTutorialShotPaths = ({ pagePath, outputImagePath, rawImageExtension = "" }) => {
   const normalizedPagePath = normalizePosixPath(pagePath);
-  const normalizedOutputPath = normalizeDecodedPosixPath(outputImagePath);
+  const requestedOutputPath = normalizeDecodedPosixPath(outputImagePath);
+  const normalizedOutputPath = applyTutorialShotStaticRasterOutputPolicy(requestedOutputPath);
   const pageDir = posixDirname(normalizedPagePath);
+  const requestedBasename = posixBasename(requestedOutputPath);
+  const requestedOutputExtension = posixExtname(requestedBasename);
   const outputBasename = posixBasename(normalizedOutputPath);
-  const outputExtension = posixExtname(outputBasename) || ".png";
-  const outputName = outputBasename.slice(0, outputBasename.length - outputExtension.length);
+  const explicitOutputExtension = posixExtname(outputBasename);
+  const outputExtension = explicitOutputExtension || TUTORIAL_SHOT_DEFAULT_OUTPUT_IMAGE_EXTENSION;
+  const outputName = explicitOutputExtension
+    ? outputBasename.slice(0, outputBasename.length - outputExtension.length)
+    : outputBasename;
+  const rawExtension =
+    getTutorialShotSourceImageExtension({
+      fallbackExtension: rawImageExtension || requestedOutputExtension || outputExtension,
+    }) || TUTORIAL_SHOT_DEFAULT_OUTPUT_IMAGE_EXTENSION;
   const shotId = sanitizeShotId(outputName);
 
   return {
     id: shotId,
+    outputImagePath: normalizedOutputPath,
     manifestPath: joinPosixPath(pageDir, `shots/${outputName}.shot.json`),
-    rawImagePath: joinPosixPath(pageDir, `shots/${outputName}.raw${outputExtension}`),
+    rawImagePath: joinPosixPath(pageDir, `shots/${outputName}.raw${rawExtension}`),
   };
 };
 
+export const deriveTutorialShotRawImagePath = ({
+  pagePath,
+  outputImagePath,
+  sourceFileName = "",
+  mimeType = "",
+  fallbackExtension = "",
+}) => {
+  const rawExtension =
+    getTutorialShotSourceImageExtension({
+      fileName: sourceFileName,
+      mimeType,
+      fallbackExtension,
+    }) || TUTORIAL_SHOT_DEFAULT_OUTPUT_IMAGE_EXTENSION;
+  return deriveTutorialShotPaths({ pagePath, outputImagePath, rawImageExtension: rawExtension })
+    .rawImagePath;
+};
+
+export const isExpectedTutorialShotRawImagePath = ({ pagePath, outputImagePath, rawImagePath }) => {
+  const normalizedRawPath = normalizeDecodedPosixPath(rawImagePath ?? "");
+  const rawExtension = posixExtname(normalizedRawPath).toLowerCase();
+  if (!TUTORIAL_SHOT_SOURCE_IMAGE_EXTENSIONS.has(rawExtension)) {
+    return false;
+  }
+
+  return (
+    normalizedRawPath ===
+    deriveTutorialShotRawImagePath({
+      pagePath,
+      outputImagePath,
+      fallbackExtension: rawExtension,
+    })
+  );
+};
+
 export const createDefaultTutorialShotManifest = ({ pagePath, outputImagePath }) => {
-  const normalizedOutputPath = normalizeDecodedPosixPath(outputImagePath);
-  const derived = deriveTutorialShotPaths({ pagePath, outputImagePath: normalizedOutputPath });
+  const derived = deriveTutorialShotPaths({ pagePath, outputImagePath });
 
   return {
     version: TUTORIAL_SHOT_MANIFEST_VERSION,
     id: derived.id,
     pagePath: normalizePosixPath(pagePath),
-    outputImagePath: normalizedOutputPath,
+    outputImagePath: derived.outputImagePath,
     rawImagePath: derived.rawImagePath,
     crop: null,
     annotations: [],
@@ -206,6 +413,35 @@ export const createDefaultTutorialShotManifest = ({ pagePath, outputImagePath })
     alt: "",
   };
 };
+
+const getPosixRelativePath = ({ fromDir, toPath }) => {
+  const fromSegments = splitPosixSegments(fromDir);
+  const toSegments = splitPosixSegments(toPath);
+  let sharedCount = 0;
+
+  while (
+    sharedCount < fromSegments.length &&
+    sharedCount < toSegments.length &&
+    fromSegments[sharedCount] === toSegments[sharedCount]
+  ) {
+    sharedCount += 1;
+  }
+
+  const upSegments = fromSegments.slice(sharedCount).map(() => "..");
+  const downSegments = toSegments.slice(sharedCount);
+  return [...upSegments, ...downSegments].join("/") || posixBasename(toPath);
+};
+
+export const getTutorialShotPageRelativeOutputImagePath = ({ pagePath, outputImagePath }) => {
+  const relative = getPosixRelativePath({
+    fromDir: posixDirname(normalizePosixPath(pagePath)),
+    toPath: applyTutorialShotStaticRasterOutputPolicy(outputImagePath),
+  });
+
+  return relative.startsWith("..") ? relative : `./${relative}`;
+};
+
+const isExternalImageSrc = (value) => /^(https?:)?\/\//iu.test(value);
 
 const extractImageRefsFromMdxTag = ({ pagePath, sourceText, tagPattern }) => {
   const normalizedPagePath = normalizePosixPath(pagePath);
@@ -220,21 +456,26 @@ const extractImageRefsFromMdxTag = ({ pagePath, sourceText, tagPattern }) => {
     }
 
     const rawSrc = imgMatch[2]?.trim();
-    if (!rawSrc || /^(https?:)?\/\//iu.test(rawSrc)) {
+    if (!rawSrc || isExternalImageSrc(rawSrc)) {
       continue;
     }
 
     const sourceImagePath = normalizeDecodedPosixPath(rawSrc);
-    const outputImagePath = normalizeDecodedPosixPath(joinPosixPath(pageDir, rawSrc));
+    const referencedImagePath = normalizeDecodedPosixPath(joinPosixPath(pageDir, rawSrc));
     const line = sourceText.slice(0, match.index ?? 0).split(/\r?\n/gu).length;
-    const derived = deriveTutorialShotPaths({ pagePath: normalizedPagePath, outputImagePath });
+    const derived = deriveTutorialShotPaths({
+      pagePath: normalizedPagePath,
+      outputImagePath: referencedImagePath,
+      rawImageExtension: posixExtname(referencedImagePath),
+    });
 
     refs.push({
       id: derived.id,
       line,
       pagePath: normalizedPagePath,
       sourceImagePath,
-      outputImagePath,
+      referencedImagePath,
+      outputImagePath: derived.outputImagePath,
       manifestPath: derived.manifestPath,
       rawImagePath: derived.rawImagePath,
     });
@@ -248,6 +489,66 @@ export const extractActionImageRefsFromMdx = ({ pagePath, sourceText }) =>
 
 export const extractVerifyImageRefsFromMdx = ({ pagePath, sourceText }) =>
   extractImageRefsFromMdxTag({ pagePath, sourceText, tagPattern: VERIFY_TAG_PATTERN });
+
+export const rewriteTutorialShotImageRefsForOutputPolicy = ({
+  pagePath,
+  sourceText,
+  outputImagePath,
+}) => {
+  const normalizedPagePath = normalizePosixPath(pagePath);
+  const policyOutputPath = applyTutorialShotStaticRasterOutputPolicy(outputImagePath);
+  const pageDir = posixDirname(normalizedPagePath);
+  const targetId = deriveTutorialShotPaths({
+    pagePath: normalizedPagePath,
+    outputImagePath: policyOutputPath,
+  }).id;
+  const pageRelativeOutputPath = getTutorialShotPageRelativeOutputImagePath({
+    pagePath: normalizedPagePath,
+    outputImagePath: policyOutputPath,
+  });
+  let changed = false;
+
+  const replaceTag = (tag) => {
+    const imgMatch = IMG_PROP_PATTERN.exec(tag);
+    if (!imgMatch) {
+      return tag;
+    }
+
+    const rawSrc = imgMatch[2]?.trim();
+    if (!rawSrc || isExternalImageSrc(rawSrc)) {
+      return tag;
+    }
+
+    const currentImagePath = normalizeDecodedPosixPath(joinPosixPath(pageDir, rawSrc));
+    const currentId = deriveTutorialShotPaths({
+      pagePath: normalizedPagePath,
+      outputImagePath: currentImagePath,
+    }).id;
+    if (currentId !== targetId) {
+      return tag;
+    }
+
+    const quote = imgMatch[1];
+    const nextImgProp = `img=${quote}${pageRelativeOutputPath}${quote}`;
+    if (imgMatch[0] === nextImgProp) {
+      return tag;
+    }
+
+    changed = true;
+    return `${tag.slice(0, imgMatch.index)}${nextImgProp}${tag.slice(
+      imgMatch.index + imgMatch[0].length,
+    )}`;
+  };
+
+  const nextSourceText = sourceText
+    .replace(ACTION_TAG_PATTERN, replaceTag)
+    .replace(VERIFY_TAG_PATTERN, replaceTag);
+
+  return {
+    sourceText: nextSourceText,
+    changed,
+  };
+};
 
 const normalizeAuthoringModeValue = (value) =>
   value
@@ -313,8 +614,9 @@ const extractExplicitAuthoringMode = (sourceText) => {
     }
   }
 
-  const directExportMatch =
-    /export\s+const\s+authoringMode\s*=\s*(['"`])([^'"`]+)\1/u.exec(sourceText);
+  const directExportMatch = /export\s+const\s+authoringMode\s*=\s*(['"`])([^'"`]+)\1/u.exec(
+    sourceText,
+  );
   if (directExportMatch) {
     const rawValue = directExportMatch[2];
     return {
@@ -431,10 +733,9 @@ export const normalizeTutorialShotManifest = (manifest) => {
       manifest?.outputImagePath ?? normalized.outputImagePath,
     ),
     rawImagePath: normalizeDecodedPosixPath(manifest?.rawImagePath ?? normalized.rawImagePath),
-    annotationMode:
-      TUTORIAL_SHOT_ANNOTATION_MODES.includes(manifest?.annotationMode)
-        ? manifest.annotationMode
-        : "focal",
+    annotationMode: TUTORIAL_SHOT_ANNOTATION_MODES.includes(manifest?.annotationMode)
+      ? manifest.annotationMode
+      : "focal",
     alt: typeof manifest?.alt === "string" ? manifest.alt.trim() : "",
     crop:
       manifest?.crop &&
@@ -486,7 +787,9 @@ export const getTutorialShotAnnotationErrors = (annotations, annotationMode = "f
   }
 
   if (boxCount > 1) {
-    errors.push("注目点モードの枠は 1 つだけです。複数の場所を示すには同種複数か番号コールアウトモードに切り替えてください。");
+    errors.push(
+      "注目点モードの枠は 1 つだけです。複数の場所を示すには同種複数か番号コールアウトモードに切り替えてください。",
+    );
   }
 
   if (arrowCount > 1) {
@@ -586,10 +889,7 @@ const expandBounds = (current, { minX, minY, maxX, maxY }) =>
       }
     : { minX, minY, maxX, maxY };
 
-export const getTutorialShotAnnotationBounds = ({
-  annotations,
-  annotationMode = "focal",
-}) => {
+export const getTutorialShotAnnotationBounds = ({ annotations, annotationMode = "focal" }) => {
   let bounds = null;
 
   for (const annotation of annotations ?? []) {

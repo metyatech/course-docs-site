@@ -5,15 +5,21 @@ import path from "node:path";
 import test from "node:test";
 import sharp from "sharp";
 import {
+  applyTutorialShotStaticRasterOutputPolicy,
   createDefaultTutorialShotManifest,
+  deriveTutorialShotRawImagePath,
   extractActionImageRefsFromMdx,
   extractVerifyImageRefsFromMdx,
+  getTutorialShotGeneratedImageFormat,
+  getTutorialShotImageContentType,
   getTutorialPageModeWarnings,
   getTutorialShotWarnings,
   isTutorialShotSourceImageFile,
   isTutorialShotSourceImageFileName,
   isTutorialShotSourceImageMimeType,
   renderTutorialShotOverlaySvg,
+  TUTORIAL_SHOT_DEFAULT_OUTPUT_IMAGE_EXTENSION,
+  TUTORIAL_SHOT_STATIC_RASTER_OUTPUT_FORMAT,
   TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT,
   TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL,
 } from "../src/lib/tutorial-shots-shared.mjs";
@@ -31,10 +37,7 @@ import {
 
 const writeTutorialFixture = async (
   rootDir,
-  {
-    actionImageSrc = "./img/startup.png",
-    imageFileName = "startup.png",
-  } = {},
+  { actionImageSrc = "./img/startup.png", imageFileName = "startup.png" } = {},
 ) => {
   const pageDir = path.join(rootDir, "content", "docs", "student-guide");
   const imageDir = path.join(pageDir, "img");
@@ -56,20 +59,107 @@ authoringMode: tutorial
     "utf8",
   );
 
-  await sharp({
+  const fixtureImage = sharp({
     create: {
       width: 640,
       height: 360,
       channels: 4,
       background: "#dbe4f0",
     },
-  })
-    .png()
-    .toFile(path.join(imageDir, imageFileName));
+  });
+  const imagePath = path.join(imageDir, imageFileName);
+  if (path.extname(imageFileName).toLowerCase() === ".webp") {
+    await fixtureImage.webp({ lossless: true }).toFile(imagePath);
+  } else {
+    await fixtureImage.png().toFile(imagePath);
+  }
 };
 
 const toDataUrl = (buffer, mimeType = "image/png") =>
   `data:${mimeType};base64,${buffer.toString("base64")}`;
+
+const writeUInt24LE = (value) => {
+  const buffer = Buffer.alloc(3);
+  buffer.writeUIntLE(value, 0, 3);
+  return buffer;
+};
+
+const createWebPChunk = (type, data) => {
+  const header = Buffer.alloc(8);
+  header.write(type, 0, "ascii");
+  header.writeUInt32LE(data.length, 4);
+
+  return Buffer.concat([header, data, data.length % 2 ? Buffer.from([0]) : Buffer.alloc(0)]);
+};
+
+const readWebPChunks = (webpBuffer) => {
+  assert.equal(webpBuffer.toString("ascii", 0, 4), "RIFF");
+  assert.equal(webpBuffer.toString("ascii", 8, 12), "WEBP");
+
+  const chunks = [];
+  let offset = 12;
+  while (offset + 8 <= webpBuffer.length) {
+    const type = webpBuffer.toString("ascii", offset, offset + 4);
+    const size = webpBuffer.readUInt32LE(offset + 4);
+    chunks.push({
+      type,
+      data: webpBuffer.subarray(offset + 8, offset + 8 + size),
+    });
+    offset += 8 + size + (size % 2);
+  }
+
+  return chunks;
+};
+
+const createAnimatedWebPFixture = async ({ width, height, delays }) => {
+  const frameBuffers = await Promise.all(
+    ["#3366ff", "#22c55e"].map((background) =>
+      sharp({
+        create: {
+          width,
+          height,
+          channels: 4,
+          background,
+        },
+      })
+        .webp({ lossless: true })
+        .toBuffer(),
+    ),
+  );
+  const vp8x = Buffer.concat([
+    Buffer.from([0x12, 0, 0, 0]),
+    writeUInt24LE(width - 1),
+    writeUInt24LE(height - 1),
+  ]);
+  const animationHeader = Buffer.alloc(6);
+  const animationChunks = frameBuffers.map((frameBuffer, index) => {
+    const framePayload = Buffer.concat(
+      readWebPChunks(frameBuffer)
+        .filter((chunk) => ["ALPH", "VP8 ", "VP8L"].includes(chunk.type))
+        .map((chunk) => createWebPChunk(chunk.type, chunk.data)),
+    );
+    const frameHeader = Buffer.concat([
+      writeUInt24LE(0),
+      writeUInt24LE(0),
+      writeUInt24LE(width - 1),
+      writeUInt24LE(height - 1),
+      writeUInt24LE(delays[index]),
+      Buffer.from([0x02]),
+    ]);
+
+    return createWebPChunk("ANMF", Buffer.concat([frameHeader, framePayload]));
+  });
+  const body = Buffer.concat([
+    createWebPChunk("VP8X", vp8x),
+    createWebPChunk("ANIM", animationHeader),
+    ...animationChunks,
+  ]);
+  const riffHeader = Buffer.alloc(8);
+  riffHeader.write("RIFF", 0, "ascii");
+  riffHeader.writeUInt32LE(4 + body.length, 4);
+
+  return Buffer.concat([riffHeader, Buffer.from("WEBP", "ascii"), body]);
+};
 
 test("tutorial shot source image accept contract lists browser-viewable image formats", () => {
   const acceptedTokens = TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT.split(",");
@@ -127,7 +217,50 @@ test("tutorial shot source image accept contract lists browser-viewable image fo
     assert.equal(acceptedTokens.includes(token), false, `accept should exclude ${token}`);
   }
 
-  assert.equal(TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL, "PNG/APNG/JPEG/GIF/WebP/AVIF/SVG/BMP/ICO/CUR");
+  assert.equal(
+    TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL,
+    "PNG/APNG/JPEG/GIF/WebP/AVIF/SVG/BMP/ICO/CUR",
+  );
+});
+
+test("tutorial shot static raster output policy defaults generated images to lossless WebP", () => {
+  assert.equal(TUTORIAL_SHOT_DEFAULT_OUTPUT_IMAGE_EXTENSION, ".webp");
+  assert.equal(
+    applyTutorialShotStaticRasterOutputPolicy("content/docs/tutorial/img/startup.png"),
+    "content/docs/tutorial/img/startup.webp",
+  );
+  assert.deepEqual(TUTORIAL_SHOT_STATIC_RASTER_OUTPUT_FORMAT, {
+    label: "WebP",
+    mimeType: "image/webp",
+    extension: ".webp",
+    sharpFormat: "webp-lossless",
+  });
+
+  assert.deepEqual(getTutorialShotGeneratedImageFormat("content/docs/tutorial/img/startup.webp"), {
+    label: "WebP",
+    mimeType: "image/webp",
+    extension: ".webp",
+    sharpFormat: "webp-lossless",
+  });
+  assert.equal(
+    getTutorialShotImageContentType("content/docs/tutorial/img/startup.webp"),
+    "image/webp",
+  );
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/tutorial/index.mdx",
+    outputImagePath: "content/docs/tutorial/img/startup.webp",
+  });
+  assert.equal(manifest.rawImagePath, "content/docs/tutorial/shots/startup.raw.webp");
+  assert.equal(
+    deriveTutorialShotRawImagePath({
+      pagePath: manifest.pagePath,
+      outputImagePath: manifest.outputImagePath,
+      sourceFileName: "source.PNG",
+      mimeType: "image/png",
+    }),
+    "content/docs/tutorial/shots/startup.raw.png",
+  );
 });
 
 test("tutorial shot source image helpers accept by MIME type or extension", () => {
@@ -150,10 +283,7 @@ test("tutorial shot source image helpers accept by MIME type or extension", () =
     true,
     "accepted MIME type should pass even when the filename has no extension",
   );
-  assert.equal(
-    isTutorialShotSourceImageFile({ name: "photo.heic", type: "" }),
-    false,
-  );
+  assert.equal(isTutorialShotSourceImageFile({ name: "photo.heic", type: "" }), false);
 });
 
 test("saveTutorialShot rejects non-image raw uploads before writing raw files", async (t) => {
@@ -169,7 +299,14 @@ test("saveTutorialShot rejects non-image raw uploads before writing raw files", 
     pagePath: "content/docs/student-guide/index.mdx",
     outputImagePath: "content/docs/student-guide/img/startup.png",
   });
-  const rawPath = path.join(sourceRoot, "content", "docs", "student-guide", "shots", "startup.raw.png");
+  const rawPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "shots",
+    "startup.raw.png",
+  );
 
   await assert.rejects(
     () =>
@@ -183,18 +320,21 @@ test("saveTutorialShot rejects non-image raw uploads before writing raw files", 
   await assert.rejects(() => fs.stat(rawPath), /ENOENT/u);
 });
 
-test("saveTutorialShot normalizes accepted raw uploads before persisting", async (t) => {
+test("saveTutorialShot preserves raw PNG uploads and generates cropped annotated WebP output", async (t) => {
   const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-upload-"));
 
   t.after(async () => {
     await fs.rm(sourceRoot, { recursive: true, force: true });
   });
 
-  await writeTutorialFixture(sourceRoot);
+  await writeTutorialFixture(sourceRoot, {
+    actionImageSrc: "./img/startup.webp",
+    imageFileName: "startup.webp",
+  });
 
   const manifest = createDefaultTutorialShotManifest({
     pagePath: "content/docs/student-guide/index.mdx",
-    outputImagePath: "content/docs/student-guide/img/startup.png",
+    outputImagePath: "content/docs/student-guide/img/startup.webp",
   });
   const uploadedImageBuffer = await sharp({
     create: {
@@ -209,14 +349,208 @@ test("saveTutorialShot normalizes accepted raw uploads before persisting", async
 
   await saveTutorialShot({
     sourceRoot,
-    manifestInput: manifest,
+    manifestInput: {
+      ...manifest,
+      crop: {
+        x: 24,
+        y: 20,
+        width: 140,
+        height: 90,
+      },
+      annotations: [
+        {
+          id: "box-1",
+          type: "box",
+          role: "action",
+          x: 24,
+          y: 20,
+          width: 72,
+          height: 36,
+        },
+      ],
+    },
     rawImageDataUrl: toDataUrl(uploadedImageBuffer, "image/png"),
   });
 
-  const rawPath = path.join(sourceRoot, "content", "docs", "student-guide", "shots", "startup.raw.png");
-  const rawMetadata = await sharp(rawPath).metadata();
+  const rawPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "shots",
+    "startup.raw.png",
+  );
+  const outputPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "img",
+    "startup.webp",
+  );
+  const rawBytes = await fs.readFile(rawPath);
+  assert.equal(Buffer.compare(rawBytes, uploadedImageBuffer), 0);
+
+  const rawMetadata = await sharp(rawBytes).metadata();
+  assert.equal(rawMetadata.format, "png");
   assert.equal(rawMetadata.width, 320);
   assert.equal(rawMetadata.height, 180);
+
+  const outputBytes = await fs.readFile(outputPath);
+  const outputMetadata = await sharp(outputBytes).metadata();
+  assert.equal(outputMetadata.format, "webp");
+  assert.equal(outputMetadata.width, 140);
+  assert.equal(outputMetadata.height, 90);
+
+  const { data, info } = await sharp(outputBytes)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const pixelOffset = (20 * info.width + 48) * info.channels;
+  const strokePixel = Array.from(data.subarray(pixelOffset, pixelOffset + info.channels));
+  assert.ok(
+    strokePixel[0] >= 250 &&
+      strokePixel[1] >= 95 &&
+      strokePixel[1] <= 120 &&
+      strokePixel[2] <= 20 &&
+      strokePixel[3] === 255,
+    `expected an orange annotation stroke pixel, got ${strokePixel.join(",")}`,
+  );
+
+  const outputImage = await readTutorialShotImage({
+    sourceRoot,
+    contentRelativePath: "content/docs/student-guide/img/startup.webp",
+  });
+  assert.equal(outputImage.contentType, "image/webp");
+
+  const rawImage = await readTutorialShotImage({
+    sourceRoot,
+    contentRelativePath: "content/docs/student-guide/shots/startup.raw.png",
+  });
+  assert.equal(rawImage.contentType, "image/png");
+});
+
+test("saveTutorialShot preserves animated WebP uploads as cropped annotated animated WebP output", async (t) => {
+  const sourceRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "course-tutorial-shots-animated-webp-"),
+  );
+
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+
+  await writeTutorialFixture(sourceRoot, {
+    actionImageSrc: "./img/startup.webp",
+    imageFileName: "startup.webp",
+  });
+
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: "content/docs/student-guide/img/startup.webp",
+  });
+  const animatedWebPBuffer = await createAnimatedWebPFixture({
+    width: 160,
+    height: 100,
+    delays: [60, 140],
+  });
+  const inputMetadata = await sharp(animatedWebPBuffer, { animated: true }).metadata();
+  assert.equal(inputMetadata.format, "webp");
+  assert.equal(inputMetadata.pages, 2);
+  assert.deepEqual(inputMetadata.delay, [60, 140]);
+
+  await saveTutorialShot({
+    sourceRoot,
+    manifestInput: {
+      ...manifest,
+      crop: {
+        x: 12,
+        y: 10,
+        width: 80,
+        height: 50,
+      },
+      annotations: [
+        {
+          id: "box-1",
+          type: "box",
+          role: "action",
+          x: 18,
+          y: 16,
+          width: 46,
+          height: 24,
+        },
+      ],
+    },
+    rawImageDataUrl: toDataUrl(animatedWebPBuffer, "image/webp"),
+    rawImageFileName: "startup.webp",
+  });
+
+  const rawPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "shots",
+    "startup.raw.webp",
+  );
+  const outputPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "img",
+    "startup.webp",
+  );
+  const rawBytes = await fs.readFile(rawPath);
+  assert.equal(Buffer.compare(rawBytes, animatedWebPBuffer), 0);
+
+  const outputBytes = await fs.readFile(outputPath);
+  assert.notEqual(
+    Buffer.compare(outputBytes, animatedWebPBuffer),
+    0,
+    "generated output must not pass through raw animated bytes",
+  );
+  const outputMetadata = await sharp(outputBytes, { animated: true }).metadata();
+  assert.equal(outputMetadata.format, "webp");
+  assert.equal(outputMetadata.pages, 2);
+  assert.deepEqual(outputMetadata.delay, [60, 140]);
+  assert.equal(outputMetadata.width, 80);
+  assert.equal(outputMetadata.pageHeight, 50);
+
+  const { data, info } = await sharp(outputBytes, { animated: true })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const readFramePixel = (frameIndex, x, y) => {
+    const frameTop = frameIndex * outputMetadata.pageHeight;
+    const pixelOffset = ((frameTop + y) * info.width + x) * info.channels;
+    return Array.from(data.subarray(pixelOffset, pixelOffset + info.channels));
+  };
+  assert.deepEqual(readFramePixel(0, 4, 4), [51, 102, 255, 255]);
+  assert.deepEqual(readFramePixel(1, 4, 4), [34, 197, 94, 255]);
+
+  for (const frameIndex of [0, 1]) {
+    const strokePixel = readFramePixel(frameIndex, 40, 16);
+    assert.ok(
+      strokePixel[0] >= 250 &&
+        strokePixel[1] >= 95 &&
+        strokePixel[1] <= 120 &&
+        strokePixel[2] <= 20 &&
+        strokePixel[3] === 255,
+      `expected an orange annotation stroke pixel on frame ${frameIndex}, got ${strokePixel.join(",")}`,
+    );
+  }
+
+  const outputImage = await readTutorialShotImage({
+    sourceRoot,
+    contentRelativePath: "content/docs/student-guide/img/startup.webp",
+  });
+  assert.equal(outputImage.contentType, "image/webp");
+
+  const rawImage = await readTutorialShotImage({
+    sourceRoot,
+    contentRelativePath: "content/docs/student-guide/shots/startup.raw.webp",
+  });
+  assert.equal(rawImage.contentType, "image/webp");
 });
 
 test("saveTutorialShot rejects MIME-spoofed unsupported raw uploads", async (t) => {
@@ -242,7 +576,14 @@ test("saveTutorialShot rejects MIME-spoofed unsupported raw uploads", async (t) 
   })
     .tiff()
     .toBuffer();
-  const rawPath = path.join(sourceRoot, "content", "docs", "student-guide", "shots", "startup.raw.png");
+  const rawPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "shots",
+    "startup.raw.png",
+  );
 
   await assert.rejects(
     () =>
@@ -283,7 +624,7 @@ authoringMode: tutorial
     [
       {
         id: "startup",
-        outputImagePath: "content/docs/student-guide/img/startup.png",
+        outputImagePath: "content/docs/student-guide/img/startup.webp",
         rawImagePath: "content/docs/student-guide/shots/startup.raw.png",
         manifestPath: "content/docs/student-guide/shots/startup.shot.json",
       },
@@ -325,14 +666,14 @@ authoringMode: tutorial
       {
         id: "node-event-actorbeginoverlap",
         sourceImagePath: "img/node-Event ActorBeginOverlap.png",
-        outputImagePath: "content/docs/student-guide/img/node-Event ActorBeginOverlap.png",
+        outputImagePath: "content/docs/student-guide/img/node-Event ActorBeginOverlap.webp",
         rawImagePath: "content/docs/student-guide/shots/node-Event ActorBeginOverlap.raw.png",
         manifestPath: "content/docs/student-guide/shots/node-Event ActorBeginOverlap.shot.json",
       },
       {
         id: "connect-score-1-setscore",
         sourceImagePath: "img/connect-Score+1-SetScore.png",
-        outputImagePath: "content/docs/student-guide/img/connect-Score+1-SetScore.png",
+        outputImagePath: "content/docs/student-guide/img/connect-Score+1-SetScore.webp",
         rawImagePath: "content/docs/student-guide/shots/connect-Score+1-SetScore.raw.png",
         manifestPath: "content/docs/student-guide/shots/connect-Score+1-SetScore.shot.json",
       },
@@ -369,7 +710,7 @@ authoringMode: tutorial
     [
       {
         id: "result",
-        outputImagePath: "content/docs/student-guide/img/result.png",
+        outputImagePath: "content/docs/student-guide/img/result.webp",
         rawImagePath: "content/docs/student-guide/shots/result.raw.png",
         manifestPath: "content/docs/student-guide/shots/result.shot.json",
       },
@@ -410,7 +751,7 @@ authoringMode: tutorial
       {
         id: "result-state",
         sourceImagePath: "img/result state.png",
-        outputImagePath: "content/docs/student-guide/img/result state.png",
+        outputImagePath: "content/docs/student-guide/img/result state.webp",
         rawImagePath: "content/docs/student-guide/shots/result state.raw.png",
         manifestPath: "content/docs/student-guide/shots/result state.shot.json",
       },
@@ -465,8 +806,13 @@ authoringMode: tutorial
 
     assert.ok(actionShot, "Action shot is present");
     assert.ok(verifyShot, "Verify shot is present");
-    assert.equal(actionShot.outputImagePath, "content/docs/student-guide/img/startup.png");
-    assert.equal(verifyShot.outputImagePath, "content/docs/student-guide/img/startup-result.png");
+    assert.equal(actionShot.outputImagePath, "content/docs/student-guide/img/startup.webp");
+    assert.equal(verifyShot.outputImagePath, "content/docs/student-guide/img/startup-result.webp");
+    assert.equal(actionShot.bootstrapImagePath, "content/docs/student-guide/img/startup.png");
+    assert.equal(
+      verifyShot.bootstrapImagePath,
+      "content/docs/student-guide/img/startup-result.png",
+    );
     assert.equal(actionShot.shotSource, "action", "Action shot has shotSource='action'");
     assert.equal(verifyShot.shotSource, "verify", "Verify shot has shotSource='verify'");
   } finally {
@@ -830,7 +1176,7 @@ test("tutorial shot editor crop state stays isolated per image and restores per 
   );
 });
 
-test("scanTutorialShots and saveTutorialShot keep Action img output paths stable", async (t) => {
+test("scanTutorialShots and saveTutorialShot migrate static Action output to WebP", async (t) => {
   const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-"));
 
   t.after(async () => {
@@ -841,7 +1187,8 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
 
   const initialShots = await scanTutorialShots({ sourceRoot });
   assert.equal(initialShots.length, 1);
-  assert.equal(initialShots[0].outputImagePath, "content/docs/student-guide/img/startup.png");
+  assert.equal(initialShots[0].outputImagePath, "content/docs/student-guide/img/startup.webp");
+  assert.equal(initialShots[0].bootstrapImagePath, "content/docs/student-guide/img/startup.png");
   assert.equal(initialShots[0].hasOutputImage, true);
   assert.equal(initialShots[0].hasRawImage, false);
   assert.equal(initialShots[0].hasManifest, false);
@@ -854,6 +1201,7 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
   const result = await saveTutorialShot({
     sourceRoot,
     bootstrapFromOutput: true,
+    bootstrapImagePath: initialShots[0].bootstrapImagePath,
     manifestInput: {
       ...manifest,
       alt: "Epic Games Launcher の起動画面",
@@ -912,7 +1260,7 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
     "docs",
     "student-guide",
     "img",
-    "startup.png",
+    "startup.webp",
   );
 
   await assert.doesNotReject(() => fs.stat(rawImagePath));
@@ -947,9 +1295,17 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
     },
   ]);
 
-  const outputMetadata = await sharp(outputImagePath).metadata();
+  const outputBytes = await fs.readFile(outputImagePath);
+  const outputMetadata = await sharp(outputBytes).metadata();
+  assert.equal(outputMetadata.format, "webp");
   assert.equal(outputMetadata.width, 280);
   assert.equal(outputMetadata.height, 160);
+
+  const savedPageSource = await fs.readFile(
+    path.join(sourceRoot, "content", "docs", "student-guide", "index.mdx"),
+    "utf8",
+  );
+  assert.match(savedPageSource, /<Action img="\.\/img\/startup\.webp">/u);
 
   const rescannedShots = await scanTutorialShots({ sourceRoot });
   assert.equal(rescannedShots.length, 1);
@@ -959,7 +1315,9 @@ test("scanTutorialShots and saveTutorialShot keep Action img output paths stable
 });
 
 test("scanTutorialShots warns when a tutorial page still lacks authoringMode", async (t) => {
-  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-mode-warning-"));
+  const sourceRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "course-tutorial-shots-mode-warning-"),
+  );
 
   t.after(async () => {
     await fs.rm(sourceRoot, { recursive: true, force: true });
@@ -1002,7 +1360,9 @@ title: Student Guide
 });
 
 test("saveTutorialShot keeps returning the page-mode warning until authoringMode is added", async (t) => {
-  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-save-warning-"));
+  const sourceRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "course-tutorial-shots-save-warning-"),
+  );
 
   t.after(async () => {
     await fs.rm(sourceRoot, { recursive: true, force: true });
@@ -1044,6 +1404,7 @@ title: Student Guide
   const result = await saveTutorialShot({
     sourceRoot,
     bootstrapFromOutput: true,
+    bootstrapImagePath: "content/docs/student-guide/img/startup.png",
     manifestInput: {
       ...manifest,
       crop: {
@@ -1061,98 +1422,100 @@ title: Student Guide
   ]);
 });
 
-test(
-  "scanTutorialShots and saveTutorialShot treat URL-encoded Action image filenames as real local files",
-  async (t) => {
-    const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-encoded-"));
+test("scanTutorialShots and saveTutorialShot treat URL-encoded Action image filenames as real local files", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-encoded-"));
 
-    t.after(async () => {
-      await fs.rm(sourceRoot, { recursive: true, force: true });
-    });
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
 
-    await writeTutorialFixture(sourceRoot, {
-      actionImageSrc: "./img/node-Event%20ActorBeginOverlap.png",
-      imageFileName: "node-Event ActorBeginOverlap.png",
-    });
+  await writeTutorialFixture(sourceRoot, {
+    actionImageSrc: "./img/node-Event%20ActorBeginOverlap.png",
+    imageFileName: "node-Event ActorBeginOverlap.png",
+  });
 
-    const initialShots = await scanTutorialShots({ sourceRoot });
-    assert.equal(initialShots.length, 1);
-    assert.equal(
-      initialShots[0].id,
-      "node-event-actorbeginoverlap",
-      "The shot id should come from the decoded filename, not the %20 escape.",
-    );
-    assert.equal(
-      initialShots[0].outputImagePath,
-      "content/docs/student-guide/img/node-Event ActorBeginOverlap.png",
-    );
-    assert.equal(initialShots[0].hasOutputImage, true);
+  const initialShots = await scanTutorialShots({ sourceRoot });
+  assert.equal(initialShots.length, 1);
+  assert.equal(
+    initialShots[0].id,
+    "node-event-actorbeginoverlap",
+    "The shot id should come from the decoded filename, not the %20 escape.",
+  );
+  assert.equal(
+    initialShots[0].outputImagePath,
+    "content/docs/student-guide/img/node-Event ActorBeginOverlap.webp",
+  );
+  assert.equal(
+    initialShots[0].bootstrapImagePath,
+    "content/docs/student-guide/img/node-Event ActorBeginOverlap.png",
+  );
+  assert.equal(initialShots[0].hasOutputImage, true);
 
-    const encodedPath = "content/docs/student-guide/img/node-Event%20ActorBeginOverlap.png";
-    const decodedRawPath = path.join(
-      sourceRoot,
-      "content",
-      "docs",
-      "student-guide",
-      "shots",
-      "node-Event ActorBeginOverlap.raw.png",
-    );
-    const encodedRawPath = path.join(
-      sourceRoot,
-      "content",
-      "docs",
-      "student-guide",
-      "shots",
-      "node-Event%20ActorBeginOverlap.raw.png",
-    );
-    const decodedManifestPath = path.join(
-      sourceRoot,
-      "content",
-      "docs",
-      "student-guide",
-      "shots",
-      "node-Event ActorBeginOverlap.shot.json",
-    );
+  const encodedPath = "content/docs/student-guide/img/node-Event%20ActorBeginOverlap.png";
+  const decodedRawPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "shots",
+    "node-Event ActorBeginOverlap.raw.png",
+  );
+  const encodedRawPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "shots",
+    "node-Event%20ActorBeginOverlap.raw.png",
+  );
+  const decodedManifestPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "shots",
+    "node-Event ActorBeginOverlap.shot.json",
+  );
 
-    const image = await readTutorialShotImage({
-      sourceRoot,
-      contentRelativePath: encodedPath,
-    });
-    assert.equal(image.contentType, "image/png");
-    assert.ok(image.bytes.length > 0);
+  const image = await readTutorialShotImage({
+    sourceRoot,
+    contentRelativePath: encodedPath,
+  });
+  assert.equal(image.contentType, "image/png");
+  assert.ok(image.bytes.length > 0);
 
-    const manifest = createDefaultTutorialShotManifest({
-      pagePath: "content/docs/student-guide/index.mdx",
-      outputImagePath: encodedPath,
-    });
-    const result = await saveTutorialShot({
-      sourceRoot,
-      bootstrapFromOutput: true,
-      manifestInput: {
-        ...manifest,
-        crop: {
-          x: 24,
-          y: 20,
-          width: 280,
-          height: 160,
-        },
-        annotations: [],
+  const manifest = createDefaultTutorialShotManifest({
+    pagePath: "content/docs/student-guide/index.mdx",
+    outputImagePath: encodedPath,
+  });
+  const result = await saveTutorialShot({
+    sourceRoot,
+    bootstrapFromOutput: true,
+    bootstrapImagePath: encodedPath,
+    manifestInput: {
+      ...manifest,
+      crop: {
+        x: 24,
+        y: 20,
+        width: 280,
+        height: 160,
       },
-    });
+      annotations: [],
+    },
+  });
 
-    assert.equal(
-      result.manifest.outputImagePath,
-      "content/docs/student-guide/img/node-Event ActorBeginOverlap.png",
-    );
-    assert.equal(
-      result.manifest.rawImagePath,
-      "content/docs/student-guide/shots/node-Event ActorBeginOverlap.raw.png",
-    );
-    await assert.doesNotReject(() => fs.stat(decodedRawPath));
-    await assert.doesNotReject(() => fs.stat(decodedManifestPath));
-    await assert.rejects(() => fs.stat(encodedRawPath));
-  },
-);
+  assert.equal(
+    result.manifest.outputImagePath,
+    "content/docs/student-guide/img/node-Event ActorBeginOverlap.webp",
+  );
+  assert.equal(
+    result.manifest.rawImagePath,
+    "content/docs/student-guide/shots/node-Event ActorBeginOverlap.raw.png",
+  );
+  await assert.doesNotReject(() => fs.stat(decodedRawPath));
+  await assert.doesNotReject(() => fs.stat(decodedManifestPath));
+  await assert.rejects(() => fs.stat(encodedRawPath));
+});
 
 test("saveTutorialShot expands the output canvas when annotations overflow the crop", async (t) => {
   const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-overflow-"));
@@ -1171,6 +1534,7 @@ test("saveTutorialShot expands the output canvas when annotations overflow the c
   const result = await saveTutorialShot({
     sourceRoot,
     bootstrapFromOutput: true,
+    bootstrapImagePath: "content/docs/student-guide/img/startup.png",
     manifestInput: {
       ...manifest,
       crop: {
@@ -1212,15 +1576,15 @@ test("saveTutorialShot expands the output canvas when annotations overflow the c
     "docs",
     "student-guide",
     "img",
-    "startup.png",
+    "startup.webp",
   );
-  const outputMetadata = await sharp(outputImagePath).metadata();
+  const outputBytes = await fs.readFile(outputImagePath);
+  const outputMetadata = await sharp(outputBytes).metadata();
+  assert.equal(outputMetadata.format, "webp");
   assert.equal(outputMetadata.width, 322);
   assert.equal(outputMetadata.height, 182);
 
-  const { data, info } = await sharp(outputImagePath)
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+  const { data, info } = await sharp(outputBytes).raw().toBuffer({ resolveWithObject: true });
   const readPixel = (x, y) => {
     const offset = (y * info.width + x) * info.channels;
     return Array.from(data.subarray(offset, offset + info.channels));
@@ -1253,6 +1617,7 @@ test("saveTutorialShot accepts no annotations for result-confirmation shots", as
   const result = await saveTutorialShot({
     sourceRoot,
     bootstrapFromOutput: true,
+    bootstrapImagePath: "content/docs/student-guide/img/startup.png",
     manifestInput: {
       ...manifest,
       crop: {
@@ -1286,6 +1651,7 @@ test("saveTutorialShot accepts a single box without an arrow", async (t) => {
   const result = await saveTutorialShot({
     sourceRoot,
     bootstrapFromOutput: true,
+    bootstrapImagePath: "content/docs/student-guide/img/startup.png",
     manifestInput: {
       ...manifest,
       crop: {
@@ -1339,6 +1705,7 @@ test("saveTutorialShot accepts multiple boxes in callout mode", async (t) => {
   const result = await saveTutorialShot({
     sourceRoot,
     bootstrapFromOutput: true,
+    bootstrapImagePath: "content/docs/student-guide/img/startup.png",
     manifestInput: {
       ...manifest,
       annotationMode: "callout",
@@ -1382,13 +1749,12 @@ test("saveTutorialShot rejects a box annotation without a role", async (t) => {
       saveTutorialShot({
         sourceRoot,
         bootstrapFromOutput: true,
+        bootstrapImagePath: "content/docs/student-guide/img/startup.png",
         manifestInput: {
           ...manifest,
           annotationMode: "callout",
           crop: { x: 0, y: 0, width: 320, height: 180 },
-          annotations: [
-            { id: "box-role-less", type: "box", x: 10, y: 10, width: 80, height: 40 },
-          ],
+          annotations: [{ id: "box-role-less", type: "box", x: 10, y: 10, width: 80, height: 40 }],
         },
       }),
     /role が必要です/u,
@@ -1431,7 +1797,11 @@ test("renderTutorialShotOverlaySvg draws verify boxes with white dashed stroke a
 
   // action badge: orange fill, white text
   const actionBadgeCirclePattern = /<circle[^>]*fill="#ff6b00"[^>]*stroke="#ffffff"[^>]*\/>/u;
-  assert.match(svg, actionBadgeCirclePattern, "action badge circle must be orange-fill white-stroke");
+  assert.match(
+    svg,
+    actionBadgeCirclePattern,
+    "action badge circle must be orange-fill white-stroke",
+  );
 
   const actionBadgeTextPattern = /<text[^>]*fill="#ffffff"[^>]*>1<\/text>/u;
   assert.match(svg, actionBadgeTextPattern, "action badge text must be white");
@@ -1458,6 +1828,7 @@ test("saveTutorialShot rejects arrows in callout mode", async (t) => {
       saveTutorialShot({
         sourceRoot,
         bootstrapFromOutput: true,
+        bootstrapImagePath: "content/docs/student-guide/img/startup.png",
         manifestInput: {
           ...manifest,
           annotationMode: "callout",
@@ -1473,9 +1844,7 @@ test("saveTutorialShot rejects arrows in callout mode", async (t) => {
 });
 
 test("saveTutorialShot accepts multiple boxes in multi-focal mode", async (t) => {
-  const sourceRoot = await fs.mkdtemp(
-    path.join(os.tmpdir(), "course-tutorial-shots-multi-focal-"),
-  );
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shots-multi-focal-"));
 
   t.after(async () => {
     await fs.rm(sourceRoot, { recursive: true, force: true });
@@ -1491,6 +1860,7 @@ test("saveTutorialShot accepts multiple boxes in multi-focal mode", async (t) =>
   const result = await saveTutorialShot({
     sourceRoot,
     bootstrapFromOutput: true,
+    bootstrapImagePath: "content/docs/student-guide/img/startup.png",
     manifestInput: {
       ...manifest,
       annotationMode: "multi-focal",
@@ -1533,6 +1903,7 @@ test("saveTutorialShot rejects arrows in multi-focal mode", async (t) => {
       saveTutorialShot({
         sourceRoot,
         bootstrapFromOutput: true,
+        bootstrapImagePath: "content/docs/student-guide/img/startup.png",
         manifestInput: {
           ...manifest,
           annotationMode: "multi-focal",

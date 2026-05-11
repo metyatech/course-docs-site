@@ -88,13 +88,14 @@ local course repo, the editor can temporarily switch to another local content
 repo from its own setup screen without restarting dev. That override affects
 only the editor. Normal docs pages still follow `COURSE_CONTENT_SOURCE`.
 
-Use it when a tutorial page already contains `Action img="./img/...png"` and
-you want to keep that output path stable while editing:
+Use it when a tutorial page already contains a page-local tutorial image
+reference such as `Action img="./img/...webp"` or an older PNG reference that
+should migrate to the static UI WebP output policy:
 
 - raw screenshot
 - crop
 - box / arrow / short label annotations
-- generated page-local output image
+- generated page-local WebP output image for static UI screenshots, with animated WebP raw uploads preserved as animated WebP
 
 The editor also warns when the scanned page still uses `<Section>` without
 declaring `authoringMode: tutorial`, so local fixtures and in-progress course

@@ -3,25 +3,46 @@ import path from "node:path";
 import sharp from "sharp";
 import {
   createDefaultTutorialShotManifest,
+  deriveTutorialShotRawImagePath,
   deriveTutorialShotPaths,
   extractActionImageRefsFromMdx,
   extractVerifyImageRefsFromMdx,
   getTutorialPageModeWarnings,
+  getTutorialShotFileExtension,
   getTutorialShotAnnotationErrors,
   getTutorialShotCanvasLayout,
+  getTutorialShotGeneratedImageFormat,
+  getTutorialShotImageContentType,
+  getTutorialShotSourceImageExtensionForFileName,
+  getTutorialShotSourceImageExtensionForMimeType,
   getTutorialShotWarnings,
+  isExpectedTutorialShotRawImagePath,
+  isTutorialShotManifestPath,
+  isTutorialShotOutputImagePath,
+  isTutorialShotReadableImagePath,
   normalizeDecodedPosixPath,
   normalizePosixPath,
   normalizeTutorialShotManifest,
+  replaceTutorialShotPathExtension,
   renderTutorialShotOverlaySvg,
   isTutorialShotSourceImageMimeType,
+  rewriteTutorialShotImageRefsForOutputPolicy,
 } from "./tutorial-shots-shared.mjs";
 
-const IMAGE_PATH_PATTERN = /^content\/.+\.(png|jpe?g|webp)$/iu;
 const PAGE_PATH_PATTERN = /^content\/.+\/index\.mdx?$/iu;
 const MAX_RAW_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024;
 const SHARP_INPUT_PIXEL_LIMIT = 100_000_000;
-const SUPPORTED_RAW_UPLOAD_FORMATS = new Set(["png", "jpeg", "webp", "gif", "avif", "svg"]);
+const ANIMATED_GENERATED_WEBP_SOURCE_FORMATS = new Set(["webp"]);
+const SHARP_RAW_UPLOAD_FORMAT_EXTENSIONS = new Map([
+  ["png", new Set([".png", ".apng"])],
+  ["jpeg", new Set([".jpg", ".jpeg", ".jfif", ".jpe", ".jif"])],
+  ["webp", new Set([".webp"])],
+  ["gif", new Set([".gif"])],
+  ["avif", new Set([".avif"])],
+  ["heif", new Set([".avif"])],
+  ["svg", new Set([".svg"])],
+  ["bmp", new Set([".bmp", ".dib"])],
+]);
 
 const isLocalPathLike = (value) =>
   value.startsWith(".") ||
@@ -61,9 +82,11 @@ const ensureInsideRoot = ({ rootDir, resolvedPath }) => {
   return normalizedResolved;
 };
 
-const assertContentRelativePath = (value, pattern = IMAGE_PATH_PATTERN) => {
+const assertContentRelativePath = (value, validator = isTutorialShotOutputImagePath) => {
   const normalized = normalizeDecodedPosixPath(value ?? "");
-  if (!pattern.test(normalized)) {
+  const isValid =
+    typeof validator === "function" ? validator(normalized) : validator.test(normalized);
+  if (!isValid) {
     throw new Error(`Invalid content-relative path: ${value}`);
   }
   return normalized;
@@ -145,8 +168,8 @@ const listSuggestedLocalSources = async ({ configuredSource, projectRoot }) => {
   return [...suggestions].sort((left, right) => left.localeCompare(right));
 };
 
-const resolveSourcePath = ({ sourceRoot, contentRelativePath, pattern }) => {
-  const normalized = assertContentRelativePath(contentRelativePath, pattern);
+const resolveSourcePath = ({ sourceRoot, contentRelativePath, validator }) => {
+  const normalized = assertContentRelativePath(contentRelativePath, validator);
   return ensureInsideRoot({
     rootDir: sourceRoot,
     resolvedPath: path.resolve(sourceRoot, normalized),
@@ -157,10 +180,21 @@ const ensureParentDir = async (filePath) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 };
 
-const rewritePageSourceForDevRefresh = async ({ pageAbsPath, sourceText }) => {
+const rewritePageSourceForDevRefresh = async ({
+  pageAbsPath,
+  pagePath,
+  sourceText,
+  outputImagePath,
+}) => {
   // Rewriting the page with identical contents makes the synced MDX page update
   // after the generated image file, so the open dev preview reloads the latest image.
-  await fs.writeFile(pageAbsPath, sourceText, "utf8");
+  const rewrite = rewriteTutorialShotImageRefsForOutputPolicy({
+    pagePath,
+    sourceText,
+    outputImagePath,
+  });
+  await fs.writeFile(pageAbsPath, rewrite.sourceText, "utf8");
+  return rewrite.sourceText;
 };
 
 const hydrateManifest = (manifestInput) => {
@@ -169,11 +203,19 @@ const hydrateManifest = (manifestInput) => {
     pagePath: normalized.pagePath,
     outputImagePath: normalized.outputImagePath,
   });
+  const rawImagePath = isExpectedTutorialShotRawImagePath({
+    pagePath: normalized.pagePath,
+    outputImagePath: defaults.outputImagePath,
+    rawImagePath: normalized.rawImagePath,
+  })
+    ? normalized.rawImagePath
+    : defaults.rawImagePath;
 
   return {
     ...normalized,
     id: defaults.id,
-    rawImagePath: defaults.rawImagePath,
+    outputImagePath: defaults.outputImagePath,
+    rawImagePath,
     version: defaults.version,
   };
 };
@@ -205,24 +247,104 @@ const parseDataUrl = (value) => {
   };
 };
 
-const normalizeUploadedRawImageBuffer = async ({ buffer, rawAbsPath }) => {
-  const sourceImage = sharp(buffer, { limitInputPixels: SHARP_INPUT_PIXEL_LIMIT });
+const createSharpInputImage = (input, options = {}) =>
+  sharp(input, { ...options, limitInputPixels: SHARP_INPUT_PIXEL_LIMIT });
+
+const validateUploadedRawImageBuffer = async ({ buffer }) => {
+  const sourceImage = createSharpInputImage(buffer);
   const metadata = await sourceImage.metadata();
   if (!metadata.width || !metadata.height) {
     throw new Error("アップロード画像のサイズを取得できませんでした。");
   }
-  if (!metadata.format || !SUPPORTED_RAW_UPLOAD_FORMATS.has(metadata.format)) {
+  const acceptedExtensions = metadata.format
+    ? SHARP_RAW_UPLOAD_FORMAT_EXTENSIONS.get(metadata.format)
+    : null;
+  if (!acceptedExtensions) {
     throw new Error("アップロード画像の形式が対応していません。");
   }
 
-  const extension = path.extname(rawAbsPath).toLowerCase();
-  if (extension === ".jpg" || extension === ".jpeg") {
-    return sourceImage.clone().jpeg().toBuffer();
+  return metadata;
+};
+
+const isAnimatedGeneratedWebpSourceMetadata = (metadata) =>
+  ANIMATED_GENERATED_WEBP_SOURCE_FORMATS.has(metadata?.format) &&
+  Number.isInteger(metadata?.pages) &&
+  metadata.pages > 1 &&
+  Number.isInteger(metadata?.pageHeight) &&
+  metadata.pageHeight > 0;
+
+const getRawImageProcessingContext = async ({ rawBuffer }) => {
+  const animatedMetadata = await createSharpInputImage(rawBuffer, { animated: true }).metadata();
+  if (isAnimatedGeneratedWebpSourceMetadata(animatedMetadata)) {
+    return {
+      frameHeight: animatedMetadata.pageHeight,
+      image: createSharpInputImage(rawBuffer, { animated: true }),
+      metadata: animatedMetadata,
+      preserveAnimation: true,
+    };
   }
-  if (extension === ".webp") {
-    return sourceImage.clone().webp().toBuffer();
+
+  const image = createSharpInputImage(rawBuffer);
+  const metadata = await image.metadata();
+
+  return {
+    frameHeight: metadata.height,
+    image,
+    metadata,
+    preserveAnimation: false,
+  };
+};
+
+const getRawUploadExtensionForMetadata = ({
+  metadataFormat,
+  mimeType,
+  rawImageFileName,
+  manifestRawImagePath,
+}) => {
+  const acceptedExtensions = SHARP_RAW_UPLOAD_FORMAT_EXTENSIONS.get(metadataFormat) ?? null;
+  if (!acceptedExtensions) {
+    throw new Error("アップロード画像の形式が対応していません。");
   }
-  return sourceImage.clone().png().toBuffer();
+
+  const manifestExtension = getTutorialShotFileExtension(manifestRawImagePath);
+  if (acceptedExtensions.has(manifestExtension)) {
+    return manifestExtension;
+  }
+
+  const fileNameExtension = getTutorialShotSourceImageExtensionForFileName(rawImageFileName);
+  if (acceptedExtensions.has(fileNameExtension)) {
+    return fileNameExtension;
+  }
+
+  const mimeExtension = getTutorialShotSourceImageExtensionForMimeType(mimeType);
+  if (acceptedExtensions.has(mimeExtension)) {
+    return mimeExtension;
+  }
+
+  return [...acceptedExtensions][0];
+};
+
+const writeGeneratedTutorialShotImage = async ({ image, outputAbsPath, outputFormat }) => {
+  if (!outputFormat) {
+    throw new Error(`出力画像の形式が対応していません: ${outputAbsPath}`);
+  }
+
+  if (outputFormat.sharpFormat === "webp-lossless") {
+    await image.webp({ lossless: true }).toFile(outputAbsPath);
+    return;
+  }
+
+  if (outputFormat.sharpFormat === "png") {
+    await image.png().toFile(outputAbsPath);
+    return;
+  }
+
+  if (outputFormat.sharpFormat === "jpeg") {
+    await image.jpeg().toFile(outputAbsPath);
+    return;
+  }
+
+  throw new Error(`出力画像の形式が対応していません: ${outputAbsPath}`);
 };
 
 const normalizeCrop = ({ crop, width, height }) => {
@@ -241,6 +363,79 @@ const normalizeCrop = ({ crop, width, height }) => {
     width: extractedWidth,
     height: extractedHeight,
   };
+};
+
+const getTutorialShotAnimatedOutputPlan = ({ metadata, outputFormat }) => {
+  const pages = Number.isInteger(metadata.pages) ? metadata.pages : 1;
+  if (pages <= 1) {
+    return null;
+  }
+
+  if (
+    !ANIMATED_GENERATED_WEBP_SOURCE_FORMATS.has(metadata.format) ||
+    outputFormat?.sharpFormat !== "webp-lossless"
+  ) {
+    return null;
+  }
+
+  return {
+    delay: Array.isArray(metadata.delay) && metadata.delay.length > 0 ? metadata.delay : undefined,
+    loop: Number.isInteger(metadata.loop) ? metadata.loop : undefined,
+    pages,
+  };
+};
+
+const getRepeatedOverlayComposites = ({ overlaySvg, pages, pageHeight }) =>
+  Array.from({ length: pages }, (_, index) => ({
+    input: Buffer.from(overlaySvg, "utf8"),
+    left: 0,
+    top: index * pageHeight,
+  }));
+
+const writeAnimatedWebpTutorialShotImage = async ({
+  rawBuffer,
+  crop,
+  outputLayout,
+  overlaySvg,
+  outputAbsPath,
+  animatedOutputPlan,
+}) => {
+  const webpOptions = { lossless: true };
+  if (animatedOutputPlan.delay) {
+    webpOptions.delay = animatedOutputPlan.delay;
+  }
+  if (animatedOutputPlan.loop !== undefined) {
+    webpOptions.loop = animatedOutputPlan.loop;
+  }
+
+  await sharp(rawBuffer, { animated: true, limitInputPixels: SHARP_INPUT_PIXEL_LIMIT })
+    .extract({
+      left: crop.x,
+      top: crop.y,
+      width: crop.width,
+      height: crop.height,
+    })
+    .extend({
+      left: outputLayout.imageX,
+      top: outputLayout.imageY,
+      right: outputLayout.width - outputLayout.imageX - crop.width,
+      bottom: outputLayout.height - outputLayout.imageY - crop.height,
+      background: {
+        r: 0,
+        g: 0,
+        b: 0,
+        alpha: 0,
+      },
+    })
+    .composite(
+      getRepeatedOverlayComposites({
+        overlaySvg,
+        pages: animatedOutputPlan.pages,
+        pageHeight: outputLayout.height,
+      }),
+    )
+    .webp(webpOptions)
+    .toFile(outputAbsPath);
 };
 
 /**
@@ -343,27 +538,42 @@ export const scanTutorialShots = async ({ sourceRoot }) => {
       const manifestPath = resolveSourcePath({
         sourceRoot,
         contentRelativePath: ref.manifestPath,
-        pattern: /^content\/.+\/shots\/.+\.shot\.json$/iu,
-      });
-      const rawImagePath = resolveSourcePath({
-        sourceRoot,
-        contentRelativePath: ref.rawImagePath,
-        pattern: /^content\/.+\/shots\/.+\.(png|jpe?g|webp)$/iu,
+        validator: isTutorialShotManifestPath,
       });
       const outputImagePath = resolveSourcePath({
         sourceRoot,
         contentRelativePath: ref.outputImagePath,
-        pattern: IMAGE_PATH_PATTERN,
+        validator: isTutorialShotOutputImagePath,
+      });
+      const referencedImagePath = resolveSourcePath({
+        sourceRoot,
+        contentRelativePath: ref.referencedImagePath,
+        validator: isTutorialShotReadableImagePath,
       });
 
       const rawManifest = await readJsonIfExists(manifestPath);
       const manifest = hydrateManifest(
-        rawManifest ??
-          createDefaultTutorialShotManifest({
-            pagePath: ref.pagePath,
-            outputImagePath: ref.outputImagePath,
-          }),
+        rawManifest
+          ? {
+              ...rawManifest,
+              pagePath: ref.pagePath,
+              outputImagePath: ref.outputImagePath,
+            }
+          : createDefaultTutorialShotManifest({
+              pagePath: ref.pagePath,
+              outputImagePath: ref.outputImagePath,
+            }),
       );
+      const rawImagePath = resolveSourcePath({
+        sourceRoot,
+        contentRelativePath: manifest.rawImagePath,
+        validator: (contentPath) =>
+          isExpectedTutorialShotRawImagePath({
+            pagePath: manifest.pagePath,
+            outputImagePath: manifest.outputImagePath,
+            rawImagePath: contentPath,
+          }),
+      });
 
       const warnings = getTutorialShotWarnings(manifest, { shotSource: ref.shotSource });
       const mergedWarnings = [...new Set([...pageModeWarnings, ...warnings])];
@@ -376,14 +586,28 @@ export const scanTutorialShots = async ({ sourceRoot }) => {
         .stat(outputImagePath)
         .then(() => true)
         .catch(() => false);
+      const hasReferencedImage =
+        ref.referencedImagePath === ref.outputImagePath
+          ? hasOutputImage
+          : await fs
+              .stat(referencedImagePath)
+              .then(() => true)
+              .catch(() => false);
+      const bootstrapImagePath = hasOutputImage
+        ? ref.outputImagePath
+        : hasReferencedImage
+          ? ref.referencedImagePath
+          : null;
 
       shots.push({
         ...ref,
+        rawImagePath: manifest.rawImagePath,
         manifest,
         warnings: mergedWarnings,
         hasManifest,
         hasRawImage,
-        hasOutputImage,
+        hasOutputImage: hasOutputImage || hasReferencedImage,
+        bootstrapImagePath,
       });
     }
   }
@@ -400,10 +624,15 @@ export const saveTutorialShot = async ({
   sourceRoot,
   manifestInput,
   rawImageDataUrl = null,
+  rawImageFileName = null,
   bootstrapFromOutput = false,
+  bootstrapImagePath = null,
 }) => {
-  const manifest = prepareManifestForSave(manifestInput);
-  const annotationErrors = getTutorialShotAnnotationErrors(manifest.annotations, manifest.annotationMode);
+  let manifest = prepareManifestForSave(manifestInput);
+  const annotationErrors = getTutorialShotAnnotationErrors(
+    manifest.annotations,
+    manifest.annotationMode,
+  );
   if (annotationErrors.length > 0) {
     throw new Error(annotationErrors[0]);
   }
@@ -415,12 +644,17 @@ export const saveTutorialShot = async ({
   const outputAbsPath = resolveSourcePath({
     sourceRoot,
     contentRelativePath: manifest.outputImagePath,
-    pattern: IMAGE_PATH_PATTERN,
+    validator: isTutorialShotOutputImagePath,
   });
-  const rawAbsPath = resolveSourcePath({
+  let rawAbsPath = resolveSourcePath({
     sourceRoot,
     contentRelativePath: manifest.rawImagePath,
-    pattern: /^content\/.+\/shots\/.+\.(png|jpe?g|webp)$/iu,
+    validator: (contentPath) =>
+      isExpectedTutorialShotRawImagePath({
+        pagePath: manifest.pagePath,
+        outputImagePath: manifest.outputImagePath,
+        rawImagePath: contentPath,
+      }),
   });
   const derivedPaths = deriveTutorialShotPaths({
     pagePath: manifest.pagePath,
@@ -429,31 +663,118 @@ export const saveTutorialShot = async ({
   const manifestAbsPath = resolveSourcePath({
     sourceRoot,
     contentRelativePath: derivedPaths.manifestPath,
-    pattern: /^content\/.+\/shots\/.+\.shot\.json$/iu,
+    validator: isTutorialShotManifestPath,
   });
   const pageAbsPath = resolveSourcePath({
     sourceRoot,
     contentRelativePath: manifest.pagePath,
-    pattern: PAGE_PATH_PATTERN,
+    validator: PAGE_PATH_PATTERN,
   });
 
   if (rawImageDataUrl) {
-    const { buffer } = parseDataUrl(rawImageDataUrl);
-    const normalizedRawBuffer = await normalizeUploadedRawImageBuffer({ buffer, rawAbsPath });
+    const { buffer, mimeType } = parseDataUrl(rawImageDataUrl);
+    const metadata = await validateUploadedRawImageBuffer({ buffer });
+    const rawExtension = getRawUploadExtensionForMetadata({
+      metadataFormat: metadata.format,
+      mimeType,
+      rawImageFileName,
+      manifestRawImagePath: manifest.rawImagePath,
+    });
+    manifest = {
+      ...manifest,
+      rawImagePath: deriveTutorialShotRawImagePath({
+        pagePath: manifest.pagePath,
+        outputImagePath: manifest.outputImagePath,
+        fallbackExtension: rawExtension,
+      }),
+    };
+    rawAbsPath = resolveSourcePath({
+      sourceRoot,
+      contentRelativePath: manifest.rawImagePath,
+      validator: (contentPath) =>
+        isExpectedTutorialShotRawImagePath({
+          pagePath: manifest.pagePath,
+          outputImagePath: manifest.outputImagePath,
+          rawImagePath: contentPath,
+        }),
+    });
     await ensureParentDir(rawAbsPath);
-    await fs.writeFile(rawAbsPath, normalizedRawBuffer);
+    await fs.writeFile(rawAbsPath, buffer);
   } else if (bootstrapFromOutput) {
-    const outputExists = await fs
-      .stat(outputAbsPath)
+    let bootstrapContentPath = normalizeDecodedPosixPath(
+      typeof bootstrapImagePath === "string" && bootstrapImagePath.trim()
+        ? bootstrapImagePath
+        : manifest.outputImagePath,
+    );
+    let bootstrapDerivedPaths = deriveTutorialShotPaths({
+      pagePath: manifest.pagePath,
+      outputImagePath: bootstrapContentPath,
+    });
+    if (bootstrapDerivedPaths.id !== manifest.id) {
+      throw new Error("現在の出力画像と保存対象のショットが一致しません。");
+    }
+    let bootstrapAbsPath = resolveSourcePath({
+      sourceRoot,
+      contentRelativePath: bootstrapContentPath,
+      validator: isTutorialShotReadableImagePath,
+    });
+    let bootstrapImageExists = await fs
+      .stat(bootstrapAbsPath)
       .then(() => true)
       .catch(() => false);
-    if (!outputExists) {
+    if (
+      !bootstrapImageExists &&
+      !(typeof bootstrapImagePath === "string" && bootstrapImagePath.trim())
+    ) {
+      const legacyExtension = getTutorialShotFileExtension(manifest.rawImagePath);
+      const legacyContentPath = legacyExtension
+        ? replaceTutorialShotPathExtension(manifest.outputImagePath, legacyExtension)
+        : manifest.outputImagePath;
+      if (legacyContentPath !== manifest.outputImagePath) {
+        bootstrapContentPath = legacyContentPath;
+        bootstrapDerivedPaths = deriveTutorialShotPaths({
+          pagePath: manifest.pagePath,
+          outputImagePath: bootstrapContentPath,
+        });
+        if (bootstrapDerivedPaths.id !== manifest.id) {
+          throw new Error("現在の出力画像と保存対象のショットが一致しません。");
+        }
+        bootstrapAbsPath = resolveSourcePath({
+          sourceRoot,
+          contentRelativePath: bootstrapContentPath,
+          validator: isTutorialShotReadableImagePath,
+        });
+        bootstrapImageExists = await fs
+          .stat(bootstrapAbsPath)
+          .then(() => true)
+          .catch(() => false);
+      }
+    }
+    manifest = {
+      ...manifest,
+      rawImagePath: deriveTutorialShotRawImagePath({
+        pagePath: manifest.pagePath,
+        outputImagePath: manifest.outputImagePath,
+        fallbackExtension: getTutorialShotFileExtension(bootstrapContentPath),
+      }),
+    };
+    rawAbsPath = resolveSourcePath({
+      sourceRoot,
+      contentRelativePath: manifest.rawImagePath,
+      validator: (contentPath) =>
+        isExpectedTutorialShotRawImagePath({
+          pagePath: manifest.pagePath,
+          outputImagePath: manifest.outputImagePath,
+          rawImagePath: contentPath,
+        }),
+    });
+    if (!bootstrapImageExists) {
       throw new Error(
         "現在の出力画像が無いため、そこから元画像を初期作成できません。先に元画像をアップロードしてください。",
       );
     }
     await ensureParentDir(rawAbsPath);
-    await fs.copyFile(outputAbsPath, rawAbsPath);
+    await fs.copyFile(bootstrapAbsPath, rawAbsPath);
   }
 
   const rawExists = await fs
@@ -467,17 +788,22 @@ export const saveTutorialShot = async ({
   }
 
   const rawBuffer = await fs.readFile(rawAbsPath);
-  const rawImage = sharp(rawBuffer);
-  const metadata = await rawImage.metadata();
+  const outputFormat = getTutorialShotGeneratedImageFormat(manifest.outputImagePath);
+  const rawImageContext = await getRawImageProcessingContext({ rawBuffer });
+  const { image: rawImage, metadata } = rawImageContext;
 
-  if (!metadata.width || !metadata.height) {
+  if (!metadata.width || !rawImageContext.frameHeight) {
     throw new Error(`元画像のサイズを取得できませんでした: ${manifest.rawImagePath}`);
   }
+
+  const animatedOutputPlan = rawImageContext.preserveAnimation
+    ? getTutorialShotAnimatedOutputPlan({ metadata, outputFormat })
+    : null;
 
   const crop = normalizeCrop({
     crop: manifest.crop,
     width: metadata.width,
-    height: metadata.height,
+    height: rawImageContext.frameHeight,
   });
   const outputLayout = getTutorialShotCanvasLayout({
     imageWidth: crop.width,
@@ -493,41 +819,54 @@ export const saveTutorialShot = async ({
     offsetX: outputLayout.imageX,
     offsetY: outputLayout.imageY,
   });
-  const croppedImageBuffer = await rawImage
-    .clone()
-    .extract({
-      left: crop.x,
-      top: crop.y,
-      width: crop.width,
-      height: crop.height,
-    })
-    .png()
-    .toBuffer();
 
   await ensureParentDir(outputAbsPath);
-  await sharp({
-    create: {
-      width: outputLayout.width,
-      height: outputLayout.height,
-      channels: 4,
-      background: {
-        r: 0,
-        g: 0,
-        b: 0,
-        alpha: 0,
+  if (animatedOutputPlan) {
+    await writeAnimatedWebpTutorialShotImage({
+      rawBuffer,
+      crop,
+      outputLayout,
+      overlaySvg,
+      outputAbsPath,
+      animatedOutputPlan,
+    });
+  } else {
+    const croppedImageBuffer = await rawImage
+      .clone()
+      .extract({
+        left: crop.x,
+        top: crop.y,
+        width: crop.width,
+        height: crop.height,
+      })
+      .png()
+      .toBuffer();
+    const generatedImage = sharp({
+      create: {
+        width: outputLayout.width,
+        height: outputLayout.height,
+        channels: 4,
+        background: {
+          r: 0,
+          g: 0,
+          b: 0,
+          alpha: 0,
+        },
       },
-    },
-  })
-    .composite([
+    }).composite([
       {
         input: croppedImageBuffer,
         left: outputLayout.imageX,
         top: outputLayout.imageY,
       },
       { input: Buffer.from(overlaySvg, "utf8") },
-    ])
-    .png()
-    .toFile(outputAbsPath);
+    ]);
+    await writeGeneratedTutorialShotImage({
+      image: generatedImage,
+      outputAbsPath,
+      outputFormat,
+    });
+  }
 
   const savedManifest = {
     ...manifest,
@@ -538,11 +877,13 @@ export const saveTutorialShot = async ({
   await fs.writeFile(manifestAbsPath, `${JSON.stringify(savedManifest, null, 2)}\n`, "utf8");
 
   const pageSourceText = await fs.readFile(pageAbsPath, "utf8");
-  await rewritePageSourceForDevRefresh({
+  const savedPageSourceText = await rewritePageSourceForDevRefresh({
     pageAbsPath,
+    pagePath: manifest.pagePath,
     sourceText: pageSourceText,
+    outputImagePath: manifest.outputImagePath,
   });
-  const pageModeWarnings = getTutorialPageModeWarnings({ sourceText: pageSourceText });
+  const pageModeWarnings = getTutorialPageModeWarnings({ sourceText: savedPageSourceText });
 
   return {
     manifest: savedManifest,
@@ -554,17 +895,14 @@ export const readTutorialShotImage = async ({ sourceRoot, contentRelativePath })
   const absolutePath = resolveSourcePath({
     sourceRoot,
     contentRelativePath,
-    pattern: /^content\/.+\.(png|jpe?g|webp)$/iu,
+    validator: isTutorialShotReadableImagePath,
   });
 
   const bytes = await fs.readFile(absolutePath);
-  const extension = path.extname(absolutePath).toLowerCase();
-  const contentType =
-    extension === ".jpg" || extension === ".jpeg"
-      ? "image/jpeg"
-      : extension === ".webp"
-        ? "image/webp"
-        : "image/png";
+  const contentType = getTutorialShotImageContentType(absolutePath);
+  if (!contentType) {
+    throw new Error(`画像の MIME type を決定できませんでした: ${contentRelativePath}`);
+  }
 
   return {
     bytes,

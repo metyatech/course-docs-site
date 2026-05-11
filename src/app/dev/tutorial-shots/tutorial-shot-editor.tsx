@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import ReactCrop, { type PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import {
+  deriveTutorialShotRawImagePath,
+  getTutorialShotImageContentType,
   getTutorialShotAnnotationErrors,
   summarizeTutorialShotAnnotations,
   getTutorialShotWarnings,
@@ -134,18 +136,12 @@ const readImageFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-const normalizeImageDataUrlToPng = async (dataUrl: string) => {
-  const image = await loadImageElement(dataUrl);
-  const canvas = document.createElement("canvas");
-  canvas.width = image.naturalWidth;
-  canvas.height = image.naturalHeight;
-  const context = canvas.getContext("2d");
-  if (!context) {
-    throw new Error("画像ファイルを読み込めませんでした。");
+const withSourceImageDataUrlMimeType = (dataUrl: string, mimeType: string) => {
+  if (!mimeType) {
+    return dataUrl;
   }
 
-  context.drawImage(image, 0, 0);
-  return canvas.toDataURL("image/png");
+  return dataUrl.replace(/^data:[^;,]*(;base64,)/u, `data:${mimeType}$1`);
 };
 
 const getClipboardImageFile = (clipboardData: DataTransfer | null) =>
@@ -334,6 +330,7 @@ export default function TutorialShotEditor() {
   const [statusText, setStatusText] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [pendingRawDataUrl, setPendingRawDataUrl] = useState<string | null>(null);
+  const [pendingRawFileName, setPendingRawFileName] = useState<string | null>(null);
   const [bootstrapFromOutput, setBootstrapFromOutput] = useState(false);
   const [isSourceEditorOpen, setIsSourceEditorOpen] = useState(false);
   const [cropDetailsOpen, setCropDetailsOpen] = useState(false);
@@ -466,6 +463,7 @@ export default function TutorialShotEditor() {
       setCroppedPreviewSrc(null);
       setSourceImageElement(null);
       setPendingRawDataUrl(null);
+      setPendingRawFileName(null);
       setBootstrapFromOutput(false);
       setCropDetailsOpen(false);
       return;
@@ -498,12 +496,11 @@ export default function TutorialShotEditor() {
     setDraftManifest(initialManifest);
     setSelectedAnnotationId(null);
     setPendingRawDataUrl(null);
-    setBootstrapFromOutput(selectedShot.hasOutputImage && !selectedShot.hasRawImage);
+    setPendingRawFileName(null);
+    setBootstrapFromOutput(Boolean(selectedShot.bootstrapImagePath) && !selectedShot.hasRawImage);
     const nextImagePath = selectedShot.hasRawImage
       ? selectedShot.rawImagePath
-      : selectedShot.hasOutputImage
-        ? selectedShot.outputImagePath
-        : null;
+      : selectedShot.bootstrapImagePath;
     setSourceImageSrc(
       nextImagePath
         ? buildImageUrl(nextImagePath, sourceImageRevision, sourceOverride ?? "")
@@ -696,7 +693,10 @@ export default function TutorialShotEditor() {
       body: JSON.stringify({
         manifest: manifestToSave,
         rawImageDataUrl: pendingRawDataUrl,
+        rawImageFileName: pendingRawFileName,
         bootstrapFromOutput: bootstrapFromOutput && !pendingRawDataUrl,
+        bootstrapImagePath:
+          bootstrapFromOutput && !pendingRawDataUrl ? selectedShot?.bootstrapImagePath : null,
         source: sourceOverride,
       }),
     });
@@ -714,6 +714,7 @@ export default function TutorialShotEditor() {
         : "保存しました",
     );
     setPendingRawDataUrl(null);
+    setPendingRawFileName(null);
     setSourceImageRevision((value) => value + 1);
     setIsSaving(false);
 
@@ -758,12 +759,29 @@ export default function TutorialShotEditor() {
       }
 
       try {
-        const dataUrl = await readImageFileAsDataUrl(file);
-        const normalizedDataUrl = await normalizeImageDataUrlToPng(dataUrl);
-        setPendingRawDataUrl(normalizedDataUrl);
+        const sourceMimeType = file.type || getTutorialShotImageContentType(file.name) || "";
+        const dataUrl = withSourceImageDataUrlMimeType(
+          await readImageFileAsDataUrl(file),
+          sourceMimeType,
+        );
+        setDraftManifest((current) =>
+          current
+            ? {
+                ...current,
+                rawImagePath: deriveTutorialShotRawImagePath({
+                  pagePath: current.pagePath,
+                  outputImagePath: current.outputImagePath,
+                  sourceFileName: file.name,
+                  mimeType: sourceMimeType,
+                }),
+              }
+            : current,
+        );
+        setPendingRawDataUrl(dataUrl);
+        setPendingRawFileName(getReadableImageName(file, fallbackFileName));
         setSourceImageElement(null);
         setCroppedPreviewSrc(null);
-        setSourceImageSrc(normalizedDataUrl);
+        setSourceImageSrc(dataUrl);
         setBootstrapFromOutput(false);
         setCropDetailsOpen(true);
         setStatusText(
@@ -803,9 +821,7 @@ export default function TutorialShotEditor() {
       const pastedImage = getClipboardImageFile(event.clipboardData);
       if (!pastedImage && hasFileTransfer(event.clipboardData)) {
         event.preventDefault();
-        setStatusText(
-          `読み込める画像は ${TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL} です。`,
-        );
+        setStatusText(`読み込める画像は ${TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL} です。`);
         return;
       }
       if (!pastedImage) {
@@ -1241,7 +1257,9 @@ export default function TutorialShotEditor() {
                                 cropDisplayScaleRef.current =
                                   cw > 0 ? sourceImageElement.naturalWidth / cw : 1;
                               }
-                              setCompletedCrop(toNaturalCrop(nextCrop, cropDisplayScaleRef.current));
+                              setCompletedCrop(
+                                toNaturalCrop(nextCrop, cropDisplayScaleRef.current),
+                              );
                               setCropOwnerKey(selectedShot.outputImagePath);
                             }}
                           >

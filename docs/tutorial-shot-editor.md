@@ -2,12 +2,12 @@
 
 Local authoring tool for step-by-step tutorial screenshots.
 
-The editor keeps learner-facing `Action img="./img/...png"` usage intact while
-moving the editable source of truth to:
+The editor keeps learner-facing tutorial image references in page-local `img/`
+folders while moving the editable source of truth to:
 
-- editable source image: `content/**/shots/*.raw.png`
+- editable source image: `content/**/shots/*.raw.<source-extension>`
 - shot manifest: `content/**/shots/*.shot.json`
-- generated learner-facing image: `content/**/img/*.png`
+- generated learner-facing image: `content/**/img/*.webp` for static UI screenshots and tested animated WebP uploads
 
 ## Why this exists
 
@@ -22,7 +22,7 @@ itself but the follow-up editing work:
 
 This tool turns that into a deterministic pipeline:
 
-`raw screenshot + crop + annotations -> generated Action image`
+`raw screenshot + crop + annotations -> generated WebP Action/Verify image`
 
 ## GUI pattern
 
@@ -31,10 +31,10 @@ Pattern: `hybrid-gui`
 - Reused GUI subsystems:
   - `react-image-crop` for crop selection
   - `react-konva` / `konva` for box and arrow placement
-  - `sharp` for deterministic PNG generation
+  - `sharp` for deterministic policy-based image generation
 - Custom glue:
   - scan `Action img="..."`
-  - keep output image paths stable
+  - choose the learner-facing output path from the static-raster WebP policy
   - save shot manifests beside each tutorial page
   - validate when annotations are absent, box-led, or invalid
 
@@ -49,9 +49,7 @@ project-contract:
   canonical_store:
     - content/**/index.mdx
     - content/**/shots/*.shot.json
-    - content/**/shots/*.raw.png
-    - content/**/shots/*.raw.jpg
-    - content/**/shots/*.raw.webp
+    - content/**/shots/*.raw.<source-extension>
   human_surface:
     - /dev/tutorial-shots
   ai_surface:
@@ -65,15 +63,17 @@ project-contract:
   conflict_policy:
     - MDX stays authoritative for which Action images exist
     - shot manifest stays authoritative for crop/annotations
-    - generated img/*.png is overwritten from manifest on save
+    - generated img/*.webp is overwritten from manifest on save for static UI screenshots and tested animated WebP uploads
+    - legacy PNG Action/Verify references are rewritten to the policy WebP path on save
   validation:
     - client and server validation per annotation mode (focal: 0–1 box + 0–1 arrow; callout: N boxes, no arrows)
     - source-image imports accept browser-viewable PNG/APNG/JPEG/GIF/WebP/AVIF/SVG/BMP/ICO/CUR files
-    - uploaded source images are decoded and normalized before raw files are persisted
+    - uploaded source images are decoded for validation, then persisted as the original accepted bytes and extension where supported
+    - generated output is rendered from decoded pixels as lossless WebP by policy; raw files are never passed through as generated output
     - server path validation before read/write
     - repo tests for scan/save behavior
   generated_artifacts:
-    - content/**/img/*.png
+    - content/**/img/*.webp
   human_startup:
     - set COURSE_CONTENT_SOURCE to a local content repo
     - run npm run dev
@@ -103,12 +103,12 @@ For images that show multiple settings or UI areas in a single dialog
 
 ### Choosing a mode
 
-| Scenario | Mode | Why |
-|---|---|---|
-| Click target / button | Focal | One focal point is sufficient |
-| Result confirmation | Focal (no annotations) | No callout needed |
-| Form with multiple settings | Callout | Splitting into N images would repeat the same dialog |
-| Sequential UI interaction | Focal (split into N shots) | Each shot shows one step |
+| Scenario                    | Mode                       | Why                                                  |
+| --------------------------- | -------------------------- | ---------------------------------------------------- |
+| Click target / button       | Focal                      | One focal point is sufficient                        |
+| Result confirmation         | Focal (no annotations)     | No callout needed                                    |
+| Form with multiple settings | Callout                    | Splitting into N images would repeat the same dialog |
+| Sequential UI interaction   | Focal (split into N shots) | Each shot shows one step                             |
 
 Rule of thumb:
 
@@ -122,17 +122,18 @@ Rule of thumb:
 
 MVP goals:
 
-- detect existing `Action img="./img/...png"` references without MDX migration
+- detect existing `Action img="./img/...png"` / `Verify img="./img/...png"` references and migrate static UI output to WebP on save
 - bootstrap a raw source from the current output image when needed
 - import source images through the upload button, drag-and-drop, or `Ctrl + V`
 - save crop + annotations beside the page in `shots/`
-- regenerate the existing `img/*.png` file in place
+- regenerate learner-facing static UI output as lossless WebP, and preserve frames for animated WebP raw uploads
 - warn when screenshot text drifts away from tutorial-authoring rules
 - allow a temporary local content-repo override when the site itself is running against a different source
 
 Out of scope for the MVP:
 
 - automatic Unreal capture
+- animated GIF/APNG/AVIF preservation and SVG wrapper output
 - video-to-frame inference
 - multi-user conflict resolution UI
 - publishing-ready asset review workflows

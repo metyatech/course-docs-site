@@ -10,7 +10,13 @@ export const runtime = "nodejs";
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
-const isSameOriginOrLoopbackAlias = ({ origin, requestUrl }: { origin: string; requestUrl: URL }) => {
+const isSameOriginOrLoopbackAlias = ({
+  origin,
+  requestUrl,
+}: {
+  origin: string;
+  requestUrl: URL;
+}) => {
   const originUrl = new URL(origin);
   if (originUrl.origin === requestUrl.origin) {
     return true;
@@ -64,7 +70,10 @@ export async function POST(request: Request) {
       sourceRoot: context.sourceRoot,
       manifestInput: body.manifest,
       rawImageDataUrl: typeof body.rawImageDataUrl === "string" ? body.rawImageDataUrl : null,
+      rawImageFileName: typeof body.rawImageFileName === "string" ? body.rawImageFileName : null,
       bootstrapFromOutput: body.bootstrapFromOutput === true,
+      bootstrapImagePath:
+        typeof body.bootstrapImagePath === "string" ? body.bootstrapImagePath : null,
     });
 
     // Bump the SSE revision so all connected docs pages reload via DevAutoReload.

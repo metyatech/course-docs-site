@@ -92,9 +92,9 @@ const writeFixtureCourseRepo = async (
     logoText = "Tutorial Shot Fixture",
     firstImageName = "startup",
     secondImageName = "missing-output",
-    firstActionImageSrc = `./img/${firstImageName}.png`,
-    secondActionImageSrc = `./img/${secondImageName}.png`,
-    firstImageFileName = `${firstImageName}.png`,
+    firstActionImageSrc = `./img/${firstImageName}.webp`,
+    secondActionImageSrc = `./img/${secondImageName}.webp`,
+    firstImageFileName = `${firstImageName}.webp`,
   } = {},
 ) => {
   const siteConfig = `export const siteConfig = {
@@ -158,16 +158,20 @@ authoringMode: tutorial
   await fs.writeFile(path.join(pageDir, "index.mdx"), tutorialPage, "utf8");
   await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 
-  await sharp({
+  const fixtureImage = sharp({
     create: {
       width: 640,
       height: 360,
       channels: 4,
       background: "#cbd5e1",
     },
-  })
-    .png()
-    .toFile(path.join(imageDir, firstImageFileName));
+  });
+  const firstImagePath = path.join(imageDir, firstImageFileName);
+  if (path.extname(firstImageFileName).toLowerCase() === ".webp") {
+    await fixtureImage.webp({ lossless: true }).toFile(firstImagePath);
+  } else {
+    await fixtureImage.png().toFile(firstImagePath);
+  }
 };
 
 const sha256File = async (filePath) => {
@@ -187,35 +191,17 @@ const createSolidPngBuffer = async ({ background = "#38bdf8", width = 640, heigh
     .png()
     .toBuffer();
 
-const createSolidBmpBuffer = ({ width = 320, height = 180 } = {}) => {
-  const rowSize = Math.floor((24 * width + 31) / 32) * 4;
-  const pixelArraySize = rowSize * height;
-  const fileSize = 54 + pixelArraySize;
-  const buffer = Buffer.alloc(fileSize);
-
-  buffer.write("BM", 0, "ascii");
-  buffer.writeUInt32LE(fileSize, 2);
-  buffer.writeUInt32LE(54, 10);
-  buffer.writeUInt32LE(40, 14);
-  buffer.writeInt32LE(width, 18);
-  buffer.writeInt32LE(height, 22);
-  buffer.writeUInt16LE(1, 26);
-  buffer.writeUInt16LE(24, 28);
-  buffer.writeUInt32LE(0, 30);
-  buffer.writeUInt32LE(pixelArraySize, 34);
-
-  for (let y = 0; y < height; y += 1) {
-    const rowOffset = 54 + y * rowSize;
-    for (let x = 0; x < width; x += 1) {
-      const pixelOffset = rowOffset + x * 3;
-      buffer[pixelOffset] = 0x22;
-      buffer[pixelOffset + 1] = 0xc5;
-      buffer[pixelOffset + 2] = 0x5e;
-    }
-  }
-
-  return buffer;
-};
+const createSolidWebpBuffer = async ({ background = "#22c55e", width = 320, height = 180 } = {}) =>
+  sharp({
+    create: {
+      width,
+      height,
+      channels: 4,
+      background,
+    },
+  })
+    .webp({ lossless: true })
+    .toBuffer();
 
 const toDataUrl = (buffer, mimeType = "image/png") =>
   `data:${mimeType};base64,${buffer.toString("base64")}`;
@@ -305,28 +291,31 @@ const dragImageOverEditor = async (page, imageDataUrl) => {
 };
 
 const dropImageIntoEditor = async (page, imageDataUrl, fileName = "dropped.png") => {
-  await page.evaluate(async ({ dataUrl, fileName: droppedFileName }) => {
-    const response = await fetch(dataUrl);
-    const blob = await response.blob();
-    const file = new File([blob], droppedFileName, { type: blob.type || "image/png" });
-    const dataTransfer = new DataTransfer();
-    dataTransfer.items.add(file);
-    const dropZone = document.querySelector('[data-testid="source-image-drop-zone"]');
-    if (!dropZone) {
-      throw new Error("Source image drop zone was not found.");
-    }
+  await page.evaluate(
+    async ({ dataUrl, fileName: droppedFileName }) => {
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      const file = new File([blob], droppedFileName, { type: blob.type || "image/png" });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      const dropZone = document.querySelector('[data-testid="source-image-drop-zone"]');
+      if (!dropZone) {
+        throw new Error("Source image drop zone was not found.");
+      }
 
-    dropZone.dispatchEvent(
-      new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer }),
-    );
-  }, { dataUrl: imageDataUrl, fileName });
+      dropZone.dispatchEvent(
+        new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer }),
+      );
+    },
+    { dataUrl: imageDataUrl, fileName },
+  );
 };
 
 const getPreviewProbeImage = (page) => page.locator('img[alt="保存反映確認"]:visible').first();
 
 const readAnnotationListSummary = (page) =>
   page.evaluate(() =>
-    Array.from(document.querySelectorAll('li[data-selected]')).map((item) => ({
+    Array.from(document.querySelectorAll("li[data-selected]")).map((item) => ({
       selected: item.getAttribute("data-selected"),
       label: item.querySelector("button")?.textContent?.replace(/\s+/g, " ").trim() ?? "",
     })),
@@ -395,7 +384,7 @@ test(
       "docs",
       "tutorial",
       "img",
-      "override-startup.png",
+      "override-startup.webp",
     );
     const startupOutputHashBefore = await sha256File(startupOutputPath);
     const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
@@ -470,7 +459,7 @@ test(
       "docs",
       "tutorial",
       "shots",
-      "override-startup.raw.png",
+      "override-startup.raw.webp",
     );
     const startupManifestPath = path.join(
       overrideCourse,
@@ -705,7 +694,7 @@ test(
       "docs",
       "tutorial",
       "img",
-      "override-missing-output.png",
+      "override-missing-output.webp",
     );
 
     await assert.doesNotReject(() => fs.stat(pastedRawPath));
@@ -716,14 +705,111 @@ test(
   },
 );
 
+test("tutorial shot editor imports a dropped source image", { timeout: 3 * 60_000 }, async (t) => {
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-drop-"));
+  const fixtureCourse = path.join(tempRoot, "course");
+  const overrideCourse = path.join(tempRoot, "override-course");
+  const droppedImageBuffer = await createSolidPngBuffer({ background: "#22c55e" });
+  const port = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  await writeFixtureCourseRepo(fixtureCourse);
+  await writeFixtureCourseRepo(overrideCourse, {
+    logoText: "Override Tutorial Shot Fixture",
+    firstImageName: "override-startup",
+    secondImageName: "override-missing-output",
+  });
+
+  const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
+
+  const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+    detached: process.platform !== "win32",
+    windowsHide: true,
+    cwd: projectRoot,
+    env: createRunDevTestEnv({
+      label: "tutorial-shot-editor-drop",
+      env: process.env,
+      overrides: {
+        COURSE_CONTENT_SOURCE: fixtureCourse,
+      },
+    }),
+    stdio: "inherit",
+  });
+
+  t.after(async () => {
+    await killProcessTree(dev);
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  });
+
+  await waitFor(
+    async () => {
+      const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
+      return status === 200 || status === 308;
+    },
+    {
+      timeoutMs: 60_000,
+      intervalMs: 500,
+      onTimeoutMessage: "Tutorial shot editor did not become ready.",
+    },
+  );
+
+  const browser = await chromium.launch({ headless: true });
+  t.after(async () => {
+    await closeBrowserBounded(browser);
+  });
+  const page = await browser.newPage({
+    baseURL: baseUrl,
+    viewport: { width: 1440, height: 1100 },
+  });
+
+  await openTutorialShotEditor(page, overrideCourseRelativePath);
+  await page.getByRole("button", { name: /override-missing-output/i }).click();
+  await page.getByText("元画像をアップロードしてください。").waitFor();
+
+  await dragImageOverEditor(page, toDataUrl(droppedImageBuffer));
+  await page.getByText("ここに画像をドロップして読み込みます").waitFor();
+
+  await dropImageIntoEditor(page, toDataUrl(droppedImageBuffer));
+  await page.getByText("ドロップした画像を読み込みました（dropped.png）").waitFor();
+  await page.locator('[data-testid="crop-stage"] img').waitFor();
+
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await page.getByText("保存しました").waitFor();
+
+  const droppedRawPath = path.join(
+    overrideCourse,
+    "content",
+    "docs",
+    "tutorial",
+    "shots",
+    "override-missing-output.raw.png",
+  );
+  const droppedOutputPath = path.join(
+    overrideCourse,
+    "content",
+    "docs",
+      "tutorial",
+      "img",
+      "override-missing-output.webp",
+  );
+
+  await assert.doesNotReject(() => fs.stat(droppedRawPath));
+  await assert.doesNotReject(() => fs.stat(droppedOutputPath));
+  const droppedRawMetadata = await sharp(droppedRawPath).metadata();
+  assert.equal(droppedRawMetadata.width, 640);
+  assert.equal(droppedRawMetadata.height, 360);
+});
+
 test(
-  "tutorial shot editor imports a dropped source image",
+  "tutorial shot editor preserves a dropped WebP source image and generates WebP output",
   { timeout: 3 * 60_000 },
   async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-drop-"));
+    const tempRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "course-tutorial-shot-editor-webp-drop-"),
+    );
     const fixtureCourse = path.join(tempRoot, "course");
     const overrideCourse = path.join(tempRoot, "override-course");
-    const droppedImageBuffer = await createSolidPngBuffer({ background: "#22c55e" });
+    const droppedImageBuffer = await createSolidWebpBuffer();
     const port = await getFreePort();
     const baseUrl = `http://127.0.0.1:${port}`;
 
@@ -732,6 +818,7 @@ test(
       logoText: "Override Tutorial Shot Fixture",
       firstImageName: "override-startup",
       secondImageName: "override-missing-output",
+      secondActionImageSrc: "./img/override-missing-output.webp",
     });
 
     const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
@@ -741,7 +828,7 @@ test(
       windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
-        label: "tutorial-shot-editor-drop",
+        label: "tutorial-shot-editor-webp-drop",
         env: process.env,
         overrides: {
           COURSE_CONTENT_SOURCE: fixtureCourse,
@@ -780,11 +867,8 @@ test(
     await page.getByRole("button", { name: /override-missing-output/i }).click();
     await page.getByText("元画像をアップロードしてください。").waitFor();
 
-    await dragImageOverEditor(page, toDataUrl(droppedImageBuffer));
-    await page.getByText("ここに画像をドロップして読み込みます").waitFor();
-
-    await dropImageIntoEditor(page, toDataUrl(droppedImageBuffer));
-    await page.getByText("ドロップした画像を読み込みました（dropped.png）").waitFor();
+    await dropImageIntoEditor(page, toDataUrl(droppedImageBuffer, "image/webp"), "dropped.webp");
+    await page.getByText("ドロップした画像を読み込みました（dropped.webp）").waitFor();
     await page.locator('[data-testid="crop-stage"] img').waitFor();
 
     await page.getByRole("button", { name: "保存", exact: true }).click();
@@ -796,7 +880,7 @@ test(
       "docs",
       "tutorial",
       "shots",
-      "override-missing-output.raw.png",
+      "override-missing-output.raw.webp",
     );
     const droppedOutputPath = path.join(
       overrideCourse,
@@ -804,100 +888,22 @@ test(
       "docs",
       "tutorial",
       "img",
-      "override-missing-output.png",
+      "override-missing-output.webp",
     );
-
-    await assert.doesNotReject(() => fs.stat(droppedRawPath));
-    await assert.doesNotReject(() => fs.stat(droppedOutputPath));
-    const droppedRawMetadata = await sharp(droppedRawPath).metadata();
-    assert.equal(droppedRawMetadata.width, 640);
-    assert.equal(droppedRawMetadata.height, 360);
-  },
-);
-
-test(
-  "tutorial shot editor normalizes a dropped browser source image to PNG before save",
-  { timeout: 3 * 60_000 },
-  async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-bmp-drop-"));
-    const fixtureCourse = path.join(tempRoot, "course");
-    const overrideCourse = path.join(tempRoot, "override-course");
-    const droppedImageBuffer = createSolidBmpBuffer();
-    const port = await getFreePort();
-    const baseUrl = `http://127.0.0.1:${port}`;
-
-    await writeFixtureCourseRepo(fixtureCourse);
-    await writeFixtureCourseRepo(overrideCourse, {
-      logoText: "Override Tutorial Shot Fixture",
-      firstImageName: "override-startup",
-      secondImageName: "override-missing-output",
-    });
-
-    const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
-
-    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
-      detached: process.platform !== "win32",
-      windowsHide: true,
-      cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: "tutorial-shot-editor-bmp-drop",
-        env: process.env,
-        overrides: {
-          COURSE_CONTENT_SOURCE: fixtureCourse,
-        },
-      }),
-      stdio: "inherit",
-    });
-
-    t.after(async () => {
-      await killProcessTree(dev);
-      await fs.rm(tempRoot, { recursive: true, force: true });
-    });
-
-    await waitFor(
-      async () => {
-        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
-        return status === 200 || status === 308;
-      },
-      {
-        timeoutMs: 60_000,
-        intervalMs: 500,
-        onTimeoutMessage: "Tutorial shot editor did not become ready.",
-      },
-    );
-
-    const browser = await chromium.launch({ headless: true });
-    t.after(async () => {
-      await closeBrowserBounded(browser);
-    });
-    const page = await browser.newPage({
-      baseURL: baseUrl,
-      viewport: { width: 1440, height: 1100 },
-    });
-
-    await openTutorialShotEditor(page, overrideCourseRelativePath);
-    await page.getByRole("button", { name: /override-missing-output/i }).click();
-    await page.getByText("元画像をアップロードしてください。").waitFor();
-
-    await dropImageIntoEditor(page, toDataUrl(droppedImageBuffer, "image/bmp"), "dropped.bmp");
-    await page.getByText("ドロップした画像を読み込みました（dropped.bmp）").waitFor();
-    await page.locator('[data-testid="crop-stage"] img').waitFor();
-
-    await page.getByRole("button", { name: "保存", exact: true }).click();
-    await page.getByText("保存しました").waitFor();
-
-    const droppedRawPath = path.join(
-      overrideCourse,
-      "content",
-      "docs",
-      "tutorial",
-      "shots",
-      "override-missing-output.raw.png",
-    );
-    const droppedRawMetadata = await sharp(droppedRawPath).metadata();
-    assert.equal(droppedRawMetadata.format, "png");
+    const droppedRawBytes = await fs.readFile(droppedRawPath);
+    const droppedRawHash = crypto.createHash("sha256").update(droppedRawBytes).digest("hex");
+    const droppedSourceHash = crypto.createHash("sha256").update(droppedImageBuffer).digest("hex");
+    assert.equal(droppedRawHash, droppedSourceHash);
+    const droppedRawMetadata = await sharp(droppedRawBytes).metadata();
+    assert.equal(droppedRawMetadata.format, "webp");
     assert.equal(droppedRawMetadata.width, 320);
     assert.equal(droppedRawMetadata.height, 180);
+
+    const droppedOutputBytes = await fs.readFile(droppedOutputPath);
+    const droppedOutputMetadata = await sharp(droppedOutputBytes).metadata();
+    assert.equal(droppedOutputMetadata.format, "webp");
+    assert.equal(droppedOutputMetadata.width, 320);
+    assert.equal(droppedOutputMetadata.height, 180);
   },
 );
 
@@ -1013,7 +1019,7 @@ test(
     // Write a fixture that includes a <Verify img="..."> on the tutorial page
     // plus a plain Markdown image (used as the pixel probe for the test).
     const verifyImageName = "startup-result";
-    const verifyImageFileName = `${verifyImageName}.png`;
+    const verifyImageFileName = `${verifyImageName}.webp`;
     const siteConfig = `export const siteConfig = {
   logoText: "Verify Reload Fixture",
   projectLink: "https://example.invalid",
@@ -1038,7 +1044,7 @@ authoringMode: tutorial
 ---
 
 <Section title="Step 1" goal="Verify 画像を保存できる状態">
-  <Action img="./img/startup.png">
+  <Action img="./img/startup.webp">
     **起動** を確認します
   </Action>
   <Verify img="./img/${verifyImageFileName}">
@@ -1060,19 +1066,19 @@ authoringMode: tutorial
     await fs.writeFile(path.join(pageDir, "index.mdx"), tutorialPage, "utf8");
     await fs.writeFile(path.join(courseDir, "public", "img", "favicon.ico"), "", "utf8");
 
-    // Action image (startup.png) — needs to exist so the Action shot can be
+    // Action image (startup.webp) — needs to exist so the Action shot can be
     // bootstrapped from output when there is no raw image yet.
     await sharp({
       create: { width: 640, height: 360, channels: 4, background: "#cbd5e1" },
     })
-      .png()
-      .toFile(path.join(imageDir, "startup.png"));
+      .webp({ lossless: true })
+      .toFile(path.join(imageDir, "startup.webp"));
 
     // Verify image — initial solid blue; after save it will have an orange box.
     await sharp({
       create: { width: 640, height: 360, channels: 4, background: "#cbd5e1" },
     })
-      .png()
+      .webp({ lossless: true })
       .toFile(path.join(imageDir, verifyImageFileName));
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
@@ -1292,7 +1298,7 @@ test(
     await page.getByRole("button", { name: "枠を追加" }).click();
     await page.getByRole("button", { name: "枠を追加" }).click();
 
-    const annotationItems = page.locator('li[data-selected]');
+    const annotationItems = page.locator("li[data-selected]");
     await assert.equal(await annotationItems.count(), 3);
 
     await annotationItems.nth(1).locator("button").first().click();
@@ -1444,7 +1450,7 @@ test(
       "docs",
       "tutorial",
       "img",
-      "override-startup.png",
+      "override-startup.webp",
     );
     const rawImagePath = path.join(
       overrideCourse,
@@ -1452,7 +1458,7 @@ test(
       "docs",
       "tutorial",
       "shots",
-      "override-startup.raw.png",
+      "override-startup.raw.webp",
     );
     const manifestPath = path.join(
       overrideCourse,
@@ -1488,9 +1494,9 @@ test(
             height: 360,
           },
           id: "override-startup",
-          outputImagePath: "content/docs/tutorial/img/override-startup.png",
+          outputImagePath: "content/docs/tutorial/img/override-startup.webp",
           pagePath: "content/docs/tutorial/index.mdx",
-          rawImagePath: "content/docs/tutorial/shots/override-startup.raw.png",
+          rawImagePath: "content/docs/tutorial/shots/override-startup.raw.webp",
           version: 1,
         },
         null,

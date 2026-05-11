@@ -53,9 +53,11 @@ export type TutorialShotItem = {
   line: number;
   pagePath: string;
   sourceImagePath: string;
+  referencedImagePath: string;
   outputImagePath: string;
   manifestPath: string;
   rawImagePath: string;
+  bootstrapImagePath: string | null;
   /** Whether this shot is referenced by <Action img="..."> or <Verify img="...">. */
   shotSource: TutorialShotSource;
   manifest: TutorialShotManifest;
