@@ -465,108 +465,121 @@ function formatIssues(issues) {
     .join("\n");
 }
 
-test("color and boundary contrast are valid on core routes", async ({ browser }) => {
-  test.setTimeout(240000);
+test.describe("Core routes contrast", () => {
+  test.describe.configure({ mode: "parallel" });
+
   const seedPaths = ["/", normalizePath(suiteConfig.docsIntroPath)];
   if (suiteConfig.enableCodePreview) {
     seedPaths.push(normalizePath(suiteConfig.codePreviewPath));
   }
   const uniqueSeedPaths = [...new Set(seedPaths)];
-  const targetPaths = uniqueSeedPaths.slice(0, MAX_DISCOVERED_PATHS);
+  const coreTargetPaths = uniqueSeedPaths.slice(0, MAX_DISCOVERED_PATHS);
 
-  const allIssues = [];
   for (const theme of THEMES) {
-    const context = await browser.newContext({
-      baseURL: BASE_URL,
-      colorScheme: theme,
-    });
+    for (const path of coreTargetPaths) {
+      test(`color and boundary contrast are valid on ${path} (${theme} mode)`, async ({
+        browser,
+      }) => {
+        const allIssues = [];
+        const context = await browser.newContext({
+          baseURL: BASE_URL,
+          colorScheme: theme,
+        });
 
-    try {
-      for (const path of targetPaths) {
-        const page = await context.newPage();
         try {
-          const loaded = await setThemeAndOpen(page, path, theme);
-          if (!loaded) {
-            continue;
-          }
-          const stateIssues = await collectStateIssues(page, path, theme);
-          const boundaryIssues = await collectBoundaryIssues(page, path, theme);
-          allIssues.push(...stateIssues);
-          allIssues.push(...boundaryIssues);
-        } finally {
-          await page.close();
-        }
-      }
-    } finally {
-      await context.close();
-    }
-  }
-
-  expect(allIssues, formatIssues(allIssues)).toEqual([]);
-});
-
-test("Exercise color and boundary contrast are valid on configured routes", async ({ browser }) => {
-  test.setTimeout(600000); // 10 minutes
-  const targetPaths = suiteConfig.exerciseContrastPaths.map(normalizePath);
-  test.skip(targetPaths.length === 0, "No Exercise contrast routes are configured for this course");
-
-  const allIssues = [];
-  for (const theme of THEMES) {
-    const context = await browser.newContext({
-      baseURL: BASE_URL,
-      colorScheme: theme,
-    });
-
-    try {
-      for (const path of targetPaths) {
-        const page = await context.newPage();
-        try {
-          const loaded = await setThemeAndOpen(page, path, theme);
-          if (!loaded) {
-            continue;
-          }
-
-          const exerciseBlocks = await page.locator(".rensyuBlock").count();
-          expect(exerciseBlocks, `${path} must contain Exercise blocks`).toBeGreaterThan(0);
-
-          const summaries = page.locator(".rensyuBlock summary");
-          const summaryCount = await summaries.count();
-          for (let index = 0; index < summaryCount; index += 1) {
-            const summary = summaries.nth(index);
-            if (await summary.isVisible()) {
-              await summary.click();
+          const page = await context.newPage();
+          try {
+            const loaded = await setThemeAndOpen(page, path, theme);
+            if (loaded) {
+              const stateIssues = await collectStateIssues(page, path, theme);
+              const boundaryIssues = await collectBoundaryIssues(page, path, theme);
+              allIssues.push(...stateIssues);
+              allIssues.push(...boundaryIssues);
             }
+          } finally {
+            await page.close();
           }
-
-          const axeResult = await runContrastCheck(page, ".rensyuBlock", ".rensyuBlock iframe");
-          for (const violation of axeResult.violations) {
-            allIssues.push({
-              path,
-              theme,
-              state: "exercise",
-              id: violation.id,
-              description: violation.nodes
-                .flatMap((node) => node.target || [])
-                .slice(0, 3)
-                .join(" | "),
-            });
-          }
-
-          const boundaryIssues = await collectBoundaryIssues(
-            page,
-            path,
-            theme,
-            ".rensyuBlock, .rensyuBlock *",
-          );
-          allIssues.push(...boundaryIssues);
         } finally {
-          await page.close();
+          await context.close();
         }
-      }
-    } finally {
-      await context.close();
+
+        expect(allIssues, formatIssues(allIssues)).toEqual([]);
+      });
     }
   }
-
-  expect(allIssues, formatIssues(allIssues)).toEqual([]);
 });
+
+const exerciseTargetPaths = suiteConfig.exerciseContrastPaths.map(normalizePath);
+
+if (exerciseTargetPaths.length === 0) {
+  test("Exercise color and boundary contrast are valid on configured routes", () => {
+    test.skip(true, "No Exercise contrast routes are configured for this course");
+  });
+} else {
+  test.describe("Exercise contrast", () => {
+    test.describe.configure({ mode: "parallel" });
+
+    for (const theme of THEMES) {
+      for (const path of exerciseTargetPaths) {
+        test(`Exercise color and boundary contrast are valid on ${path} (${theme} mode)`, async ({
+          browser,
+        }) => {
+          const allIssues = [];
+          const context = await browser.newContext({
+            baseURL: BASE_URL,
+            colorScheme: theme,
+          });
+
+          try {
+            const page = await context.newPage();
+            try {
+              const loaded = await setThemeAndOpen(page, path, theme);
+              if (loaded) {
+                const exerciseBlocks = await page.locator(".rensyuBlock").count();
+                expect(exerciseBlocks, `${path} must contain Exercise blocks`).toBeGreaterThan(0);
+
+                const summaries = page.locator(".rensyuBlock summary");
+                const summaryCount = await summaries.count();
+                for (let index = 0; index < summaryCount; index += 1) {
+                  const summary = summaries.nth(index);
+                  if (await summary.isVisible()) {
+                    await summary.click();
+                  }
+                }
+
+                const axeResult = await runContrastCheck(page, ".rensyuBlock", ".rensyuBlock iframe");
+                for (const violation of axeResult.violations) {
+                  allIssues.push({
+                    path,
+                    theme,
+                    state: "exercise",
+                    id: violation.id,
+                    description: violation.nodes
+                      .flatMap((node) => node.target || [])
+                      .slice(0, 3)
+                      .join(" | "),
+                  });
+                }
+
+                const boundaryIssues = await collectBoundaryIssues(
+                  page,
+                  path,
+                  theme,
+                  ".rensyuBlock, .rensyuBlock *",
+                );
+                allIssues.push(...boundaryIssues);
+              }
+            } finally {
+              await page.close();
+            }
+          } finally {
+            await context.close();
+          }
+
+          expect(allIssues, formatIssues(allIssues)).toEqual([]);
+        });
+      }
+    }
+  });
+}
+
