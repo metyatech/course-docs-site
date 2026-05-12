@@ -48,7 +48,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "verify": "npm run lint && npm run typecheck && npm run build && npm test",
-    "prepare": "husky && npm run build"
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@metyatech/code-preview": "github:metyatech/code-preview#main",
