@@ -93,7 +93,10 @@ test('Exercise dark-mode colors meet WCAG contrast thresholds', async () => {
 test('Exercise dark-mode CSS covers readable text, solutions, blanks, and focus states', async () => {
   const css = await fs.readFile(cssPath, 'utf8');
 
-  assert.match(css, /\.dark \.rensyuBlock :where\(\.rensyuNaiyou, \.rensyuKaitou, p, li, dd, dt\)/);
+  assert.match(
+    css,
+    /\.dark \.rensyuBlock :where\(\.rensyuNaiyou, \.rensyuKaitou, p, li, dd, dt, h1, h2, h3, h4, h5, h6, strong, em, span, div\)/,
+  );
   assert.match(css, /\.dark \.rensyuBlock :where\(code, kbd, samp\)/);
   assert.match(css, /\.dark \.rensyuBlock :where\(pre\)/);
   assert.match(css, /\.dark \.rensyuBlock :where\(\.rensyuKaitou, details, summary\)/);
