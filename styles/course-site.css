@@ -37,10 +37,11 @@
 
   color: var(--course-exercise-dark-text);
   background-color: var(--course-exercise-dark-surface);
+  background-image: none; /* Override linear-gradient from base styles */
   border-color: var(--course-exercise-dark-border);
 }
 
-.dark .rensyuBlock :where(.rensyuNaiyou, .rensyuKaitou, p, li, dd, dt) {
+.dark .rensyuBlock :where(.rensyuNaiyou, .rensyuKaitou, p, li, dd, dt, h1, h2, h3, h4, h5, h6, strong, em, span, div) {
   color: var(--course-exercise-dark-text);
 }
 
