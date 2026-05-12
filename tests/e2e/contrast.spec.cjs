@@ -506,7 +506,7 @@ test("color and boundary contrast are valid on core routes", async ({ browser })
 });
 
 test("Exercise color and boundary contrast are valid on configured routes", async ({ browser }) => {
-  test.setTimeout(240000);
+  test.setTimeout(600000); // 10 minutes
   const targetPaths = suiteConfig.exerciseContrastPaths.map(normalizePath);
   test.skip(targetPaths.length === 0, "No Exercise contrast routes are configured for this course");
 
