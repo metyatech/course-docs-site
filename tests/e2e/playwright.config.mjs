@@ -14,6 +14,7 @@ const maxFailures =
 export default defineConfig({
   testDir: fileURLToPath(new URL(".", import.meta.url)),
   timeout: 60_000,
+  workers: process.env.CI ? 1 : undefined,
   maxFailures,
   expect: {
     timeout: 10_000,

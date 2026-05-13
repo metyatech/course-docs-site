@@ -547,7 +547,7 @@ if (exerciseTargetPaths.length === 0) {
                   }
                 }
 
-                const axeResult = await runContrastCheck(page, ".rensyuBlock", ".rensyuBlock iframe");
+                const axeResult = await runContrastCheck(page, ".rensyuBlock", ".rensyuBlock iframe, .nextra-code");
                 for (const violation of axeResult.violations) {
                   allIssues.push({
                     path,
