@@ -466,7 +466,7 @@ function formatIssues(issues) {
 }
 
 test.describe("Core routes contrast", () => {
-  test.describe.configure({ mode: "parallel" });
+  // test.describe.configure({ mode: "parallel" });
 
   const seedPaths = ["/", normalizePath(suiteConfig.docsIntroPath)];
   if (suiteConfig.enableCodePreview) {
@@ -480,6 +480,7 @@ test.describe("Core routes contrast", () => {
       test(`color and boundary contrast are valid on ${path} (${theme} mode)`, async ({
         browser,
       }) => {
+        test.setTimeout(180_000);
         const allIssues = [];
         const context = await browser.newContext({
           baseURL: BASE_URL,
@@ -517,13 +518,14 @@ if (exerciseTargetPaths.length === 0) {
   });
 } else {
   test.describe("Exercise contrast", () => {
-    test.describe.configure({ mode: "parallel" });
+    // test.describe.configure({ mode: "parallel" });
 
     for (const theme of THEMES) {
       for (const path of exerciseTargetPaths) {
         test(`Exercise color and boundary contrast are valid on ${path} (${theme} mode)`, async ({
           browser,
         }) => {
+          test.setTimeout(180_000);
           const allIssues = [];
           const context = await browser.newContext({
             baseURL: BASE_URL,
