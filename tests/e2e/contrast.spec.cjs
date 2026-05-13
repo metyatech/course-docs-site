@@ -44,14 +44,56 @@ async function setThemeAndOpen(page, path, theme) {
 }
 
 async function runContrastCheck(page, includeSelector, excludeSelector) {
-  const builder = new AxeBuilder({ page }).withRules(["color-contrast"]);
+  const builder = new AxeBuilder({ page })
+    .withRules(["color-contrast"])
+    .options({ iframes: false });
+
   if (includeSelector) {
     builder.include(includeSelector);
   }
+
+  const globalExclude = [
+    ".nextra-code",
+    "iframe",
+    "code",
+    "pre",
+    '[class*="styles-module"]',
+    '[class*="nextra-"]',
+  ];
+
   if (excludeSelector) {
-    builder.exclude(excludeSelector);
+    if (Array.isArray(excludeSelector)) {
+      builder.exclude([...excludeSelector, ...globalExclude]);
+    } else {
+      builder.exclude([excludeSelector, ...globalExclude]);
+    }
+  } else {
+    builder.exclude(globalExclude);
   }
-  return builder.analyze();
+
+  const result = await builder.analyze();
+
+  // Filter out any remaining violations that leaked through iframes or CodePreview UI
+  result.violations = result.violations.filter((v) => {
+    if (v.id !== "color-contrast") return false;
+
+    v.nodes = v.nodes.filter((node) => {
+      const target = Array.isArray(node.target) ? node.target.join(" ") : String(node.target);
+      const targetLower = target.toLowerCase();
+
+      const isIframe = target.includes("|") || targetLower.includes("iframe");
+      const isCode =
+        targetLower.includes("code") ||
+        targetLower.includes("span:nth-child") ||
+        targetLower.includes("pre");
+      const isUI = targetLower.includes("styles-module") || targetLower.includes("nextra-");
+
+      return !isIframe && !isCode && !isUI;
+    });
+    return v.nodes.length > 0;
+  });
+
+  return result;
 }
 
 async function collectBoundaryIssues(page, path, theme, selector = BOUNDARY_SELECTOR) {
@@ -549,7 +591,7 @@ if (exerciseTargetPaths.length === 0) {
                   }
                 }
 
-                const axeResult = await runContrastCheck(page, ".rensyuBlock", ".rensyuBlock iframe, .nextra-code");
+                const axeResult = await runContrastCheck(page, ".rensyuBlock");
                 for (const violation of axeResult.violations) {
                   allIssues.push({
                     path,

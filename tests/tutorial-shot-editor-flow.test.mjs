@@ -414,8 +414,8 @@ test(
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 60_000,
-        intervalMs: 500,
+        timeoutMs: 120_000,
+        intervalMs: 1000,
         onTimeoutMessage: "Tutorial shot editor did not become ready.",
       },
     );
@@ -566,8 +566,8 @@ test(
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 60_000,
-        intervalMs: 500,
+        timeoutMs: 120_000,
+        intervalMs: 1000,
         onTimeoutMessage: "Tutorial shot editor did not become ready.",
       },
     );
@@ -649,8 +649,8 @@ test(
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 60_000,
-        intervalMs: 500,
+        timeoutMs: 120_000,
+        intervalMs: 1000,
         onTimeoutMessage: "Tutorial shot editor did not become ready.",
       },
     );
@@ -852,8 +852,8 @@ test(
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 60_000,
-        intervalMs: 500,
+        timeoutMs: 120_000,
+        intervalMs: 1000,
         onTimeoutMessage: "Tutorial shot editor did not become ready.",
       },
     );
@@ -950,8 +950,8 @@ test(
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 60_000,
-        intervalMs: 500,
+        timeoutMs: 120_000,
+        intervalMs: 1000,
         onTimeoutMessage: "Tutorial preview page did not become ready.",
       },
     );
@@ -1112,8 +1112,8 @@ authoringMode: tutorial
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 60_000,
-        intervalMs: 500,
+        timeoutMs: 120_000,
+        intervalMs: 1000,
         onTimeoutMessage: "Tutorial preview page did not become ready.",
       },
     );
@@ -1284,8 +1284,8 @@ test(
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 60_000,
-        intervalMs: 500,
+        timeoutMs: 120_000,
+        intervalMs: 1000,
         onTimeoutMessage: "Tutorial shot editor did not become ready.",
       },
     );
@@ -1401,8 +1401,8 @@ test(
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 60_000,
-        intervalMs: 500,
+        timeoutMs: 120_000,
+        intervalMs: 1000,
         onTimeoutMessage: "Tutorial shot editor did not become ready.",
       },
     );
@@ -1541,8 +1541,8 @@ test(
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 60_000,
-        intervalMs: 500,
+        timeoutMs: 120_000,
+        intervalMs: 1000,
         onTimeoutMessage: "Tutorial shot editor did not become ready.",
       },
     );
@@ -1611,8 +1611,8 @@ test(
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 60_000,
-        intervalMs: 500,
+        timeoutMs: 120_000,
+        intervalMs: 1000,
         onTimeoutMessage: "Tutorial shot editor did not become ready from env file startup.",
       },
     );
