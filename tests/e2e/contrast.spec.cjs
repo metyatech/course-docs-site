@@ -10,7 +10,7 @@ const MIN_BACKGROUND_CONTRAST = 1.1;
 const MIN_BORDER_CONTRAST = 3;
 const MIN_BOUNDARY_AREA = 600;
 const MAX_BOUNDARY_ISSUES_PER_PAGE = 120;
-const MAX_DISCOVERED_PATHS = 4;
+// const MAX_DISCOVERED_PATHS = 4; // Removed to run all paths
 const HOST = process.env.E2E_HOST ?? "localhost";
 const PORT_FROM_ENV = process.env.E2E_PORT ? Number(process.env.E2E_PORT) : 3101;
 const PORT = Number.isFinite(PORT_FROM_ENV) ? PORT_FROM_ENV : 3101;
@@ -473,7 +473,7 @@ test.describe("Core routes contrast", () => {
     seedPaths.push(normalizePath(suiteConfig.codePreviewPath));
   }
   const uniqueSeedPaths = [...new Set(seedPaths)];
-  const coreTargetPaths = uniqueSeedPaths.slice(0, MAX_DISCOVERED_PATHS);
+  const coreTargetPaths = uniqueSeedPaths;
 
   for (const theme of THEMES) {
     for (const path of coreTargetPaths) {

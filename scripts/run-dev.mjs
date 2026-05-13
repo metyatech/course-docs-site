@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import dotenv from "dotenv";
 import fs from "node:fs";
@@ -513,4 +513,18 @@ queueSync().then(async () => {
 
   process.on("SIGINT", () => void closeAll());
   process.on("SIGTERM", () => void closeAll());
+});
+
+process.on("exit", () => {
+  if (devProcess && devProcess.pid) {
+    try {
+      if (isWindows) {
+        spawnSync("taskkill", ["/PID", String(devProcess.pid), "/T", "/F"], { stdio: "ignore" });
+      } else {
+        devProcess.kill("SIGKILL");
+      }
+    } catch {
+      // ignore
+    }
+  }
 });

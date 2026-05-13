@@ -420,10 +420,11 @@ test(
       },
     );
 
-    const browser = await chromium.launch({ headless: true });
+    let browser;
     t.after(async () => {
       await closeBrowserBounded(browser);
     });
+    browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({
       baseURL: baseUrl,
       viewport: { width: 1440, height: 1100 },
@@ -571,10 +572,11 @@ test(
       },
     );
 
-    const browser = await chromium.launch({ headless: true });
+    let browser;
     t.after(async () => {
       await closeBrowserBounded(browser);
     });
+    browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({
       baseURL: baseUrl,
       viewport: { width: 1440, height: 1100 },
@@ -653,10 +655,11 @@ test(
       },
     );
 
-    const browser = await chromium.launch({ headless: true });
+    let browser;
     t.after(async () => {
       await closeBrowserBounded(browser);
     });
+    browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({
       baseURL: baseUrl,
       viewport: { width: 1440, height: 1100 },
@@ -753,10 +756,11 @@ test("tutorial shot editor imports a dropped source image", { timeout: 3 * 60_00
     },
   );
 
-  const browser = await chromium.launch({ headless: true });
+  let browser;
   t.after(async () => {
     await closeBrowserBounded(browser);
   });
+  browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({
     baseURL: baseUrl,
     viewport: { width: 1440, height: 1100 },
@@ -854,10 +858,11 @@ test(
       },
     );
 
-    const browser = await chromium.launch({ headless: true });
+    let browser;
     t.after(async () => {
       await closeBrowserBounded(browser);
     });
+    browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({
       baseURL: baseUrl,
       viewport: { width: 1440, height: 1100 },
@@ -951,10 +956,11 @@ test(
       },
     );
 
-    const browser = await chromium.launch({ headless: true });
+    let browser;
     t.after(async () => {
       await closeBrowserBounded(browser);
     });
+    browser = await chromium.launch({ headless: true });
 
     const previewPage = await browser.newPage({
       baseURL: baseUrl,
@@ -1112,10 +1118,11 @@ authoringMode: tutorial
       },
     );
 
-    const browser = await chromium.launch({ headless: true });
+    let browser;
     t.after(async () => {
       await closeBrowserBounded(browser);
     });
+    browser = await chromium.launch({ headless: true });
 
     const previewPage = await browser.newPage({
       baseURL: baseUrl,
@@ -1283,10 +1290,11 @@ test(
       },
     );
 
-    const browser = await chromium.launch({ headless: true });
+    let browser;
     t.after(async () => {
       await closeBrowserBounded(browser);
     });
+    browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({
       baseURL: baseUrl,
       viewport: { width: 1440, height: 1100 },
@@ -1399,10 +1407,11 @@ test(
       },
     );
 
-    const browser = await chromium.launch({ headless: true });
+    let browser;
     t.after(async () => {
       await closeBrowserBounded(browser);
     });
+    browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({
       baseURL: baseUrl,
       viewport: { width: 1440, height: 1100 },
@@ -1538,10 +1547,11 @@ test(
       },
     );
 
-    const browser = await chromium.launch({ headless: true });
+    let browser;
     t.after(async () => {
       await closeBrowserBounded(browser);
     });
+    browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({
       baseURL: baseUrl,
       viewport: { width: 1920, height: 1100 },
