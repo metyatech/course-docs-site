@@ -53,6 +53,7 @@ jobs:
             e2ePort: 3103
     env:
       COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
+      COURSE_DOCS_NEXT_DIST_DIR: .next-test
       E2E_PORT: ${{ matrix.e2ePort }}
       PLAYWRIGHT_MAX_FAILURES: "1"
     steps:

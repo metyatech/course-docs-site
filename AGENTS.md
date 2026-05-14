@@ -313,9 +313,12 @@ Write these rules in a way that keeps learning outcomes (clarity, sequencing, re
 
 ## Assessments (exam questions written in Markdown)
 
+- Write questions so there is a single interpretation and a single correct answer.
+- Avoid ambiguous verbs like “switch”; specify the exact state transition.
 - For UI behavior questions, include a visual target (GIF/image) when feasible.
-- For external-system blanks, use `${answer}` (multiple answers: `${/regex/}`);
-  do not convert to custom placeholders (e.g. `【1】`).
+- For fill-in-the-blank questions, specify the expected answer format and any forbidden answers.
+- For external-system blanks, use `${answer}` (multiple answers: `${/regex/}`); do not convert to custom placeholders (e.g. `【1】`).
+- If multiple answers are allowed, describe the allowed range explicitly (e.g. `textContent` or `innerText`).
 
 ## Tutorial-shot images in `<Action>` components
 
