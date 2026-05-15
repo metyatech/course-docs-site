@@ -41,7 +41,26 @@
   border-color: var(--course-exercise-dark-border) !important;
 }
 
-.dark .rensyuBlock :where(.rensyuNaiyou, .rensyuKaitou, p, li, dd, dt, h1, h2, h3, h4, h5, h6, strong, em, span, div) {
+.dark
+  .rensyuBlock
+  :where(
+    .rensyuNaiyou,
+    .rensyuKaitou,
+    p,
+    li,
+    dd,
+    dt,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    strong,
+    em,
+    span,
+    div
+  ):not(.monaco-editor):not(.monaco-editor *) {
   color: var(--course-exercise-dark-text) !important;
 }
 
@@ -92,6 +111,90 @@
 
 .dark .rensyuBlock :where(hr, table, th, td) {
   border-color: var(--course-exercise-dark-divider);
+}
+
+/* Keep @metyatech/code-preview shell chrome in sync with the Course Docs theme. */
+[data-code-preview-theme='dark'] [class*='codePreviewContainer'] {
+  --cp-border: #475569;
+  --cp-bg: #0f172a;
+  --cp-surface: #111827;
+  --cp-control-bg: rgb(15 23 42 / 0.92);
+  --cp-control-hover-bg: #1e293b;
+  --cp-text: #cbd5e1;
+  --cp-strong-text: #f8fafc;
+  --cp-resizer-bg: #111827;
+  --cp-resizer-hover-bg: #1e293b;
+  --cp-resizer-grip: #94a3b8;
+  --cp-resizer-grip-hover: #e2e8f0;
+  --cp-focus: #38bdf8;
+  --cp-editor-bg: #0f172a;
+  background: var(--cp-bg);
+  color: var(--cp-strong-text);
+  border-color: var(--cp-border);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
+}
+
+[data-code-preview-theme='dark']
+  :where(
+    [class*='header'],
+    [class*='fileStructure'],
+    [class*='sectionHeader'],
+    [class*='editorSection'],
+    [class*='editorContainer'],
+    [class*='editorsRow']
+  ) {
+  background: var(--cp-surface);
+  color: var(--cp-text);
+  border-color: var(--cp-border);
+}
+
+[data-code-preview-theme='dark'] [class*='editorsRow'],
+[data-code-preview-theme='dark'] [class*='editorSection'],
+[data-code-preview-theme='dark'] [class*='editorContainer'] {
+  background: var(--cp-editor-bg);
+}
+
+[data-code-preview-theme='dark'] :where([class*='title'], [class*='fileStructureTitle']) {
+  color: var(--cp-strong-text);
+  border-color: var(--cp-border);
+}
+
+[data-code-preview-theme='dark']
+  :where([class*='fileTree'], [class*='fileTreeItem'], [class*='fileTreeSubItem']) {
+  color: var(--cp-text);
+}
+
+[data-code-preview-theme='dark'] [class*='gyoButton'] {
+  background: var(--cp-control-bg);
+  color: var(--cp-text);
+  border-color: var(--cp-border);
+}
+
+[data-code-preview-theme='dark'] [class*='gyoButton']:where(:hover, :focus) {
+  background: var(--cp-control-hover-bg);
+  color: var(--cp-strong-text);
+}
+
+[data-code-preview-theme='dark'] [class*='resizer'] {
+  background: var(--cp-resizer-bg);
+}
+
+[data-code-preview-theme='dark'] [class*='resizer']::before {
+  background: var(--cp-border);
+}
+
+[data-code-preview-theme='dark'] [class*='resizer']:where(:hover, :focus-visible) {
+  background: var(--cp-resizer-hover-bg);
+}
+
+[data-code-preview-theme='dark'] [class*='resizerGrip'] {
+  background: var(--cp-resizer-grip);
+}
+
+[data-code-preview-theme='dark']
+  [class*='resizer']:where(:hover, :focus-visible)
+  [class*='resizerGrip'] {
+  background: var(--cp-resizer-grip-hover);
 }
 
 .course-footer-row {
