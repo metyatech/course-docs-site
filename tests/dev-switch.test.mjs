@@ -521,22 +521,26 @@ test(
       "utf8",
     );
 
+    const devEnv = createRunDevTestEnv({
+      label: "dev-watch-local-source",
+      env: process.env,
+      overrides: {
+        COURSE_DOCS_SITE_DEV_INNER: "stub",
+      },
+    });
+    const distDirPath = path.join(projectRoot, ...devEnv.COURSE_DOCS_NEXT_DIST_DIR.split("/"));
+
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       detached: process.platform !== "win32",
       windowsHide: true,
       cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: "dev-watch-local-source",
-        env: process.env,
-        overrides: {
-          COURSE_DOCS_SITE_DEV_INNER: "stub",
-        },
-      }),
+      env: devEnv,
       stdio: "inherit",
     });
 
     t.after(async () => {
       await killProcessTree(dev);
+      await safeRm(distDirPath);
     });
 
     const baseUrl = `http://127.0.0.1:${port}`;
@@ -557,6 +561,10 @@ test(
     assert.equal(initialHealthz.status, 200);
     const initialRevision = initialHealthz.text.trim();
     assert.ok(initialRevision.startsWith("course-docs-site-stub:"), "Expected stub revision");
+
+    await fs.mkdir(distDirPath, { recursive: true });
+    const activeDistMarkerPath = path.join(distDirPath, "active-dev-cache.txt");
+    await fs.writeFile(activeDistMarkerPath, "active", "utf8");
 
     await fs.mkdir(path.join(courseA, "content", "docs", "watch-only"), { recursive: true });
     await fs.writeFile(
@@ -580,5 +588,6 @@ test(
     const nextHealthz = await fetchText(`${baseUrl}/healthz`);
     assert.equal(nextHealthz.status, 200);
     assert.equal(nextHealthz.text.trim(), initialRevision);
+    assert.equal(await fileExists(activeDistMarkerPath), true);
   },
 );

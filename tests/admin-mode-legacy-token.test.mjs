@@ -78,47 +78,12 @@ const assertRedirectToIntro = (actualLocation) => {
   );
 };
 
-const isRenderedIntroPage = (response) =>
-  response?.status === 200 && response.text.includes("Public intro page.");
-
-const waitForAdminModeFixtureSynced = async () => {
-  const expectedFiles = [
-    path.join(projectRoot, "content", "docs", "intro", "index.mdx"),
-    path.join(projectRoot, "content", "docs", "teacher-guide", "index.mdx"),
-    path.join(projectRoot, "site.config.ts"),
-  ];
-
-  await waitFor(
-    async () => {
-      try {
-        const [introText, teacherText, siteConfigText] = await Promise.all([
-          fs.readFile(expectedFiles[0], "utf8"),
-          fs.readFile(expectedFiles[1], "utf8"),
-          fs.readFile(expectedFiles[2], "utf8"),
-        ]);
-        return (
-          introText.includes("Public intro page.") &&
-          teacherText.includes("Teacher Guide") &&
-          siteConfigText.includes("Admin Fixture")
-        );
-      } catch {
-        return false;
-      }
-    },
-    {
-      timeoutMs: 60_000,
-      intervalMs: 250,
-      onTimeoutMessage: "Admin mode fixture files were not synced into the app tree.",
-    },
-  );
-};
-
-const waitForRenderedIntroPage = async (baseUrl, onTimeoutMessage) => {
+const waitForRenderedIntroPage = async (baseUrl) => {
   let lastIntroResult = null;
   await waitFor(
     async () => {
       lastIntroResult = await tryFetchResponse(`${baseUrl}/docs/intro/`);
-      return isRenderedIntroPage(lastIntroResult);
+      return lastIntroResult?.status === 200 && lastIntroResult.text.includes("Public intro page.");
     },
     {
       timeoutMs: 180_000,
@@ -126,7 +91,7 @@ const waitForRenderedIntroPage = async (baseUrl, onTimeoutMessage) => {
       onTimeoutMessage: () => {
         const status = lastIntroResult?.status ?? "no response";
         const text = lastIntroResult?.text?.slice(0, 500) ?? "";
-        return `${onTimeoutMessage} Last /docs/intro/ status: ${status}. Body excerpt: ${text}`;
+        return `Public intro page did not become ready for legacy admin token test. Last /docs/intro/ status: ${status}. Body excerpt: ${text}`;
       },
     },
   );
@@ -209,12 +174,11 @@ export default meta;
   await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
-
 test(
-  "admin-only docs stay hidden from public and open with admin mode enabled",
+  "legacy ADMIN_DELETE_TOKEN alone does not enable admin mode anymore",
   { timeout: 5 * 60_000 },
   async (t) => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-admin-mode-"));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-admin-mode-legacy-"));
     const fixtureCourse = path.join(tempRoot, "course");
     const port = await getFreePort();
     const baseUrl = `http://127.0.0.1:${port}`;
@@ -227,11 +191,12 @@ test(
       windowsHide: true,
       cwd: projectRoot,
       env: createRunDevTestEnv({
-        label: "admin-mode-route-protection",
+        label: "admin-mode-route-protection-legacy",
         env: process.env,
         overrides: {
           COURSE_CONTENT_SOURCE: fixtureCourse,
-          ADMIN_MODE_TOKEN: "teacher-secret",
+          ADMIN_MODE_TOKEN: "",
+          ADMIN_DELETE_TOKEN: "legacy-secret",
         },
       }),
       stdio: "inherit",
@@ -243,49 +208,25 @@ test(
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
-    await waitForAdminModeFixtureSynced();
+    await waitForRenderedIntroPage(baseUrl);
 
+    let status = null;
     await waitFor(
       async () => {
-        const redirectResult = await tryFetchResponse(`${baseUrl}/`);
-        return redirectResult?.status === 307;
+        status = await tryFetchResponse(`${baseUrl}/api/admin/mode/`);
+        return status?.status === 200;
       },
       {
         timeoutMs: 60_000,
         intervalMs: 500,
-        onTimeoutMessage: "Server did not become ready for admin-mode route protection test.",
+        onTimeoutMessage: "Admin mode status API did not become ready for legacy token test.",
       },
     );
-
-    const root = await fetchResponse(`${baseUrl}/`);
-    assert.equal(root.status, 307);
-    assertRedirectToIntro(root.location);
-
-    await waitFor(
-      async () => {
-        const teacherGuideResult = await tryFetchResponse(`${baseUrl}/docs/teacher-guide/`);
-        return teacherGuideResult?.status === 307;
-      },
-      {
-        timeoutMs: 60_000,
-        intervalMs: 500,
-        onTimeoutMessage: "Public teacher guide route did not start redirecting.",
-      },
-    );
-
-    const publicTeacherGuide = await fetchResponse(`${baseUrl}/docs/teacher-guide/`);
-    assert.equal(publicTeacherGuide.status, 307);
-    assertRedirectToIntro(publicTeacherGuide.location);
-
-    const publicIntro = await waitForRenderedIntroPage(
-      baseUrl,
-      "Public intro page did not become ready.",
-    );
-    assert.equal(publicIntro.status, 200);
-    assert.ok(
-      !publicIntro.text.includes("/docs/teacher-guide"),
-      "Public intro page should not expose teacher-guide links.",
-    );
+    assert.equal(status.status, 200);
+    assert.match(status.text, /"configured":false/);
+    assert.match(status.text, /"tokenConfigured":false/);
+    assert.match(status.text, /"unavailableReason":"missing-admin-mode-token"/);
+    assert.match(status.text, /ADMIN_MODE_TOKEN/);
 
     let enableAdmin = null;
     await waitFor(
@@ -295,66 +236,32 @@ test(
           headers: {
             "content-type": "application/json",
           },
-          body: JSON.stringify({ token: "teacher-secret" }),
+          body: JSON.stringify({ token: "legacy-secret" }),
         });
-        return enableAdmin?.status === 200 && Boolean(enableAdmin.setCookie);
+        return enableAdmin?.status === 200;
       },
       {
         timeoutMs: 60_000,
         intervalMs: 500,
-        onTimeoutMessage: "Admin mode API did not enable after token submission.",
+        onTimeoutMessage: "Admin mode POST did not become ready for legacy token test.",
       },
     );
     assert.equal(enableAdmin.status, 200);
-    assert.ok(enableAdmin.setCookie, "Expected admin mode API to set a cookie.");
+    assert.equal(enableAdmin.setCookie, null);
+    assert.match(enableAdmin.text, /"configured":false/);
+    assert.match(enableAdmin.text, /"enabled":false/);
+    assert.match(enableAdmin.text, /"unavailableReason":"missing-admin-mode-token"/);
 
-    const cookieHeader = enableAdmin.setCookie.split(";", 1)[0];
+    const teacherGuide = await fetchResponse(`${baseUrl}/docs/teacher-guide/`);
+    assert.equal(teacherGuide.status, 307);
+    assertRedirectToIntro(teacherGuide.location);
 
-    await waitFor(
-      async () => {
-        const adminTeacherGuide = await tryFetchResponse(`${baseUrl}/docs/teacher-guide/`, {
-          headers: {
-            cookie: cookieHeader,
-          },
-        });
-        return adminTeacherGuide?.status === 200;
-      },
-      {
-        timeoutMs: 60_000,
-        intervalMs: 500,
-        onTimeoutMessage: "Teacher guide did not open after enabling admin mode.",
-      },
-    );
-
-    const adminTeacherGuide = await fetchResponse(`${baseUrl}/docs/teacher-guide/`, {
+    const teacherGuideWithManualCookie = await fetchResponse(`${baseUrl}/docs/teacher-guide/`, {
       headers: {
-        cookie: cookieHeader,
+        cookie: "course-docs-admin-mode=1",
       },
     });
-    assert.equal(adminTeacherGuide.status, 200);
-    assert.match(adminTeacherGuide.text, /Teacher Guide/);
-
-    let disableAdmin = null;
-    await waitFor(
-      async () => {
-        disableAdmin = await tryFetchResponse(`${baseUrl}/api/admin/mode/`, {
-          method: "DELETE",
-          headers: {
-            cookie: cookieHeader,
-          },
-        });
-        return disableAdmin?.status === 200;
-      },
-      {
-        timeoutMs: 60_000,
-        intervalMs: 500,
-        onTimeoutMessage: "Admin mode API did not disable after DELETE.",
-      },
-    );
-    assert.equal(disableAdmin.status, 200);
-
-    const teacherGuideAfterDisable = await fetchResponse(`${baseUrl}/docs/teacher-guide/`);
-    assert.equal(teacherGuideAfterDisable.status, 307);
-    assertRedirectToIntro(teacherGuideAfterDisable.location);
+    assert.equal(teacherGuideWithManualCookie.status, 307);
+    assertRedirectToIntro(teacherGuideWithManualCookie.location);
   },
 );

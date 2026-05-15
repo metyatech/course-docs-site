@@ -6,12 +6,13 @@ import { getRequiredContentSourceText, parseContentSource } from "./content-sour
 import { resolveNextDistDirPath } from "./next-dist-dir.mjs";
 
 const projectRoot = process.cwd();
+const envFileRoot = path.resolve(projectRoot, process.env.COURSE_DOCS_ENV_FILE_DIR ?? ".");
 const workRoot = path.join(projectRoot, ".course-content");
 const cloneDir = path.join(workRoot, "repo");
 const sourceStatePath = path.join(workRoot, "active-source.txt");
 
 const readEnv = (filename) => {
-  const envPath = path.join(projectRoot, filename);
+  const envPath = path.join(envFileRoot, filename);
   if (!fs.existsSync(envPath)) {
     return {};
   }
@@ -39,6 +40,7 @@ for (const [key, value] of Object.entries(fileEnv)) {
 }
 
 const nextDistDirPath = resolveNextDistDirPath({ projectRoot, env: process.env });
+const skipNextDistClear = process.env.COURSE_DOCS_SKIP_NEXT_DIST_CLEAR === "1";
 
 const courseSourceText = getRequiredContentSourceText(process.env);
 const courseSource = parseContentSource(courseSourceText);
@@ -92,7 +94,7 @@ const rmIfExists = (targetPath) => {
   } catch {
     // ignore
   }
-  fs.rmSync(targetPath, { recursive: true, force: true });
+  fs.rmSync(targetPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 };
 
 const readTextIfExists = (p) => {
@@ -268,7 +270,7 @@ if (!activeSourceId) {
   activeSourceId = sourceRoot ? `dir:${sourceRoot}` : "unknown";
 }
 
-if (previousSourceId && previousSourceId !== activeSourceId) {
+if (!skipNextDistClear && previousSourceId && previousSourceId !== activeSourceId) {
   // Switching content can change the MDX tree and page-map.
   // Clear Next build artifacts to avoid cross-course stale runtime chunks.
   rmIfExists(nextDistDirPath);

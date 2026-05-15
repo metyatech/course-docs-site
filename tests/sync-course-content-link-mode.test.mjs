@@ -8,6 +8,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const syncScriptPath = path.join(projectRoot, "scripts/sync-course-content.mjs");
 
 const writeCourseRepo = async ({ rootDir, courseName, introBody }) => {
   const siteConfig = `export const siteConfig = {\n  logoText: ${JSON.stringify(
@@ -30,10 +31,10 @@ const writeCourseRepo = async ({ rootDir, courseName, introBody }) => {
   await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
-const runSync = (env) =>
+const runSync = ({ env, cwd }) =>
   new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["scripts/sync-course-content.mjs"], {
-      cwd: projectRoot,
+    const child = spawn(process.execPath, [syncScriptPath], {
+      cwd,
       env: { ...process.env, ...env },
       stdio: "inherit",
     });
@@ -60,6 +61,7 @@ const safeRm = async (targetPath) => {
 };
 
 test("local content sources are mirrored into real directories", { timeout: 60_000 }, async (t) => {
+  const fakeSiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-site-"));
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-real-dir-"));
   const courseA = path.join(tempRoot, "course-a");
 
@@ -70,21 +72,16 @@ test("local content sources are mirrored into real directories", { timeout: 60_0
   });
 
   t.after(async () => {
-    await safeRm(path.join(projectRoot, "content"));
-    await safeRm(path.join(projectRoot, "public"));
-    await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
-    await fs.mkdir(path.join(projectRoot, "public"), { recursive: true });
-    await fs.writeFile(path.join(projectRoot, "content", ".keep"), "", "utf8");
-    await fs.writeFile(path.join(projectRoot, "public", ".keep"), "", "utf8");
+    await safeRm(fakeSiteRoot);
     await fs.rm(tempRoot, { recursive: true, force: true });
   });
 
-  const exitCode = await runSync({ COURSE_CONTENT_SOURCE: courseA });
+  const exitCode = await runSync({ cwd: fakeSiteRoot, env: { COURSE_CONTENT_SOURCE: courseA } });
   assert.equal(exitCode, 0);
-  assert.equal(await isRealDirectory(path.join(projectRoot, "content")), true);
-  assert.equal(await isRealDirectory(path.join(projectRoot, "public")), true);
+  assert.equal(await isRealDirectory(path.join(fakeSiteRoot, "content")), true);
+  assert.equal(await isRealDirectory(path.join(fakeSiteRoot, "public")), true);
   assert.match(
-    await fs.readFile(path.join(projectRoot, "content", "docs", "intro", "index.mdx"), "utf8"),
+    await fs.readFile(path.join(fakeSiteRoot, "content", "docs", "intro", "index.mdx"), "utf8"),
     /initial content/u,
   );
 });
@@ -93,6 +90,7 @@ test(
   "sync replaces pre-existing external links with mirrored directories and prunes stale files",
   { timeout: 60_000 },
   async (t) => {
+    const fakeSiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-site-"));
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-relink-"));
     const courseA = path.join(tempRoot, "course-a");
 
@@ -103,35 +101,30 @@ test(
     });
 
     t.after(async () => {
-      await safeRm(path.join(projectRoot, "content"));
-      await safeRm(path.join(projectRoot, "public"));
-      await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
-      await fs.mkdir(path.join(projectRoot, "public"), { recursive: true });
-      await fs.writeFile(path.join(projectRoot, "content", ".keep"), "", "utf8");
-      await fs.writeFile(path.join(projectRoot, "public", ".keep"), "", "utf8");
+      await safeRm(fakeSiteRoot);
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
     const targetLinkType = process.platform === "win32" ? "junction" : "dir";
-    await safeRm(path.join(projectRoot, "content"));
-    await safeRm(path.join(projectRoot, "public"));
+    await safeRm(path.join(fakeSiteRoot, "content"));
+    await safeRm(path.join(fakeSiteRoot, "public"));
     await fs.symlink(
       path.join(courseA, "content"),
-      path.join(projectRoot, "content"),
+      path.join(fakeSiteRoot, "content"),
       targetLinkType,
     );
     await fs.symlink(
       path.join(courseA, "public"),
-      path.join(projectRoot, "public"),
+      path.join(fakeSiteRoot, "public"),
       targetLinkType,
     );
 
-    const exitCode = await runSync({ COURSE_CONTENT_SOURCE: courseA });
+    const exitCode = await runSync({ cwd: fakeSiteRoot, env: { COURSE_CONTENT_SOURCE: courseA } });
     assert.equal(exitCode, 0);
-    assert.equal(await isRealDirectory(path.join(projectRoot, "content")), true);
-    assert.equal(await isRealDirectory(path.join(projectRoot, "public")), true);
+    assert.equal(await isRealDirectory(path.join(fakeSiteRoot, "content")), true);
+    assert.equal(await isRealDirectory(path.join(fakeSiteRoot, "public")), true);
 
-    const staleFilePath = path.join(projectRoot, "content", "docs", "stale.txt");
+    const staleFilePath = path.join(fakeSiteRoot, "content", "docs", "stale.txt");
     await fs.writeFile(staleFilePath, "stale", "utf8");
     await fs.rm(path.join(courseA, "content", "docs", "intro", "index.mdx"), { force: true });
     await fs.mkdir(path.join(courseA, "content", "docs", "updated"), { recursive: true });
@@ -141,12 +134,15 @@ test(
       "utf8",
     );
 
-    const secondExitCode = await runSync({ COURSE_CONTENT_SOURCE: courseA });
+    const secondExitCode = await runSync({
+      cwd: fakeSiteRoot,
+      env: { COURSE_CONTENT_SOURCE: courseA },
+    });
     assert.equal(secondExitCode, 0);
     await assert.rejects(fs.stat(staleFilePath));
-    await assert.rejects(fs.stat(path.join(projectRoot, "content", "docs", "intro", "index.mdx")));
+    await assert.rejects(fs.stat(path.join(fakeSiteRoot, "content", "docs", "intro", "index.mdx")));
     assert.match(
-      await fs.readFile(path.join(projectRoot, "content", "docs", "updated", "index.mdx"), "utf8"),
+      await fs.readFile(path.join(fakeSiteRoot, "content", "docs", "updated", "index.mdx"), "utf8"),
       /updated/u,
     );
   },

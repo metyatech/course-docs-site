@@ -10,6 +10,7 @@ import { findFirstFreePort, waitForPortFree } from "./port-availability.mjs";
 
 const args = process.argv.slice(2);
 const projectRoot = process.cwd();
+const envFileRoot = path.resolve(projectRoot, process.env.COURSE_DOCS_ENV_FILE_DIR ?? ".");
 
 const devInnerMode = (process.env.COURSE_DOCS_SITE_DEV_INNER ?? "").trim();
 const isWindows = process.platform === "win32";
@@ -57,7 +58,7 @@ const stripPortArgs = (argv) => {
 };
 
 const readEnvFile = (filename) => {
-  const envPath = path.join(projectRoot, filename);
+  const envPath = path.join(envFileRoot, filename);
   if (!fs.existsSync(envPath)) {
     return {};
   }
@@ -115,8 +116,13 @@ let sourceWatcher = null;
 
 const runSync = () =>
   new Promise((resolve) => {
+    const childEnv = { ...process.env };
+    if (devProcess) {
+      childEnv.COURSE_DOCS_SKIP_NEXT_DIST_CLEAR = "1";
+    }
     const child = spawn(process.execPath, ["scripts/sync-course-content.mjs"], {
       stdio: "inherit",
+      env: childEnv,
     });
     child.on("exit", (code) => resolve(code ?? 1));
   });
@@ -164,12 +170,29 @@ const stopDev = async () => {
   }
 
   if (isWindows) {
-    try {
-      // Kill process tree (node/next workers) on Windows.
-      spawn("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
-    } catch {
-      // ignore
-    }
+    await new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve();
+      };
+      try {
+        // Kill process tree (node/next workers) on Windows and wait until
+        // taskkill finishes so the next fixture cannot race a live worker.
+        const killer = spawn("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+          stdio: "ignore",
+          windowsHide: true,
+        });
+        killer.once("close", finish);
+        killer.once("error", finish);
+      } catch {
+        finish();
+      }
+      setTimeout(finish, 10_000);
+    });
   } else {
     setTimeout(() => {
       try {
@@ -462,7 +485,7 @@ const createEnvWatcher = () => {
   };
 
   const watchFiles = [".env", ".env.local", ".env.course", ".env.course.local"].map((f) =>
-    path.join(projectRoot, f),
+    path.join(envFileRoot, f),
   );
 
   // `fs.watch()` is not reliable with atomic save patterns (common on Windows).

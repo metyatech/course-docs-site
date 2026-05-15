@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { createIsolatedNextDistDir } from "../scripts/next-dist-dir.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const syncScriptPath = path.join(projectRoot, "scripts/sync-course-content.mjs");
 
 const safeRm = async (targetPath) => {
   await fs.rm(targetPath, { recursive: true, force: true });
@@ -23,10 +24,10 @@ const fileExists = async (targetPath) => {
   }
 };
 
-const runSync = (env) =>
+const runSync = ({ env, cwd }) =>
   new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["scripts/sync-course-content.mjs"], {
-      cwd: projectRoot,
+    const child = spawn(process.execPath, [syncScriptPath], {
+      cwd,
       env: { ...process.env, ...env },
       stdio: "inherit",
     });
@@ -123,23 +124,17 @@ test(
   "remote content sync reuses the existing clone until the resolved ref changes",
   { timeout: 60_000 },
   async (t) => {
+    const fakeSiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-site-"));
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-remote-"));
     const fakeBin = path.join(tempRoot, "bin");
     const logPath = path.join(tempRoot, "git.log");
     const distDir = createIsolatedNextDistDir("sync-course-content-remote-cache");
-    const distDirPath = path.join(projectRoot, ...distDir.split("/"));
+    const distDirPath = path.join(fakeSiteRoot, ...distDir.split("/"));
 
     await writeFakeGit({ binDir: fakeBin });
 
     t.after(async () => {
-      await safeRm(path.join(projectRoot, "content"));
-      await safeRm(path.join(projectRoot, "public"));
-      await safeRm(path.join(projectRoot, ".course-content"));
-      await safeRm(distDirPath);
-      await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
-      await fs.mkdir(path.join(projectRoot, "public"), { recursive: true });
-      await fs.writeFile(path.join(projectRoot, "content", ".keep"), "", "utf8");
-      await fs.writeFile(path.join(projectRoot, "public", ".keep"), "", "utf8");
+      await safeRm(fakeSiteRoot);
       await safeRm(tempRoot);
     });
 
@@ -153,14 +148,17 @@ test(
       Path: `${fakeBin}${path.delimiter}${process.env.Path ?? process.env.PATH ?? ""}`,
     };
 
-    await safeRm(path.join(projectRoot, ".course-content"));
+    await safeRm(path.join(fakeSiteRoot, ".course-content"));
     await safeRm(distDirPath);
     await fs.mkdir(distDirPath, { recursive: true });
     await fs.writeFile(path.join(distDirPath, "keep-first.txt"), "keep", "utf8");
 
     const firstExit = await runSync({
-      ...baseEnv,
-      FAKE_GIT_SHA: "1111111111111111111111111111111111111111",
+      cwd: fakeSiteRoot,
+      env: {
+        ...baseEnv,
+        FAKE_GIT_SHA: "1111111111111111111111111111111111111111",
+      },
     });
     assert.equal(firstExit, 0);
     assert.equal(await fileExists(path.join(distDirPath, "keep-first.txt")), true);
@@ -168,8 +166,11 @@ test(
     await fs.writeFile(path.join(distDirPath, "keep-second.txt"), "keep", "utf8");
 
     const secondExit = await runSync({
-      ...baseEnv,
-      FAKE_GIT_SHA: "1111111111111111111111111111111111111111",
+      cwd: fakeSiteRoot,
+      env: {
+        ...baseEnv,
+        FAKE_GIT_SHA: "1111111111111111111111111111111111111111",
+      },
     });
     assert.equal(secondExit, 0);
     assert.equal(await fileExists(path.join(distDirPath, "keep-second.txt")), true);
@@ -177,8 +178,11 @@ test(
     await fs.writeFile(path.join(distDirPath, "keep-third.txt"), "clear", "utf8");
 
     const thirdExit = await runSync({
-      ...baseEnv,
-      FAKE_GIT_SHA: "2222222222222222222222222222222222222222",
+      cwd: fakeSiteRoot,
+      env: {
+        ...baseEnv,
+        FAKE_GIT_SHA: "2222222222222222222222222222222222222222",
+      },
     });
     assert.equal(thirdExit, 0);
     assert.equal(await fileExists(distDirPath), false);
@@ -193,7 +197,7 @@ test(
     assert.equal(cloneCount, 2);
     assert.equal(lsRemoteCount, 3);
     assert.match(
-      await fs.readFile(path.join(projectRoot, "content", "docs", "intro", "index.mdx"), "utf8"),
+      await fs.readFile(path.join(fakeSiteRoot, "content", "docs", "intro", "index.mdx"), "utf8"),
       /2222222222222222222222222222222222222222/,
     );
   },

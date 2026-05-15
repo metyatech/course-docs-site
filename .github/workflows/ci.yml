@@ -36,8 +36,8 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Verify shared tests
-        run: npm run test:shared
+      - name: Verify shared tests (repeat-clean gate)
+        run: npm run verify:repeat-clean
 
   verify-course:
     runs-on: ubuntu-latest

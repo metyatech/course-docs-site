@@ -5,7 +5,11 @@ import {
   applyCourseAssetWebpackRules,
   courseMdxOptions,
 } from "@metyatech/course-docs-platform/next";
-import { resolveNextDistDir, resolveNextDistDirPath } from "./scripts/next-dist-dir.mjs";
+import {
+  ensureNextTsconfig,
+  resolveNextDistDir,
+  resolveNextDistDirPath,
+} from "./scripts/next-dist-dir.mjs";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 const skipBuildLint = process.env.COURSE_DOCS_SKIP_BUILD_LINT === "1";
@@ -68,6 +72,7 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: skipBuildTypecheck,
+    tsconfigPath: ensureNextTsconfig({ projectRoot, env: process.env }),
   },
   outputFileTracingIncludes: {
     // Ensure /asset route can read synced course files in serverless runtimes.

@@ -8,6 +8,10 @@ type RevisionResponse = {
 
 export default function DevAutoReload() {
   useEffect(() => {
+    if (window.location.pathname.startsWith('/dev/')) {
+      return undefined;
+    }
+
     let cancelled = false;
     let lastRevision = '';
 

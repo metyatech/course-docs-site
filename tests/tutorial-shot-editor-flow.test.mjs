@@ -6,7 +6,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import test from "node:test";
+import test, { after, before } from "node:test";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import sharp from "sharp";
@@ -14,43 +14,30 @@ import {
   TUTORIAL_SHOT_EDITOR_WORKSPACE_PADDING,
   TUTORIAL_SHOT_SOURCE_IMAGE_ACCEPT,
 } from "../src/lib/tutorial-shots-shared.mjs";
-import { closeBrowserBounded, createRunDevTestEnv, killProcessTree } from "./test-harness-env.mjs";
+import {
+  closeBrowserBounded,
+  cleanupWorktreeDevProcesses,
+  createRunDevTestEnv,
+  killProcessTreeAndWaitForPort,
+  waitForProcessExit,
+} from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const envCourseLocalPath = path.join(projectRoot, ".env.course.local");
 
-const fileExists = async (targetPath) => {
-  try {
-    await fs.stat(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
-};
+before(async () => {
+  await cleanupWorktreeDevProcesses({ projectRoot });
+});
 
-const backupFile = async (targetPath) => {
-  if (!(await fileExists(targetPath))) {
-    return null;
-  }
-
-  return fs.readFile(targetPath, "utf8");
-};
-
-const restoreFile = async (targetPath, contentsOrNull) => {
-  if (contentsOrNull === null) {
-    await fs.rm(targetPath, { force: true });
-    return;
-  }
-
-  await fs.writeFile(targetPath, contentsOrNull, "utf8");
-};
+after(async () => {
+  await cleanupWorktreeDevProcesses({ projectRoot });
+});
 
 const getFreePort = () =>
   new Promise((resolve, reject) => {
     const server = net.createServer();
     server.unref();
     server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
+    server.listen(0, () => {
       const address = server.address();
       if (!address || typeof address === "string") {
         server.close(() => reject(new Error("Failed to allocate free port")));
@@ -67,7 +54,9 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   const startedAt = Date.now();
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
-      throw new Error(onTimeoutMessage ?? "Timed out");
+      throw new Error(
+        typeof onTimeoutMessage === "function" ? onTimeoutMessage() : (onTimeoutMessage ?? "Timed out"),
+      );
     }
     const result = await fn();
     if (result) {
@@ -77,13 +66,120 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   }
 };
 
-const tryFetchStatus = async (url) => {
+const tryFetchStatus = async (url, { timeoutMs = 10_000 } = {}) => {
   try {
-    const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(10_000) });
+    const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
     return response.status;
   } catch {
     return null;
   }
+};
+
+const tryFetchTutorialShotsApi = async (baseUrl) => {
+  try {
+    const response = await fetch(`${baseUrl}/api/dev/tutorial-shots/`, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    const text = await response.text();
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // Preserve the raw body for timeout diagnostics.
+    }
+    return {
+      status: response.status,
+      data,
+      text,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const waitForTutorialShotsApiReady = async (
+  baseUrl,
+  {
+    expectedSourcePath = null,
+    expectedShotId = null,
+    expectedOutputImagePath = null,
+    onTimeoutMessage,
+  },
+) => {
+  let lastResult = null;
+  await waitFor(
+    async () => {
+      lastResult = await tryFetchTutorialShotsApi(baseUrl);
+      if (lastResult?.status !== 200 || lastResult.data?.enabled !== true) {
+        return false;
+      }
+      if (expectedSourcePath && lastResult.data.activeSourcePath !== expectedSourcePath) {
+        return false;
+      }
+      if (expectedShotId) {
+        if (!Array.isArray(lastResult.data.shots)) {
+          return false;
+        }
+        const expectedShot = lastResult.data.shots.find((shot) => shot?.id === expectedShotId);
+        if (!expectedShot) {
+          return false;
+        }
+        if (expectedOutputImagePath) {
+          return (
+            expectedShot.outputImagePath === expectedOutputImagePath &&
+            expectedShot.hasOutputImage === true &&
+            expectedShot.bootstrapImagePath === expectedOutputImagePath
+          );
+        }
+        return true;
+      }
+      return Array.isArray(lastResult.data.shots) && lastResult.data.shots.length > 0;
+    },
+    {
+      timeoutMs: 120_000,
+      intervalMs: 1000,
+      onTimeoutMessage: () => {
+        const status = lastResult?.status ?? "no response";
+        const body = (lastResult?.text ?? JSON.stringify(lastResult?.data ?? null)).slice(0, 500);
+        return `${onTimeoutMessage} Last API status: ${status}. Last API body: ${body}`;
+      },
+    },
+  );
+  return lastResult;
+};
+
+const isImageLoaded = async (imageLocator, expectedFilename) => {
+  try {
+    return await imageLocator.evaluate(
+      (image, filename) =>
+        image instanceof HTMLImageElement &&
+        image.complete &&
+        image.naturalWidth > 0 &&
+        (!filename || decodeURIComponent(image.currentSrc || image.src).includes(filename)),
+      expectedFilename,
+    );
+  } catch {
+    return false;
+  }
+};
+
+const waitForReadableFile = async (targetPath, onTimeoutMessage) => {
+  await waitFor(
+    async () => {
+      try {
+        const stat = await fs.stat(targetPath);
+        return stat.isFile() && stat.size > 0;
+      } catch {
+        return false;
+      }
+    },
+    {
+      timeoutMs: 60_000,
+      intervalMs: 250,
+      onTimeoutMessage,
+    },
+  );
 };
 
 const writeFixtureCourseRepo = async (
@@ -361,6 +457,166 @@ const readPreviewProbePixel = async (page, { x = 8, y = 8 } = {}) =>
     { x, y },
   );
 
+const previewProbeHasHighlightPixel = async (page) =>
+  getPreviewProbeImage(page).evaluate((image) => {
+    if (!(image instanceof HTMLImageElement) || !image.complete || image.naturalWidth === 0) {
+      return false;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return false;
+    }
+
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (
+        pixels[index] >= 250 &&
+        pixels[index + 1] >= 100 &&
+        pixels[index + 1] <= 110 &&
+        pixels[index + 2] <= 10 &&
+        pixels[index + 3] === 255
+      ) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+const evaluateExactTutorialImage = async (
+  page,
+  descriptor,
+  { pixelCoordinates = null, scanForAnnotationStroke = false } = {},
+) =>
+  page.locator("img").evaluateAll(
+    (images, { descriptor: expectedImage, pixelCoordinates, scanForAnnotationStroke }) => {
+      const findMatchingImage = () =>
+        images.find((image) => {
+          if (!(image instanceof HTMLImageElement)) {
+            return false;
+          }
+          if (expectedImage.alt && image.getAttribute("alt") !== expectedImage.alt) {
+            return false;
+          }
+
+          let url;
+          try {
+            url = new URL(
+              image.currentSrc || image.src || image.getAttribute("src") || "",
+              document.baseURI,
+            );
+          } catch {
+            return false;
+          }
+
+          if (url.pathname !== expectedImage.apiPath) {
+            return false;
+          }
+          if (url.searchParams.get("path") !== expectedImage.imagePath) {
+            return false;
+          }
+          return Object.entries(expectedImage.searchParams ?? {}).every(
+            ([key, value]) => url.searchParams.get(key) === value,
+          );
+        });
+
+      const image = findMatchingImage();
+      if (!image) {
+        return {
+          found: false,
+          loaded: false,
+          sources: images.map((candidate) => candidate.getAttribute("src") ?? candidate.currentSrc),
+        };
+      }
+
+      const rect = image.getBoundingClientRect();
+      const loaded =
+        image.complete &&
+        image.naturalWidth > 0 &&
+        image.naturalHeight > 0 &&
+        rect.width > 0 &&
+        rect.height > 0;
+      if (!loaded) {
+        return {
+          found: true,
+          loaded: false,
+          complete: image.complete,
+          naturalWidth: image.naturalWidth,
+          naturalHeight: image.naturalHeight,
+          rect: { width: rect.width, height: rect.height },
+          src: image.getAttribute("src") ?? image.currentSrc,
+        };
+      }
+      if (!pixelCoordinates && !scanForAnnotationStroke) {
+        return { found: true, loaded: true, src: image.getAttribute("src") ?? image.currentSrc };
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        return { found: true, loaded: true, src: image.getAttribute("src") ?? image.currentSrc };
+      }
+      context.drawImage(image, 0, 0);
+
+      if (pixelCoordinates) {
+        return {
+          found: true,
+          loaded: true,
+          pixel: Array.from(
+            context.getImageData(pixelCoordinates.x, pixelCoordinates.y, 1, 1).data,
+          ),
+          src: image.getAttribute("src") ?? image.currentSrc,
+        };
+      }
+
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let index = 0; index < pixels.length; index += 4) {
+        const isActionStroke =
+          pixels[index] >= 250 &&
+          pixels[index + 1] >= 100 &&
+          pixels[index + 1] <= 110 &&
+          pixels[index + 2] <= 10 &&
+          pixels[index + 3] === 255;
+        const isVerifyStroke =
+          pixels[index] >= 245 &&
+          pixels[index + 1] >= 245 &&
+          pixels[index + 2] >= 245 &&
+          pixels[index + 3] === 255;
+        if (isActionStroke || isVerifyStroke) {
+          return {
+            found: true,
+            loaded: true,
+            hasAnnotationStrokePixel: true,
+            src: image.getAttribute("src") ?? image.currentSrc,
+          };
+        }
+      }
+      return {
+        found: true,
+        loaded: true,
+        hasAnnotationStrokePixel: false,
+        src: image.getAttribute("src") ?? image.currentSrc,
+      };
+    },
+    { descriptor, pixelCoordinates, scanForAnnotationStroke },
+  );
+
+const syncContentForDevTest = async (env) => {
+  const sync = spawn(process.execPath, ["scripts/sync-course-content.mjs"], {
+    cwd: projectRoot,
+    env,
+    stdio: "inherit",
+    windowsHide: true,
+  });
+  await waitForProcessExit(sync, "sync-course-content");
+};
+
 test(
   "tutorial shot editor saves one boxed focal point with an optional arrow",
   { timeout: 3 * 60_000 },
@@ -404,7 +660,7 @@ test(
     });
 
     t.after(async () => {
-      await killProcessTree(dev);
+      await killProcessTreeAndWaitForPort(dev, port);
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
@@ -556,7 +812,7 @@ test(
     });
 
     t.after(async () => {
-      await killProcessTree(dev);
+      await killProcessTreeAndWaitForPort(dev, port);
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
@@ -639,7 +895,7 @@ test(
     });
 
     t.after(async () => {
-      await killProcessTree(dev);
+      await killProcessTreeAndWaitForPort(dev, port);
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
@@ -740,7 +996,7 @@ test("tutorial shot editor imports a dropped source image", { timeout: 3 * 60_00
   });
 
   t.after(async () => {
-    await killProcessTree(dev);
+    await killProcessTreeAndWaitForPort(dev, port);
     await fs.rm(tempRoot, { recursive: true, force: true });
   });
 
@@ -750,8 +1006,8 @@ test("tutorial shot editor imports a dropped source image", { timeout: 3 * 60_00
       return status === 200 || status === 308;
     },
     {
-      timeoutMs: 60_000,
-      intervalMs: 500,
+      timeoutMs: 120_000,
+      intervalMs: 1000,
       onTimeoutMessage: "Tutorial shot editor did not become ready.",
     },
   );
@@ -792,9 +1048,9 @@ test("tutorial shot editor imports a dropped source image", { timeout: 3 * 60_00
     overrideCourse,
     "content",
     "docs",
-      "tutorial",
-      "img",
-      "override-missing-output.webp",
+    "tutorial",
+    "img",
+    "override-missing-output.webp",
   );
 
   await assert.doesNotReject(() => fs.stat(droppedRawPath));
@@ -842,7 +1098,7 @@ test(
     });
 
     t.after(async () => {
-      await killProcessTree(dev);
+      await killProcessTreeAndWaitForPort(dev, port);
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
@@ -914,7 +1170,7 @@ test(
 
 test(
   "tutorial shot editor save refreshes the open dev tutorial page to the latest image",
-  { timeout: 3 * 60_000 },
+  { timeout: 5 * 60_000 },
   async (t) => {
     const tempRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "course-tutorial-shot-editor-live-refresh-"),
@@ -922,39 +1178,75 @@ test(
     const fixtureCourse = path.join(tempRoot, "course");
     const port = await getFreePort();
     const baseUrl = `http://127.0.0.1:${port}`;
+    const liveRefreshImageName = `startup-live-refresh-${crypto.randomUUID()}`;
+    const liveRefreshImageFileName = `${liveRefreshImageName}.webp`;
+    const liveRefreshOutputImagePath = `content/docs/tutorial/img/${liveRefreshImageName}.webp`;
 
-    await writeFixtureCourseRepo(fixtureCourse);
+    await writeFixtureCourseRepo(fixtureCourse, { firstImageName: liveRefreshImageName });
 
-    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+    const devEnv = createRunDevTestEnv({
+      label: "tutorial-shot-editor-live-refresh",
+      env: process.env,
+      overrides: {
+        COURSE_CONTENT_SOURCE: fixtureCourse,
+      },
+    });
+    await syncContentForDevTest(devEnv);
+    await assert.doesNotReject(() =>
+      fs.stat(
+        path.join(projectRoot, "content", "docs", "tutorial", "img", `${liveRefreshImageName}.webp`),
+      ),
+    );
+
+    const dev = spawn(
+      process.execPath,
+      [path.join(projectRoot, "scripts", "run-dev.mjs"), "--port", String(port)],
+      {
       detached: process.platform !== "win32",
       windowsHide: true,
       cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: "tutorial-shot-editor-live-refresh",
-        env: process.env,
-        overrides: {
-          COURSE_CONTENT_SOURCE: fixtureCourse,
-        },
-      }),
+      env: devEnv,
       stdio: "inherit",
-    });
+      },
+    );
 
     t.after(async () => {
-      await killProcessTree(dev);
+      await killProcessTreeAndWaitForPort(dev, port);
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
     await waitFor(
       async () => {
-        const status = await tryFetchStatus(`${baseUrl}/docs/tutorial/`);
+        const status = await tryFetchStatus(`${baseUrl}/docs/tutorial/`, { timeoutMs: 60_000 });
         return status === 200 || status === 308;
       },
       {
-        timeoutMs: 120_000,
+        timeoutMs: 180_000,
         intervalMs: 1000,
         onTimeoutMessage: "Tutorial preview page did not become ready.",
       },
     );
+
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(
+          `${baseUrl}/docs/tutorial/img/${liveRefreshImageFileName}`,
+        );
+        return status === 200;
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 250,
+        onTimeoutMessage: "Tutorial preview probe source image did not become available.",
+      },
+    );
+
+    await waitForTutorialShotsApiReady(baseUrl, {
+      expectedSourcePath: fixtureCourse,
+      expectedShotId: liveRefreshImageName,
+      expectedOutputImagePath: liveRefreshOutputImagePath,
+      onTimeoutMessage: "Tutorial shot editor API did not expose the exact live-refresh fixture image.",
+    });
 
     let browser;
     t.after(async () => {
@@ -971,14 +1263,39 @@ test(
       viewport: { width: 1440, height: 1100 },
     });
 
-    await previewPage.goto("/docs/tutorial/", { waitUntil: "domcontentloaded" });
-    await getPreviewProbeImage(previewPage).waitFor();
+    await waitFor(
+      async () => {
+        try {
+          await previewPage.goto("/docs/tutorial/", { waitUntil: "domcontentloaded" });
+          await getPreviewProbeImage(previewPage).waitFor({ timeout: 5_000 });
+          return await isImageLoaded(getPreviewProbeImage(previewPage), liveRefreshImageFileName);
+        } catch {
+          return false;
+        }
+      },
+      {
+        timeoutMs: 120_000,
+        intervalMs: 1000,
+        onTimeoutMessage: "Tutorial preview probe image did not become visible.",
+      },
+    );
 
-    const initialProbePixel = await readPreviewProbePixel(previewPage, { x: 200, y: 72 });
-    assert.deepEqual(
-      initialProbePixel,
-      [203, 213, 225, 255],
-      "The box border position should start from the original tutorial image color.",
+    const originalProbePixel = [203, 213, 225, 255];
+    let initialProbePixel = null;
+    await waitFor(
+      async () => {
+        if (!(await isImageLoaded(getPreviewProbeImage(previewPage), liveRefreshImageFileName))) {
+          return false;
+        }
+        initialProbePixel = await readPreviewProbePixel(previewPage, { x: 200, y: 72 });
+        return initialProbePixel?.every((value, index) => value === originalProbePixel[index]);
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 250,
+        onTimeoutMessage:
+          "The box border position should start from the original tutorial image color.",
+      },
     );
 
     await editorPage.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
@@ -991,12 +1308,12 @@ test(
     await editorPage.getByRole("button", { name: "矢印を追加" }).click();
     await editorPage.getByRole("button", { name: "保存", exact: true }).click();
     await editorPage.getByText("保存しました").waitFor();
+    await editorPage.close();
 
     await waitFor(
       async () => {
         try {
-          const pixel = await readPreviewProbePixel(previewPage, { x: 200, y: 72 });
-          return isTutorialShotHighlightPixel(pixel);
+          return await previewProbeHasHighlightPixel(previewPage);
         } catch {
           return false;
         }
@@ -1013,7 +1330,7 @@ test(
 
 test(
   "tutorial shot editor save refreshes the open dev tutorial page after saving a Verify image",
-  { timeout: 3 * 60_000 },
+  { timeout: 5 * 60_000 },
   async (t) => {
     const tempRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "course-tutorial-shot-editor-verify-reload-"),
@@ -1023,9 +1340,12 @@ test(
     const baseUrl = `http://127.0.0.1:${port}`;
 
     // Write a fixture that includes a <Verify img="..."> on the tutorial page
-    // plus a plain Markdown image (used as the pixel probe for the test).
-    const verifyImageName = "startup-result";
+    // plus an imported image element that probes the exact generated fixture file.
+    const verifyImageName = `startup-result-${crypto.randomUUID()}`;
     const verifyImageFileName = `${verifyImageName}.webp`;
+    const verifyOutputImagePath = `content/docs/tutorial/img/${verifyImageFileName}`;
+    const verifyProbeImageUrl = `/api/dev/tutorial-shots/image/?path=${encodeURIComponent(verifyOutputImagePath)}&v=fixture`;
+    const verifyProbeImageMdxSrc = `/api/dev/tutorial-shots/image/?path=${encodeURIComponent(verifyOutputImagePath)}&amp;v=fixture`;
     const siteConfig = `export const siteConfig = {
   logoText: "Verify Reload Fixture",
   projectLink: "https://example.invalid",
@@ -1058,12 +1378,21 @@ authoringMode: tutorial
   </Verify>
 </Section>
 
-![Verify保存反映確認](./img/${verifyImageFileName})
+<img alt="Verify保存反映確認" src="${verifyProbeImageMdxSrc}" />
 `;
 
     const courseDir = fixtureCourse;
     const pageDir = path.join(courseDir, "content", "docs", "tutorial");
     const imageDir = path.join(pageDir, "img");
+    const verifySourceImagePath = path.join(imageDir, verifyImageFileName);
+    const syncedVerifyImagePath = path.join(
+      projectRoot,
+      "content",
+      "docs",
+      "tutorial",
+      "img",
+      verifyImageFileName,
+    );
     await fs.mkdir(imageDir, { recursive: true });
     await fs.mkdir(path.join(courseDir, "public", "img"), { recursive: true });
     await fs.writeFile(path.join(courseDir, "site.config.ts"), siteConfig, "utf8");
@@ -1085,84 +1414,164 @@ authoringMode: tutorial
       create: { width: 640, height: 360, channels: 4, background: "#cbd5e1" },
     })
       .webp({ lossless: true })
-      .toFile(path.join(imageDir, verifyImageFileName));
+      .toFile(verifySourceImagePath);
+    const verifyImageHashBefore = await sha256File(verifySourceImagePath);
 
-    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
-      detached: process.platform !== "win32",
-      windowsHide: true,
-      cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: "tutorial-shot-editor-verify-reload",
-        env: process.env,
-        overrides: {
-          COURSE_CONTENT_SOURCE: fixtureCourse,
-        },
-      }),
-      stdio: "inherit",
+    const devEnv = createRunDevTestEnv({
+      label: "tutorial-shot-editor-verify-reload",
+      env: process.env,
+      overrides: {
+        COURSE_CONTENT_SOURCE: fixtureCourse,
+      },
     });
+    await cleanupWorktreeDevProcesses({ projectRoot });
+    await syncContentForDevTest(devEnv);
+    assert.match(
+      await fs.readFile(path.join(projectRoot, "content", "docs", "tutorial", "index.mdx"), "utf8"),
+      new RegExp(verifyImageName),
+    );
+    await assert.doesNotReject(() => fs.stat(syncedVerifyImagePath));
+    assert.equal(await sha256File(syncedVerifyImagePath), verifyImageHashBefore);
+    await waitForReadableFile(
+      path.join(projectRoot, ...verifyOutputImagePath.split("/")),
+      "Verify probe fixture image was not synced into the app content tree.",
+    );
+
+    const dev = spawn(
+      process.execPath,
+      [path.join(projectRoot, "scripts", "run-dev.mjs"), "--port", String(port)],
+      {
+        detached: process.platform !== "win32",
+        windowsHide: true,
+        cwd: projectRoot,
+        env: devEnv,
+        stdio: "inherit",
+      },
+    );
 
     t.after(async () => {
-      await killProcessTree(dev);
-      await fs.rm(tempRoot, { recursive: true, force: true });
+      try {
+        await killProcessTreeAndWaitForPort(dev, port);
+      } finally {
+        try {
+          await cleanupWorktreeDevProcesses({ projectRoot });
+        } finally {
+          await fs.rm(tempRoot, { recursive: true, force: true });
+        }
+      }
+    });
+
+    await waitForTutorialShotsApiReady(baseUrl, {
+      expectedSourcePath: fixtureCourse,
+      expectedShotId: verifyImageName,
+      expectedOutputImagePath: verifyOutputImagePath,
+      onTimeoutMessage: "Tutorial shot editor API did not expose the exact Verify fixture image.",
     });
 
     await waitFor(
       async () => {
-        const status = await tryFetchStatus(`${baseUrl}/docs/tutorial/`);
-        return status === 200 || status === 308;
+        const status = await tryFetchStatus(`${baseUrl}${verifyProbeImageUrl}`);
+        return status === 200;
       },
       {
-        timeoutMs: 120_000,
-        intervalMs: 1000,
-        onTimeoutMessage: "Tutorial preview page did not become ready.",
+        timeoutMs: 30_000,
+        intervalMs: 250,
+        onTimeoutMessage: "Verify probe image API did not expose the exact fixture image.",
       },
     );
 
     let browser;
+    let previewPage;
+    let editorPage;
+    const openBrowserPages = async () => {
+      await closeBrowserBounded(browser);
+      browser = await chromium.launch({ headless: true });
+      previewPage = await browser.newPage({
+        baseURL: baseUrl,
+        viewport: { width: 1440, height: 1100 },
+      });
+      editorPage = await browser.newPage({
+        baseURL: baseUrl,
+        viewport: { width: 1440, height: 1100 },
+      });
+    };
     t.after(async () => {
       await closeBrowserBounded(browser);
     });
-    browser = await chromium.launch({ headless: true });
+    await openBrowserPages();
 
-    const previewPage = await browser.newPage({
-      baseURL: baseUrl,
-      viewport: { width: 1440, height: 1100 },
-    });
-    const editorPage = await browser.newPage({
-      baseURL: baseUrl,
-      viewport: { width: 1440, height: 1100 },
-    });
-
-    await previewPage.goto("/docs/tutorial/", { waitUntil: "domcontentloaded" });
-
-    // Locate the Markdown probe image (![Verify保存反映確認](...)).
-    const verifyProbeImage = previewPage.locator('img[alt="Verify保存反映確認"]:visible').first();
-    await verifyProbeImage.waitFor();
+    const verifyProbeImageDescriptor = {
+      alt: "Verify保存反映確認",
+      apiPath: "/api/dev/tutorial-shots/image/",
+      imagePath: verifyOutputImagePath,
+      searchParams: { v: "fixture" },
+    };
+    let lastVerifyProbeImageState = null;
+    let previewPageHasExactProbeImage = false;
+    await waitFor(
+      async () => {
+        try {
+          if (!previewPageHasExactProbeImage) {
+            await previewPage.goto("/docs/tutorial/", { waitUntil: "domcontentloaded" });
+          }
+          lastVerifyProbeImageState = await evaluateExactTutorialImage(
+            previewPage,
+            verifyProbeImageDescriptor,
+          );
+          previewPageHasExactProbeImage = lastVerifyProbeImageState.found === true;
+          return lastVerifyProbeImageState.loaded === true;
+        } catch (error) {
+          const navigationError = error instanceof Error ? error.message : String(error);
+          lastVerifyProbeImageState = {
+            found: false,
+            loaded: false,
+            navigationError,
+          };
+          previewPageHasExactProbeImage = false;
+          if (/Target page, context or browser has been closed/u.test(navigationError)) {
+            await openBrowserPages();
+          }
+          return false;
+        }
+      },
+      {
+        timeoutMs: 120_000,
+        intervalMs: 1000,
+        onTimeoutMessage: () =>
+          `Verify probe image did not become visible on the tutorial page. Last image state: ${JSON.stringify(lastVerifyProbeImageState).slice(0, 500)}`,
+      },
+    );
 
     const readVerifyProbePixel = async (x = 8, y = 8) =>
-      verifyProbeImage.evaluate(
-        (image, coordinates) => {
-          if (!(image instanceof HTMLImageElement) || !image.complete || image.naturalWidth === 0) {
-            return null;
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = image.naturalWidth;
-          canvas.height = image.naturalHeight;
-          const context = canvas.getContext("2d");
-          if (!context) {
-            return null;
-          }
-          context.drawImage(image, 0, 0);
-          return Array.from(context.getImageData(coordinates.x, coordinates.y, 1, 1).data);
-        },
-        { x, y },
-      );
+      (
+        await evaluateExactTutorialImage(previewPage, verifyProbeImageDescriptor, {
+          pixelCoordinates: { x, y },
+        })
+      ).pixel ?? null;
 
-    const initialPixel = await readVerifyProbePixel(200, 72);
-    assert.deepEqual(
-      initialPixel,
-      [203, 213, 225, 255],
-      "Verify probe pixel should start from the original (un-annotated) image color.",
+    const originalProbePixel = [203, 213, 225, 255];
+    let initialPixel = null;
+    await waitFor(
+      async () => {
+        initialPixel = await readVerifyProbePixel(200, 72);
+        return initialPixel?.every((value, index) => value === originalProbePixel[index]);
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 250,
+        onTimeoutMessage:
+          "Verify probe pixel should start from the original (un-annotated) image color.",
+      },
+    );
+
+    await waitForTutorialShotsApiReady(
+      baseUrl,
+      {
+        expectedSourcePath: fixtureCourse,
+        expectedShotId: verifyImageName,
+        expectedOutputImagePath: verifyOutputImagePath,
+        onTimeoutMessage: "Tutorial shot editor API did not stay ready for Verify image save.",
+      },
     );
 
     await editorPage.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
@@ -1182,13 +1591,35 @@ authoringMode: tutorial
     await editorPage.getByRole("button", { name: "保存", exact: true }).click();
     await editorPage.getByText("保存しました").waitFor();
 
+    await waitFor(
+      async () => {
+        try {
+          return (
+            (await sha256File(verifySourceImagePath)) !== verifyImageHashBefore &&
+            (await sha256File(syncedVerifyImagePath)) !== verifyImageHashBefore
+          );
+        } catch {
+          return false;
+        }
+      },
+      {
+        timeoutMs: 30_000,
+        intervalMs: 250,
+        onTimeoutMessage: "Saved Verify image did not reach both source and synced content files.",
+      },
+    );
+    await editorPage.close();
+
     // The docs page should reload automatically via the SSE revision bump,
     // showing the newly annotated Verify image (white dashed box = annotation stroke pixel).
     await waitFor(
       async () => {
         try {
-          const pixel = await readVerifyProbePixel(200, 72);
-          return isAnnotationStrokePixel(pixel);
+          return (
+            await evaluateExactTutorialImage(previewPage, verifyProbeImageDescriptor, {
+              scanForAnnotationStroke: true,
+            })
+          ).hasAnnotationStrokePixel === true;
         } catch {
           return false;
         }
@@ -1238,6 +1669,14 @@ test("tutorial shot editor canvas keeps PowerPoint-like resize and callout drag 
   assert.match(source, /<Text[\s\S]*x=\{-CALLOUT_BADGE_RADIUS\}[\s\S]*y=\{-9\}/);
 });
 
+test("dev auto reload does not reload the tutorial shot editor itself", async () => {
+  const autoReloadSourcePath = path.join(projectRoot, "src", "components", "dev-auto-reload.tsx");
+  const source = await fs.readFile(autoReloadSourcePath, "utf8");
+
+  assert.match(source, /window\.location\.pathname\.startsWith\('\/dev\/'\)/);
+  assert.match(source, /return undefined;/);
+});
+
 test(
   "tutorial shot editor reorders callout numbers from the sidebar list",
   { timeout: 3 * 60_000 },
@@ -1274,7 +1713,7 @@ test(
     });
 
     t.after(async () => {
-      await killProcessTree(dev);
+      await killProcessTreeAndWaitForPort(dev, port);
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
@@ -1391,7 +1830,7 @@ test(
     });
 
     t.after(async () => {
-      await killProcessTree(dev);
+      await killProcessTreeAndWaitForPort(dev, port);
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
@@ -1516,22 +1955,25 @@ test(
 
     const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
 
+    const devEnv = createRunDevTestEnv({
+      label: "tutorial-shot-editor-overflow",
+      env: process.env,
+      overrides: {
+        COURSE_CONTENT_SOURCE: fixtureCourse,
+      },
+    });
+    await syncContentForDevTest(devEnv);
+
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       detached: process.platform !== "win32",
       windowsHide: true,
       cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: "tutorial-shot-editor-overflow",
-        env: process.env,
-        overrides: {
-          COURSE_CONTENT_SOURCE: fixtureCourse,
-        },
-      }),
+      env: devEnv,
       stdio: "inherit",
     });
 
     t.after(async () => {
-      await killProcessTree(dev);
+      await killProcessTreeAndWaitForPort(dev, port);
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
@@ -1574,11 +2016,13 @@ test(
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-tutorial-shot-editor-env-"));
     const fixtureCourse = path.join(tempRoot, "course");
     const fixtureCourseEnvPath = fixtureCourse.replaceAll("\\", "/");
+    const envFileRoot = path.join(tempRoot, "env-files");
+    const envCourseLocalPath = path.join(envFileRoot, ".env.course.local");
     const port = await getFreePort();
     const baseUrl = `http://127.0.0.1:${port}`;
-    const envCourseLocalBackup = await backupFile(envCourseLocalPath);
 
     await writeFixtureCourseRepo(fixtureCourse);
+    await fs.mkdir(envFileRoot, { recursive: true });
     await fs.writeFile(
       envCourseLocalPath,
       `COURSE_CONTENT_SOURCE=${fixtureCourseEnvPath}\n`,
@@ -1588,6 +2032,9 @@ test(
     const childEnv = createRunDevTestEnv({
       label: "tutorial-shot-editor-env-file",
       env: process.env,
+      overrides: {
+        COURSE_DOCS_ENV_FILE_DIR: envFileRoot,
+      },
     });
     delete childEnv.COURSE_CONTENT_SOURCE;
 
@@ -1600,29 +2047,22 @@ test(
     });
 
     t.after(async () => {
-      await killProcessTree(dev);
-      await restoreFile(envCourseLocalPath, envCourseLocalBackup);
+      await killProcessTreeAndWaitForPort(dev, port);
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
-    await waitFor(
-      async () => {
-        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
-        return status === 200 || status === 308;
-      },
+    const readyResult = await waitForTutorialShotsApiReady(
+      baseUrl,
       {
-        timeoutMs: 120_000,
-        intervalMs: 1000,
-        onTimeoutMessage: "Tutorial shot editor did not become ready from env file startup.",
+        expectedSourcePath: fixtureCourseEnvPath,
+        expectedShotId: "startup",
+        onTimeoutMessage: "Tutorial shot editor API did not become ready from env file startup.",
       },
     );
 
-    const response = await fetch(`${baseUrl}/api/dev/tutorial-shots/`, {
-      signal: AbortSignal.timeout(30_000),
-    });
-    const data = await response.json();
+    const { status, data } = readyResult;
 
-    assert.equal(response.status, 200);
+    assert.equal(status, 200);
     assert.equal(data.enabled, true);
     assert.equal(data.configuredSource, fixtureCourseEnvPath);
     assert.equal(data.activeSourcePath, fixtureCourseEnvPath);

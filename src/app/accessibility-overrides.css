@@ -77,7 +77,64 @@
 
 .dark .rensyuBlock {
   border-color: #93c5fd !important;
-  background-color: rgba(15, 23, 42, 0.92) !important;
+  background-color: #0f172a !important;
+  background-image: none !important;
+}
+
+/*
+ * Exercise content (rensyuNaiyou) and solutions (rensyuKaitouNaiyou) carry
+ * prose-tinted text and inherit a light checker-pattern background-image from
+ * Nextra's dark prose styling. Axe color-contrast on <li> children fails when
+ * that checker bleeds through, because the effective rendered background
+ * blends light gridlines with the dark slate fill from .rensyuBlock and the
+ * <li> text color (gray-prose default) lands below 4.5:1. Suppress the
+ * checker on every descendant inside .dark .rensyuBlock and force a solid
+ * fill plus a high-contrast text color on the structural panels so the
+ * fallback chain cannot collapse below the threshold on any route.
+ */
+/*
+ * Suppress both the inherited checker background-image and any semi-opaque
+ * white container background that Nextra ships for prose-style lists. On
+ * pages like /docs/html-basics/introduction/ and /docs/basics/object-intro/
+ * the bullet/numbered list inside .rensyuNaiyou and .rensyuKaitouNaiyou
+ * carries background-color: rgba(255, 255, 255, 0.6); in dark mode it blends
+ * with the .rensyuBlock fill to roughly #9fa2aa, dropping text contrast on
+ * the <li> below 4.5:1 (axe reports the blended background, not the panel
+ * fill). Force every dark-mode descendant of .rensyuBlock back to a
+ * transparent fill with no background image so contrast falls through to the
+ * panel's solid #0f172a.
+ */
+.dark .rensyuBlock *,
+.dark .rensyuBlock details,
+.dark .rensyuBlock .rensyuNaiyou,
+.dark .rensyuBlock .rensyuKaitou,
+.dark .rensyuBlock .rensyuKaitouNaiyou {
+  background-image: none !important;
+}
+
+.dark .rensyuBlock .rensyuNaiyou :where(ul, ol, li, p, dl, dd, dt, blockquote, details, summary),
+.dark .rensyuBlock .rensyuKaitouNaiyou :where(ul, ol, li, p, dl, dd, dt, blockquote, details, summary) {
+  background-color: transparent !important;
+}
+
+.dark .rensyuBlock details,
+.dark .rensyuBlock .rensyuNaiyou,
+.dark .rensyuBlock .rensyuKaitou,
+.dark .rensyuBlock .rensyuKaitouNaiyou {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+.dark .rensyuBlock .rensyuNaiyou :where(p, li, dd, dt, ul, ol, span, em, strong, b, i),
+.dark .rensyuBlock .rensyuKaitouNaiyou :where(p, li, dd, dt, ul, ol, span, em, strong, b, i) {
+  color: #f8fafc !important;
+}
+
+.dark .rensyuBlock .rensyuNaiyou a,
+.dark .rensyuBlock .rensyuNaiyou a:visited,
+.dark .rensyuBlock .rensyuKaitouNaiyou a,
+.dark .rensyuBlock .rensyuKaitouNaiyou a:visited {
+  color: #bfdbfe !important;
 }
 
 .rensyuBlock a code {

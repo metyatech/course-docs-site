@@ -1,15 +1,19 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   createIsolatedNextDistDir,
   DEFAULT_NEXT_DIST_DIR,
+  ensureNextTsconfig,
+  GENERATED_NEXT_TSCONFIG_PREFIX,
   TEST_NEXT_DIST_DIR,
   resolveNextDistDir,
   resolveNextDistDirPath,
+  resolveNextTsconfigPath,
 } from "../scripts/next-dist-dir.mjs";
 import { findFirstFreePort, parsePortValue } from "../scripts/port-availability.mjs";
 import { createPlaywrightWebServerEnv, createRunDevTestEnv } from "./test-harness-env.mjs";
@@ -22,6 +26,7 @@ const playwrightCiConfigUrl = pathToFileURL(
   path.join(projectRoot, "tests", "e2e", "playwright.ci.config.mjs"),
 );
 const ciWorkflowPath = path.join(projectRoot, ".github", "workflows", "ci.yml");
+const gitignorePath = path.join(projectRoot, ".gitignore");
 
 const loadPlaywrightConfigWithoutOverride = async (configUrl = playwrightConfigUrl) => {
   const originalDistDir = process.env.COURSE_DOCS_NEXT_DIST_DIR;
@@ -83,11 +88,112 @@ test("resolveNextDistDir rejects paths outside the project root", () => {
 });
 
 test("test harnesses stay out of the default .next cache", () => {
-  assert.equal(createIsolatedNextDistDir("Admin Mode Route Protection"), TEST_NEXT_DIST_DIR);
+  assert.equal(
+    createIsolatedNextDistDir("Admin Mode Route Protection"),
+    `${TEST_NEXT_DIST_DIR}/admin-mode-route-protection`,
+  );
   assert.notEqual(
     createRunDevTestEnv({ label: "admin-mode-route-protection" }).COURSE_DOCS_NEXT_DIST_DIR,
     DEFAULT_NEXT_DIST_DIR,
   );
+});
+
+test("test harness dist dirs are isolated by scope", () => {
+  assert.notEqual(createIsolatedNextDistDir("admin"), createIsolatedNextDistDir("editor"));
+});
+
+test("run-dev test harness dist dirs are unique across repeated labels", () => {
+  const first = createRunDevTestEnv({ label: "admin" }).COURSE_DOCS_NEXT_DIST_DIR;
+  const second = createRunDevTestEnv({ label: "admin" }).COURSE_DOCS_NEXT_DIST_DIR;
+
+  assert.notEqual(first, second);
+  assert.match(
+    first,
+    new RegExp(
+      `^${TEST_NEXT_DIST_DIR}/admin-${process.pid}-\\d+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
+    ),
+  );
+  assert.match(
+    second,
+    new RegExp(
+      `^${TEST_NEXT_DIST_DIR}/admin-${process.pid}-\\d+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
+    ),
+  );
+});
+
+test("custom dist dirs use an ignored generated tsconfig with the exact Next types include", async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "course-docs-next-tsconfig-"));
+  const customDistDir = `${TEST_NEXT_DIST_DIR}/admin-mode-route-protection`;
+  const env = { COURSE_DOCS_NEXT_DIST_DIR: customDistDir };
+  const rootTsconfigContents = `${JSON.stringify(
+    {
+      include: [
+        "**/*.mjs",
+        "**/*.ts",
+        "**/*.tsx",
+        ".next-test/old-scope/types/**/*.ts",
+        ".next/types/**/*.ts",
+        "src/types/**/*.ts",
+        "next-env.d.ts",
+      ],
+      exclude: ["node_modules", "coverage"],
+    },
+    null,
+    2,
+  )}\n`;
+
+  await writeFile(path.join(temporaryRoot, "tsconfig.json"), rootTsconfigContents);
+
+  try {
+    assert.equal(
+      resolveNextTsconfigPath({ projectRoot: temporaryRoot, env }),
+      `${GENERATED_NEXT_TSCONFIG_PREFIX}.next-test-admin-mode-route-protection.json`,
+    );
+
+    const generatedTsconfigPath = ensureNextTsconfig({ projectRoot: temporaryRoot, env });
+    const generatedTsconfig = JSON.parse(
+      await readFile(path.join(temporaryRoot, ...generatedTsconfigPath.split("/")), "utf8"),
+    );
+
+    assert.equal(generatedTsconfig.extends, "./tsconfig.json");
+    assert.deepEqual(generatedTsconfig.exclude, ["node_modules", "coverage"]);
+    assert.deepEqual(generatedTsconfig.include, [
+      "**/*.mjs",
+      "**/*.ts",
+      "**/*.tsx",
+      ".next/types/**/*.ts",
+      "src/types/**/*.ts",
+      "next-env.d.ts",
+      `${customDistDir}/types/**/*.ts`,
+    ]);
+    assert.equal(
+      await readFile(path.join(temporaryRoot, "tsconfig.json"), "utf8"),
+      rootTsconfigContents,
+    );
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("tracked root tsconfig stays free of scoped test dist dir includes", async () => {
+  const rootTsconfig = JSON.parse(await readFile(path.join(projectRoot, "tsconfig.json"), "utf8"));
+
+  assert.equal(
+    rootTsconfig.include.some((include) =>
+      new RegExp(`^${TEST_NEXT_DIST_DIR}/(?!types/)`).test(include),
+    ),
+    false,
+  );
+});
+
+test("default dist dir keeps the tracked root tsconfig", () => {
+  assert.equal(resolveNextTsconfigPath({ projectRoot, env: {} }), "tsconfig.json");
+  assert.equal(ensureNextTsconfig({ projectRoot, env: {} }), "tsconfig.json");
+});
+
+test("generated Next tsconfig files are ignored", async () => {
+  const gitignore = await readFile(gitignorePath, "utf8");
+  assert.match(gitignore, /^tsconfig\.next\.generated\*\.json$/m);
 });
 
 test("playwright web server uses an isolated Next dist dir by default", async () => {
@@ -98,12 +204,15 @@ test("playwright web server uses an isolated Next dist dir by default", async ()
     "Expected Playwright webServer env to set COURSE_DOCS_NEXT_DIST_DIR.",
   );
   assert.notEqual(configuredDistDir, DEFAULT_NEXT_DIST_DIR);
-  assert.equal(configuredDistDir, TEST_NEXT_DIST_DIR);
+  assert.equal(configuredDistDir, `${TEST_NEXT_DIST_DIR}/playwright-webserver`);
 });
 
 test("playwright CI web server uses the test Next dist dir by default", async () => {
   const playwrightConfig = await loadPlaywrightConfigWithoutOverride(playwrightCiConfigUrl);
-  assert.equal(playwrightConfig.webServer?.env?.COURSE_DOCS_NEXT_DIST_DIR, TEST_NEXT_DIST_DIR);
+  assert.equal(
+    playwrightConfig.webServer?.env?.COURSE_DOCS_NEXT_DIST_DIR,
+    `${TEST_NEXT_DIST_DIR}/playwright-webserver-ci`,
+  );
 });
 
 test("CI verify-course build and Playwright steps share the test Next dist dir", async () => {
@@ -152,4 +261,3 @@ test("findFirstFreePort skips an occupied preferred port", async () => {
     });
   }
 });
-
