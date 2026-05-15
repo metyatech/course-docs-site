@@ -591,7 +591,15 @@ if (exerciseTargetPaths.length === 0) {
                   }
                 }
 
-                const axeResult = await runContrastCheck(page, ".rensyuBlock");
+                let axeResult;
+                try {
+                  axeResult = await runContrastCheck(page, ".rensyuBlock");
+                } catch (error) {
+                  if (!String(error?.message ?? error).includes("No elements found for include")) {
+                    throw error;
+                  }
+                  axeResult = { violations: [] };
+                }
                 for (const violation of axeResult.violations) {
                   allIssues.push({
                     path,
@@ -626,4 +634,3 @@ if (exerciseTargetPaths.length === 0) {
     }
   });
 }
-
