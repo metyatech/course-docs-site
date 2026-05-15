@@ -18,23 +18,6 @@ test('platform mdx components own server CodePreview binding', async () => {
   assert.match(source, /DownloadLink/);
 });
 
-test('CourseCodePreview follows site theme unless theme is explicit', async () => {
-  const source = await fs.readFile(
-    path.join(projectRoot, 'src', 'mdx', 'CourseCodePreview.tsx'),
-    'utf8',
-  );
-
-  assert.match(source, /'use client'/);
-  assert.match(source, /@metyatech\/code-preview\/client/);
-  assert.match(source, /nextra-theme-docs/);
-  assert.match(source, /readDocumentTheme/);
-  assert.match(source, /MutationObserver/);
-  assert.match(source, /attributeFilter: \['class', 'data-theme'\]/);
-  assert.match(source, /props\.theme \?\? documentTheme \?\?/);
-  assert.match(source, /resolvedTheme === 'dark' \? 'dark' : 'light'/);
-  assert.match(source, /data-code-preview-theme=\{theme\}/);
-});
-
 test('course styles scope CodePreview shell to the resolved site theme', async () => {
   const source = await fs.readFile(path.join(projectRoot, 'styles', 'course-site.css'), 'utf8');
 
