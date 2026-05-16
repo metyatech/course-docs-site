@@ -249,9 +249,9 @@ test("package.json exposes verify:precommit (fast local gate) and verify:ci (CI-
     "verify:ci MUST chain `build` then `verify:course:ci` so local repro matches CI.",
   );
   assert.equal(
-    Object.prototype.hasOwnProperty.call(pkg.scripts, "verify"),
-    false,
-    "Generic `verify` alias MUST be removed; callers use verify:precommit or verify:ci explicitly.",
+    pkg.scripts.verify,
+    "npm run verify:precommit",
+    "Generic `verify` MUST remain a tooling-compatible alias for the fast local gate.",
   );
 });
 

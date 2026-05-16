@@ -35,6 +35,7 @@
     "test:dev-switch": "node scripts/run-node-tests-sequential.mjs tests/dev-switch.test.mjs tests/import-asset-resolution.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs tests/e2e-content-source.test.mjs tests/intro-image-resolution.test.mjs tests/qspec-relative-image-resolution.test.mjs tests/asset-route-trace-config.test.mjs && node --test --test-concurrency=1 tests/admin-mode-route-protection.test.mjs && node --test --test-concurrency=1 tests/admin-mode-legacy-token.test.mjs",
     "test:e2e": "node scripts/run-playwright.mjs test -c tests/e2e/playwright.config.mjs",
     "lint:contrast": "node scripts/run-playwright.mjs test -c tests/e2e/playwright.config.mjs tests/e2e/contrast.spec.cjs",
+    "verify": "npm run verify:precommit",
     "verify:precommit": "npm run lint && npm run test && npm run build:verified",
     "verify:course": "npm run lint && npm run test:course && npm run build:verified",
     "verify:course:ci": "npm run lint && npm run test:course:ci && npm run build:verified",

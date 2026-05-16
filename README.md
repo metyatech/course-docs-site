@@ -173,6 +173,8 @@ This is the command the Husky `pre-commit` hook runs. It executes
 `.env.course.local`). It does **not** iterate the full remote course matrix,
 so commits stay fast while still catching lint, type, unit, and build
 regressions against the course content you are actively working on.
+`npm run verify` is kept as a tooling-compatible alias for this same local
+gate.
 
 ### `npm run verify:ci` — CI-equivalent for one course
 

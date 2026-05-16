@@ -26,7 +26,8 @@ Thank you for your interest in contributing to this project!
 `verify:precommit` deliberately does not iterate the full remote course matrix.
 The CI `verify-course` job fans out across course content sources and runs
 `verify:ci` for each one, so any commit that passes `verify:precommit` locally
-is still subject to the full matrix in CI.
+is still subject to the full matrix in CI. `npm run verify` remains a
+tooling-compatible alias for `npm run verify:precommit`.
 
 ## Rules
 
