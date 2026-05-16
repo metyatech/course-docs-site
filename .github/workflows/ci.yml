@@ -79,8 +79,5 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Build site
-        run: npm run build
-
-      - name: Verify course matrix entry
-        run: npm run verify:course:ci
+      - name: Verify CI
+        run: npm run verify:ci

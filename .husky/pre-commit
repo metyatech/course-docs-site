@@ -2,7 +2,7 @@ _IDX=$(git rev-parse --git-path index)
 _SNAP=${_IDX}.snap
 cp "$_IDX" "$_SNAP"
 
-npm run verify
+npm run verify:precommit
 compose-agentsmd --compose
 
 python -c "

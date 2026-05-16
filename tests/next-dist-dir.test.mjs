@@ -27,6 +27,8 @@ const playwrightCiConfigUrl = pathToFileURL(
 );
 const ciWorkflowPath = path.join(projectRoot, ".github", "workflows", "ci.yml");
 const gitignorePath = path.join(projectRoot, ".gitignore");
+const packageJsonPath = path.join(projectRoot, "package.json");
+const preCommitHookPath = path.join(projectRoot, ".husky", "pre-commit");
 
 const loadPlaywrightConfigWithoutOverride = async (configUrl = playwrightConfigUrl) => {
   const originalDistDir = process.env.COURSE_DOCS_NEXT_DIST_DIR;
@@ -215,15 +217,56 @@ test("playwright CI web server uses the test Next dist dir by default", async ()
   );
 });
 
-test("CI verify-course build and Playwright steps share the test Next dist dir", async () => {
+test("CI verify-course runs the canonical verify:ci command under the test Next dist dir", async () => {
   const workflowText = await readFile(ciWorkflowPath, "utf8");
   const { env, jobText } = parseVerifyCourseJobEnv(workflowText);
 
   assert.equal(env.get("COURSE_DOCS_NEXT_DIST_DIR"), TEST_NEXT_DIST_DIR);
-  assert.match(jobText, /      - name: Build site\n        run: npm run build/);
+  assert.match(jobText, /      - name: Verify CI\n        run: npm run verify:ci/);
+  assert.equal(
+    /run: npm run build(?!:|\w)/.test(jobText),
+    false,
+    "verify-course job MUST NOT call `npm run build` separately; it is part of verify:ci.",
+  );
+  assert.equal(
+    /run: npm run verify:course:ci/.test(jobText),
+    false,
+    "verify-course job MUST NOT call verify:course:ci directly; it runs via verify:ci.",
+  );
+});
+
+test("package.json exposes verify:precommit (fast local gate) and verify:ci (CI-equivalent)", async () => {
+  const pkg = JSON.parse(await readFile(packageJsonPath, "utf8"));
+
+  assert.equal(
+    pkg.scripts["verify:precommit"],
+    "npm run lint && npm run test && npm run build:verified",
+    "verify:precommit MUST be the fast local gate: lint + test + build:verified.",
+  );
+  assert.equal(
+    pkg.scripts["verify:ci"],
+    "npm run build && npm run verify:course:ci",
+    "verify:ci MUST chain `build` then `verify:course:ci` so local repro matches CI.",
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(pkg.scripts, "verify"),
+    false,
+    "Generic `verify` alias MUST be removed; callers use verify:precommit or verify:ci explicitly.",
+  );
+});
+
+test("pre-commit hook uses the fast verify:precommit gate, not the full CI command", async () => {
+  const hook = await readFile(preCommitHookPath, "utf8");
+
   assert.match(
-    jobText,
-    /      - name: Verify course matrix entry\n        run: npm run verify:course:ci/,
+    hook,
+    /^npm run verify:precommit$/m,
+    "pre-commit hook MUST invoke `npm run verify:precommit`.",
+  );
+  assert.equal(
+    /^npm run verify(?::ci|:course(?::ci)?)?$/m.test(hook),
+    false,
+    "pre-commit hook MUST NOT invoke verify, verify:ci, verify:course, or verify:course:ci.",
   );
 });
 
