@@ -158,14 +158,40 @@ E2E_JAVASCRIPT_CONTENT_SOURCE="github:metyatech/javascript-course-docs#master"
 
 ## Verification
 
-Run the full verification suite (typecheck and tests):
+There are two canonical verification commands. Pick the one that matches what
+you are trying to confirm.
+
+### `npm run verify:precommit` — local fast gate
 
 ```sh
-npm run verify
+npm run verify:precommit
 ```
 
-The matrix E2E harness now auto-selects a free local `E2E_PORT` when none is
-explicitly configured, so full verification does not fail just because another
+This is the command the Husky `pre-commit` hook runs. It executes
+`lint` + `test` + `build:verified` against your current
+`COURSE_CONTENT_SOURCE` (typically a local course content checkout via
+`.env.course.local`). It does **not** iterate the full remote course matrix,
+so commits stay fast while still catching lint, type, unit, and build
+regressions against the course content you are actively working on.
+
+### `npm run verify:ci` — CI-equivalent for one course
+
+```sh
+COURSE_CONTENT_SOURCE="github:metyatech/javascript-course-docs#master" \
+  npm run verify:ci
+```
+
+This is the exact command the GitHub Actions `verify-course` matrix runs for
+each course. It builds the site for the configured `COURSE_CONTENT_SOURCE`
+and then runs `verify:course:ci` (CI Playwright config). Use it when you
+need to reproduce a CI matrix failure locally, or when validating changes
+that affect course-specific build or E2E behavior. CI runs this command once
+per course content source; reproduce a specific matrix entry by setting
+`COURSE_CONTENT_SOURCE`, `COURSE_DOCS_NEXT_DIST_DIR=.next-test`, `E2E_PORT`,
+and `PLAYWRIGHT_MAX_FAILURES` to match the workflow.
+
+The matrix E2E harness auto-selects a free local `E2E_PORT` when none is
+explicitly configured, so verification does not fail just because another
 local Next dev server is already using the default Playwright port. Set
 `E2E_PORT` yourself only when you need a fixed port for a specific run.
 
