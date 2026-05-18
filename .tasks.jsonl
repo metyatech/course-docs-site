@@ -85,3 +85,4 @@
 {"id":"N-_peDeE","description":"Fix course-docs-site CI contrast failure for Exercise CodePreview Monaco tokens","stage":"committed","createdAt":"2026-05-16T03:33:14.246Z","updatedAt":"2026-05-16T05:00:49.707Z","committedEventId":"33zZYei-ttbTkoKK"}
 {"id":"2y5COjvs","description":"Redesign course-docs-site verification commands for long-term CI/local parity","stage":"committed","createdAt":"2026-05-16T08:09:43.707Z","updatedAt":"2026-05-16T09:23:44.049Z","committedEventId":"TK8b8QoI1n2rQ50P"}
 {"id":"ZuMG4Y-Y","description":"Apply Playwright verification best practices","stage":"committed","createdAt":"2026-05-18T04:07:48.138Z","updatedAt":"2026-05-18T05:12:41.916Z","committedEventId":"CjZKmNQB_Y_SIfQS"}
+{"id":"FXOYu49b","description":"Reapply course-docs-site security remediation onto current main and clean obsolete worktrees","stage":"committed","createdAt":"2026-05-18T05:59:31.529Z","updatedAt":"2026-05-18T07:01:32.767Z","committedEventId":"wTlBK5dpLtcAy-Lr"}
