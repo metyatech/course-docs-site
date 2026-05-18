@@ -240,8 +240,8 @@ test("package.json exposes verify:precommit (fast local gate) and verify:ci (CI-
 
   assert.equal(
     pkg.scripts["verify:precommit"],
-    "npm run lint && npm run test && npm run build:verified",
-    "verify:precommit MUST be the fast local gate: lint + test + build:verified.",
+    "npm run lint && npm test",
+    "verify:precommit MUST be the fast local gate: lint + fast tests.",
   );
   assert.equal(
     pkg.scripts["verify:ci"],

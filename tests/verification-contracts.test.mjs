@@ -1,0 +1,143 @@
+import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import {
+  DEFAULT_COURSE_TIMEOUT_MS,
+  courses,
+  parseCourseTimeoutMs,
+  runCourse,
+} from "../scripts/test-e2e-matrix.mjs";
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const packageJsonPath = path.join(projectRoot, "package.json");
+const readmePath = path.join(projectRoot, "README.md");
+const contributingPath = path.join(projectRoot, "CONTRIBUTING.md");
+const ciWorkflowPath = path.join(projectRoot, ".github", "workflows", "ci.yml");
+
+const readPackageJson = async () => JSON.parse(await readFile(packageJsonPath, "utf8"));
+
+const extractVerifyCourseJob = (workflowText) => {
+  const jobHeader = "  verify-course:\n";
+  const jobStart = workflowText.indexOf(jobHeader);
+  assert.notEqual(jobStart, -1, "Expected CI workflow to define a verify-course job.");
+
+  const afterHeader = workflowText.slice(jobStart + jobHeader.length);
+  const nextJobStart = afterHeader.search(/\n  [A-Za-z0-9_-]+:\n/);
+  return nextJobStart === -1 ? afterHeader : afterHeader.slice(0, nextJobStart);
+};
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+test("fast local scripts do not invoke the full E2E matrix", async () => {
+  const pkg = await readPackageJson();
+  const matrixPattern = /(?:test-e2e-matrix|test:e2e:matrix|verify:e2e:matrix)/;
+
+  assert.equal(pkg.scripts.test, "npm run test:fast");
+  assert.doesNotMatch(pkg.scripts.test, matrixPattern);
+  assert.doesNotMatch(pkg.scripts["test:fast"], matrixPattern);
+  assert.doesNotMatch(pkg.scripts["test:shared"], matrixPattern);
+  assert.doesNotMatch(pkg.scripts["test:e2e-config"], matrixPattern);
+  assert.doesNotMatch(pkg.scripts["verify:precommit"], matrixPattern);
+  assert.doesNotMatch(pkg.scripts["verify:precommit"], /build:verified|test:shared|admin-mode|tutorial-shot-editor-flow|import-asset-resolution/);
+  assert.equal(pkg.scripts["test:e2e:matrix"], "node scripts/test-e2e-matrix.mjs");
+  assert.equal(pkg.scripts["verify:e2e:matrix"], "npm run test:e2e:matrix");
+});
+
+test("verification docs document fast, single-course CI, and explicit matrix tiers", async () => {
+  const readme = await readFile(readmePath, "utf8");
+  const contributing = await readFile(contributingPath, "utf8");
+
+  for (const documentText of [readme, contributing]) {
+    assert.match(documentText, /npm run verify:precommit/);
+    assert.match(documentText, /npm run verify:ci/);
+    assert.match(documentText, /npm run test:e2e:matrix/);
+    assert.match(documentText, /npm run verify:e2e:matrix/);
+  }
+
+  assert.doesNotMatch(
+    readme,
+    /Run E2E against (?:both|all) course contents:\s*```sh\s*npm test/s,
+    "README must not teach users to run the full E2E matrix through npm test.",
+  );
+});
+
+test("CI verify-course matrix still runs verify:ci for every course source", async () => {
+  const workflowText = await readFile(ciWorkflowPath, "utf8");
+  const jobText = extractVerifyCourseJob(workflowText);
+  const expectedSources = [
+    "github:metyatech/javascript-course-docs#master",
+    "github:metyatech/programming-course-docs#master",
+    "github:metyatech/open-campus-unreal-90min#main",
+  ];
+
+  for (const source of expectedSources) {
+    assert.match(jobText, new RegExp(`courseSource: "${escapeRegExp(source)}"`));
+  }
+
+  assert.match(jobText, /COURSE_CONTENT_SOURCE: \$\{\{ matrix\.courseSource \}\}/);
+  assert.equal((jobText.match(/run: npm run verify:ci/g) ?? []).length, 1);
+  assert.doesNotMatch(jobText, /run: npm run verify:course:ci/);
+  assert.doesNotMatch(jobText, /run: npm run build(?!:)/);
+});
+
+test("matrix runner exposes default timeout and validates timeout overrides", () => {
+  assert.equal(parseCourseTimeoutMs({}), DEFAULT_COURSE_TIMEOUT_MS);
+  assert.equal(parseCourseTimeoutMs({ E2E_MATRIX_COURSE_TIMEOUT_MS: "1234" }), 1234);
+  assert.throws(
+    () => parseCourseTimeoutMs({ E2E_MATRIX_COURSE_TIMEOUT_MS: "0" }),
+    /positive integer/,
+  );
+});
+
+test("matrix course failures remove suite config and run cleanup around the course", async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "course-docs-matrix-contract-"));
+  const configPath = path.join(temporaryRoot, "tests", "e2e", ".suite-config.json");
+  const cleanupCalls = [];
+  const portWaitCalls = [];
+  const runCalls = [];
+
+  try {
+    await assert.rejects(
+      () =>
+        runCourse(
+          courses.find((course) => course.name === "javascript-course-docs"),
+          {
+            root: temporaryRoot,
+            configPath,
+            baseEnv: { E2E_PORT: "42321" },
+            timeoutMs: 1234,
+            runNpmFn: async (details) => {
+              runCalls.push(details);
+              assert.equal(existsSync(configPath), true);
+              throw new Error("simulated matrix failure");
+            },
+            cleanupWorktreeDevProcessesFn: (details) => cleanupCalls.push(details),
+            waitForPortClosedFn: async (port, options) => portWaitCalls.push({ port, options }),
+            log: () => {},
+          },
+        ),
+      /simulated matrix failure/,
+    );
+
+    assert.equal(existsSync(configPath), false);
+    assert.equal(cleanupCalls.length, 2);
+    assert.equal(portWaitCalls.length, 2);
+    assert.equal(runCalls.length, 1);
+    assert.ok(runCalls[0].timeoutMs > 0);
+    assert.ok(runCalls[0].timeoutMs <= 1234);
+    assert.equal(runCalls[0].env.E2E_PORT, "42321");
+    assert.equal(
+      runCalls[0].env.COURSE_CONTENT_SOURCE,
+      "github:metyatech/javascript-course-docs#master",
+    );
+    assert.match(runCalls[0].label, /javascript-course-docs/);
+    assert.match(runCalls[0].label, /E2E_PORT=42321/);
+    assert.match(runCalls[0].label, /timeout=1234 ms/);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
