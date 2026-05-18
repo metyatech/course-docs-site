@@ -194,11 +194,12 @@ COURSE_CONTENT_SOURCE="github:metyatech/javascript-course-docs#master" \
 ```
 
 This is the exact command the GitHub Actions `verify-course` matrix runs for
-each course. It builds the site for the configured `COURSE_CONTENT_SOURCE`
-and then runs `verify:course:ci` (CI Playwright config). Use it when you
-need to reproduce a CI matrix failure locally, or when validating changes
-that affect course-specific build or E2E behavior. CI runs this command once
-per course content source; reproduce a specific matrix entry by setting
+each course. It first runs the high-severity dependency audit gate, then builds
+the site for the configured `COURSE_CONTENT_SOURCE`, and then runs
+`verify:course:ci` (CI Playwright config). Use it when you need to reproduce a
+CI matrix failure locally, or when validating changes that affect
+course-specific build, security-audit, or E2E behavior. CI runs this command
+once per course content source; reproduce a specific matrix entry by setting
 `COURSE_CONTENT_SOURCE`, `COURSE_DOCS_NEXT_DIST_DIR=.next-test`, `E2E_PORT`,
 and `PLAYWRIGHT_MAX_FAILURES` to match the workflow.
 

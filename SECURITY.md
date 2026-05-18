@@ -11,32 +11,22 @@ We will address them as soon as possible.
 
 ## Known accepted advisories (upstream-blocked)
 
-The following Dependabot advisories remain open because the fix is
-gated on an upstream release we cannot influence locally. Each entry
-identifies the transitive dependency, the upstream package that pins
-it, and the reason the advisory cannot be resolved by a direct or
-override-based bump in this repository.
+The repository currently gates CI with `npm audit --audit-level=high`.
+Known moderate advisories are tracked here so high-severity regressions
+still fail CI while upstream-only moderate fixes remain visible.
 
-- `dompurify <=3.3.3`, `@xmldom/xmldom 0.9.0-0.9.9`, `mathjax-full`,
-  `speech-rule-engine`, `mermaid`, `better-react-mathjax`,
-  `@theguild/remark-mermaid`: pulled in by `nextra` 4.x. `nextra@4.6.1`
-  (latest) still pins the vulnerable transitive ranges. Awaiting an
-  upstream nextra release that bumps mermaid / mathjax-full /
-  speech-rule-engine.
-- `next` (advisory range covers `9.3.4-canary.0 - 16.3.0-canary.5`):
-  no fixed stable release exists yet; only `16.3.0` canary builds
-  carry the fix. Awaiting `next@16.3.0` stable.
-- `postcss <8.5.10`: reaches us solely as a transitive of `next`.
-  Resolves once `next` upgrades its bundled `postcss`.
-- `uuid <14.0.0` (via `mermaid`): `uuid@14` is a major release that
-  current `mermaid` versions are not compatible with. Awaiting
-  upstream `mermaid` upgrade.
+- `postcss <8.5.10`: reaches this project solely through Next.js.
+  `next@15.5.18` is the current Next 15 security backport, but it still
+  bundles `postcss@8.4.31`. The npm audit autofix suggests downgrading
+  `next` to `9.3.3`, which is a breaking regression and is not accepted.
+  Revisit this entry when a stable Next.js release bundles
+  `postcss >=8.5.10`.
 
-We do not apply `npm audit fix --force` because every proposed fix
-downgrades `nextra` to `4.2.17` or `next` to `9.3.3`, both of which
-are major regressions with no security benefit. We also do not pin
-overrides for these transitives until the upstream fix lands, to
-avoid masking later upstream resolutions.
+Previously accepted Nextra transitive advisories for `mermaid`,
+`dompurify`, and `@xmldom/xmldom` are resolved locally through npm
+overrides that stay within the upstream dependency ranges. `mathjax-full`
+remains deprecated upstream, but it no longer appears in `npm audit` after
+the `@xmldom/xmldom` override update.
 
-This list is reviewed whenever a new Dependabot alert opens or a
-listed upstream package publishes a new release.
+This list is reviewed whenever a new Dependabot alert opens or a listed
+upstream package publishes a new release.
