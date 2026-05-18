@@ -113,25 +113,30 @@ COURSE_CONTENT_SOURCE="github:metyatech/programming-course-docs#master" npm run 
 
 ## E2E test matrix
 
-Run E2E against both course contents:
+The full course Playwright matrix is an explicit heavy local command, not the
+default test or pre-commit path. Run it only when you intentionally want E2E
+coverage across every supported course content source:
 
 ```sh
-npm test
+npm run test:e2e:matrix
 ```
+
+`npm run verify:e2e:matrix` is an alias for the same full local matrix.
 
 Behavior:
 
 - Runs E2E once with `programming-course-docs`
 - Runs E2E once with `javascript-course-docs`
-- Uses the same E2E suite in both runs
-- Injects course-specific behavior by generating `tests/e2e/.suite-config.json` per course:
-  - `enableSubmissions=true` for `programming-course-docs`
-  - `enableSubmissions=false` for `javascript-course-docs`
-  - `codePreviewPath=/docs/html-basics/introduction` for `programming-course-docs`
-  - `codePreviewPath=/docs/basics/array-intro` for `javascript-course-docs`
+- Runs E2E once with `open-campus-unreal-90min`
+- Uses the same E2E suite in every run
+- Injects course-specific behavior by generating `tests/e2e/.suite-config.json` per course
+- Cleans `tests/e2e/.suite-config.json` and leftover worktree dev/test processes before and after each course
+- Fails with a nonzero exit code when a course run fails or exceeds `E2E_MATRIX_COURSE_TIMEOUT_MS`
+- Logs the course name, source, port, and timeout for each matrix run
 - Uses one source variable per course:
   - `E2E_PROGRAMMING_CONTENT_SOURCE`
   - `E2E_JAVASCRIPT_CONTENT_SOURCE`
+  - `E2E_OPEN_CAMPUS_CONTENT_SOURCE`
 - Source format:
   - Remote GitHub: `github:owner/repo#ref`
   - Local path: `../path-to-content-repo`
@@ -147,6 +152,7 @@ Local example (`.env.e2e.example`):
 ```dotenv
 E2E_PROGRAMMING_CONTENT_SOURCE=../programming-course-docs
 E2E_JAVASCRIPT_CONTENT_SOURCE=../javascript-course-docs
+E2E_OPEN_CAMPUS_CONTENT_SOURCE=../open-campus-unreal-90min
 ```
 
 Remote example:
@@ -154,27 +160,31 @@ Remote example:
 ```dotenv
 E2E_PROGRAMMING_CONTENT_SOURCE="github:metyatech/programming-course-docs#master"
 E2E_JAVASCRIPT_CONTENT_SOURCE="github:metyatech/javascript-course-docs#master"
+E2E_OPEN_CAMPUS_CONTENT_SOURCE="github:metyatech/open-campus-unreal-90min#main"
 ```
 
 ## Verification
 
-There are two canonical verification commands. Pick the one that matches what
-you are trying to confirm.
+There are three verification tiers. Pick the smallest tier that proves the
+change you are making.
 
-### `npm run verify:precommit` — local fast gate
+### `npm run verify:precommit` — fast pre-commit gate
 
 ```sh
 npm run verify:precommit
 ```
 
 This is the command the Husky `pre-commit` hook runs. It executes
-`lint` + `test` + `build:verified` against your current
-`COURSE_CONTENT_SOURCE` (typically a local course content checkout via
-`.env.course.local`). It does **not** iterate the full remote course matrix,
-so commits stay fast while still catching lint, type, unit, and build
-regressions against the course content you are actively working on.
+`lint` + `test`. `npm test` runs the fast contract/unit subset via
+`test:fast`; it does not start the dev-server route tests, run the production
+build, execute `scripts/test-e2e-matrix.mjs`, or iterate the full course
+Playwright matrix.
 `npm run verify` is kept as a tooling-compatible alias for this same local
 gate.
+
+Use `npm run test:shared` when you need the heavier shared local suite that
+includes dev-server-backed route/editor flows without running the full course
+matrix.
 
 ### `npm run verify:ci` — CI-equivalent for one course
 
@@ -192,10 +202,17 @@ per course content source; reproduce a specific matrix entry by setting
 `COURSE_CONTENT_SOURCE`, `COURSE_DOCS_NEXT_DIST_DIR=.next-test`, `E2E_PORT`,
 and `PLAYWRIGHT_MAX_FAILURES` to match the workflow.
 
-The matrix E2E harness auto-selects a free local `E2E_PORT` when none is
-explicitly configured, so verification does not fail just because another
-local Next dev server is already using the default Playwright port. Set
-`E2E_PORT` yourself only when you need a fixed port for a specific run.
+### `npm run test:e2e:matrix` — explicit full local E2E matrix
+
+```sh
+npm run test:e2e:matrix
+```
+
+Use this heavy tier only when you intentionally want local Playwright E2E
+coverage across all supported course content sources. It auto-selects a free
+local `E2E_PORT` when none is configured, isolates each course's Next dist
+dir, and cleans deterministic matrix state before and after each course. Set
+`E2E_MATRIX_COURSE_TIMEOUT_MS` to override the per-course timeout.
 
 ## Documentation
 
