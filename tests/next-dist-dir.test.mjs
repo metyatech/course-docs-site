@@ -245,8 +245,8 @@ test("package.json exposes verify:precommit (fast local gate) and verify:ci (CI-
   );
   assert.equal(
     pkg.scripts["verify:ci"],
-    "npm run build && npm run verify:course:ci",
-    "verify:ci MUST chain `build` then `verify:course:ci` so local repro matches CI.",
+    "npm run audit:ci && npm run build && npm run verify:course:ci",
+    "verify:ci MUST chain the high audit gate, `build`, then `verify:course:ci` so local repro matches CI.",
   );
   assert.equal(
     pkg.scripts.verify,

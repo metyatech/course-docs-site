@@ -41,10 +41,19 @@ test("fast local scripts do not invoke the full E2E matrix", async () => {
   assert.doesNotMatch(pkg.scripts["test:fast"], matrixPattern);
   assert.doesNotMatch(pkg.scripts["test:shared"], matrixPattern);
   assert.doesNotMatch(pkg.scripts["test:e2e-config"], matrixPattern);
+  assert.match(pkg.scripts["test:e2e-config"], /dependency-security-contracts\.test\.mjs/);
   assert.doesNotMatch(pkg.scripts["verify:precommit"], matrixPattern);
-  assert.doesNotMatch(pkg.scripts["verify:precommit"], /build:verified|test:shared|admin-mode|tutorial-shot-editor-flow|import-asset-resolution/);
+  assert.doesNotMatch(
+    pkg.scripts["verify:precommit"],
+    /build:verified|test:shared|admin-mode|tutorial-shot-editor-flow|import-asset-resolution/,
+  );
   assert.equal(pkg.scripts["test:e2e:matrix"], "node scripts/test-e2e-matrix.mjs");
   assert.equal(pkg.scripts["verify:e2e:matrix"], "npm run test:e2e:matrix");
+  assert.equal(pkg.scripts["audit:ci"], "npm audit --audit-level=high");
+  assert.equal(
+    pkg.scripts["verify:ci"],
+    "npm run audit:ci && npm run build && npm run verify:course:ci",
+  );
 });
 
 test("verification docs document fast, single-course CI, and explicit matrix tiers", async () => {
@@ -54,6 +63,7 @@ test("verification docs document fast, single-course CI, and explicit matrix tie
   for (const documentText of [readme, contributing]) {
     assert.match(documentText, /npm run verify:precommit/);
     assert.match(documentText, /npm run verify:ci/);
+    assert.match(documentText, /high-severity dependency audit gate/);
     assert.match(documentText, /npm run test:e2e:matrix/);
     assert.match(documentText, /npm run verify:e2e:matrix/);
   }
