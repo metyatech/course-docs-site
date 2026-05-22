@@ -41,6 +41,8 @@ jobs:
             ref: main
           - repo: metyatech/teacher-profile-docs
             ref: main
+          - repo: metyatech/web-foundations-docs
+            ref: main
     name: Dispatch ${{ matrix.repo }}
     steps:
       - name: Validate dispatch token
