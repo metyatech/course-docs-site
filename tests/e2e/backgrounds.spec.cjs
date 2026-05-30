@@ -80,6 +80,8 @@ test('backgrounds page keeps background images visible in code previews', async 
   const backgroundAssetResponse = await page.request.get(backgroundAssetUrl);
   await expectServedImageBytes(backgroundAssetResponse, 'png');
 
+  await page.getByText('背景が固定されている領域1').scrollIntoViewIfNeeded();
+
   const parallaxImage = await findBackgroundImageInPreview(
     page,
     '背景が固定されている領域1',

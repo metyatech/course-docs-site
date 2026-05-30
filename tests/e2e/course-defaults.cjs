@@ -35,7 +35,6 @@ const COURSE_DEFAULTS = {
       "/docs/ui-components/accordion-menu_jquery-slidetoggle",
       "/docs/ui-components/drawer-menu",
       "/docs/ui-components/dropdown-menu",
-      "/docs/ui-components/popup_magnific-popup",
       "/docs/ui-components/show-more",
       "/docs/ui-components/slider_swiper"
     ],
