@@ -1,29 +1,27 @@
 import { NextResponse } from "next/server";
-import { middleware as platformMiddleware } from "@metyatech/course-docs-platform/next-app/middleware";
-import {
-  getAdminModeCookieName,
-  getAdminModePublicFallbackPath,
-  isAdminModeConfigured,
-  isAdminModeCookieEnabled,
-  isProtectedRoute,
-} from "./lib/admin-mode";
+import { isProtectedRoute } from "./lib/admin-mode";
+import { isAdminSessionValid } from "./lib/admin/session";
+import { rewriteAssetRequests, type AssetMiddlewareRequest } from "./lib/next-app/middleware";
 
 export const config = {
   matcher: ["/docs/:path*", "/exams/:path*", "/layout-preview/:path*", "/submissions/:path*"],
 };
-export function middleware(request: Parameters<typeof platformMiddleware>[0]) {
+
+export async function middleware(request: AssetMiddlewareRequest) {
   if (isProtectedRoute(request.nextUrl.pathname)) {
-    const enabled =
-      isAdminModeConfigured() &&
-      isAdminModeCookieEnabled(request.cookies.get(getAdminModeCookieName())?.value);
+    const secret = (process.env.ADMIN_MODE_TOKEN ?? '').trim();
+    const enabled = await isAdminSessionValid(
+      request.cookies.get('course-docs-admin-session')?.value,
+      secret,
+    );
 
     if (!enabled) {
       const url = request.nextUrl.clone();
-      url.pathname = getAdminModePublicFallbackPath();
-      url.search = "";
+      url.pathname = process.env.NEXT_PUBLIC_ADMIN_FALLBACK_PATH ?? '/';
+      url.search = '';
       return NextResponse.redirect(url);
     }
   }
 
-  return platformMiddleware(request);
+  return rewriteAssetRequests(request);
 }

@@ -7,8 +7,13 @@ import {
   getProtectedAdminLinks,
   hasProtectedAdminRoutes,
   isAdminModeConfigured,
-  isAdminModeCookieEnabled,
+  isAdminSessionValid,
 } from "../../../../lib/admin-mode";
+import {
+  getAdminSessionTtlSeconds,
+  signAdminSession,
+} from "../../../../lib/admin/session";
+import { constantTimeStringEqual } from "../../../../lib/admin/timing";
 
 type AdminModeUnavailableReason = "missing-admin-mode-token" | "no-protected-links" | null;
 
@@ -47,7 +52,9 @@ const buildStatusPayload = (cookieEnabled: boolean) => {
 
 export async function GET() {
   const cookieStore = await cookies();
-  const enabled = isAdminModeCookieEnabled(cookieStore.get(getAdminModeCookieName())?.value);
+  const enabled = await isAdminSessionValid(
+    cookieStore.get(getAdminModeCookieName())?.value,
+  );
   return NextResponse.json(buildStatusPayload(enabled));
 }
 
@@ -59,19 +66,21 @@ export async function POST(request: Request) {
   const payload = (await request.json().catch(() => ({}))) as { token?: string };
   const token = payload.token?.trim() ?? "";
 
-  if (!token || token !== getAdminModeSecret()) {
+  const secret = getAdminModeSecret();
+  if (!token || !constantTimeStringEqual(token, secret)) {
     return NextResponse.json(buildStatusPayload(false), { status: 401 });
   }
 
+  const signed = await signAdminSession(secret);
   const response = NextResponse.json(buildStatusPayload(true));
   response.cookies.set({
     name: getAdminModeCookieName(),
-    value: "1",
+    value: signed,
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 8,
+    maxAge: getAdminSessionTtlSeconds(),
   });
   return response;
 }

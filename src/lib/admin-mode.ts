@@ -1,7 +1,11 @@
 import type { Meta, PageMapItem } from 'nextra';
 import { siteConfig } from '../../site.config';
+import {
+  getAdminSessionCookieName,
+  getAdminSessionSecret,
+  isAdminSessionValid as isAdminSessionValidImpl,
+} from './admin/session';
 
-const DEFAULT_ADMIN_COOKIE_NAME = 'course-docs-admin-mode';
 const DEFAULT_PUBLIC_FALLBACK_PATH = '/';
 const RESERVED_META_KEYS = new Set(['*', 'index']);
 
@@ -74,7 +78,7 @@ const protectedRoutes = protectedLinks.map((link) => link.href);
 
 export const getAdminModeCookieName = () => {
   const configured = getAdminModeConfig()?.cookieName?.trim();
-  return configured || DEFAULT_ADMIN_COOKIE_NAME;
+  return configured || getAdminSessionCookieName();
 };
 
 export const getAdminModePublicFallbackPath = () => {
@@ -82,7 +86,7 @@ export const getAdminModePublicFallbackPath = () => {
   return configured ? normalizeRoute(configured) : DEFAULT_PUBLIC_FALLBACK_PATH;
 };
 
-export const getAdminModeSecret = () => (process.env.ADMIN_MODE_TOKEN ?? '').trim();
+export const getAdminModeSecret = () => getAdminSessionSecret();
 
 export const getProtectedAdminLinks = () => protectedLinks;
 
@@ -91,8 +95,23 @@ export const hasProtectedAdminRoutes = () => protectedRoutes.length > 0;
 export const isAdminModeConfigured = () =>
   hasProtectedAdminRoutes() && Boolean(getAdminModeSecret());
 
-export const isAdminModeCookieEnabled = (cookieValue: string | null | undefined) =>
-  cookieValue === '1';
+/**
+ * Synchronous-best-effort cookie check used by code paths that cannot await
+ * the Web Crypto verifier (e.g. React render of layouts that may run on the
+ * server). Returns true only when the cookie value is shaped like a valid
+ * signed session envelope; the middleware performs the full signature check
+ * before granting access to protected routes.
+ */
+export const isAdminModeCookieEnabled = (cookieValue: string | null | undefined) => {
+  if (typeof cookieValue !== 'string') return false;
+  if (cookieValue === '1') return false;
+  const dotIndex = cookieValue.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex === cookieValue.length - 1) return false;
+  return cookieValue.slice(dotIndex + 1).length > 0;
+};
+
+export const isAdminSessionValid = (cookieValue: string | null | undefined) =>
+  isAdminSessionValidImpl(cookieValue ?? undefined, getAdminSessionSecret());
 
 export const isProtectedRoute = (pathname: string) => {
   const normalizedPath = normalizeRoute(pathname);

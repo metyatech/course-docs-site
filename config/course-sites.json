@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "sites": [
+    {
+      "id": "course-common-docs",
+      "contentRepository": "metyatech/course-common-docs",
+      "defaultContentRef": "main",
+      "productionUrl": "https://course-common-docs.vercel.app",
+      "vercelProjectId": "VERCEL_PROJECT_ID",
+      "vercelOrgId": "VERCEL_ORG_ID",
+      "features": {
+        "submissions": false,
+        "adminMode": false,
+        "pagefind": true,
+        "codePreview": true,
+        "exercises": false
+      },
+      "e2eProfile": "docs-only",
+      "smokeTestPaths": ["/", "/docs/intro"],
+      "redeployOnSiteChange": true,
+      "dispatchTarget": {
+        "owner": "metyatech",
+        "repo": "course-common-docs",
+        "workflow": "deploy-vercel.yml"
+      }
+    },
+    {
+      "id": "javascript-course-docs",
+      "contentRepository": "metyatech/javascript-course-docs",
+      "defaultContentRef": "master",
+      "productionUrl": "https://javascript-course-docs.vercel.app",
+      "vercelProjectId": "VERCEL_PROJECT_ID",
+      "vercelOrgId": "VERCEL_ORG_ID",
+      "features": {
+        "submissions": false,
+        "adminMode": false,
+        "pagefind": true,
+        "codePreview": true,
+        "exercises": true
+      },
+      "e2eProfile": "docs-only",
+      "smokeTestPaths": ["/", "/docs/intro"],
+      "redeployOnSiteChange": true,
+      "dispatchTarget": {
+        "owner": "metyatech",
+        "repo": "javascript-course-docs",
+        "workflow": "deploy-vercel.yml"
+      }
+    },
+    {
+      "id": "programming-course-docs",
+      "contentRepository": "metyatech/programming-course-docs",
+      "defaultContentRef": "master",
+      "productionUrl": "https://programming-course-docs.vercel.app",
+      "vercelProjectId": "VERCEL_PROJECT_ID",
+      "vercelOrgId": "VERCEL_ORG_ID",
+      "features": {
+        "submissions": true,
+        "adminMode": true,
+        "pagefind": true,
+        "codePreview": true,
+        "exercises": true
+      },
+      "e2eProfile": "submissions",
+      "smokeTestPaths": ["/", "/docs/intro", "/submissions"],
+      "redeployOnSiteChange": true,
+      "dispatchTarget": {
+        "owner": "metyatech",
+        "repo": "programming-course-docs",
+        "workflow": "deploy-vercel.yml"
+      }
+    },
+    {
+      "id": "web-foundations-docs",
+      "contentRepository": "metyatech/web-foundations-docs",
+      "defaultContentRef": "main",
+      "productionUrl": "https://web-foundations-docs.vercel.app",
+      "vercelProjectId": "VERCEL_PROJECT_ID",
+      "vercelOrgId": "VERCEL_ORG_ID",
+      "features": {
+        "submissions": false,
+        "adminMode": false,
+        "pagefind": true,
+        "codePreview": true,
+        "exercises": false
+      },
+      "e2eProfile": "docs-only",
+      "smokeTestPaths": ["/", "/docs/intro"],
+      "redeployOnSiteChange": true,
+      "dispatchTarget": {
+        "owner": "metyatech",
+        "repo": "web-foundations-docs",
+        "workflow": "deploy-vercel.yml"
+      }
+    },
+    {
+      "id": "open-campus-unreal-90min",
+      "contentRepository": "metyatech/open-campus-unreal-90min",
+      "defaultContentRef": "main",
+      "productionUrl": "https://open-campus-unreal-90min.vercel.app",
+      "vercelProjectId": "VERCEL_PROJECT_ID",
+      "vercelOrgId": "VERCEL_ORG_ID",
+      "features": {
+        "submissions": false,
+        "adminMode": true,
+        "pagefind": true,
+        "codePreview": true,
+        "exercises": true
+      },
+      "e2eProfile": "admin",
+      "smokeTestPaths": ["/", "/docs/intro"],
+      "redeployOnSiteChange": true,
+      "dispatchTarget": {
+        "owner": "metyatech",
+        "repo": "open-campus-unreal-90min",
+        "workflow": "deploy-vercel.yml"
+      }
+    },
+    {
+      "id": "teacher-profile-docs",
+      "contentRepository": "metyatech/teacher-profile-docs",
+      "defaultContentRef": "main",
+      "productionUrl": "https://teacher-profile-docs.vercel.app",
+      "vercelProjectId": "VERCEL_PROJECT_ID",
+      "vercelOrgId": "VERCEL_ORG_ID",
+      "features": {
+        "submissions": false,
+        "adminMode": false,
+        "pagefind": true,
+        "codePreview": true,
+        "exercises": false
+      },
+      "e2eProfile": "docs-only",
+      "smokeTestPaths": ["/", "/docs/intro"],
+      "redeployOnSiteChange": true,
+      "dispatchTarget": {
+        "owner": "metyatech",
+        "repo": "teacher-profile-docs",
+        "workflow": "deploy-vercel.yml"
+      }
+    }
+  ]
+}

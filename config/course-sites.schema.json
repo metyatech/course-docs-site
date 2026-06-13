@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/metyatech/course-docs-site/config/course-sites.schema.json",
+  "title": "Course Docs Sites Manifest",
+  "description": "Single source of truth for all metyatech course documentation sites. Consumed by build matrix, E2E, redeploy dispatch, smoke test, and local dev tooling.",
+  "type": "object",
+  "required": ["version", "sites"],
+  "properties": {
+    "version": { "const": 1 },
+    "sites": {
+      "type": "array",
+      "minItems": 6,
+      "items": { "$ref": "#/$defs/site" }
+    }
+  },
+  "$defs": {
+    "site": {
+      "type": "object",
+      "required": [
+        "id",
+        "contentRepository",
+        "defaultContentRef",
+        "productionUrl",
+        "vercelProjectId",
+        "vercelOrgId",
+        "features",
+        "e2eProfile",
+        "smokeTestPaths",
+        "redeployOnSiteChange",
+        "dispatchTarget"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,80}$" },
+        "contentRepository": { "type": "string", "pattern": "^metyatech/[a-z0-9._-]+$" },
+        "defaultContentRef": { "type": "string", "minLength": 1 },
+        "productionUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "vercelProjectId": { "type": "string", "minLength": 1 },
+        "vercelOrgId": { "type": "string", "minLength": 1 },
+        "features": {
+          "type": "object",
+          "required": ["submissions", "adminMode", "pagefind", "codePreview", "exercises"],
+          "additionalProperties": false,
+          "properties": {
+            "submissions": { "type": "boolean" },
+            "adminMode": { "type": "boolean" },
+            "pagefind": { "type": "boolean" },
+            "codePreview": { "type": "boolean" },
+            "exercises": { "type": "boolean" }
+          }
+        },
+        "e2eProfile": {
+          "type": "string",
+          "enum": ["docs-only", "submissions", "admin", "mixed"]
+        },
+        "smokeTestPaths": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "pattern": "^/" }
+        },
+        "redeployOnSiteChange": { "type": "boolean" },
+        "dispatchTarget": {
+          "type": "object",
+          "required": ["owner", "repo", "workflow"],
+          "additionalProperties": false,
+          "properties": {
+            "owner": { "type": "string" },
+            "repo": { "type": "string" },
+            "workflow": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
