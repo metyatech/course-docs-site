@@ -14,6 +14,8 @@ import {
   waitForProcessExit,
 } from "../tests/test-harness-env.mjs";
 
+import { readCourseSitesManifest } from "./course-sites-manifest.mjs";
+
 const require = createRequire(import.meta.url);
 const { resolveCourseSuiteConfig } = require("../tests/e2e/course-defaults.cjs");
 
@@ -24,23 +26,15 @@ const COURSE_TIMEOUT_ENV = "E2E_MATRIX_COURSE_TIMEOUT_MS";
 const CLEANUP_TIMEOUT_SECONDS = 30;
 const PORT_CLEANUP_TIMEOUT_MS = 30_000;
 
-export const courses = [
-  {
-    name: "programming-course-docs",
-    sourceEnv: "E2E_PROGRAMMING_CONTENT_SOURCE",
-    defaultSource: "github:metyatech/programming-course-docs#master",
-  },
-  {
-    name: "javascript-course-docs",
-    sourceEnv: "E2E_JAVASCRIPT_CONTENT_SOURCE",
-    defaultSource: "github:metyatech/javascript-course-docs#master",
-  },
-  {
-    name: "open-campus-unreal-90min",
-    sourceEnv: "E2E_OPEN_CAMPUS_CONTENT_SOURCE",
-    defaultSource: "github:metyatech/open-campus-unreal-90min#main",
-  },
-];
+const manifest = readCourseSitesManifest();
+const representativeSites = manifest.sites.filter((site) => site.representativeE2E === true);
+
+export const courses = representativeSites.map((site) => ({
+  name: site.id,
+  sourceEnv: site.e2eSourceEnv,
+  defaultSource: `github:${site.contentRepository}#${site.defaultContentRef}`,
+  preferredPort: site.e2ePort,
+}));
 
 const messageFrom = (reason) => (reason instanceof Error ? reason.message : String(reason));
 
@@ -165,13 +159,13 @@ export const loadEnvDefaults = () => {
   }
 };
 
-export const resolveMatrixE2ePort = async (env) => {
+export const resolveMatrixE2ePort = async (env, course) => {
   const explicitPort = parsePortValue(env.E2E_PORT);
   if (explicitPort !== null) {
     return explicitPort;
   }
-
-  return await findFirstFreePort(3101);
+  const start = course?.preferredPort ?? 3101;
+  return await findFirstFreePort(start);
 };
 
 export const resolveCourseEnv = (course, baseEnv = process.env, root = projectRoot) => {
@@ -270,7 +264,7 @@ export const runCourse = async (
 ) => {
   const { env: sourceEnv, sourceLabel } = resolveCourseEnv(course, baseEnv, root);
   const env = { ...sourceEnv };
-  env.E2E_PORT = String(await resolveMatrixE2ePort(env));
+  env.E2E_PORT = String(await resolveMatrixE2ePort(env, course));
   env.COURSE_DOCS_NEXT_DIST_DIR = createIsolatedNextDistDir(`playwright-${course.name}`);
   const suiteConfig = resolveCourseSuiteConfig(env.COURSE_CONTENT_SOURCE);
   const label = `${course.name} (${sourceLabel}, E2E_PORT=${env.E2E_PORT}, timeout=${timeoutMs} ms)`;

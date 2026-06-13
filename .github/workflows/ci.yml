@@ -10,9 +10,15 @@ concurrency:
   group: course-docs-site-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  shared:
+  prepare-matrix:
     runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.set-build-matrix.outputs.build }}
+      e2e: ${{ steps.set-e2e-matrix.outputs.e2e }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -24,11 +30,35 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Cache Playwright Chromium
-        uses: actions/cache@v5
+      - name: Install
+        run: npm ci
+
+      - name: Verify site manifest
+        run: npm run verify:sites
+
+      - name: Generate build matrix
+        id: set-build-matrix
+        run: echo "build=$(node scripts/print-course-sites-matrix.mjs --kind build)" >> $GITHUB_OUTPUT
+
+      - name: Generate E2E matrix
+        id: set-e2e-matrix
+        run: echo "e2e=$(node scripts/print-course-sites-matrix.mjs --kind e2e)" >> $GITHUB_OUTPUT
+
+  shared:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COURSE_CONTENT_SOURCE: github:metyatech/javascript-course-docs#master
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: package-lock.json
 
       - name: Install
         run: npm ci
@@ -36,24 +66,55 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Verify shared tests (repeat-clean gate)
+      - name: Audit (high severity gate)
+        run: npm run audit:ci
+
+      - name: Verify (repeat-clean)
         run: npm run verify:repeat-clean
 
-  verify-course:
+      - name: Verify (precommit)
+        run: npm run verify:precommit
+
+  build-course:
+    needs: prepare-matrix
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - courseSource: "github:metyatech/javascript-course-docs#master"
-            e2ePort: 3101
-          - courseSource: "github:metyatech/programming-course-docs#master"
-            e2ePort: 3102
-          - courseSource: "github:metyatech/open-campus-unreal-90min#main"
-            e2ePort: 3103
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.build) }}
     env:
       COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
-      COURSE_DOCS_NEXT_DIST_DIR: .next-test
+      COURSE_DOCS_NEXT_DIST_DIR: .next-build-${{ matrix.siteId }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build (verified)
+        run: npm run build:verified
+
+  e2e-course:
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.e2e) }}
+    env:
+      COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
+      COURSE_DOCS_NEXT_DIST_DIR: .next-e2e-${{ matrix.siteId }}
       E2E_PORT: ${{ matrix.e2ePort }}
       PLAYWRIGHT_MAX_FAILURES: "1"
     steps:
@@ -67,17 +128,11 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Cache Playwright Chromium
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
-
       - name: Install
         run: npm ci
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Verify CI
-        run: npm run verify:ci
+      - name: Run course E2E (CI)
+        run: npm run test:course:ci
