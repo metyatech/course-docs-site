@@ -3,31 +3,35 @@
  *
  * Replaces the previous trivially-forgeable `cookie === "1"` check.
  * The cookie value is `<base64url(payload)>.<base64url(hmacSha256(payload, key))>`.
- * The payload is `{ v: 1, exp: <unix-seconds> }`. The HMAC key is derived
- * directly from `ADMIN_MODE_TOKEN` to avoid introducing a new env var.
+ * The payload is `{ v: 1, iat: <unix-seconds>, exp: <unix-seconds> }`. The HMAC
+ * key is derived directly from `ADMIN_SESSION_SECRET`.
  *
  * Compatible with Edge Middleware (uses SubtleCrypto only, never Node `crypto`).
  */
 const COOKIE_VERSION = 1 as const;
-const DEFAULT_TTL_SECONDS = 8 * 60 * 60;
+const SESSION_TTL_SECONDS = 8 * 60 * 60;
+const MAX_CLOCK_SKEW_SECONDS = 60;
+const MAX_COOKIE_LENGTH = 2048;
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 const toBase64Url = (bytes: Uint8Array): string => {
-  let str = '';
+  let str = "";
   for (let i = 0; i < bytes.length; i += 1) {
     str += String.fromCharCode(bytes[i]);
   }
-  const b64 = typeof btoa === 'function' ? btoa(str) : Buffer.from(str, 'binary').toString('base64');
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64 =
+    typeof btoa === "function" ? btoa(str) : Buffer.from(str, "binary").toString("base64");
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 
 const fromBase64Url = (input: string): Uint8Array | null => {
-  if (typeof input !== 'string' || input.length === 0) return null;
-  const padded = input.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((input.length + 3) % 4);
+  if (typeof input !== "string" || input.length === 0) return null;
+  const padded = input.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((input.length + 3) % 4);
   try {
-    const binary = typeof atob === 'function' ? atob(padded) : Buffer.from(padded, 'base64').toString('binary');
+    const binary =
+      typeof atob === "function" ? atob(padded) : Buffer.from(padded, "base64").toString("binary");
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
     return bytes;
@@ -38,17 +42,14 @@ const fromBase64Url = (input: string): Uint8Array | null => {
 
 const importKey = async (secret: string): Promise<CryptoKey> => {
   const keyBytes = enc.encode(secret);
-  return crypto.subtle.importKey(
-    'raw',
-    keyBytes,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign', 'verify'],
-  );
+  return crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, [
+    "sign",
+    "verify",
+  ]);
 };
 
 const signBytes = async (key: CryptoKey, message: string): Promise<Uint8Array> => {
-  const signature = await crypto.subtle.sign('HMAC', key, enc.encode(message));
+  const signature = await crypto.subtle.sign("HMAC", key, enc.encode(message));
   return new Uint8Array(signature);
 };
 
@@ -72,17 +73,23 @@ export type SignOptions = {
   now?: number;
 };
 
-export const getAdminSessionTtlSeconds = () => DEFAULT_TTL_SECONDS;
+export const getAdminSessionTtlSeconds = () => SESSION_TTL_SECONDS;
 
-export const getAdminSessionSecret = (): string => (process.env.ADMIN_MODE_TOKEN ?? '').trim();
+export const getAdminSessionSecret = (): string => (process.env.ADMIN_SESSION_SECRET ?? "").trim();
 
-export const isAdminSessionConfigured = (): boolean => getAdminSessionSecret() !== '';
+export const isAdminSessionConfigured = (): boolean => getAdminSessionSecret() !== "";
 
-export const signAdminSession = async (secret: string, options: SignOptions = {}): Promise<string> => {
+export const signAdminSession = async (
+  secret: string,
+  options: SignOptions = {},
+): Promise<string> => {
   if (!secret) {
-    throw new Error('Admin session secret is not configured');
+    throw new Error("Admin session secret is not configured");
   }
-  const ttl = options.ttlSeconds ?? DEFAULT_TTL_SECONDS;
+  // `ttlSeconds` and `now` are accepted for test fixtures only. The default
+  // TTL is fixed at SESSION_TTL_SECONDS and is not overridable through
+  // configuration; no other call site should pass these options.
+  const ttl = options.ttlSeconds ?? SESSION_TTL_SECONDS;
   const now = options.now ?? Math.floor(Date.now() / 1000);
   const payload: AdminSessionPayload = { v: COOKIE_VERSION, iat: now, exp: now + ttl };
   const payloadJson = JSON.stringify(payload);
@@ -94,51 +101,76 @@ export const signAdminSession = async (secret: string, options: SignOptions = {}
 
 export type VerifyResult =
   | { ok: true; payload: AdminSessionPayload }
-  | { ok: false; reason: 'missing' | 'malformed' | 'bad-version' | 'bad-signature' | 'expired' };
+  | { ok: false; reason: "missing" | "malformed" | "bad-version" | "bad-signature" | "expired" };
 
 export const verifyAdminSession = async (
   value: string | undefined | null,
   secret: string,
   options: { now?: number } = {},
 ): Promise<VerifyResult> => {
-  if (!value || typeof value !== 'string') return { ok: false, reason: 'missing' };
-  if (!secret) return { ok: false, reason: 'missing' };
-  const lastDot = value.lastIndexOf('.');
-  if (lastDot <= 0 || lastDot === value.length - 1) {
-    return { ok: false, reason: 'malformed' };
+  if (!value || typeof value !== "string") return { ok: false, reason: "missing" };
+  if (!secret) return { ok: false, reason: "missing" };
+  if (value.length > MAX_COOKIE_LENGTH) return { ok: false, reason: "malformed" };
+
+  // Strictly enforce a single '.' separator: no `lastIndexOf` trick that would
+  // accept two or more dots, no leading-dot, no trailing-dot values.
+  const firstDot = value.indexOf(".");
+  if (firstDot <= 0 || firstDot === value.length - 1) {
+    return { ok: false, reason: "malformed" };
   }
-  const body = value.slice(0, lastDot);
-  const sigB64 = value.slice(lastDot + 1);
+  if (value.indexOf(".", firstDot + 1) !== -1) {
+    return { ok: false, reason: "malformed" };
+  }
+
+  const body = value.slice(0, firstDot);
+  const sigB64 = value.slice(firstDot + 1);
+
   const sigBytes = fromBase64Url(sigB64);
-  if (!sigBytes) return { ok: false, reason: 'malformed' };
+  if (!sigBytes) return { ok: false, reason: "malformed" };
+
   const key = await importKey(secret);
   const expectedSig = await signBytes(key, body);
   if (!constantTimeEqual(sigBytes, expectedSig)) {
-    return { ok: false, reason: 'bad-signature' };
+    return { ok: false, reason: "bad-signature" };
   }
+
   const bodyBytes = fromBase64Url(body);
-  if (!bodyBytes) return { ok: false, reason: 'malformed' };
+  if (!bodyBytes) return { ok: false, reason: "malformed" };
   let parsed: unknown;
   try {
     parsed = JSON.parse(dec.decode(bodyBytes));
   } catch {
-    return { ok: false, reason: 'malformed' };
+    return { ok: false, reason: "malformed" };
   }
-  if (!parsed || typeof parsed !== 'object') {
-    return { ok: false, reason: 'malformed' };
+  if (!parsed || typeof parsed !== "object") {
+    return { ok: false, reason: "malformed" };
   }
   const candidate = parsed as Partial<AdminSessionPayload>;
   if (candidate.v !== COOKIE_VERSION) {
-    return { ok: false, reason: 'bad-version' };
+    return { ok: false, reason: "bad-version" };
   }
-  if (typeof candidate.exp !== 'number' || !Number.isFinite(candidate.exp)) {
-    return { ok: false, reason: 'malformed' };
+  if (!Number.isInteger(candidate.iat)) {
+    return { ok: false, reason: "malformed" };
   }
+  if (!Number.isInteger(candidate.exp)) {
+    return { ok: false, reason: "malformed" };
+  }
+  const iat = candidate.iat as number;
+  const exp = candidate.exp as number;
   const now = options.now ?? Math.floor(Date.now() / 1000);
-  if (candidate.exp <= now) {
-    return { ok: false, reason: 'expired' };
+  if (iat > now + MAX_CLOCK_SKEW_SECONDS) {
+    return { ok: false, reason: "malformed" };
   }
-  return { ok: true, payload: candidate as AdminSessionPayload };
+  if (exp <= iat) {
+    return { ok: false, reason: "malformed" };
+  }
+  if (exp - iat > SESSION_TTL_SECONDS) {
+    return { ok: false, reason: "malformed" };
+  }
+  if (exp <= now) {
+    return { ok: false, reason: "expired" };
+  }
+  return { ok: true, payload: { v: COOKIE_VERSION, iat, exp } };
 };
 
 export const isAdminSessionValid = async (
@@ -147,4 +179,4 @@ export const isAdminSessionValid = async (
   options?: { now?: number },
 ): Promise<boolean> => (await verifyAdminSession(value, secret, options)).ok;
 
-export const getAdminSessionCookieName = (): string => 'course-docs-admin-session';
+export const getAdminSessionCookieName = (): string => "course-docs-admin-session";

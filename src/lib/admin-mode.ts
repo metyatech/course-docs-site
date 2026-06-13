@@ -1,13 +1,15 @@
-import type { Meta, PageMapItem } from 'nextra';
-import { siteConfig } from '../../site.config';
+import type { Meta, PageMapItem } from "nextra";
+import { siteConfig } from "../../site.config";
 import {
   getAdminSessionCookieName,
-  getAdminSessionSecret,
+  getAdminSessionSecret as getSessionSecret,
   isAdminSessionValid as isAdminSessionValidImpl,
-} from './admin/session';
+} from "./admin/session";
 
-const DEFAULT_PUBLIC_FALLBACK_PATH = '/';
-const RESERVED_META_KEYS = new Set(['*', 'index']);
+import { getCurrentCourseSite } from "./current-course-site";
+
+const DEFAULT_PUBLIC_FALLBACK_PATH = "/";
+const RESERVED_META_KEYS = new Set(["*", "index"]);
 
 type AdminModeLink = {
   href: string;
@@ -32,23 +34,23 @@ type StaticParams = {
 const normalizeRoute = (route: string) => {
   const trimmed = route.trim();
   if (!trimmed) {
-    return '/';
+    return "/";
   }
 
-  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-  if (withLeadingSlash.length > 1 && withLeadingSlash.endsWith('/')) {
+  const withLeadingSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  if (withLeadingSlash.length > 1 && withLeadingSlash.endsWith("/")) {
     return withLeadingSlash.slice(0, -1);
   }
   return withLeadingSlash;
 };
 
 const isAdminModeLink = (value: unknown): value is AdminModeLink => {
-  if (!value || typeof value !== 'object') {
+  if (!value || typeof value !== "object") {
     return false;
   }
 
   const maybeLink = value as Partial<AdminModeLink>;
-  return typeof maybeLink.href === 'string' && typeof maybeLink.label === 'string';
+  return typeof maybeLink.href === "string" && typeof maybeLink.label === "string";
 };
 
 const getAdminModeConfig = () => (siteConfig as SiteConfigWithAdminMode).adminMode;
@@ -86,29 +88,45 @@ export const getAdminModePublicFallbackPath = () => {
   return configured ? normalizeRoute(configured) : DEFAULT_PUBLIC_FALLBACK_PATH;
 };
 
-export const getAdminModeSecret = () => getAdminSessionSecret();
+/**
+ * Returns the admin-mode shared token (`ADMIN_MODE_TOKEN`). The user supplies
+ * this token in the admin-mode UI; the server compares it against the
+ * `ADMIN_SESSION_SECRET` HMAC key using a constant-time digest comparison.
+ */
+export const getAdminModeToken = (): string => (process.env.ADMIN_MODE_TOKEN ?? "").trim();
+
+/**
+ * Returns the admin-session HMAC secret (`ADMIN_SESSION_SECRET`). The same
+ * secret is used both to mint the signed session cookie and to verify it.
+ */
+export const getAdminSessionSecret = (): string => getSessionSecret();
 
 export const getProtectedAdminLinks = () => protectedLinks;
 
-export const hasProtectedAdminRoutes = () => protectedRoutes.length > 0;
-
-export const isAdminModeConfigured = () =>
-  hasProtectedAdminRoutes() && Boolean(getAdminModeSecret());
+/** True when the active course site defines at least one protected route. */
+export const hasProtectedAdminRoutes = (): boolean => protectedRoutes.length > 0;
 
 /**
- * Synchronous-best-effort cookie check used by code paths that cannot await
- * the Web Crypto verifier (e.g. React render of layouts that may run on the
- * server). Returns true only when the cookie value is shaped like a valid
- * signed session envelope; the middleware performs the full signature check
- * before granting access to protected routes.
+ * True when the active course site enables the admin comment-moderation
+ * surface (deleting work-submission comments). Read from the site manifest's
+ * `features.adminCommentModeration` flag, not from the legacy `adminMode`
+ * course config.
  */
-export const isAdminModeCookieEnabled = (cookieValue: string | null | undefined) => {
-  if (typeof cookieValue !== 'string') return false;
-  if (cookieValue === '1') return false;
-  const dotIndex = cookieValue.lastIndexOf('.');
-  if (dotIndex <= 0 || dotIndex === cookieValue.length - 1) return false;
-  return cookieValue.slice(dotIndex + 1).length > 0;
-};
+export const hasAdminCommentModeration = (): boolean =>
+  getCurrentCourseSite()?.features.adminCommentModeration === true;
+
+/** True when the active course site has any admin-mode capability. */
+export const hasAnyAdminCapability = (): boolean =>
+  hasProtectedAdminRoutes() || hasAdminCommentModeration();
+
+/**
+ * True when the runtime is actually able to enable admin mode: at least one
+ * admin capability is declared for the current site, and both the
+ * `ADMIN_MODE_TOKEN` (user-supplied) and the `ADMIN_SESSION_SECRET` (HMAC
+ * key) are configured on the server.
+ */
+export const isAdminModeConfigured = (): boolean =>
+  hasAnyAdminCapability() && getAdminModeToken() !== "" && getAdminSessionSecret() !== "";
 
 export const isAdminSessionValid = (cookieValue: string | null | undefined) =>
   isAdminSessionValidImpl(cookieValue ?? undefined, getAdminSessionSecret());
@@ -117,7 +135,7 @@ export const isProtectedRoute = (pathname: string) => {
   const normalizedPath = normalizeRoute(pathname);
   return protectedRoutes.some(
     (protectedRoute) =>
-      normalizedPath === protectedRoute || normalizedPath.startsWith(`${protectedRoute}/`)
+      normalizedPath === protectedRoute || normalizedPath.startsWith(`${protectedRoute}/`),
   );
 };
 
@@ -125,7 +143,7 @@ export const isProtectedMdxPath = (mdxPath: string[] | undefined) => {
   if (!mdxPath || mdxPath.length === 0) {
     return false;
   }
-  return isProtectedRoute(`/${mdxPath.join('/')}`);
+  return isProtectedRoute(`/${mdxPath.join("/")}`);
 };
 
 export const filterProtectedStaticParams = <T extends StaticParams>(params: T[]) =>
@@ -135,26 +153,22 @@ export const filterProtectedStaticParams = <T extends StaticParams>(params: T[])
   });
 
 const isPageMapMeta = (
-  item: PageMapItem
+  item: PageMapItem,
 ): item is PageMapItem & { data: Record<string, unknown> } =>
-  'data' in item && Boolean(item.data) && typeof item.data === 'object';
+  "data" in item && Boolean(item.data) && typeof item.data === "object";
 
 const isPageMapFolder = (
-  item: PageMapItem
+  item: PageMapItem,
 ): item is PageMapItem & { route: string; children: PageMapItem[] } =>
-  'route' in item &&
-  typeof item.route === 'string' &&
-  'children' in item &&
+  "route" in item &&
+  typeof item.route === "string" &&
+  "children" in item &&
   Array.isArray(item.children);
 
-const isPageMapRouteEntry = (
-  item: PageMapItem
-): item is PageMapItem & { route: string } => 'route' in item && typeof item.route === 'string';
+const isPageMapRouteEntry = (item: PageMapItem): item is PageMapItem & { route: string } =>
+  "route" in item && typeof item.route === "string";
 
-export const filterProtectedPageMap = (
-  items: PageMapItem[],
-  parentRoute = ''
-): PageMapItem[] =>
+export const filterProtectedPageMap = (items: PageMapItem[], parentRoute = ""): PageMapItem[] =>
   items.reduce<PageMapItem[]>((filteredItems, item) => {
     if (isPageMapMeta(item)) {
       const filteredData = Object.fromEntries(
@@ -163,7 +177,7 @@ export const filterProtectedPageMap = (
             return true;
           }
           return !isProtectedRoute(`${parentRoute}/${key}`);
-        })
+        }),
       ) as Record<string, Meta>;
       filteredItems.push({ ...item, data: filteredData });
       return filteredItems;

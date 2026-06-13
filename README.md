@@ -21,16 +21,37 @@ Optional env vars:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-- `ADMIN_MODE_TOKEN` (server-only, shared admin token for comment deletion and admin-mode unlock)
+- `ADMIN_MODE_TOKEN` (server-only, the human-entered admin code)
+- `ADMIN_SESSION_SECRET` (server-only, HMAC-SHA256 signing key for the admin session cookie)
 
 The Supabase variables are only needed when the selected course enables the `/submissions` experience backed by
 `@metyatech/course-docs-platform`. At the moment, that means `programming-course-docs`. They are not required for
 `javascript-course-docs`.
 
-If the synced `site.config.ts` defines `adminMode.protectedLinks`, `ADMIN_MODE_TOKEN` is the single shared
-admin code for both protected pages and admin comment deletion.
-Local preview of those protected pages also requires `ADMIN_MODE_TOKEN` in `.env.local`; otherwise the footer
-can accept a code input, but the protected routes will remain locked and show a setup hint.
+### Admin mode
+
+If the synced `site.config.ts` defines `adminMode.protectedLinks` (or the active site enables admin comment
+moderation), two server-only environment variables are required to actually unlock admin features:
+
+- `ADMIN_MODE_TOKEN`: the human-entered code shown in the admin-mode UI on the footer. The server compares it
+  against this value at login time using a constant-time digest comparison. The token is **never** reused as
+  the cookie signing secret.
+- `ADMIN_SESSION_SECRET`: the HMAC-SHA256 signing key for the signed admin session cookie. The cookie is set
+  after a successful `ADMIN_MODE_TOKEN` check and is verified on every protected request.
+
+Both values must be set in production. The two values **must not be the same** — using the same value for both
+would let anyone who learns the user-entered code forge valid session cookies. `ADMIN_SESSION_SECRET` must be at
+least 32 bytes of randomness; generate one with:
+
+```sh
+openssl rand -base64 32
+```
+
+The issued session cookie is `HttpOnly`, `SameSite=Lax`, scoped to `/`, and expires after 8 hours. The cookie
+value is `<base64url(payload)>.<base64url(hmacSha256(payload, key))>`; only the HMAC key needs to stay secret.
+The client stores nothing in `sessionStorage` or `localStorage`; the cookie alone gates access. Local preview
+of protected pages also requires both values in `.env.local`; otherwise the footer can accept a code input, but
+the protected routes will remain locked and show a setup hint.
 
 See `.env.example` for the full list.
 
@@ -66,7 +87,7 @@ COURSE_CONTENT_SOURCE=../programming-course-docs
 
 Template: `.env.course.local.example`
 
-If your selected course defines `siteConfig.adminMode.protectedLinks`, also set `ADMIN_MODE_TOKEN` in
+If your selected course defines `siteConfig.adminMode.protectedLinks`, also set `ADMIN_SESSION_SECRET` in
 `.env.local` before `npm run dev`.
 
 PowerShell example:

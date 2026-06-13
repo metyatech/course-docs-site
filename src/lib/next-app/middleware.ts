@@ -1,13 +1,13 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { DIRECT_ROUTE_ASSET_EXTENSION_SET } from '../shared/course-asset-config';
+import { NextResponse, type NextRequest } from "next/server";
+import { DIRECT_ROUTE_ASSET_EXTENSION_SET } from "../../shared/course-asset-config";
 
 export type AssetMiddlewareRequest = NextRequest;
 
 const getExtension = (pathname: string) => {
-  const lastSlash = pathname.lastIndexOf('/');
-  const lastDot = pathname.lastIndexOf('.');
-  if (lastDot === -1) return '';
-  if (lastSlash !== -1 && lastDot < lastSlash) return '';
+  const lastSlash = pathname.lastIndexOf("/");
+  const lastDot = pathname.lastIndexOf(".");
+  if (lastDot === -1) return "";
+  if (lastSlash !== -1 && lastDot < lastSlash) return "";
   return pathname.slice(lastDot).toLowerCase();
 };
 
@@ -24,16 +24,16 @@ export const rewriteAssetRequests = (request: AssetMiddlewareRequest) => {
   const { pathname } = request.nextUrl;
 
   if (
-    !pathname.startsWith('/docs/') &&
-    !pathname.startsWith('/exams/') &&
-    !pathname.startsWith('/layout-preview/') &&
-    !pathname.startsWith('/submissions/')
+    !pathname.startsWith("/docs/") &&
+    !pathname.startsWith("/exams/") &&
+    !pathname.startsWith("/layout-preview/") &&
+    !pathname.startsWith("/submissions/")
   ) {
     return NextResponse.next();
   }
 
   const ext = getExtension(pathname);
-  if (!ext || ext === '.md' || ext === '.mdx') {
+  if (!ext || ext === ".md" || ext === ".mdx") {
     return NextResponse.next();
   }
 

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { isProtectedRoute } from "./lib/admin-mode";
+import {
+  isProtectedRoute,
+  getAdminModeCookieName,
+  getAdminModePublicFallbackPath,
+  getAdminSessionSecret,
+} from "./lib/admin-mode";
 import { isAdminSessionValid } from "./lib/admin/session";
 import { rewriteAssetRequests, type AssetMiddlewareRequest } from "./lib/next-app/middleware";
 
@@ -9,16 +14,16 @@ export const config = {
 
 export async function middleware(request: AssetMiddlewareRequest) {
   if (isProtectedRoute(request.nextUrl.pathname)) {
-    const secret = (process.env.ADMIN_MODE_TOKEN ?? '').trim();
+    const secret = getAdminSessionSecret();
     const enabled = await isAdminSessionValid(
-      request.cookies.get('course-docs-admin-session')?.value,
+      request.cookies.get(getAdminModeCookieName())?.value,
       secret,
     );
 
     if (!enabled) {
       const url = request.nextUrl.clone();
-      url.pathname = process.env.NEXT_PUBLIC_ADMIN_FALLBACK_PATH ?? '/';
-      url.search = '';
+      url.pathname = getAdminModePublicFallbackPath();
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }
