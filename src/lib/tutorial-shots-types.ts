@@ -21,9 +21,7 @@ export type TutorialShotArrowAnnotation = {
 
 export type TutorialShotAnnotationMode = "focal" | "multi-focal" | "callout";
 
-export type TutorialShotAnnotation =
-  | TutorialShotBoxAnnotation
-  | TutorialShotArrowAnnotation;
+export type TutorialShotAnnotation = TutorialShotBoxAnnotation | TutorialShotArrowAnnotation;
 
 export type TutorialShotCrop = {
   x: number;

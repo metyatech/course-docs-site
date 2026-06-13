@@ -16,7 +16,7 @@ type Subscriber = (revision: string) => void;
 
 const subscribers = new Set<Subscriber>();
 
-let currentRevision = process.env.COURSE_DOCS_SITE_DEV_REVISION ?? '';
+let currentRevision = process.env.COURSE_DOCS_SITE_DEV_REVISION ?? "";
 
 /** Subscribe to revision bumps. Returns an unsubscribe function. */
 export const subscribe = (fn: Subscriber): (() => void) => {

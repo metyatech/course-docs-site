@@ -19,6 +19,7 @@ site.config.ts
 # Playwright
 playwright-report/
 test-results/
+tests/.next-headers-stubs/
 
 # Agents
 AGENTS.md

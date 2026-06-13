@@ -44,7 +44,7 @@ test("javascript-course-docs keeps submissions disabled", () => {
     "/docs/ui-components/drawer-menu",
     "/docs/ui-components/dropdown-menu",
     "/docs/ui-components/show-more",
-    "/docs/ui-components/slider_swiper"
+    "/docs/ui-components/slider_swiper",
   ]);
   assert.equal(config.enableSubmissions, false);
   assert.equal(config.enableCodePreview, true);

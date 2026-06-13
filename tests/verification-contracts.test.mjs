@@ -20,10 +20,20 @@ const ciWorkflowPath = path.join(projectRoot, ".github", "workflows", "ci.yml");
 
 const readPackageJson = async () => JSON.parse(await readFile(packageJsonPath, "utf8"));
 
-const extractVerifyCourseJob = (workflowText) => {
-  const jobHeader = "  verify-course:\n";
+const extractE2eCourseJob = (workflowText) => {
+  const jobHeader = "  e2e-course:\n";
   const jobStart = workflowText.indexOf(jobHeader);
-  assert.notEqual(jobStart, -1, "Expected CI workflow to define a verify-course job.");
+  assert.notEqual(jobStart, -1, "Expected CI workflow to define an e2e-course job.");
+
+  const afterHeader = workflowText.slice(jobStart + jobHeader.length);
+  const nextJobStart = afterHeader.search(/\n  [A-Za-z0-9_-]+:\n/);
+  return nextJobStart === -1 ? afterHeader : afterHeader.slice(0, nextJobStart);
+};
+
+const extractPrepareMatrixJob = (workflowText) => {
+  const jobHeader = "  prepare-matrix:\n";
+  const jobStart = workflowText.indexOf(jobHeader);
+  assert.notEqual(jobStart, -1, "Expected CI workflow to define a prepare-matrix job.");
 
   const afterHeader = workflowText.slice(jobStart + jobHeader.length);
   const nextJobStart = afterHeader.search(/\n  [A-Za-z0-9_-]+:\n/);
@@ -52,7 +62,7 @@ test("fast local scripts do not invoke the full E2E matrix", async () => {
   assert.equal(pkg.scripts["audit:ci"], "npm audit --audit-level=high");
   assert.equal(
     pkg.scripts["verify:ci"],
-    "npm run audit:ci && npm run build && npm run verify:course:ci",
+    "npm run verify:sites && npm run audit:ci && npm run build && npm run verify:course:ci",
   );
 });
 
@@ -75,23 +85,36 @@ test("verification docs document fast, single-course CI, and explicit matrix tie
   );
 });
 
-test("CI verify-course matrix still runs verify:ci for every course source", async () => {
+test("CI matrix drives build and e2e jobs per course source from the manifest", async () => {
   const workflowText = await readFile(ciWorkflowPath, "utf8");
-  const jobText = extractVerifyCourseJob(workflowText);
-  const expectedSources = [
-    "github:metyatech/javascript-course-docs#master",
-    "github:metyatech/programming-course-docs#master",
-    "github:metyatech/open-campus-unreal-90min#main",
-  ];
+  const prepareJobText = extractPrepareMatrixJob(workflowText);
+  const e2eJobText = extractE2eCourseJob(workflowText);
 
-  for (const source of expectedSources) {
-    assert.match(jobText, new RegExp(`courseSource: "${escapeRegExp(source)}"`));
-  }
+  // prepare-matrix must read the manifest and publish both build and e2e matrices.
+  assert.match(
+    prepareJobText,
+    /echo "build=\$\(node scripts\/print-course-sites-matrix\.mjs --kind build\)" >> \$GITHUB_OUTPUT/,
+  );
+  assert.match(
+    prepareJobText,
+    /echo "e2e=\$\(node scripts\/print-course-sites-matrix\.mjs --kind e2e\)" >> \$GITHUB_OUTPUT/,
+  );
+  assert.match(
+    prepareJobText,
+    /outputs:[\s\S]*?build: \$\{\{ steps\.set-build-matrix\.outputs\.build \}\}/,
+  );
+  assert.match(
+    prepareJobText,
+    /outputs:[\s\S]*?e2e: \$\{\{ steps\.set-e2e-matrix\.outputs\.e2e \}\}/,
+  );
 
-  assert.match(jobText, /COURSE_CONTENT_SOURCE: \$\{\{ matrix\.courseSource \}\}/);
-  assert.equal((jobText.match(/run: npm run verify:ci/g) ?? []).length, 1);
-  assert.doesNotMatch(jobText, /run: npm run verify:course:ci/);
-  assert.doesNotMatch(jobText, /run: npm run build(?!:)/);
+  // e2e-course must consume the e2e matrix and run the CI course E2E command per course source.
+  assert.match(e2eJobText, /matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\) \}\}/);
+  assert.match(e2eJobText, /needs: prepare-matrix/);
+  assert.match(e2eJobText, /COURSE_CONTENT_SOURCE: \$\{\{ matrix\.courseSource \}\}/);
+  assert.equal((e2eJobText.match(/run: npm run test:course:ci/g) ?? []).length, 1);
+  assert.doesNotMatch(e2eJobText, /run: npm run verify:ci/);
+  assert.doesNotMatch(e2eJobText, /run: npm run build(?!:)/);
 });
 
 test("matrix runner exposes default timeout and validates timeout overrides", () => {
@@ -111,25 +134,32 @@ test("matrix course failures remove suite config and run cleanup around the cour
   const runCalls = [];
 
   try {
+    const representativeCourse =
+      courses.find((course) => course.name === "programming-course-docs") ?? courses[0];
+    assert.ok(
+      representativeCourse,
+      "Expected the matrix to expose at least one representative course.",
+    );
+
+    const expectedDefaultSource = representativeCourse?.defaultSource;
+    const expectedCourseName = representativeCourse?.name ?? "unknown";
+
     await assert.rejects(
       () =>
-        runCourse(
-          courses.find((course) => course.name === "javascript-course-docs"),
-          {
-            root: temporaryRoot,
-            configPath,
-            baseEnv: { E2E_PORT: "42321" },
-            timeoutMs: 1234,
-            runNpmFn: async (details) => {
-              runCalls.push(details);
-              assert.equal(existsSync(configPath), true);
-              throw new Error("simulated matrix failure");
-            },
-            cleanupWorktreeDevProcessesFn: (details) => cleanupCalls.push(details),
-            waitForPortClosedFn: async (port, options) => portWaitCalls.push({ port, options }),
-            log: () => {},
+        runCourse(representativeCourse, {
+          root: temporaryRoot,
+          configPath,
+          baseEnv: { E2E_PORT: "42321" },
+          timeoutMs: 1234,
+          runNpmFn: async (details) => {
+            runCalls.push(details);
+            assert.equal(existsSync(configPath), true);
+            throw new Error("simulated matrix failure");
           },
-        ),
+          cleanupWorktreeDevProcessesFn: (details) => cleanupCalls.push(details),
+          waitForPortClosedFn: async (port, options) => portWaitCalls.push({ port, options }),
+          log: () => {},
+        }),
       /simulated matrix failure/,
     );
 
@@ -140,11 +170,8 @@ test("matrix course failures remove suite config and run cleanup around the cour
     assert.ok(runCalls[0].timeoutMs > 0);
     assert.ok(runCalls[0].timeoutMs <= 1234);
     assert.equal(runCalls[0].env.E2E_PORT, "42321");
-    assert.equal(
-      runCalls[0].env.COURSE_CONTENT_SOURCE,
-      "github:metyatech/javascript-course-docs#master",
-    );
-    assert.match(runCalls[0].label, /javascript-course-docs/);
+    assert.equal(runCalls[0].env.COURSE_CONTENT_SOURCE, expectedDefaultSource);
+    assert.match(runCalls[0].label, new RegExp(expectedCourseName));
     assert.match(runCalls[0].label, /E2E_PORT=42321/);
     assert.match(runCalls[0].label, /timeout=1234 ms/);
   } finally {

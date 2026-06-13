@@ -38,7 +38,9 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
       throw new Error(
-        typeof onTimeoutMessage === "function" ? onTimeoutMessage() : (onTimeoutMessage ?? "Timed out"),
+        typeof onTimeoutMessage === "function"
+          ? onTimeoutMessage()
+          : (onTimeoutMessage ?? "Timed out"),
       );
     }
     const result = await fn();
@@ -143,6 +145,7 @@ const writeFixtureCourseRepo = async (rootDir) => {
   description: "admin mode fixture",
   faviconHref: "/img/favicon.ico",
   adminMode: {
+    cookieName: 'course-docs-admin-fixture-session',
     publicFallbackPath: "/docs/intro",
     protectedLinks: [
       { href: "/docs/teacher-guide", label: "教員ガイド" },
@@ -209,7 +212,6 @@ export default meta;
   await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
-
 test(
   "admin-only docs stay hidden from public and open with admin mode enabled",
   { timeout: 5 * 60_000 },
@@ -232,6 +234,7 @@ test(
         overrides: {
           COURSE_CONTENT_SOURCE: fixtureCourse,
           ADMIN_MODE_TOKEN: "teacher-secret",
+          ADMIN_SESSION_SECRET: "fixture-session-secret-at-least-32-bytes",
         },
       }),
       stdio: "inherit",
@@ -307,6 +310,18 @@ test(
     );
     assert.equal(enableAdmin.status, 200);
     assert.ok(enableAdmin.setCookie, "Expected admin mode API to set a cookie.");
+    assert.match(
+      enableAdmin.setCookie,
+      /^course-docs-admin-fixture-session=[^;]+/,
+      "Expected Set-Cookie to use the custom fixture cookie name.",
+    );
+    assert.match(enableAdmin.setCookie, /HttpOnly/i, "Expected Set-Cookie to be HttpOnly.");
+    assert.match(
+      enableAdmin.setCookie,
+      /SameSite=Lax/i,
+      "Expected Set-Cookie to use SameSite=Lax.",
+    );
+    assert.match(enableAdmin.setCookie, /Path=\//, "Expected Set-Cookie to scope to Path=/.");
 
     const cookieHeader = enableAdmin.setCookie.split(";", 1)[0];
 

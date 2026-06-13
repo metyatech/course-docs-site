@@ -35,7 +35,7 @@ test("security scripts gate high audits and hard-fail broken patches", async () 
   assert.equal(pkg.scripts["audit:ci"], "npm audit --audit-level=high");
   assert.equal(
     pkg.scripts["verify:ci"],
-    "npm run audit:ci && npm run build && npm run verify:course:ci",
+    "npm run verify:sites && npm run audit:ci && npm run build && npm run verify:course:ci",
   );
 });
 

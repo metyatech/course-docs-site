@@ -161,7 +161,6 @@ export default meta;
   }
 };
 
-
 test(
   "root redirect follows the first visible content entry from the active content repo",
   { timeout: 2 * 60_000 },
@@ -213,8 +212,8 @@ test(
       });
 
       const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
-    detached: process.platform !== "win32",
-    windowsHide: true,
+        detached: process.platform !== "win32",
+        windowsHide: true,
         cwd: projectRoot,
         env: createRunDevTestEnv({
           label: `root-redirect-${scenario.name}`,
