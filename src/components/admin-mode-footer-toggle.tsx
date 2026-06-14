@@ -13,6 +13,7 @@ type AdminModeUnavailableReason =
   | "no-admin-capability"
   | "missing-admin-mode-token"
   | "missing-admin-session-secret"
+  | "invalid-admin-session-secret"
   | null;
 
 type AdminModeStatus = {
@@ -24,6 +25,7 @@ type AdminModeStatus = {
   publicFallbackPath: string;
   tokenConfigured: boolean;
   sessionSecretConfigured: boolean;
+  sessionSecretValid: boolean;
   unavailableReason: AdminModeUnavailableReason;
   setupHint: string | null;
 };
@@ -37,6 +39,7 @@ const defaultStatus: AdminModeStatus = {
   publicFallbackPath: "/docs/intro",
   tokenConfigured: false,
   sessionSecretConfigured: false,
+  sessionSecretValid: false,
   unavailableReason: null,
   setupHint: null,
 };

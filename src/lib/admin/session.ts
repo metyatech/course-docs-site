@@ -69,7 +69,6 @@ export type AdminSessionPayload = {
 };
 
 export type SignOptions = {
-  ttlSeconds?: number;
   now?: number;
 };
 
@@ -77,7 +76,11 @@ export const getAdminSessionTtlSeconds = () => SESSION_TTL_SECONDS;
 
 export const getAdminSessionSecret = (): string => (process.env.ADMIN_SESSION_SECRET ?? "").trim();
 
-export const isAdminSessionConfigured = (): boolean => getAdminSessionSecret() !== "";
+const MIN_SESSION_SECRET_BYTES = 32;
+export const isAdminSessionSecretValid = (secret = getAdminSessionSecret()): boolean =>
+  enc.encode(secret).byteLength >= MIN_SESSION_SECRET_BYTES;
+
+export const isAdminSessionConfigured = (): boolean => isAdminSessionSecretValid();
 
 export const signAdminSession = async (
   secret: string,
@@ -86,12 +89,15 @@ export const signAdminSession = async (
   if (!secret) {
     throw new Error("Admin session secret is not configured");
   }
-  // `ttlSeconds` and `now` are accepted for test fixtures only. The default
-  // TTL is fixed at SESSION_TTL_SECONDS and is not overridable through
-  // configuration; no other call site should pass these options.
-  const ttl = options.ttlSeconds ?? SESSION_TTL_SECONDS;
+  // The session TTL is fixed at SESSION_TTL_SECONDS (8 hours). There is no
+  // public `ttlSeconds` option. `now` is accepted only for deterministic
+  // test fixtures; no production call site should pass it.
   const now = options.now ?? Math.floor(Date.now() / 1000);
-  const payload: AdminSessionPayload = { v: COOKIE_VERSION, iat: now, exp: now + ttl };
+  const payload: AdminSessionPayload = {
+    v: COOKIE_VERSION,
+    iat: now,
+    exp: now + SESSION_TTL_SECONDS,
+  };
   const payloadJson = JSON.stringify(payload);
   const payloadB64 = toBase64Url(enc.encode(payloadJson));
   const key = await importKey(secret);

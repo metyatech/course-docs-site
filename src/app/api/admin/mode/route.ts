@@ -12,7 +12,11 @@ import {
   getAdminModeToken,
   getAdminSessionSecret,
 } from "../../../../lib/admin-mode";
-import { getAdminSessionTtlSeconds, signAdminSession } from "../../../../lib/admin/session";
+import {
+  getAdminSessionTtlSeconds,
+  isAdminSessionSecretValid,
+  signAdminSession,
+} from "../../../../lib/admin/session";
 import { constantTimeSecretEqual } from "../../../../lib/admin/timing";
 import { isSameOriginMutation } from "../../../../lib/admin/same-origin";
 
@@ -22,6 +26,7 @@ type UnavailableReason =
   | "no-admin-capability"
   | "missing-admin-mode-token"
   | "missing-admin-session-secret"
+  | "invalid-admin-session-secret"
   | null;
 
 type AdminModeStatus = {
@@ -36,6 +41,7 @@ type AdminModeStatus = {
   publicFallbackPath: string;
   tokenConfigured: boolean;
   sessionSecretConfigured: boolean;
+  sessionSecretValid: boolean;
   unavailableReason: UnavailableReason;
   setupHint: string | null;
 };
@@ -47,7 +53,9 @@ const setupHintFor = (reason: UnavailableReason) => {
     case "missing-admin-mode-token":
       return "ADMIN_MODE_TOKEN が未設定です。.env.local に ADMIN_MODE_TOKEN を設定して再起動してください。";
     case "missing-admin-session-secret":
-      return "ADMIN_SESSION_SECRET が未設定です。.env.local に 32 バイト以上のランダム値を設定して再起動してください。";
+      return "ADMIN_SESSION_SECRET が未設定です。.env.local に ADMIN_SESSION_SECRET を設定して再起動してください。";
+    case "invalid-admin-session-secret":
+      return "ADMIN_SESSION_SECRET は UTF-8 で32バイト以上のランダム値にしてください。";
     default:
       return null;
   }
@@ -65,6 +73,7 @@ const buildStatus = (enabled: boolean): AdminModeStatus => {
   const commentModeration = hasAdminCommentModeration();
   const tokenConfigured = getAdminModeToken() !== "";
   const sessionSecretConfigured = getAdminSessionSecret() !== "";
+  const sessionSecretValid = isAdminSessionSecretValid(getAdminSessionSecret());
   const capability = protectedDocs || commentModeration;
 
   const unavailableReason: UnavailableReason = !capability
@@ -73,7 +82,9 @@ const buildStatus = (enabled: boolean): AdminModeStatus => {
       ? "missing-admin-mode-token"
       : !sessionSecretConfigured
         ? "missing-admin-session-secret"
-        : null;
+        : !sessionSecretValid
+          ? "invalid-admin-session-secret"
+          : null;
 
   const configured = unavailableReason === null;
   return {
@@ -85,6 +96,7 @@ const buildStatus = (enabled: boolean): AdminModeStatus => {
     publicFallbackPath: getAdminModePublicFallbackPath(),
     tokenConfigured,
     sessionSecretConfigured,
+    sessionSecretValid,
     unavailableReason,
     setupHint: setupHintFor(unavailableReason),
   };

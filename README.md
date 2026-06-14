@@ -40,12 +40,19 @@ moderation), two server-only environment variables are required to actually unlo
   after a successful `ADMIN_MODE_TOKEN` check and is verified on every protected request.
 
 Both values must be set in production. The two values **must not be the same** — using the same value for both
-would let anyone who learns the user-entered code forge valid session cookies. `ADMIN_SESSION_SECRET` must be at
-least 32 bytes of randomness; generate one with:
+would let anyone who learns the user-entered code forge valid session cookies. `ADMIN_SESSION_SECRET` must be
+at least 32 bytes of UTF-8 randomness; anything shorter disables the configured admin-mode gate (the
+`/api/admin/mode` endpoint reports `invalid-admin-session-secret` and the admin footer shows the setup hint).
+Generate one with:
 
 ```sh
 openssl rand -base64 32
 ```
+
+Only `programming-course-docs` and `open-campus-unreal-90min` actually need these admin secrets — they are the
+two sites that define admin capabilities (comment moderation / protected docs). The other four supported sites
+(`course-common-docs`, `javascript-course-docs`, `web-foundations-docs`, `teacher-profile-docs`) have no admin
+features, so they do not need `ADMIN_MODE_TOKEN` or `ADMIN_SESSION_SECRET`.
 
 The issued session cookie is `HttpOnly`, `SameSite=Lax`, scoped to `/`, and expires after 8 hours. The cookie
 value is `<base64url(payload)>.<base64url(hmacSha256(payload, key))>`; only the HMAC key needs to stay secret.

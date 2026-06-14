@@ -3,6 +3,7 @@ import { siteConfig } from "../../site.config";
 import {
   getAdminSessionCookieName,
   getAdminSessionSecret as getSessionSecret,
+  isAdminSessionSecretValid,
   isAdminSessionValid as isAdminSessionValidImpl,
 } from "./admin/session";
 
@@ -121,12 +122,15 @@ export const hasAnyAdminCapability = (): boolean =>
 
 /**
  * True when the runtime is actually able to enable admin mode: at least one
- * admin capability is declared for the current site, and both the
- * `ADMIN_MODE_TOKEN` (user-supplied) and the `ADMIN_SESSION_SECRET` (HMAC
- * key) are configured on the server.
+ * admin capability is declared for the current site, the `ADMIN_MODE_TOKEN`
+ * (user-supplied code) is configured, and the `ADMIN_SESSION_SECRET` (HMAC
+ * key) is at least 32 bytes of UTF-8 randomness. Anything shorter
+ * disables the configured gate so callers fail closed.
  */
 export const isAdminModeConfigured = (): boolean =>
-  hasAnyAdminCapability() && getAdminModeToken() !== "" && getAdminSessionSecret() !== "";
+  hasAnyAdminCapability() &&
+  getAdminModeToken() !== "" &&
+  isAdminSessionSecretValid(getAdminSessionSecret());
 
 export const isAdminSessionValid = (cookieValue: string | null | undefined) =>
   isAdminSessionValidImpl(cookieValue ?? undefined, getAdminSessionSecret());
