@@ -12,6 +12,7 @@ import {
   createRunDevTestEnv,
   killProcessTreeAndWaitForPort,
 } from "./test-harness-env.mjs";
+import { signAdminSession } from "../src/lib/admin/session.ts";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -371,5 +372,115 @@ test(
     const teacherGuideAfterDisable = await fetchResponse(`${baseUrl}/docs/teacher-guide/`);
     assert.equal(teacherGuideAfterDisable.status, 307);
     assertRedirectToIntro(teacherGuideAfterDisable.location);
+  },
+);
+
+test(
+  "identical admin token and session secret fail closed across HTTP routes",
+  { timeout: 5 * 60_000 },
+  async (t) => {
+    const identicalSecret = "identical-admin-token-and-session-secret-32-bytes";
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-admin-identical-"));
+    const fixtureCourse = path.join(tempRoot, "course");
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+    cleanupWorktreeDevProcesses({ projectRoot });
+
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "admin-mode-identical-secrets",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+          // Intentionally identical: the admin login code and the session
+          // signing secret share one value, which must fail the configured gate.
+          ADMIN_MODE_TOKEN: identicalSecret,
+          ADMIN_SESSION_SECRET: identicalSecret,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTreeAndWaitForPort(dev, port);
+      cleanupWorktreeDevProcesses({ projectRoot });
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+
+    await waitForAdminModeFixtureSynced();
+
+    // GET status API: configured/enabled must be false and the status must
+    // explain why (secrets are not distinct).
+    let statusResult = null;
+    await waitFor(
+      async () => {
+        statusResult = await tryFetchResponse(`${baseUrl}/api/admin/mode/`);
+        return statusResult?.status === 200;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Admin mode status API did not become ready.",
+      },
+    );
+    assert.equal(statusResult.status, 200);
+    const statusBody = JSON.parse(statusResult.text);
+    assert.equal(statusBody.configured, false);
+    assert.equal(statusBody.enabled, false);
+    assert.equal(statusBody.secretsDistinct, false);
+    assert.equal(statusBody.unavailableReason, "admin-token-must-differ-from-session-secret");
+
+    // POST login API: must fail closed with 503 and issue no session cookie.
+    const loginResult = await fetchResponse(`${baseUrl}/api/admin/mode/`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: identicalSecret }),
+    });
+    assert.equal(loginResult.status, 503);
+    assert.equal(loginResult.setCookie, null);
+    const loginBody = JSON.parse(loginResult.text);
+    assert.equal(loginBody.configured, false);
+    assert.equal(loginBody.enabled, false);
+    assert.equal(loginBody.secretsDistinct, false);
+    assert.equal(loginBody.unavailableReason, "admin-token-must-differ-from-session-secret");
+
+    // A manually forged, correctly-signed cookie (same secret) must NOT grant
+    // access, because the configured gate is closed when the secrets match.
+    const forgedCookie = await signAdminSession(identicalSecret);
+    const cookieHeader = `course-docs-admin-fixture-session=${forgedCookie}`;
+
+    let forgedTeacherGuide = null;
+    await waitFor(
+      async () => {
+        forgedTeacherGuide = await tryFetchResponse(`${baseUrl}/docs/teacher-guide/`, {
+          headers: { cookie: cookieHeader },
+        });
+        return forgedTeacherGuide?.status === 307;
+      },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 500,
+        onTimeoutMessage: "Protected route did not fail closed for forged cookie.",
+      },
+    );
+    assert.equal(forgedTeacherGuide.status, 307);
+    assertRedirectToIntro(forgedTeacherGuide.location);
+
+    // The public layout must also respect configured=false: even with the
+    // forged cookie, the admin-only link must not appear on the public page.
+    await waitForRenderedIntroPage(baseUrl, "Public intro page did not become ready.");
+    const forgedIntro = await fetchResponse(`${baseUrl}/docs/intro/`, {
+      headers: { cookie: cookieHeader },
+    });
+    assert.equal(forgedIntro.status, 200);
+    assert.ok(
+      !forgedIntro.text.includes("/docs/teacher-guide"),
+      "Forged cookie must not reveal teacher-guide links on the public page.",
+    );
   },
 );

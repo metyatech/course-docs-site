@@ -128,7 +128,6 @@ export const verifyAdminSession = async (
   if (!isAdminSessionSecretValid(secret)) {
     return { ok: false, reason: "invalid-secret" };
   }
-  if (!secret) return { ok: false, reason: "missing" };
   if (value.length > MAX_COOKIE_LENGTH) return { ok: false, reason: "malformed" };
 
   // Strictly enforce a single '.' separator: no `lastIndexOf` trick that would

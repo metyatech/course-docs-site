@@ -1,7 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createAdminCommentDeleteRoute } from "../src/lib/admin/comment-delete-route.ts";
-import { signAdminSession } from "../src/lib/admin/session.ts";
+import {
+  isAdminSessionValid as isSignedAdminSessionValid,
+  signAdminSession,
+} from "../src/lib/admin/session.ts";
 
 const SIGNING_SECRET = "unit-test-route-signing-secret-please-ignore";
 
@@ -549,62 +552,43 @@ test("processing order: same-origin → session → capability → delete", asyn
 });
 
 test("real session integration: a valid cookie is accepted by the real validator", async () => {
-  const originalSecret = process.env.ADMIN_SESSION_SECRET;
-  const originalToken = process.env.ADMIN_MODE_TOKEN;
-  // The configured gate now requires ADMIN_MODE_TOKEN and ADMIN_SESSION_SECRET
-  // to be distinct 32+ byte values. Set both so isAdminModeConfigured() opens.
-  process.env.ADMIN_SESSION_SECRET = SIGNING_SECRET;
-  process.env.ADMIN_MODE_TOKEN = "unit-test-route-signing-token-please-ignore-32";
-  let response;
-  let deleteCalls;
-  try {
-    const deleteLog = callLog();
-    // signAdminSession uses the current real time by default and the
-    // 8-hour fixed TTL, so the cookie is valid right now.
-    const cookie = await signAdminSession(SIGNING_SECRET);
-    const handler = createAdminCommentDeleteRoute({
-      isSameOriginMutation: () => true,
-      getCookieValue: () => cookie,
-      // Use the real session validator by NOT overriding it.
-      isAdminCommentModerationEnabled: () => true,
-      deleteComment: deleteLog.deleteComment,
-    });
-    const request = buildRequest();
-    response = await handler(request, okContext());
-    deleteCalls = deleteLog.calls.length;
-  } finally {
-    if (originalSecret === undefined) delete process.env.ADMIN_SESSION_SECRET;
-    else process.env.ADMIN_SESSION_SECRET = originalSecret;
-    if (originalToken === undefined) delete process.env.ADMIN_MODE_TOKEN;
-    else process.env.ADMIN_MODE_TOKEN = originalToken;
-  }
+  const deleteLog = callLog();
+  // signAdminSession uses the current real time by default and the
+  // 8-hour fixed TTL, so the cookie is valid right now. We inject the real
+  // low-level signature validator with an explicit secret so this test does
+  // not depend on ADMIN_MODE_TOKEN, the synced manifest site, or
+  // isAdminModeConfigured() — only on the cryptographic session check.
+  const cookie = await signAdminSession(SIGNING_SECRET);
+  const handler = createAdminCommentDeleteRoute({
+    isSameOriginMutation: () => true,
+    getCookieValue: () => cookie,
+    isAdminSessionValid: (value) => isSignedAdminSessionValid(value, SIGNING_SECRET),
+    isAdminCommentModerationEnabled: () => true,
+    deleteComment: deleteLog.deleteComment,
+  });
+  const request = buildRequest();
+  const response = await handler(request, okContext());
   assert.equal(response.status, 200);
-  assert.equal(deleteCalls, 1);
+  assert.equal(deleteLog.calls.length, 1);
   assert.equal(response.headers.get("cache-control"), "no-store");
 });
 
 test("real session integration: an expired cookie is rejected by the real validator", async () => {
-  const originalSecret = process.env.ADMIN_SESSION_SECRET;
-  process.env.ADMIN_SESSION_SECRET = SIGNING_SECRET;
-  let response;
-  let deleteCalls;
-  try {
-    const deleteLog = callLog();
-    const expired = await signShortCookie(1_700_000_000, 60);
-    const handler = createAdminCommentDeleteRoute({
-      isSameOriginMutation: () => true,
-      getCookieValue: () => expired,
-      isAdminCommentModerationEnabled: () => true,
-      deleteComment: deleteLog.deleteComment,
-    });
-    response = await handler(buildRequest(), okContext());
-    deleteCalls = deleteLog.calls.length;
-  } finally {
-    if (originalSecret === undefined) delete process.env.ADMIN_SESSION_SECRET;
-    else process.env.ADMIN_SESSION_SECRET = originalSecret;
-  }
+  const deleteLog = callLog();
+  // The cookie is genuinely signed with SIGNING_SECRET but already expired, so
+  // the injected real validator rejects it because of expiry (not because of a
+  // bad/invalid site configuration).
+  const expired = await signShortCookie(1_700_000_000, 60);
+  const handler = createAdminCommentDeleteRoute({
+    isSameOriginMutation: () => true,
+    getCookieValue: () => expired,
+    isAdminSessionValid: (value) => isSignedAdminSessionValid(value, SIGNING_SECRET),
+    isAdminCommentModerationEnabled: () => true,
+    deleteComment: deleteLog.deleteComment,
+  });
+  const response = await handler(buildRequest(), okContext());
   assert.equal(response.status, 401);
-  assert.equal(deleteCalls, 0);
+  assert.equal(deleteLog.calls.length, 0);
 });
 
 // Avoid unused-import warnings.

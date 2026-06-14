@@ -43,6 +43,10 @@ const defaultGetCookieValue: GetCookieValue = async () => {
 const defaultIsAdminCommentModerationEnabled: IsAdminCommentModerationEnabled = () =>
   getCurrentCourseSite()?.features.adminCommentModeration === true;
 
+export type AdminCommentDeleteAuthorizationOptions = {
+  isAdminModeConfigured?: () => boolean;
+};
+
 /**
  * Testable helper that combines the configured-check and the cookie check.
  * Returns true only when admin mode is fully configured (token + 32-byte
@@ -53,17 +57,13 @@ const defaultIsAdminCommentModerationEnabled: IsAdminCommentModerationEnabled = 
  * config. Production callers (and the route factory default) use the real
  * `isAdminModeConfigured`.
  */
-export const isAdminAuthorizedForCommentDelete: IsAdminSessionValidFn = async (
-  cookieValue,
-  options: { isAdminModeConfigured?: () => boolean } = {},
-) => {
+export const isAdminAuthorizedForCommentDelete = async (
+  cookieValue: string | null | undefined,
+  options: AdminCommentDeleteAuthorizationOptions = {},
+): Promise<boolean> => {
   const configured = options.isAdminModeConfigured ?? isAdminModeConfigured;
-  return configured() && (await isAdminSessionValid(cookieValue ?? undefined));
-};
 
-const defaultIsAdminSessionValid: IsAdminSessionValidFn = async (cookie) => {
-  if (!isAdminModeConfigured()) return false;
-  return isAdminSessionValid(cookie);
+  return configured() && (await isAdminSessionValid(cookieValue ?? undefined));
 };
 
 export const createAdminCommentDeleteRoute = (
@@ -71,7 +71,7 @@ export const createAdminCommentDeleteRoute = (
 ) => {
   const isSameOrigin = options.isSameOriginMutation ?? isSameOriginMutation;
   const getCookieValue = options.getCookieValue ?? defaultGetCookieValue;
-  const isSessionValid = options.isAdminSessionValid ?? defaultIsAdminSessionValid;
+  const isSessionValid = options.isAdminSessionValid ?? isAdminAuthorizedForCommentDelete;
   const isAdminCommentModerationEnabledFn =
     options.isAdminCommentModerationEnabled ?? defaultIsAdminCommentModerationEnabled;
   const deleteCommentFn = options.deleteComment ?? deleteComment;

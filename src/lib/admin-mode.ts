@@ -90,9 +90,11 @@ export const getAdminModePublicFallbackPath = () => {
 };
 
 /**
- * Returns the admin-mode shared token (`ADMIN_MODE_TOKEN`). The user supplies
- * this token in the admin-mode UI; the server compares it against the
- * `ADMIN_SESSION_SECRET` HMAC key using a constant-time digest comparison.
+ * Returns the human-entered admin login code (`ADMIN_MODE_TOKEN`).
+ * The login endpoint compares user input with this value using a
+ * constant-time digest comparison. It is never compared against
+ * `ADMIN_SESSION_SECRET` and is never used as the admin-session HMAC
+ * signing key; `ADMIN_SESSION_SECRET` is reserved for signing cookies.
  */
 export const getAdminModeToken = (): string => (process.env.ADMIN_MODE_TOKEN ?? "").trim();
 

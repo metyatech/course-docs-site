@@ -82,9 +82,10 @@ To allow Site CI to read private content repositories, register a GitHub Actions
 - When the secret is registered, Site CI exposes it to the relevant jobs as `GH_TOKEN`. A per-matrix
   preflight step validates that the secret is present for any site whose manifest entry sets
   `requiresContentReadToken: true`; if the secret is missing, the build fails fast with a clear error.
-- When the secret is NOT registered, the only thing that fails is the Site CI build for the private site.
-  The PR is still mergeable, but the `teacher-profile-docs` build will report failure until the secret
-  is added.
+- When the secret is NOT registered, the `teacher-profile-docs` build fails at the "Validate private
+  content read token" preflight step, so the overall Site CI run reports failure. Do not merge the PR
+  while CI is failing. Register `COURSE_CONTENT_READ_TOKEN`, re-run CI, and confirm all 11 jobs succeed
+  (11/11) before merging.
 
 Add or rotate the secret with:
 
