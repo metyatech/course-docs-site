@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
-import { getRevision, subscribe } from "../../../../../lib/dev-reload-bus";
+import { NextResponse } from 'next/server';
+import { getRevision, subscribe } from '../../../../../lib/dev-reload-bus';
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
   const encoder = new TextEncoder();
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       };
 
       // Speed up reconnection after dev server restart.
-      send("retry: 1000\n");
+      send('retry: 1000\n');
       // Send the current revision immediately on connect so the client can
       // track the baseline and detect any bump that occurred before this
       // connection was established.
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       const keepAlive = setInterval(() => {
         // Comment frame (ignored by clients).
         try {
-          send(":keep-alive\n\n");
+          send(':keep-alive\n\n');
         } catch {
           abort();
         }
@@ -51,15 +51,15 @@ export async function GET(request: Request) {
         abort();
         return;
       }
-      request.signal.addEventListener("abort", abort, { once: true });
+      request.signal.addEventListener('abort', abort, { once: true });
     },
   });
 
   return new NextResponse(stream, {
     headers: {
-      "content-type": "text/event-stream; charset=utf-8",
-      "cache-control": "no-store, max-age=0",
-      connection: "keep-alive",
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-store, max-age=0',
+      connection: 'keep-alive',
     },
   });
 }

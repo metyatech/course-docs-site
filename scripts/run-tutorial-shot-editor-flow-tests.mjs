@@ -28,13 +28,7 @@ const runOne = (testName) =>
     cleanupWorktreeDevProcesses();
     const child = spawn(
       process.execPath,
-      [
-        "--test",
-        "--test-concurrency=1",
-        "--test-name-pattern",
-        `^${escapeRegExp(testName)}$`,
-        testFile,
-      ],
+      ["--test", "--test-concurrency=1", "--test-name-pattern", `^${escapeRegExp(testName)}$`, testFile],
       {
         env: process.env,
         stdio: "inherit",

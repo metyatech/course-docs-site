@@ -77,7 +77,7 @@ const areStoredCropStatesEqual = (left, right) =>
   arePixelCropsEqual(left?.completedCrop ?? null, right?.completedCrop ?? null);
 
 export const getStoredTutorialShotCropState = ({ currentCropStates, shotKey }) =>
-  shotKey ? (currentCropStates[shotKey] ?? null) : null;
+  shotKey ? currentCropStates[shotKey] ?? null : null;
 
 export const updateTutorialShotCropStateMap = ({
   currentCropStates,

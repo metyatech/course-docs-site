@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   readManifestFile,
   validateManifest,
@@ -8,6 +11,22 @@ import {
   representativeE2EMatrix,
   redeployMatrix,
 } from "../scripts/course-sites-manifest.mjs";
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+const runMatrixCli = (kind) => {
+  const result = spawnSync(
+    process.execPath,
+    [path.join(projectRoot, "scripts", "print-course-sites-matrix.mjs"), "--kind", kind],
+    { encoding: "utf8", cwd: projectRoot },
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `matrix CLI failed (kind=${kind}, exit=${result.status}):\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
+    );
+  }
+  return result.stdout;
+};
 
 const baseManifest = () => structuredClone(readManifestFile());
 const siteById = (manifest, id) => manifest.sites.find((s) => s.id === id);
@@ -150,4 +169,55 @@ test("non-https production url is rejected", () => {
   m.sites[0].productionUrl = "not-a-real-url";
   const errors = validateManifest(m);
   assert.ok(errors.some((e) => /schema:/.test(e)));
+});
+
+test("matrix CLI: build output is an object with include.length === 6", () => {
+  const stdout = runMatrixCli("build");
+  const parsed = JSON.parse(stdout);
+  assert.equal(typeof parsed, "object");
+  assert.ok(parsed !== null, "CLI output must be a JSON object");
+  assert.ok(!Array.isArray(parsed), "top-level must not be an array");
+  assert.ok(Array.isArray(parsed.include), "parsed.include must be an array");
+  assert.equal(parsed.include.length, 6);
+});
+
+test("matrix CLI: e2e output is an object with include.length === 3", () => {
+  const stdout = runMatrixCli("e2e");
+  const parsed = JSON.parse(stdout);
+  assert.equal(typeof parsed, "object");
+  assert.ok(parsed !== null, "CLI output must be a JSON object");
+  assert.ok(!Array.isArray(parsed), "top-level must not be an array");
+  assert.ok(Array.isArray(parsed.include), "parsed.include must be an array");
+  assert.equal(parsed.include.length, 3);
+});
+
+test("matrix CLI: redeploy output is an object with include.length === 6", () => {
+  const stdout = runMatrixCli("redeploy");
+  const parsed = JSON.parse(stdout);
+  assert.equal(typeof parsed, "object");
+  assert.ok(parsed !== null, "CLI output must be a JSON object");
+  assert.ok(!Array.isArray(parsed), "top-level must not be an array");
+  assert.ok(Array.isArray(parsed.include), "parsed.include must be an array");
+  assert.equal(parsed.include.length, 6);
+});
+
+test("matrix CLI: stdout is parseable JSON with no stray log lines", () => {
+  for (const kind of ["build", "e2e", "redeploy"]) {
+    const stdout = runMatrixCli(kind);
+    assert.ok(!/\n/.test(stdout), `matrix CLI stdout (${kind}) must not contain newlines`);
+    assert.doesNotThrow(() => JSON.parse(stdout), `matrix CLI stdout (${kind}) must be valid JSON`);
+  }
+});
+
+test("matrix CLI: top-level shape is `{ include: [...] }`, not a bare array", () => {
+  for (const kind of ["build", "e2e", "redeploy"]) {
+    const stdout = runMatrixCli(kind);
+    const parsed = JSON.parse(stdout);
+    assert.ok(!Array.isArray(parsed), `top-level (${kind}) must not be a bare array`);
+    assert.ok("include" in parsed, `top-level (${kind}) must contain an "include" key`);
+    assert.ok(
+      Object.keys(parsed).every((k) => k === "include"),
+      `top-level (${kind}) must only contain "include"`,
+    );
+  }
 });

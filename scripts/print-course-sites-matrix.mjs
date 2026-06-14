@@ -43,4 +43,7 @@ const matrix =
       ? representativeE2EMatrix(manifest)
       : redeployMatrix(manifest);
 
-process.stdout.write(JSON.stringify(matrix));
+// GitHub Actions `strategy.matrix` requires the top-level shape
+// `{ "include": [ ... ] }`. We emit the array wrapped in `include` so
+// workflows can consume the output directly via `fromJson(needs.*.outputs.*)`.
+process.stdout.write(JSON.stringify({ include: matrix }));

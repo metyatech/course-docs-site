@@ -16,6 +16,7 @@ permissions:
 jobs:
   prepare-matrix:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       build: ${{ steps.set-build-matrix.outputs.build }}
       e2e: ${{ steps.set-e2e-matrix.outputs.e2e }}

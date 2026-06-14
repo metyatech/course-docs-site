@@ -127,10 +127,7 @@ import modelUrl from './assets/Item.fbx';
     "000000206674797069736f6d0000020069736f6d69736f32617663316d703431",
     "hex",
   );
-  const tinyFbx = Buffer.from(
-    "; FBX 7.3.0 project file\n; placeholder - replace with actual asset\n",
-    "utf8",
-  );
+  const tinyFbx = Buffer.from("; FBX 7.3.0 project file\n; placeholder - replace with actual asset\n", "utf8");
   await fs.mkdir(path.join(rootDir, "content", "docs", "imports", "assets"), { recursive: true });
   await fs.mkdir(path.join(rootDir, "public", "img"), { recursive: true });
 
@@ -160,6 +157,7 @@ import modelUrl from './assets/Item.fbx';
   );
   await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
+
 
 test(
   "imported download assets resolve through stable-filename URLs",

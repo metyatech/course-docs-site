@@ -206,63 +206,123 @@
   border-color: #64748b !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk1 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk1 {
   color: #e2e8f0 !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk4 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk4 {
   color: #c4b5fd !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk5 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk5 {
   color: #f9a8d4 !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk6 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk6 {
   color: #93c5fd !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk7 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk7 {
   color: #fde68a !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk8 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk8 {
   color: #86efac !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk9 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk9 {
   color: #fbbf24 !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk10 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk10 {
   color: #d4d4d4 !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk11 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk11 {
   color: #b5cea8 !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk13 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk13 {
   color: #94a3b8 !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk14 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk14 {
   color: #f0abfc !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk16 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk16 {
   color: #cbd5e1 !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk20 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk20 {
   color: #fcd34d !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk22 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk22 {
   color: #fda4af !important;
 }
 
-.dark .rensyuBlock [class*="styles-module__codePreviewContainer__"] .monaco-editor .mtk24 {
+.dark
+  .rensyuBlock
+  [class*="styles-module__codePreviewContainer__"]
+  .monaco-editor
+  .mtk24 {
   color: #60a5fa !important;
 }
 

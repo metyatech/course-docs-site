@@ -7,14 +7,24 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createIsolatedNextDistDir } from "../scripts/next-dist-dir.mjs";
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const projectRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 
-const stateFile = path.join(projectRoot, ".course-content", "active-platform-sha.txt");
+const stateFile = path.join(
+  projectRoot,
+  ".course-content",
+  "active-platform-sha.txt",
+);
 
 // Read the real platform SHA from package.json so the test
 // stays correct after any future pin bump.
-const pkg = JSON.parse(readFileSync(path.join(projectRoot, "package.json"), "utf8"));
-const platformSpec = pkg.dependencies?.["@metyatech/course-docs-platform"] ?? "";
+const pkg = JSON.parse(
+  readFileSync(path.join(projectRoot, "package.json"), "utf8"),
+);
+const platformSpec =
+  pkg.dependencies?.["@metyatech/course-docs-platform"] ?? "";
 const realSha = platformSpec.match(/#([0-9a-f]+)$/i)?.[1] ?? "";
 
 const fileExists = async (p) => {
@@ -32,11 +42,15 @@ const safeRm = async (p) => {
 
 const runCheck = (env) =>
   new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["scripts/check-platform-cache.mjs"], {
-      cwd: projectRoot,
-      env: { ...process.env, ...env },
-      stdio: "inherit",
-    });
+    const child = spawn(
+      process.execPath,
+      ["scripts/check-platform-cache.mjs"],
+      {
+        cwd: projectRoot,
+        env: { ...process.env, ...env },
+        stdio: "inherit",
+      },
+    );
     child.on("error", reject);
     child.on("exit", (code) => resolve(code ?? 1));
   });
@@ -73,7 +87,11 @@ test("check-platform-cache clears .next when platform SHA changes", async (t) =>
 
   // Create a fake .next-test directory.
   await fs.mkdir(distDirPath, { recursive: true });
-  await fs.writeFile(path.join(distDirPath, "stale-cache.txt"), "stale", "utf8");
+  await fs.writeFile(
+    path.join(distDirPath, "stale-cache.txt"),
+    "stale",
+    "utf8",
+  );
 
   const exitCode = await runCheck({
     COURSE_DOCS_NEXT_DIST_DIR: distDir,
@@ -98,13 +116,21 @@ test("check-platform-cache keeps .next when platform SHA matches", async (t) => 
   await fs.writeFile(stateFile, realSha, "utf8");
 
   await fs.mkdir(distDirPath, { recursive: true });
-  await fs.writeFile(path.join(distDirPath, "keep-this.txt"), "keep", "utf8");
+  await fs.writeFile(
+    path.join(distDirPath, "keep-this.txt"),
+    "keep",
+    "utf8",
+  );
 
   const exitCode = await runCheck({
     COURSE_DOCS_NEXT_DIST_DIR: distDir,
   });
   assert.equal(exitCode, 0);
-  assert.equal(await fileExists(distDirPath), true, ".next should NOT be cleared when SHA matches");
+  assert.equal(
+    await fileExists(distDirPath),
+    true,
+    ".next should NOT be cleared when SHA matches",
+  );
   assert.equal(
     await fileExists(path.join(distDirPath, "keep-this.txt")),
     true,
@@ -120,7 +146,11 @@ test("check-platform-cache clears .next on first run (no previous SHA) to flush 
   await fs.rm(stateFile, { force: true });
 
   await fs.mkdir(distDirPath, { recursive: true });
-  await fs.writeFile(path.join(distDirPath, "stale-from-old-platform.txt"), "stale", "utf8");
+  await fs.writeFile(
+    path.join(distDirPath, "stale-from-old-platform.txt"),
+    "stale",
+    "utf8",
+  );
 
   const exitCode = await runCheck({
     COURSE_DOCS_NEXT_DIST_DIR: distDir,

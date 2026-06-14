@@ -55,9 +55,7 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
       throw new Error(
-        typeof onTimeoutMessage === "function"
-          ? onTimeoutMessage()
-          : (onTimeoutMessage ?? "Timed out"),
+        typeof onTimeoutMessage === "function" ? onTimeoutMessage() : (onTimeoutMessage ?? "Timed out"),
       );
     }
     const result = await fn();
@@ -70,10 +68,7 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
 
 const tryFetchStatus = async (url, { timeoutMs = 10_000 } = {}) => {
   try {
-    const response = await fetch(url, {
-      redirect: "manual",
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
     return response.status;
   } catch {
     return null;
@@ -1199,14 +1194,7 @@ test(
     await syncContentForDevTest(devEnv);
     await assert.doesNotReject(() =>
       fs.stat(
-        path.join(
-          projectRoot,
-          "content",
-          "docs",
-          "tutorial",
-          "img",
-          `${liveRefreshImageName}.webp`,
-        ),
+        path.join(projectRoot, "content", "docs", "tutorial", "img", `${liveRefreshImageName}.webp`),
       ),
     );
 
@@ -1214,11 +1202,11 @@ test(
       process.execPath,
       [path.join(projectRoot, "scripts", "run-dev.mjs"), "--port", String(port)],
       {
-        detached: process.platform !== "win32",
-        windowsHide: true,
-        cwd: projectRoot,
-        env: devEnv,
-        stdio: "inherit",
+      detached: process.platform !== "win32",
+      windowsHide: true,
+      cwd: projectRoot,
+      env: devEnv,
+      stdio: "inherit",
       },
     );
 
@@ -1257,8 +1245,7 @@ test(
       expectedSourcePath: fixtureCourse,
       expectedShotId: liveRefreshImageName,
       expectedOutputImagePath: liveRefreshOutputImagePath,
-      onTimeoutMessage:
-        "Tutorial shot editor API did not expose the exact live-refresh fixture image.",
+      onTimeoutMessage: "Tutorial shot editor API did not expose the exact live-refresh fixture image.",
     });
 
     let browser;
@@ -1577,12 +1564,15 @@ authoringMode: tutorial
       },
     );
 
-    await waitForTutorialShotsApiReady(baseUrl, {
-      expectedSourcePath: fixtureCourse,
-      expectedShotId: verifyImageName,
-      expectedOutputImagePath: verifyOutputImagePath,
-      onTimeoutMessage: "Tutorial shot editor API did not stay ready for Verify image save.",
-    });
+    await waitForTutorialShotsApiReady(
+      baseUrl,
+      {
+        expectedSourcePath: fixtureCourse,
+        expectedShotId: verifyImageName,
+        expectedOutputImagePath: verifyOutputImagePath,
+        onTimeoutMessage: "Tutorial shot editor API did not stay ready for Verify image save.",
+      },
+    );
 
     await editorPage.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
     await editorPage.getByRole("heading", { name: "チュートリアル画像エディタ" }).waitFor();
@@ -1626,12 +1616,10 @@ authoringMode: tutorial
       async () => {
         try {
           return (
-            (
-              await evaluateExactTutorialImage(previewPage, verifyProbeImageDescriptor, {
-                scanForAnnotationStroke: true,
-              })
-            ).hasAnnotationStrokePixel === true
-          );
+            await evaluateExactTutorialImage(previewPage, verifyProbeImageDescriptor, {
+              scanForAnnotationStroke: true,
+            })
+          ).hasAnnotationStrokePixel === true;
         } catch {
           return false;
         }
@@ -1685,7 +1673,7 @@ test("dev auto reload does not reload the tutorial shot editor itself", async ()
   const autoReloadSourcePath = path.join(projectRoot, "src", "components", "dev-auto-reload.tsx");
   const source = await fs.readFile(autoReloadSourcePath, "utf8");
 
-  assert.match(source, /window\.location\.pathname\.startsWith\(["']\/dev\/["']\)/);
+  assert.match(source, /window\.location\.pathname\.startsWith\('\/dev\/'\)/);
   assert.match(source, /return undefined;/);
 });
 
@@ -2063,11 +2051,14 @@ test(
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
-    const readyResult = await waitForTutorialShotsApiReady(baseUrl, {
-      expectedSourcePath: fixtureCourseEnvPath,
-      expectedShotId: "startup",
-      onTimeoutMessage: "Tutorial shot editor API did not become ready from env file startup.",
-    });
+    const readyResult = await waitForTutorialShotsApiReady(
+      baseUrl,
+      {
+        expectedSourcePath: fixtureCourseEnvPath,
+        expectedShotId: "startup",
+        onTimeoutMessage: "Tutorial shot editor API did not become ready from env file startup.",
+      },
+    );
 
     const { status, data } = readyResult;
 

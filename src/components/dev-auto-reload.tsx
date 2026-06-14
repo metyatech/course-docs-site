@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
+import { useEffect } from 'react';
 
 type RevisionResponse = {
   revision?: unknown;
@@ -8,12 +8,12 @@ type RevisionResponse = {
 
 export default function DevAutoReload() {
   useEffect(() => {
-    if (window.location.pathname.startsWith("/dev/")) {
+    if (window.location.pathname.startsWith('/dev/')) {
       return undefined;
     }
 
     let cancelled = false;
-    let lastRevision = "";
+    let lastRevision = '';
 
     const applyRevision = (revision: string) => {
       if (cancelled || !revision) {
@@ -27,12 +27,12 @@ export default function DevAutoReload() {
     };
 
     let eventSource: EventSource | null = null;
-    if (typeof window.EventSource === "function") {
-      eventSource = new EventSource("/api/dev/revision/stream");
+    if (typeof window.EventSource === 'function') {
+      eventSource = new EventSource('/api/dev/revision/stream');
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data) as RevisionResponse;
-          if (typeof data.revision === "string") {
+          if (typeof data.revision === 'string') {
             applyRevision(data.revision);
           }
         } catch {

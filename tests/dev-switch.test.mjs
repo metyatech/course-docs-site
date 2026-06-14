@@ -172,6 +172,7 @@ ${courseName}
   await fs.writeFile(path.join(rootDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
+
 const safeRm = async (targetPath) => {
   try {
     const st = await fs.lstat(targetPath);
