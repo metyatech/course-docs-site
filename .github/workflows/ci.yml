@@ -99,19 +99,20 @@ jobs:
     env:
       COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
       COURSE_DOCS_NEXT_DIST_DIR: .next-build-${{ matrix.siteId }}
-      GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           # The build-course job runs `npm run sync:content`, which invokes
           # `git ls-remote` and `git clone` against the matrix-defined
-          # `courseSource`. For private repos, only the `GH_TOKEN` (mapped
-          # from COURSE_CONTENT_READ_TOKEN) should be used. Disabling
-          # persist-credentials here prevents the PR-scoped GITHUB_TOKEN
-          # from being written to the local `.git/config` as an
-          # `http.https://github.com/.extraheader`, which would otherwise
-          # be preferred over the per-content GH_TOKEN and cause exit 128.
+          # `courseSource`. For private repos, only the per-content
+          # `GH_TOKEN` (mapped from COURSE_CONTENT_READ_TOKEN) should be
+          # used, and it is delivered to those few steps only — not at
+          # job level. Disabling persist-credentials here prevents the
+          # PR-scoped GITHUB_TOKEN from being written to the local
+          # `.git/config` as an `http.https://github.com/.extraheader`,
+          # which would otherwise be preferred over the per-content
+          # GH_TOKEN and cause exit 128.
           persist-credentials: false
 
       - name: Setup Node
@@ -135,10 +136,33 @@ jobs:
             exit 1
           fi
 
+      # Public/private step split: the `GH_TOKEN` (COURSE_CONTENT_READ_TOKEN)
+      # is delivered only to the `(private content)` variants when
+      # `matrix.requiresContentReadToken` is true. Public matrix entries
+      # must not see the secret, so they have no `env:` block at all and
+      # are skipped via `if: ${{ !matrix.requiresContentReadToken }}`.
+      # This keeps the secret out of `npm ci`, `npm run typecheck`, and
+      # `npm run build:verified` logs for public sites, and limits it to
+      # the steps that actually need it for private sites.
+
       - name: Typecheck
+        if: ${{ !matrix.requiresContentReadToken }}
+        run: npm run typecheck
+
+      - name: Typecheck (private content)
+        if: ${{ matrix.requiresContentReadToken }}
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
         run: npm run typecheck
 
       - name: Build (verified)
+        if: ${{ !matrix.requiresContentReadToken }}
+        run: npm run build:verified
+
+      - name: Build (verified, private content)
+        if: ${{ matrix.requiresContentReadToken }}
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
         run: npm run build:verified
 
   e2e-course:
@@ -153,7 +177,6 @@ jobs:
       COURSE_DOCS_NEXT_DIST_DIR: .next-e2e-${{ matrix.siteId }}
       E2E_PORT: ${{ matrix.e2ePort }}
       PLAYWRIGHT_MAX_FAILURES: "1"
-      GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -187,11 +210,42 @@ jobs:
             exit 1
           fi
 
+      # Public/private step split: the `GH_TOKEN` (COURSE_CONTENT_READ_TOKEN)
+      # is delivered only to the `(private content)` variants when
+      # `matrix.requiresContentReadToken` is true. Public matrix entries
+      # must not see the secret, so they have no `env:` block at all and
+      # are skipped via `if: ${{ !matrix.requiresContentReadToken }}`.
+      # This keeps the secret out of `npm ci`, `npm run typecheck`,
+      # `npm run build:verified`, and `npm run test:course:ci` logs for
+      # public sites, and limits it to the steps that actually need it
+      # for private sites.
+
       - name: Typecheck
+        if: ${{ !matrix.requiresContentReadToken }}
+        run: npm run typecheck
+
+      - name: Typecheck (private content)
+        if: ${{ matrix.requiresContentReadToken }}
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
         run: npm run typecheck
 
       - name: Build (verified)
+        if: ${{ !matrix.requiresContentReadToken }}
+        run: npm run build:verified
+
+      - name: Build (verified, private content)
+        if: ${{ matrix.requiresContentReadToken }}
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
         run: npm run build:verified
 
       - name: Run course E2E (CI)
+        if: ${{ !matrix.requiresContentReadToken }}
+        run: npm run test:course:ci
+
+      - name: Run course E2E (CI, private content)
+        if: ${{ matrix.requiresContentReadToken }}
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
         run: npm run test:course:ci

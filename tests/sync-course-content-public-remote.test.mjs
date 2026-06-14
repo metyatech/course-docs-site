@@ -26,9 +26,13 @@ const runSync = ({ env, cwd }) =>
     child.on("exit", (code) => resolve(code ?? 1));
   });
 
-// Public-path fake git. Mirrors the private-remote fake git but additionally
-// records (in a single line) the presence/absence of the per-command auth
-// context env vars, so the test can assert the public path skipped them.
+// Public-path fake git. Mirrors the private-remote fake git log format
+// so both tests assert the new contract symmetrically. The new design
+// (T1) skips the per-command auth context on the public path: no
+// GIT_CONFIG_COUNT / KEY_0 / VALUE_0 triple, no GIT_TERMINAL_PROMPT,
+// no env scrubbing, and no tmpdir `cwd` override. The fake records
+// the relevant env keys and the spawned process's working directory
+// so the test can prove all of that is true.
 const buildFakeGitSource = () => {
   return `#!/usr/bin/env node
 import fs from "node:fs";
@@ -42,10 +46,13 @@ const append = (line) => {
 };
 
 append("[argv] " + JSON.stringify(args));
-append("[env] GIT_CONFIG_GLOBAL=" + JSON.stringify(process.env.GIT_CONFIG_GLOBAL ?? null));
-append("[env] GIT_CONFIG_NOSYSTEM=" + JSON.stringify(process.env.GIT_CONFIG_NOSYSTEM ?? null));
-append("[env] GIT_CONFIG_SYSTEM=" + JSON.stringify(process.env.GIT_CONFIG_SYSTEM ?? null));
-append("[env] GIT_CONFIG_PARAMETERS=" + JSON.stringify(process.env.GIT_CONFIG_PARAMETERS ?? null));
+append("[env] CWD=" + JSON.stringify(process.cwd()));
+append("[env] GIT_CONFIG_COUNT=" + JSON.stringify(process.env.GIT_CONFIG_COUNT ?? null));
+append("[env] GIT_CONFIG_KEY_0=" + JSON.stringify(process.env.GIT_CONFIG_KEY_0 ?? null));
+append("[env] GIT_CONFIG_VALUE_0=" + JSON.stringify(process.env.GIT_CONFIG_VALUE_0 ?? null));
+append("[env] GIT_TERMINAL_PROMPT=" + JSON.stringify(process.env.GIT_TERMINAL_PROMPT ?? null));
+append("[env] GIT_DIR=" + JSON.stringify(process.env.GIT_DIR ?? null));
+append("[env] GIT_WORK_TREE=" + JSON.stringify(process.env.GIT_WORK_TREE ?? null));
 append("[env] GH_TOKEN=" + JSON.stringify(process.env.GH_TOKEN ?? null));
 
 const writeFixtureCourse = (targetDir) => {
@@ -99,6 +106,25 @@ title: Fake Public Course
   fs.writeFileSync(path.join(targetDir, "public", "img", "favicon.ico"), "", "utf8");
 };
 
+// The fake git writes a CLEAN .git/config (canonical origin URL, no
+// credential) for the clone invocation. The production
+// normalizeOriginUrl runs unconditionally on every clone path (new and
+// reused) and rewrites any credentialed URL to the canonical form.
+// The fake mirrors that post-clone state so the test's downstream
+// "the canonical URL is the persisted origin URL" contract is
+// observable; the real-git regression test in T6 covers the actual
+// transformation. The FAKE_GIT_CANONICAL_URL indirection lets the
+// test run against any owner/repo pair without rebuilding the fake.
+const writeCleanGitConfig = (targetDir, canonicalUrl) => {
+  const config = [
+    '[remote "origin"]',
+    "\\turl = " + canonicalUrl,
+    "\\tfetch = +refs/heads/*:refs/remotes/origin/*",
+    "",
+  ].join("\\n");
+  fs.writeFileSync(path.join(targetDir, ".git", "config"), config, "utf8");
+};
+
 if (args[0] === "ls-remote") {
   const ref = args.at(-1);
   process.stdout.write(\`\${process.env.FAKE_GIT_SHA}\\trefs/heads/\${ref}\\n\`);
@@ -109,6 +135,10 @@ if (args[0] === "clone") {
   const targetDir = args.at(-1);
   fs.mkdirSync(targetDir, { recursive: true });
   fs.mkdirSync(path.join(targetDir, ".git"), { recursive: true });
+  const canonicalUrl = process.env.FAKE_GIT_CANONICAL_URL;
+  if (typeof canonicalUrl === "string" && canonicalUrl.length > 0) {
+    writeCleanGitConfig(targetDir, canonicalUrl);
+  }
   writeFixtureCourse(targetDir);
   process.exit(0);
 }
@@ -142,6 +172,17 @@ const parseEnvLines = (lines) => {
   );
 };
 
+const parseCwdLine = (lines) => {
+  const cwdLine = lines.find((line) => line.startsWith("[env] CWD="));
+  if (!cwdLine) return null;
+  const raw = cwdLine.slice("[env] CWD=".length);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+};
+
 const parseArgvLines = (lines) => {
   const argvLines = lines.filter((line) => line.startsWith("[argv] "));
   return argvLines.map((line) => {
@@ -155,7 +196,7 @@ const parseArgvLines = (lines) => {
 };
 
 test(
-  "public remote sync still works after the auth-isolation changes and skips the per-command auth context",
+  "public remote sync uses the canonical URL and runs the spawned git in the project root with no auth context installed",
   { timeout: 60_000 },
   async (t) => {
     const fakeSiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-site-public-"));
@@ -163,6 +204,7 @@ test(
     const fakeBin = path.join(tempRoot, "bin");
     const logPath = path.join(tempRoot, "git.log");
     const distDir = createIsolatedNextDistDir("sync-course-content-public-remote");
+    const canonicalUrl = "https://github.com/metyatech/some-public-repo.git";
 
     await writeFakeGit({ binDir: fakeBin });
 
@@ -177,12 +219,15 @@ test(
       cwd: fakeSiteRoot,
       env: {
         COURSE_CONTENT_SOURCE: "github:metyatech/some-public-repo#main",
-        // Intentionally NOT setting GH_TOKEN.
+        // Intentionally NOT setting GH_TOKEN. The public path must
+        // proceed without a token, so no auth context is installed
+        // and no env scrubbing happens.
         COURSE_DOCS_GIT_COMMAND: process.execPath,
         COURSE_DOCS_GIT_SCRIPT: path.join(fakeBin, "git.mjs"),
         COURSE_DOCS_NEXT_DIST_DIR: distDir,
         FAKE_GIT_LOG_PATH: logPath,
         FAKE_GIT_SHA: "3333330000000000000000000000000000000000",
+        FAKE_GIT_CANONICAL_URL: canonicalUrl,
         PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
         Path: `${fakeBin}${path.delimiter}${process.env.Path ?? process.env.PATH ?? ""}`,
       },
@@ -191,6 +236,9 @@ test(
 
     const lines = (await fs.readFile(logPath, "utf8")).split(/\r?\n/u);
 
+    // argv contract: the sync script must NOT prepend `-c` flags, and
+    // every argv record must use the canonical URL (no `x-access-token:`
+    // userinfo, no `@github.com` userinfo, no token).
     const argvRecords = parseArgvLines(lines);
     const commands = argvRecords.map((argv) => argv[0]);
     assert.ok(
@@ -208,31 +256,65 @@ test(
 
     const lsRemoteRecords = argvRecords.filter((argv) => argv[0] === "ls-remote");
     assert.equal(lsRemoteRecords.length, 1);
-    assert.deepEqual(lsRemoteRecords[0], [
-      "ls-remote",
-      "https://github.com/metyatech/some-public-repo.git",
-      "main",
-    ]);
+    assert.deepEqual(lsRemoteRecords[0], ["ls-remote", canonicalUrl, "main"]);
 
-    // The fixture was mirrored: content/docs/intro/index.mdx exists and
-    // contains the fake SHA.
-    const introPath = path.join(fakeSiteRoot, "content", "docs", "intro", "index.mdx");
-    const intro = await fs.readFile(introPath, "utf8");
-    assert.match(intro, /3333330000000000000000000000000000000000/);
+    const argvBlob = argvRecords.map((argv) => argv.join(" ")).join("\n");
+    assert.equal(
+      argvBlob.includes("x-access-token:"),
+      false,
+      "argv must not contain the x-access-token: prefix",
+    );
+    assert.equal(
+      argvBlob.includes("@github.com"),
+      false,
+      "argv must not contain a github.com userinfo form",
+    );
 
-    // The public path must NOT install the per-command auth context. The
-    // auth isolation is for the private-repo path; for public repos there
-    // is no Authorization header to inject, so installing one would only
-    // risk a spurious 401 from GitHub. Every env dump in the log (one per
-    // fake-git invocation) must report GIT_CONFIG_PARAMETERS and GH_TOKEN
-    // as null.
+    // Env contract: the public path does not install an Authorization
+    // header, so the spawned git's env must not carry the
+    // GIT_CONFIG_COUNT / KEY_0 / VALUE_0 triple, must not disable
+    // interactive prompts, and must not carry the override env vars
+    // (those are only relevant to the private path). GH_TOKEN is
+    // intentionally absent from the spawned env (this test never sets
+    // it).
     const envMap = parseEnvLines(lines);
-    for (const key of ["GIT_CONFIG_PARAMETERS", "GH_TOKEN"]) {
+    for (const key of [
+      "GIT_CONFIG_COUNT",
+      "GIT_CONFIG_KEY_0",
+      "GIT_CONFIG_VALUE_0",
+      "GIT_TERMINAL_PROMPT",
+      "GIT_DIR",
+      "GIT_WORK_TREE",
+      "GH_TOKEN",
+    ]) {
       assert.equal(
         envMap[key],
         null,
         `${key} must be unset on the public path; got ${JSON.stringify(envMap[key])}`,
       );
     }
+
+    // The spawned process's cwd must be the project root (the sync
+    // script's own `process.cwd()`), not a fresh tmpdir. The sync
+    // script is spawned with `cwd: fakeSiteRoot`, so its own
+    // `process.cwd()` is fakeSiteRoot, and `runGit` falls back to
+    // `process.cwd()` when no explicit cwd is passed on the public
+    // path. We assert equality with the spawn cwd.
+    const recordedCwd = parseCwdLine(lines);
+    assert.ok(
+      typeof recordedCwd === "string" && recordedCwd.length > 0,
+      `fake git must record a CWD line; got ${JSON.stringify(recordedCwd)}`,
+    );
+    assert.equal(
+      path.resolve(recordedCwd),
+      path.resolve(fakeSiteRoot),
+      `spawned cwd must equal the sync script's project root (the spawn cwd); got ${recordedCwd} vs ${fakeSiteRoot}`,
+    );
+
+    // The fixture was mirrored: content/docs/intro/index.mdx exists and
+    // contains the fake SHA.
+    const introPath = path.join(fakeSiteRoot, "content", "docs", "intro", "index.mdx");
+    const intro = await fs.readFile(introPath, "utf8");
+    assert.match(intro, /3333330000000000000000000000000000000000/);
   },
 );

@@ -78,3 +78,36 @@ export const redactGitError = (text, { token } = {}) => {
   next = scrubAuthorizationHeader(next);
   return next;
 };
+
+/**
+ * Redact the `args` array passed to a git invocation so that it is safe to
+ * embed in a user-facing error message (e.g. the command label produced by
+ * `buildCommandFailureError`). Each element is treated as a string and
+ * passed through {@link redactGitError}; elements that match
+ * `https?://<userinfo>@github.com/...` or that begin with the
+ * `https://x-access-token:` prefix are replaced with the canonical
+ * `https://github.com` form (the userinfo is the only thing that is
+ * authoritative — the rest of the URL is left as the canonical form rather
+ * than the credentialed form). All other elements pass through unchanged.
+ *
+ * This helper is intentionally a thin wrapper around {@link redactGitError}
+ * so the per-element redaction rules stay in one place. Callers should NOT
+ * embed the raw `args` array into a user-facing message; always go through
+ * this helper first.
+ *
+ * @param {readonly unknown[]} args The argv elements passed to git.
+ * @returns {string[]} A new array of the same length, with auth material
+ *   replaced. Non-array inputs yield an empty array.
+ */
+export const redactArgsForError = (args) => {
+  if (!Array.isArray(args)) {
+    return [];
+  }
+  return args.map((entry) => {
+    if (entry === null || entry === undefined) {
+      return "";
+    }
+    const value = typeof entry === "string" ? entry : String(entry);
+    return redactGitError(value);
+  });
+};

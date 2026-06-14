@@ -261,8 +261,14 @@ test("CI e2e-course job depends on prepare-matrix and runs test:course:ci under 
 
   assert.match(
     jobText,
-    /      - name: Run course E2E \(CI\)\n        run: npm run test:course:ci/,
-    "e2e-course job MUST run `npm run test:course:ci` as the E2E step.",
+    /      - name: Run course E2E \(CI\)\n        if: \$\{\{ !matrix\.requiresContentReadToken \}\}\n        run: npm run test:course:ci/,
+    "e2e-course job MUST run `npm run test:course:ci` as the public E2E step (no GH_TOKEN).",
+  );
+
+  assert.match(
+    jobText,
+    /      - name: Run course E2E \(CI, private content\)\n        if: \$\{\{ matrix\.requiresContentReadToken \}\}\n        env:\n          GH_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}\n        run: npm run test:course:ci/,
+    "e2e-course job MUST run `npm run test:course:ci` as the private E2E step (with GH_TOKEN).",
   );
   assert.equal(
     /run: npm run verify:ci/.test(jobText),

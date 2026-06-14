@@ -87,6 +87,69 @@ To allow Site CI to read private content repositories, register a GitHub Actions
   while CI is failing. Register `COURSE_CONTENT_READ_TOKEN`, re-run CI, and confirm all 11 jobs succeed
   (11/11) before merging.
 
+#### How is the secret handled?
+
+The PAT is delivered to the spawned Git process by `scripts/sync-course-content.mjs` and is never
+written to a file. The design has three independent isolation layers, applied only when `GH_TOKEN`
+is set (the public path skips all of them):
+
+- The PAT is **not** URL-embedded. `git ls-remote` and `git clone` always receive the canonical
+  `https://github.com/<owner>/<repo>.git` URL.
+- The PAT is delivered to the spawned process as an `http.https://github.com/.extraheader`
+  Authorization header via the `GIT_CONFIG_COUNT` + `GIT_CONFIG_KEY_0` + `GIT_CONFIG_VALUE_0`
+  triple, where `VALUE_0` is `AUTHORIZATION: basic <base64(x-access-token:PAT)>`. The base64 value
+  is computed at spawn time and never written to disk.
+- The spawned Git process runs with `cwd` set to a fresh empty tmpdir under `os.tmpdir()`. With no
+  `.git/` in the cwd, no `includeIf.gitdir:` rule from the workspace's `.git/config` (or any
+  leftover from `actions/checkout`) can match.
+- The inherited parent env is explicitly scrubbed of every Git override
+  (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_*`,
+  `GIT_CONFIG_VALUE_*`, `GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM`, `GIT_CONFIG_NOSYSTEM`) before
+  the isolated triple is installed.
+- After every successful `git clone` (and on existing-clone reuse) the
+  `normalizeOriginUrl` helper defensively rewrites `<cloneDir>/.git/config`
+  `[remote "origin"]` `url =` to the canonical URL, repairing any clone that an older release of
+  this script may have checked out with a credentialed URL.
+- User-visible command labels and exception messages are run through `redactArgsForError` and
+  `redactGitError` in `scripts/sanitize-git-error.mjs`, so a failed Git invocation never echoes a
+  token, an authed URL, an `Authorization: basic <b64>` value, a percent-encoded token, or an
+  `x-access-token:` prefix.
+- The `resolveRemoteHeadSha` error messages use the canonical URL for both
+  `Unable to resolve remote ref` and `Unable to parse remote ref`, never the credentialed URL.
+- On the public path (no `GH_TOKEN`) none of the above isolation is installed: the canonical URL,
+  the inherited env, and the project-root `cwd` are used as-is.
+
+#### How is the secret scoped in CI?
+
+The secret is **never** placed at job level. `.github/workflows/ci.yml` splits the consumer steps
+in `build-course` and `e2e-course` into a public variant (no `env:` block, gated on
+`!matrix.requiresContentReadToken`) and a `(private content)` variant
+(`env: { GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }} }`, gated on
+`matrix.requiresContentReadToken`):
+
+- Split steps in `build-course`: `Typecheck`, `Build (verified)`.
+- Split steps in `e2e-course`: `Typecheck`, `Build (verified)`, `Run course E2E (CI)`.
+
+The public matrix element never sees the secret, and the private matrix element sees the secret
+only on the few steps that actually need it. The `npm ci`, `actions/checkout`, and
+`actions/setup-node` steps never see the secret. Every `actions/checkout@v6` keeps
+`persist-credentials: false`, so the PR-scoped `GITHUB_TOKEN` is never written to the local
+`.git/config` as a competing `http.https://github.com/.extraheader`.
+
+#### Regression tests
+
+Two test files guard this design against regression:
+
+- `tests/sync-course-content-origin-url-normalize.test.mjs` uses the real `git` binary to create a
+  throwaway repo, set `remote.origin.url` to a credentialed URL, run the production
+  `normalizeOriginUrl` helper, and then verify that `git remote get-url origin` returns the
+  canonical URL and that the on-disk `.git/config` no longer contains the credentialed form.
+- `tests/sync-course-content-failure-redaction.test.mjs` uses a fake `git` to fail
+  `ls-remote` and `clone` (exit 128 with stderr carrying the literal token, the percent-encoded
+  form, an authed `https://...@github.com/...` URL, and an `Authorization: basic <b64>` header),
+  then asserts that no token-shaped content appears in the parent process's stdout, stderr, or
+  exception message.
+
 Add or rotate the secret with:
 
 ```sh

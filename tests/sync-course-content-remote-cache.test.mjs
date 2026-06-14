@@ -104,10 +104,26 @@ if (args[0] === "ls-remote") {
   process.exit(0);
 }
 
+// Mirrors the T10 pattern: normalizeOriginUrl runs unconditionally after
+// clone and reads .git/config, so the fake must write a clean one.
+const writeCleanGitConfig = (targetDir, canonicalUrl) => {
+  const config = [
+    '[remote "origin"]',
+    "\turl = " + canonicalUrl,
+    "\tfetch = +refs/heads/*:refs/remotes/origin/*",
+    "",
+  ].join("\\n");
+  fs.writeFileSync(path.join(targetDir, ".git", "config"), config, "utf8");
+};
+
 if (args[0] === "clone") {
   const targetDir = args.at(-1);
   fs.mkdirSync(targetDir, { recursive: true });
   fs.mkdirSync(path.join(targetDir, ".git"), { recursive: true });
+  const canonicalUrl = process.env.FAKE_GIT_CANONICAL_URL;
+  if (typeof canonicalUrl === "string" && canonicalUrl.length > 0) {
+    writeCleanGitConfig(targetDir, canonicalUrl);
+  }
   writeFixtureCourse(targetDir);
   process.exit(0);
 }
@@ -144,6 +160,7 @@ test(
       COURSE_DOCS_GIT_SCRIPT: path.join(fakeBin, "git.mjs"),
       COURSE_DOCS_NEXT_DIST_DIR: distDir,
       FAKE_GIT_LOG_PATH: logPath,
+      FAKE_GIT_CANONICAL_URL: "https://github.com/metyatech/fake-course.git",
       PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
       Path: `${fakeBin}${path.delimiter}${process.env.Path ?? process.env.PATH ?? ""}`,
     };

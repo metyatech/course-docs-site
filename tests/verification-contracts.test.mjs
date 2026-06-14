@@ -133,6 +133,42 @@ const assertCheckoutHasPersistCredentialsFalse = (jobBody, jobName) => {
   );
 };
 
+// Extract the first step block whose `name:` line matches `stepName`. The
+// block is the contiguous text from the matching `      - name: <name>` line
+// through every line that is *strictly more indented* than the step's start
+// (i.e. starts at column 9 or beyond) or is empty. A line at the same or
+// lower indentation (or the end of the body) terminates the block. This
+// mirrors the column-7 heuristic used by `extractCheckoutStep` so a step
+// can be located by its human-readable name (e.g. `Install`,
+// `Typecheck`, `Validate private content read token`).
+const extractStepByName = (jobBody, stepName) => {
+  const lines = jobBody.split("\n");
+  const stepHeader = `      - name: ${stepName}`;
+  let stepStartIndex = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i] === stepHeader || lines[i].startsWith(`${stepHeader}\n`)) {
+      stepStartIndex = i;
+      break;
+    }
+  }
+  assert.notEqual(
+    stepStartIndex,
+    -1,
+    `Expected to find a step named ${JSON.stringify(stepName)} in the job body.`,
+  );
+
+  const blockLines = [lines[stepStartIndex]];
+  for (let j = stepStartIndex + 1; j < lines.length; j += 1) {
+    const line = lines[j];
+    if (line.startsWith("        ") || line === "") {
+      blockLines.push(line);
+    } else {
+      break;
+    }
+  }
+  return blockLines.join("\n");
+};
+
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 test("fast local scripts do not invoke the full E2E matrix", async () => {
@@ -205,7 +241,19 @@ test("CI matrix drives build and e2e jobs per course source from the manifest", 
   assert.match(e2eJobText, /matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\) \}\}/);
   assert.match(e2eJobText, /needs: prepare-matrix/);
   assert.match(e2eJobText, /COURSE_CONTENT_SOURCE: \$\{\{ matrix\.courseSource \}\}/);
-  assert.equal((e2eJobText.match(/run: npm run test:course:ci/g) ?? []).length, 1);
+  // The job exposes a public step and a `(private content)` step that both
+  // invoke `npm run test:course:ci`. The public step has no `env:` block;
+  // the private step carries `GH_TOKEN` for the secret-aware run. T8 will
+  // expand this with full public/private step-split invariants.
+  assert.equal((e2eJobText.match(/run: npm run test:course:ci/g) ?? []).length, 2);
+  assert.match(
+    e2eJobText,
+    /- name: Run course E2E \(CI\)\n        if: \$\{\{ !matrix\.requiresContentReadToken \}\}\n        run: npm run test:course:ci/,
+  );
+  assert.match(
+    e2eJobText,
+    /- name: Run course E2E \(CI, private content\)\n        if: \$\{\{ matrix\.requiresContentReadToken \}\}\n        env:\n          GH_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}\n        run: npm run test:course:ci/,
+  );
   assert.doesNotMatch(e2eJobText, /run: npm run verify:ci/);
   assert.doesNotMatch(e2eJobText, /run: npm run build(?!:)/);
 });
@@ -293,4 +341,147 @@ test("redeploy-content-sites.yml prepare-matrix checkout sets persist-credential
     prepareMatrixBody,
     "redeploy-content-sites.yml:prepare-matrix",
   );
+});
+
+test("ci.yml build-course and e2e-course keep COURSE_CONTENT_READ_TOKEN step-scoped (no job-level GH_TOKEN; public steps have no GH_TOKEN; private steps carry it gated on matrix; npm ci never sees it; preflight is unchanged)", async (t) => {
+  const workflowText = await readFile(ciWorkflowPath, "utf8");
+  const jobLevelSecretLine = /^ {6}GH_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}$/m;
+  const stepGateLine = "if: ${{ matrix.requiresContentReadToken }}";
+  const stepSecretLine = "GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}";
+  const preflightSecretLine = "CONTENT_READ_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}";
+
+  const publicStepsByJob = {
+    "build-course": ["Typecheck", "Build (verified)"],
+    "e2e-course": ["Typecheck", "Build (verified)", "Run course E2E (CI)"],
+  };
+  const privateStepsByJob = {
+    "build-course": ["Typecheck (private content)", "Build (verified, private content)"],
+    "e2e-course": [
+      "Typecheck (private content)",
+      "Build (verified, private content)",
+      "Run course E2E (CI, private content)",
+    ],
+  };
+  const preflightStepName = "Validate private content read token";
+
+  for (const jobName of Object.keys(publicStepsByJob)) {
+    const jobBody = extractJobBody(workflowText, jobName);
+
+    await t.test(`${jobName}: no job-level GH_TOKEN on COURSE_CONTENT_READ_TOKEN`, () => {
+      assert.doesNotMatch(
+        jobBody,
+        jobLevelSecretLine,
+        `${jobName}: job-level env: must not contain GH_TOKEN mapped from COURSE_CONTENT_READ_TOKEN. ` +
+          `The secret is only allowed inside step-level env: blocks (indented 8+ spaces).`,
+      );
+      // Sanity: a step-level form (column 11) is still permitted and the
+      // job body should still contain the secret string somewhere so the
+      // negative assertion above is meaningful.
+      assert.ok(
+        jobBody.includes(stepSecretLine),
+        `${jobName}: expected at least one step-level GH_TOKEN: line (column 11) to exist ` +
+          `so the job-level negative assertion is meaningful.`,
+      );
+    });
+
+    for (const stepName of publicStepsByJob[jobName]) {
+      await t.test(`${jobName}: public step "${stepName}" has no GH_TOKEN`, () => {
+        const stepBlock = extractStepByName(jobBody, stepName);
+        assert.doesNotMatch(
+          stepBlock,
+          /GH_TOKEN:/,
+          `${jobName}:${stepName} is the public variant and must not declare a GH_TOKEN env ` +
+            `entry of any form (column 11 or column 7).`,
+        );
+        // Public steps are gated on !matrix.requiresContentReadToken.
+        assert.match(
+          stepBlock,
+          /if: \$\{\{ !matrix\.requiresContentReadToken \}\}/,
+          `${jobName}:${stepName} is the public variant and must be gated on ` +
+            `!matrix.requiresContentReadToken so private matrix entries skip it.`,
+        );
+      });
+    }
+
+    for (const stepName of privateStepsByJob[jobName]) {
+      await t.test(
+        `${jobName}: private step "${stepName}" carries GH_TOKEN gated on matrix`,
+        () => {
+          const stepBlock = extractStepByName(jobBody, stepName);
+          assert.match(
+            stepBlock,
+            new RegExp(escapeRegExp(stepGateLine)),
+            `${jobName}:${stepName} (private content) must be gated on ` +
+              `matrix.requiresContentReadToken so public matrix entries skip it.`,
+          );
+          assert.match(
+            stepBlock,
+            new RegExp(escapeRegExp(stepSecretLine)),
+            `${jobName}:${stepName} (private content) must declare ` +
+              `GH_TOKEN: \${{ secrets.COURSE_CONTENT_READ_TOKEN }} in its step-level env: block.`,
+          );
+          // The step-level env: must host the secret — not the job-level env:.
+          // A column-7 GH_TOKEN line inside the step block would indicate the
+          // secret leaked to job-level, which is exactly what we forbid.
+          assert.doesNotMatch(
+            stepBlock,
+            jobLevelSecretLine,
+            `${jobName}:${stepName} (private content) must keep GH_TOKEN inside the step-level ` +
+              `env: block (column 11), not at column 7 (job-level).`,
+          );
+        },
+      );
+    }
+
+    await t.test(`${jobName}: Install (npm ci) step has no GH_TOKEN`, () => {
+      const stepBlock = extractStepByName(jobBody, "Install");
+      assert.match(
+        stepBlock,
+        /run: npm ci/,
+        `${jobName}:Install must invoke \`npm ci\` so the no-GH_TOKEN assertion targets the right step.`,
+      );
+      assert.doesNotMatch(
+        stepBlock,
+        /GH_TOKEN:/,
+        `${jobName}:Install (\`npm ci\`) must not expose a GH_TOKEN env entry, otherwise the ` +
+          `secret would be visible to every transitive npm postinstall / lifecycle script.`,
+      );
+    });
+
+    await t.test(`${jobName}: preflight "${preflightStepName}" is unchanged`, () => {
+      const stepBlock = extractStepByName(jobBody, preflightStepName);
+      assert.match(
+        stepBlock,
+        new RegExp(escapeRegExp(stepGateLine)),
+        `${jobName}:${preflightStepName} (preflight) must remain gated on ` +
+          `matrix.requiresContentReadToken.`,
+      );
+      assert.match(
+        stepBlock,
+        new RegExp(escapeRegExp(preflightSecretLine)),
+        `${jobName}:${preflightStepName} (preflight) must still use CONTENT_READ_TOKEN ` +
+          `(not GH_TOKEN) so the secret name does not appear in the validate-only path.`,
+      );
+      assert.doesNotMatch(
+        stepBlock,
+        /GH_TOKEN:/,
+        `${jobName}:${preflightStepName} (preflight) must not introduce GH_TOKEN; the ` +
+          `preflight only validates presence and the per-step GH_TOKEN delivery is owned by the ` +
+          `(private content) Typecheck / Build / E2E steps.`,
+      );
+    });
+  }
+});
+
+test("ci.yml checkout steps in shared, build-course, e2e-course, and prepare-matrix still set persist-credentials: false (sanity after step split)", async () => {
+  // The T3 step-split work did not touch the checkout steps, so the
+  // pre-existing `assertCheckoutHasPersistCredentialsFalse` assertions
+  // should still pass. This test re-asserts them explicitly to localize a
+  // regression if the step split is ever refactored in a way that
+  // accidentally disturbs a checkout.
+  const workflowText = await readFile(ciWorkflowPath, "utf8");
+  for (const jobName of ["shared", "build-course", "e2e-course", "prepare-matrix"]) {
+    const jobBody = extractJobBody(workflowText, jobName);
+    assertCheckoutHasPersistCredentialsFalse(jobBody, `ci.yml:${jobName}`);
+  }
 });
