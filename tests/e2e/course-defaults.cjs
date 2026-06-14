@@ -36,7 +36,7 @@ const COURSE_DEFAULTS = {
       "/docs/ui-components/drawer-menu",
       "/docs/ui-components/dropdown-menu",
       "/docs/ui-components/show-more",
-      "/docs/ui-components/slider_swiper",
+      "/docs/ui-components/slider_swiper"
     ],
     enableSubmissions: false,
   },
