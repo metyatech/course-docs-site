@@ -35,6 +35,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          # This job never pushes to the checkout. Leaving the PR-scoped
+          # GITHUB_TOKEN behind in `.git/config` would be dead weight at
+          # best and could leak into future steps that run git. Match the
+          # CI workflow's checkout posture.
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v6

@@ -23,6 +23,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # Do not persist the PR-scoped GITHUB_TOKEN in this checkout. The
+          # matrix jobs run `npm run sync:content`, which invokes `git
+          # ls-remote` and `git clone` against course content repos. A stale
+          # `http.https://github.com/.extraheader` from this checkout would
+          # override the per-content `GH_TOKEN` (COURSE_CONTENT_READ_TOKEN)
+          # and break private content authentication.
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -53,6 +61,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # See prepare-matrix. The shared job also runs sync-course-content
+          # and must not let a leftover PR-scoped GITHUB_TOKEN interfere
+          # with the per-content token.
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -90,6 +103,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # The build-course job runs `npm run sync:content`, which invokes
+          # `git ls-remote` and `git clone` against the matrix-defined
+          # `courseSource`. For private repos, only the `GH_TOKEN` (mapped
+          # from COURSE_CONTENT_READ_TOKEN) should be used. Disabling
+          # persist-credentials here prevents the PR-scoped GITHUB_TOKEN
+          # from being written to the local `.git/config` as an
+          # `http.https://github.com/.extraheader`, which would otherwise
+          # be preferred over the per-content GH_TOKEN and cause exit 128.
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -134,6 +157,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # See build-course. The e2e-course job also runs sync:content
+          # and must not let a leftover PR-scoped GITHUB_TOKEN interfere
+          # with the per-content token.
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v6

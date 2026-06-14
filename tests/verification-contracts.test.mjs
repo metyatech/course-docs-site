@@ -40,6 +40,99 @@ const extractPrepareMatrixJob = (workflowText) => {
   return nextJobStart === -1 ? afterHeader : afterHeader.slice(0, nextJobStart);
 };
 
+// Generic version of the per-job extractors above. Slices the workflow text
+// from the `  <jobName>:` header up to (but not including) the next
+// top-level `  <something>:` key, and returns the body of that job.
+const extractJobBody = (workflowText, jobName) => {
+  const jobHeader = `  ${jobName}:\n`;
+  const jobStart = workflowText.indexOf(jobHeader);
+  assert.notEqual(jobStart, -1, `Expected workflow to define a ${jobName} job.`);
+
+  const afterHeader = workflowText.slice(jobStart + jobHeader.length);
+  const nextJobStart = afterHeader.search(/\n  [A-Za-z0-9_-]+:\n/);
+  return nextJobStart === -1 ? afterHeader : afterHeader.slice(0, nextJobStart);
+};
+
+// Extract the single `actions/checkout@v6` step block from a job body.
+// Asserts exactly one such block exists. The block is the contiguous text
+// from the first matching step line up to (but not including) the next
+// step (another `      - ` at column 7) or the end of the job body.
+const extractCheckoutStep = (jobBody) => {
+  // Split the job into lines. A step starts at column 7 with `      - `.
+  // The block runs from that line through every line that is *strictly
+  // more indented* than the step's start (i.e. starts at column 9 or
+  // beyond). A line at the same or lower indentation (or the end of the
+  // body) terminates the block.
+  const lines = jobBody.split("\n");
+  let stepStartIndex = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].startsWith("      - ")) {
+      const blockLines = [lines[i]];
+      for (let j = i + 1; j < lines.length; j += 1) {
+        const line = lines[j];
+        if (line.startsWith("        ") || line === "") {
+          blockLines.push(line);
+        } else {
+          break;
+        }
+      }
+      const block = blockLines.join("\n");
+      if (block.includes("actions/checkout@v6")) {
+        if (stepStartIndex !== -1) {
+          assert.fail(
+            `Expected exactly one actions/checkout@v6 step in the job, found more than one.`,
+          );
+        }
+        stepStartIndex = i;
+      }
+    }
+  }
+  assert.notEqual(
+    stepStartIndex,
+    -1,
+    "Expected exactly one actions/checkout@v6 step in the job, found 0.",
+  );
+  // Reconstruct the block from the discovered start.
+  const blockLines = [lines[stepStartIndex]];
+  for (let j = stepStartIndex + 1; j < lines.length; j += 1) {
+    const line = lines[j];
+    if (line.startsWith("        ") || line === "") {
+      blockLines.push(line);
+    } else {
+      break;
+    }
+  }
+  return blockLines.join("\n");
+};
+
+const assertCheckoutHasPersistCredentialsFalse = (jobBody, jobName) => {
+  const stepBlock = extractCheckoutStep(jobBody);
+  assert.match(
+    stepBlock,
+    /actions\/checkout@v6/,
+    `${jobName}: actions/checkout@v6 step must be present.`,
+  );
+  assert.match(
+    stepBlock,
+    /persist-credentials: false/,
+    `${jobName}: actions/checkout@v6 must set persist-credentials: false so the PR-scoped GITHUB_TOKEN does not leak into sync:content.`,
+  );
+  // `with:` must be declared *before* `persist-credentials:` on the same
+  // step, otherwise the value is detached from its block.
+  const withIndex = stepBlock.indexOf("with:");
+  const persistIndex = stepBlock.indexOf("persist-credentials: false");
+  assert.notEqual(withIndex, -1, `${jobName}: actions/checkout@v6 must declare a 'with:' block.`);
+  assert.notEqual(
+    persistIndex,
+    -1,
+    `${jobName}: actions/checkout@v6 must declare 'persist-credentials: false' inside 'with:'.`,
+  );
+  assert.ok(
+    withIndex < persistIndex,
+    `${jobName}: 'with:' must be declared before 'persist-credentials: false' on the checkout step.`,
+  );
+};
+
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 test("fast local scripts do not invoke the full E2E matrix", async () => {
@@ -177,4 +270,27 @@ test("matrix course failures remove suite config and run cleanup around the cour
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
+});
+
+test("ci.yml checkouts in shared, build-course, e2e-course, and prepare-matrix set persist-credentials: false", async () => {
+  const workflowText = await readFile(ciWorkflowPath, "utf8");
+  for (const jobName of ["shared", "build-course", "e2e-course", "prepare-matrix"]) {
+    const jobBody = extractJobBody(workflowText, jobName);
+    assertCheckoutHasPersistCredentialsFalse(jobBody, `ci.yml:${jobName}`);
+  }
+});
+
+test("redeploy-content-sites.yml prepare-matrix checkout sets persist-credentials: false", async () => {
+  const redeployWorkflowPath = path.join(
+    projectRoot,
+    ".github",
+    "workflows",
+    "redeploy-content-sites.yml",
+  );
+  const workflowText = await readFile(redeployWorkflowPath, "utf8");
+  const prepareMatrixBody = extractJobBody(workflowText, "prepare-matrix");
+  assertCheckoutHasPersistCredentialsFalse(
+    prepareMatrixBody,
+    "redeploy-content-sites.yml:prepare-matrix",
+  );
 });
