@@ -53,48 +53,61 @@ const gitCommandPrefix = process.env.COURSE_DOCS_GIT_SCRIPT
   ? [process.env.COURSE_DOCS_GIT_SCRIPT]
   : [];
 
-// The script only ever talks to github.com. Match that single host precisely
-// so the per-command Authorization header we inject is the only one git will
-// send. A broader pattern would risk eating config set by a different system.
-const GITHUB_HTTP_URL_KEY = "http.https://github.com/.extraheader";
-
+// The script only ever talks to github.com. We embed the auth in the URL
+// (e.g. `https://x-access-token:<token>@github.com/owner/repo.git`); git's
+// own URL parser strips the userinfo from any error message it emits, so the
+// token never leaks to the terminal even before redaction runs. This
+// matches the on-the-wire behavior the embedded URL has always had: git
+// base64-encodes the userinfo and sends it as `Authorization: basic <b64>`.
 const isWindows = process.platform === "win32";
 
 // Build a short-lived, isolated git config + auth context. The returned
 // `authEnv` is meant to be spread into `spawnSync` so that the spawned git
-// process sees:
-//   - an empty GIT_CONFIG_GLOBAL pointing at a fresh, empty file we just
-//     created in the OS temp dir (so no `~/.gitconfig` is consulted);
-//   - GIT_CONFIG_SYSTEM pointed at NUL (Linux) or the NUL device on Windows,
-//     plus GIT_CONFIG_NOSYSTEM=1 as belt-and-suspenders, so the system
-//     gitconfig is bypassed;
-//   - GIT_CONFIG_PARAMETERS carrying the per-command Authorization header
-//     (which takes precedence over any inherited config but is invisible to
-//     argv, so existing fake-git tests that branch on `args[0]` keep working).
+// process is immune to:
+//   1. The workspace's local `.git/config` (which `actions/checkout@v6`
+//      writes an `includeIf.gitdir:...` into, pointing at a temp file
+//      containing the run-scoped `GITHUB_TOKEN` `extraheader`). We bypass
+//      it by setting `GIT_DIR` to a fresh, empty directory under
+//      `os.tmpdir()`. With no `.git/config` to read, the `includeIf:`
+//      never fires.
+//   2. The user's `~/.gitconfig`. We bypass it by pointing
+//      `GIT_CONFIG_GLOBAL` at a fresh, empty file we just created in the
+//      OS temp dir.
+//   3. The system gitconfig. We bypass it by setting
+//      `GIT_CONFIG_NOSYSTEM=1` and `GIT_CONFIG_SYSTEM` to the NUL device
+//      (`NUL` on Windows, `/dev/null` on Linux) as belt-and-suspenders.
 //
-// All files we create live under `os.tmpdir()` and are removed in
-// `disposeIsolatedGitAuthContext`; we never touch the workspace's
-// `.git/config`, the user's `~/.gitconfig`, or any other persistent state.
-const createIsolatedGitAuthContext = (token) => {
+// The auth is URL-embedded (not delivered via `extraheader`) for two
+// reasons:
+//   - `GIT_CONFIG_PARAMETERS` is rejected by git 2.54.0 with
+//     `error: bogus format in GIT_CONFIG_PARAMETERS` on the CI runner.
+//   - The URL form is git's native, version-stable way to deliver basic
+//     auth to a single HTTP operation, and git's URL parser already strips
+//     the userinfo from error messages, so the token does not reach stderr
+//     even without redaction. `redactGitError` is preserved as
+//     defense-in-depth in case a future git version regresses on the
+//     userinfo-stripping behavior.
+//
+// No persistent state is mutated: both temp dirs we create live under
+// `os.tmpdir()` and are removed in `disposeIsolatedGitAuthContext`. We
+// never write to the workspace's `.git/config`, the user's `~/.gitconfig`,
+// the system gitconfig, or any file outside `os.tmpdir()`.
+const createIsolatedGitAuthContext = (_token) => {
+  // The "config dir" holds the empty GIT_CONFIG_GLOBAL file. We use
+  // mkdtempSync so the directory is created atomically with a unique
+  // suffix and we own its lifecycle.
   const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "course-docs-git-"));
   const globalConfigPath = path.join(configDir, "gitconfig");
   // Touch the file as an empty config so GIT_CONFIG_GLOBAL can be resolved.
   fs.writeFileSync(globalConfigPath, "");
-  // Build the per-command Authorization header. The `extraheader` value is
-  // sent verbatim as an HTTP request header; for the x-access-token PAT
-  // variant that the embedded URL would otherwise produce, git base64-encodes
-  // `x-access-token:<token>` and sends `Authorization: basic <b64>`. We
-  // build the same value here so the on-wire behavior is identical to the
-  // old embedded-URL path.
-  const basicAuthValue = Buffer.from(`x-access-token:${token}`).toString("base64");
-  const parameters = [
-    // Clear any inherited extraheader that an earlier checkout (e.g.
-    // `actions/checkout` or a stale local config) might have written.
-    `${GITHUB_HTTP_URL_KEY}=`,
-    // Then set the per-command Authorization header.
-    `${GITHUB_HTTP_URL_KEY}=AUTHORIZATION: basic ${basicAuthValue}`,
-  ];
+  // The "empty git dir" is used as the value of GIT_DIR. It must exist on
+  // disk at the time of the spawn so git can chdir into it (git stats
+  // GIT_DIR before doing anything else). An empty directory is fine: it
+  // is a valid (empty) git repo, so the includeIf.gitdir rules in the
+  // workspace's `.git/config` are never matched.
+  const emptyGitDir = fs.mkdtempSync(path.join(os.tmpdir(), "course-docs-empty-gitdir-"));
   const authEnv = {
+    GIT_DIR: emptyGitDir,
     GIT_CONFIG_GLOBAL: globalConfigPath,
     // On Windows, `GIT_CONFIG_NOSYSTEM=1` is honored by Git for Windows, and
     // `GIT_CONFIG_SYSTEM=NUL` is the device path that makes any residual
@@ -102,17 +115,18 @@ const createIsolatedGitAuthContext = (token) => {
     // and works for every supported runner.
     GIT_CONFIG_SYSTEM: isWindows ? "NUL" : "/dev/null",
     GIT_CONFIG_NOSYSTEM: "1",
-    GIT_CONFIG_PARAMETERS: parameters.join("\n"),
   };
-  return { configDir, globalConfigPath, authEnv };
+  return { configDir, emptyGitDir, globalConfigPath, authEnv };
 };
 
-const disposeIsolatedGitAuthContext = (configDir) => {
-  if (!configDir) return;
-  try {
-    fs.rmSync(configDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-  } catch {
-    // best-effort cleanup; never let cleanup mask the original error
+const disposeIsolatedGitAuthContext = ({ configDir, emptyGitDir } = {}) => {
+  for (const target of [configDir, emptyGitDir]) {
+    if (!target) continue;
+    try {
+      fs.rmSync(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+      // best-effort cleanup; never let cleanup mask the original error
+    }
   }
 };
 
@@ -378,14 +392,14 @@ if (courseSource.kind === "local") {
 } else {
   fs.mkdirSync(workRoot, { recursive: true });
   const ghToken = process.env.GH_TOKEN?.trim();
-  // Use the canonical, non-authed URL regardless of whether GH_TOKEN is set;
-  // when it is set, the per-command `http.https://github.com/.extraheader`
-  // we install in `createIsolatedGitAuthContext` carries the Authorization
-  // header instead of the URL. This decouples auth from the URL string, so
-  // even an `actions/checkout` leftover `http.*.extraheader` cannot collide
-  // with the value we set, and a leaked error message has no embedded
-  // userinfo to redact.
-  const repoUrl = `https://github.com/${courseSource.repo}.git`;
+  // When GH_TOKEN is set, embed it in the URL so git sends the run-scoped
+  // PAT as `Authorization: basic <b64>`. Git's URL parser strips the
+  // userinfo from any error message it emits, so the token does not leak
+  // to stderr even before redaction runs. For the public-repo path (no
+  // GH_TOKEN), use the canonical non-authed URL.
+  const repoUrl = ghToken
+    ? `https://x-access-token:${ghToken}@github.com/${courseSource.repo}.git`
+    : `https://github.com/${courseSource.repo}.git`;
   const authContext = ghToken ? createIsolatedGitAuthContext(ghToken) : null;
   const authEnv = authContext?.authEnv;
   try {
@@ -400,7 +414,7 @@ if (courseSource.kind === "local") {
     }
   } finally {
     if (authContext) {
-      disposeIsolatedGitAuthContext(authContext.configDir);
+      disposeIsolatedGitAuthContext(authContext);
     }
   }
 }

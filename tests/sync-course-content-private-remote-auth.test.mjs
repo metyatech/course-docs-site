@@ -84,14 +84,19 @@ const append = (line) => {
 };
 
   append("[argv] " + JSON.stringify(args));
+  append("[env] GIT_DIR=" + JSON.stringify(process.env.GIT_DIR ?? null));
   append("[env] GIT_CONFIG_GLOBAL=" + JSON.stringify(process.env.GIT_CONFIG_GLOBAL ?? null));
   append("[env] GIT_CONFIG_NOSYSTEM=" + JSON.stringify(process.env.GIT_CONFIG_NOSYSTEM ?? null));
   append("[env] GIT_CONFIG_SYSTEM=" + JSON.stringify(process.env.GIT_CONFIG_SYSTEM ?? null));
+  // GIT_CONFIG_PARAMETERS is logged too so a regression that re-introduces
+  // it (e.g. on a future git version that accepts the newline-separated
+  // form again) is observable in the log. The test does not assert on it.
   append("[env] GIT_CONFIG_PARAMETERS=" + JSON.stringify(process.env.GIT_CONFIG_PARAMETERS ?? null));
-  // Intentionally do NOT log GH_TOKEN: the test asserts the raw token never
-  // appears anywhere in the log. GH_TOKEN's effect is observable through
-  // GIT_CONFIG_PARAMETERS (the per-command Authorization: basic header),
-  // which is enough to prove the auth context was installed.
+  // Intentionally do NOT log GH_TOKEN directly. The token is intentionally
+  // embedded in the URL the sync script passes to git, so the argv log line
+  // will contain the token. The test asserts the token appears only in URL
+  // fields and nowhere else (no env vars, no error messages, no other URLs,
+  // no basic-auth header values).
   if (process.env.GIT_CONFIG_GLOBAL) {
     let exists = "no";
     try {
@@ -101,6 +106,16 @@ const append = (line) => {
       exists = "no";
     }
     append("[env] GIT_CONFIG_GLOBAL_EXISTS_AT_INVOCATION=" + exists);
+  }
+  if (process.env.GIT_DIR) {
+    let exists = "no";
+    try {
+      fs.statSync(process.env.GIT_DIR);
+      exists = "yes";
+    } catch {
+      exists = "no";
+    }
+    append("[env] GIT_DIR_EXISTS_AT_INVOCATION=" + exists);
   }
   if (process.env.DUMP_GIT_CONFIG_GLOBAL_FILE === "1" && process.env.GIT_CONFIG_GLOBAL) {
     try {
@@ -194,7 +209,7 @@ const readLog = async (logPath) => {
 };
 
 test(
-  "private remote sync installs per-command git config isolation and never embeds the token in the URL",
+  "private remote sync installs per-command git config isolation and embeds the token only in URL fields",
   { timeout: 60_000 },
   async (t) => {
     const fakeSiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-site-private-"));
@@ -249,16 +264,29 @@ test(
       `sync script must not prepend -c flags to argv (saw '-c'): ${commands.join(", ")}`,
     );
 
-    // ls-remote URL is the canonical non-authed form.
+    // ls-remote URL is the authed form (the sync script URL-encodes the
+    // token into the URL since `GIT_CONFIG_PARAMETERS` is rejected by
+    // git 2.54+).
     const lsRemoteRecords = argvRecords.filter((argv) => argv[0] === "ls-remote");
     assert.equal(lsRemoteRecords.length, 1);
     const lsRemoteArgv = lsRemoteRecords[0];
     assert.deepEqual(lsRemoteArgv, [
       "ls-remote",
-      "https://github.com/metyatech/teacher-profile-docs.git",
+      `https://x-access-token:${fixtureToken}@github.com/metyatech/teacher-profile-docs.git`,
       "main",
     ]);
-    assert.ok(!lsRemoteArgv.some((arg) => String(arg).includes(fixtureToken)));
+    // The clone URL is also authed.
+    const cloneRecords = argvRecords.filter((argv) => argv[0] === "clone");
+    assert.equal(cloneRecords.length, 1);
+    const cloneArgv = cloneRecords[0];
+    assert.ok(
+      cloneArgv.some((arg) =>
+        String(arg).includes(
+          `x-access-token:${fixtureToken}@github.com/metyatech/teacher-profile-docs.git`,
+        ),
+      ),
+      `clone argv must include the authed URL; got: ${cloneArgv.join(" ")}`,
+    );
 
     // Auth context was installed and is visible to the spawned git.
     const envMap = parseEnvLines(lines);
@@ -273,28 +301,44 @@ test(
       "yes",
       "GIT_CONFIG_GLOBAL must point at a real file on disk at the time of invocation",
     );
-
+    assert.ok(envMap.GIT_DIR, "GIT_DIR must be set when GH_TOKEN is present");
     assert.ok(
-      envMap.GIT_CONFIG_PARAMETERS,
-      "GIT_CONFIG_PARAMETERS must be set when GH_TOKEN is present",
+      path.isAbsolute(envMap.GIT_DIR),
+      `GIT_DIR must be an absolute path; got ${envMap.GIT_DIR}`,
     );
-    assert.match(
-      envMap.GIT_CONFIG_PARAMETERS,
-      /http\.https:\/\/github\.com\/\.extraheader=/,
-      "GIT_CONFIG_PARAMETERS must include the github.com extraheader key",
+    assert.notEqual(
+      path.resolve(envMap.GIT_DIR),
+      path.resolve(path.join(fakeSiteRoot, ".git")),
+      "GIT_DIR must NOT point at the workspace's .git directory",
     );
-    assert.match(
-      envMap.GIT_CONFIG_PARAMETERS,
-      /AUTHORIZATION: basic/,
-      "GIT_CONFIG_PARAMETERS must include the Authorization: basic header value",
+    assert.equal(
+      envMap.GIT_DIR_EXISTS_AT_INVOCATION,
+      "yes",
+      "GIT_DIR must point at a real directory on disk at the time of invocation",
     );
 
-    // The token itself must never reach the log.
+    // The token is now embedded in the URL (intentionally), so it WILL
+    // appear in the logged argv. What matters is that the token does NOT
+    // appear anywhere ELSE in the log: no env vars, no error messages, no
+    // other URLs, no basic-auth header values. We assert the token appears
+    // exactly twice (one URL field each for ls-remote and clone) and that
+    // the total token count equals the URL count.
     const logBlob = lines.join("\n");
-    assert.doesNotMatch(
-      logBlob,
-      new RegExp(fixtureToken),
-      "the fixture token must not appear anywhere in the fake-git log",
+    const escapedToken = fixtureToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const tokenOccurrences = (logBlob.match(new RegExp(escapedToken, "g")) ?? []).length;
+    const urlPattern = `x-access-token:${fixtureToken}@github.com`;
+    const urlOccurrences = (
+      logBlob.match(new RegExp(urlPattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []
+    ).length;
+    assert.equal(
+      urlOccurrences,
+      2,
+      `token should appear exactly twice (ls-remote URL + clone URL), got ${urlOccurrences}`,
+    );
+    assert.equal(
+      tokenOccurrences,
+      urlOccurrences,
+      `token must not leak outside the expected URL fields (saw ${tokenOccurrences} total occurrences, ${urlOccurrences} in URLs)`,
     );
 
     // The fixture was mirrored.
@@ -375,8 +419,8 @@ test(
     );
 
     // The file the sync script installed must be empty (no inherited
-    // extraheader from a stale ~/.gitconfig) so the GIT_CONFIG_PARAMETERS
-    // value wins unambiguously.
+    // extraheader from a stale ~/.gitconfig) so the URL-embedded token
+    // wins unambiguously.
     const begin = lines.indexOf("[file] GIT_CONFIG_GLOBAL_CONTENTS_BEGIN");
     const end = lines.indexOf("[file] GIT_CONFIG_GLOBAL_CONTENTS_END");
     assert.ok(
@@ -387,12 +431,39 @@ test(
     assert.equal(
       contents.trim(),
       "",
-      "GIT_CONFIG_GLOBAL file must be empty so GIT_CONFIG_PARAMETERS wins",
+      "GIT_CONFIG_GLOBAL file must be empty so the URL-embedded token is the only auth signal",
     );
 
-    // The token must still not leak anywhere in the log.
+    // GIT_DIR is set to a fresh, empty directory so the workspace's local
+    // .git/config (and any includeIf: leftovers from actions/checkout) are
+    // never consulted.
+    assert.ok(envMap.GIT_DIR, "GIT_DIR must be set");
+    assert.notEqual(
+      path.resolve(envMap.GIT_DIR),
+      path.resolve(path.join(fakeSiteRoot, ".git")),
+      "GIT_DIR must NOT point at the workspace's .git directory",
+    );
+
+    // The token must appear in the log only in the URL fields (ls-remote
+    // and clone), and the seeded `~/.gitconfig` content (BADBASIC) must
+    // never appear in the log because the sync script bypasses it.
     const logBlob = lines.join("\n");
-    assert.doesNotMatch(logBlob, new RegExp(fixtureToken));
+    const escapedToken = fixtureToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const tokenOccurrences = (logBlob.match(new RegExp(escapedToken, "g")) ?? []).length;
+    const urlPattern = `x-access-token:${fixtureToken}@github.com`;
+    const urlOccurrences = (
+      logBlob.match(new RegExp(urlPattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []
+    ).length;
+    assert.equal(
+      urlOccurrences,
+      2,
+      `token should appear exactly twice (ls-remote URL + clone URL), got ${urlOccurrences}`,
+    );
+    assert.equal(
+      tokenOccurrences,
+      urlOccurrences,
+      `token must not leak outside the expected URL fields (saw ${tokenOccurrences} total occurrences, ${urlOccurrences} in URLs)`,
+    );
     assert.doesNotMatch(logBlob, /BADBASIC/);
   },
 );
