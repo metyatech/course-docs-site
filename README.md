@@ -102,14 +102,45 @@ is set (the public path skips all of them):
 - The spawned Git process runs with `cwd` set to a fresh empty tmpdir under `os.tmpdir()`. With no
   `.git/` in the cwd, no `includeIf.gitdir:` rule from the workspace's `.git/config` (or any
   leftover from `actions/checkout`) can match.
+- **Triple-isolation of Git config sources** (added in the private-git-config-isolation pass): the
+  `GIT_CONFIG_GLOBAL` env var is REPLACED with an EMPTY tmpfile under `os.tmpdir()` (so Git's
+  global config is a file we control, not the user's `~/.gitconfig`); `GIT_CONFIG_NOSYSTEM=1` is
+  set so Git does not read `/etc/gitconfig`; and `GIT_CONFIG_SYSTEM` is pointed at the
+  OS-specific null device (`NUL` on Windows, `/dev/null` elsewhere) so any code path that
+  ignores `GIT_CONFIG_NOSYSTEM` still reads an empty file. The tmpfile and tmpdir are both
+  removed in `disposeIsolatedGitAuthContext` after the spawn returns.
 - The inherited parent env is explicitly scrubbed of every Git override
-  (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_*`,
-  `GIT_CONFIG_VALUE_*`, `GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM`, `GIT_CONFIG_NOSYSTEM`) before
-  the isolated triple is installed.
-- After every successful `git clone` (and on existing-clone reuse) the
-  `normalizeOriginUrl` helper defensively rewrites `<cloneDir>/.git/config`
-  `[remote "origin"]` `url =` to the canonical URL, repairing any clone that an older release of
-  this script may have checked out with a credentialed URL.
+  (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_COUNT`, the multi-value
+  `GIT_CONFIG_KEY_<n>` / `GIT_CONFIG_VALUE_<n>` family matched by pattern) before the isolated
+  triple is installed. (`GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM`, and `GIT_CONFIG_NOSYSTEM` are
+  installed by the auth context, not scrubbed.)
+- The real-git regression test `tests/git-auth-context.test.mjs` verifies the triple-isolation
+  by spawning `git config --get-all http.https://github.com/.extraheader` with the isolated env
+  and asserting that exactly one Authorization header survives, with no `BADBASIC` contribution
+  from a seeded `~/.gitconfig` or `XDG_CONFIG_HOME/git/config`. The test is skipped when the
+  `git` binary is not on PATH.
+- After every successful `git clone` (and on existing-clone reuse) the `normalizeOriginUrl`
+  helper in `scripts/git-origin-normalize.mjs` defensively rewrites `<cloneDir>/.git/config` so
+  that EVERY `[remote "origin"]` section's `url =` line is removed and the canonical
+  `https://github.com/<owner>/<repo>.git` URL is written as exactly one `url =` line in the
+  first origin section (or appended as a new section if none exists). `fetch =` lines, other
+  remote sections (e.g. `[remote "backup"]`), and unrelated config keys are preserved. After
+  the rewrite, the helper re-reads the file and asserts a postcondition (exactly one canonical
+  `url =` line under any origin section, zero `x-access-token:` anywhere, zero `@github.com`
+  userinfo in any origin URL value) so a failed repair throws an error that mentions only the
+  canonical URL — never the original (potentially credentialed) value. The real-git regression
+  test `tests/git-origin-normalize.test.mjs` covers the multi-`url =`-in-one-section,
+  credentialed-first-then-canonical, two-origin-sections, fetch-only, no-section, and
+  backup-section-preserved cases.
+- `git ls-remote` stdout is parsed by `parseLsRemoteObjectId` in `scripts/git-remote-ref.mjs`,
+  which enforces a strict SHA-1 (40 hex) or SHA-256 (64 hex) object-id grammar on the first
+  non-blank line. Empty stdout throws `Unable to resolve remote ref ... from <canonical>`;
+  malformed stdout (a first non-blank line that does not match `<hex>{40,64}\s+<ref>`) throws
+  `Unable to parse remote ref ... from <canonical>` BEFORE the script attempts `git clone`.
+  Both error messages use the canonical URL and never embed the malformed line. The unit test
+  `tests/git-remote-ref.test.mjs` covers empty / blank-only / null input, valid 40-hex and
+  64-hex lines, mixed-case hex, short / long / off-by-one hex, non-hex characters, and
+  missing whitespace separators.
 - User-visible command labels and exception messages are run through `redactArgsForError` and
   `redactGitError` in `scripts/sanitize-git-error.mjs`, so a failed Git invocation never echoes a
   token, an authed URL, an `Authorization: basic <b64>` value, a percent-encoded token, or an
@@ -138,17 +169,45 @@ only on the few steps that actually need it. The `npm ci`, `actions/checkout`, a
 
 #### Regression tests
 
-Two test files guard this design against regression:
+Five test files guard this design against regression:
 
 - `tests/sync-course-content-origin-url-normalize.test.mjs` uses the real `git` binary to create a
   throwaway repo, set `remote.origin.url` to a credentialed URL, run the production
   `normalizeOriginUrl` helper, and then verify that `git remote get-url origin` returns the
-  canonical URL and that the on-disk `.git/config` no longer contains the credentialed form.
+  canonical URL and that the on-disk `.git/config` no longer contains the credentialed form. (The
+  new import path for `normalizeOriginUrl` is `../scripts/git-origin-normalize.mjs`; the
+  re-export from `scripts/sync-course-content.mjs` remains for backward compatibility but the
+  helper itself has moved to its own file.)
 - `tests/sync-course-content-failure-redaction.test.mjs` uses a fake `git` to fail
   `ls-remote` and `clone` (exit 128 with stderr carrying the literal token, the percent-encoded
   form, an authed `https://...@github.com/...` URL, and an `Authorization: basic <b64>` header),
   then asserts that no token-shaped content appears in the parent process's stdout, stderr, or
-  exception message.
+  exception message. The malformed-`ls-remote` scenario also asserts that the strict
+  `parseLsRemoteObjectId` parser rejects the malformed line BEFORE the script attempts
+  `git clone`, so the fake-git's log file does NOT contain a `clone` argv line and the
+  `Unable to parse remote ref` exception reaches the parent stderr.
+- `tests/sync-course-content-private-remote-auth.test.mjs` exercises the private path
+  end-to-end: it asserts that `git ls-remote` and `git clone` receive the canonical URL (no
+  token in argv, no `x-access-token:` prefix, no `@github.com` userinfo), that the
+  triple-isolated `GIT_CONFIG_GLOBAL` (empty tmpfile under `os.tmpdir()`),
+  `GIT_CONFIG_NOSYSTEM` (`1`), and `GIT_CONFIG_SYSTEM` (OS null device) env vars are installed,
+  and that a stale seeded `~/.gitconfig` extraheader does NOT leak through.
+- `tests/git-auth-context.test.mjs` (real-git, skipped when no `git` on PATH) verifies the
+  `createIsolatedGitAuthContext` / `disposeIsolatedGitAuthContext` /
+  `buildScrubbedIsolatedEnv` helpers in isolation: it asserts the authEnv shape, the
+  empty-tmpfile disposition, the env scrubbing against a fixture base env, and the
+  triple-isolation via `git config --get-all` with seeded stale `~/.gitconfig` and
+  `XDG_CONFIG_HOME/git/config` files.
+- `tests/git-origin-normalize.test.mjs` (real-git) exercises the new multi-section,
+  multi-`url =`-line behavior of `normalizeOriginUrl`: multiple `url =` lines in one origin
+  section (canonical + credentialed, credentialed + canonical), two `[remote "origin"]`
+  sections in the same file, fetch-only origin sections, no-section append, and a separate
+  `[remote "backup"]` section that must be preserved.
+- `tests/git-remote-ref.test.mjs` (pure unit, no I/O) covers the strict
+  `parseLsRemoteObjectId` parser: empty / blank-only / null input, valid 40-hex (SHA-1) and
+  64-hex (SHA-256) lines, mixed-case hex, short / long / off-by-one hex, non-hex characters,
+  missing whitespace separators, and the `kind: "empty"` / `kind: "ok"` /
+  `kind: "malformed"` return shapes.
 
 Add or rotate the secret with:
 

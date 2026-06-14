@@ -194,10 +194,18 @@ test(
 
     await fs.writeFile(path.join(distDirPath, "keep-third.txt"), "clear", "utf8");
 
+    // The third run switches to a DIFFERENT REF (`feature-branch`).
+    // The new design reuses the existing clone on the SAME (repo, ref)
+    // even when the resolved head SHA changes (a `git clone --depth 1
+    // --branch <ref>` pins content to the ref, so a SHA change for the
+    // same ref does not require a re-clone). Switching the ref
+    // exercises the cold-clone path: the script removes the existing
+    // clone directory and re-clones for the new ref.
     const thirdExit = await runSync({
       cwd: fakeSiteRoot,
       env: {
         ...baseEnv,
+        COURSE_CONTENT_SOURCE: "github:metyatech/fake-course#feature-branch",
         FAKE_GIT_SHA: "2222222222222222222222222222222222222222",
       },
     });
@@ -211,8 +219,11 @@ test(
     const cloneCount = logLines.filter((entry) => entry.startsWith("clone ")).length;
     const lsRemoteCount = logLines.filter((entry) => entry.startsWith("ls-remote ")).length;
 
-    assert.equal(cloneCount, 2);
-    assert.equal(lsRemoteCount, 3);
+    // Two clones total: one on the cold-start path (first run), one
+    // on the ref-switch path (third run). The second run reuses the
+    // existing clone because the (repo, ref) is unchanged.
+    assert.equal(cloneCount, 2, `expected exactly 2 clone calls; got ${cloneCount}`);
+    assert.equal(lsRemoteCount, 3, `expected exactly 3 ls-remote calls; got ${lsRemoteCount}`);
     assert.match(
       await fs.readFile(path.join(fakeSiteRoot, "content", "docs", "intro", "index.mdx"), "utf8"),
       /2222222222222222222222222222222222222222/,

@@ -110,16 +110,16 @@ if (args[0] === "ls-remote") {
     process.exit(0);
   }
   if (lsRemoteMode === "malformed-0") {
-    // No SHA before the tab. The sync script's parser trims and
-    // splits, so this malformed line is treated as the SHA token
-    // "refs/heads/main" (no internal whitespace) and the script
-    // proceeds to clone. The clone will succeed (fake git's "ok"
-    // mode) and the post-clone required-path check will fire
-    // "Missing required path in content repo: content (content)".
-    // The test asserts the parent throws AND that no token shape
-    // appears in any captured surface. The redaction contract is
-    // what this scenario defends; the specific error message is
-    // an implementation detail of the parser.
+    // No SHA before the tab. The strict parseLsRemoteObjectId parser
+    // in scripts/git-remote-ref.mjs requires the first token to match
+    // the Git object-id grammar (40 hex chars for SHA-1 or 64 hex
+    // chars for SHA-256). A line starting with a literal tab is
+    // rejected as malformed, so the sync script throws
+    // "Unable to parse remote ref ... from <canonicalUrl>" BEFORE
+    // attempting the clone. The test asserts (1) the parent stderr
+    // carries that exception, (2) the fake-git's log file does NOT
+    // contain a clone argv line, and (3) no token shape appears in
+    // any captured surface.
     process.stdout.write("\\trefs/heads/main\\n");
     process.exit(0);
   }
@@ -488,7 +488,7 @@ test(
 );
 
 test(
-  "C. ls-remote exit 0 with malformed output (no SHA before the tab): parent throws with no secret leakage",
+  "C. ls-remote exit 0 with malformed output (no SHA before the tab): strict parser rejects pre-clone, parent throws 'Unable to parse remote ref' with no secret leakage",
   { timeout: 60_000 },
   async (t) => {
     const { fakeSiteRoot, tempRoot, fakeBin, logPath } = await buildScenarioHarness(t, "C");
@@ -504,10 +504,12 @@ test(
       },
     });
 
-    // The sync script throws (either the parse-error path or the
-    // post-clone required-path check). Either way, the parent process
-    // observes a non-zero exit and a parent stderr blob containing
-    // the thrown error.
+    // The strict parseLsRemoteObjectId parser rejects the malformed
+    // ls-remote output as `kind: "malformed"`, so the sync script
+    // throws "Unable to parse remote ref ... from <canonicalUrl>"
+    // BEFORE attempting the clone. The parent process observes a
+    // non-zero exit and a parent stderr blob containing the thrown
+    // error.
     assert.notEqual(
       result.code,
       0,
@@ -520,14 +522,9 @@ test(
     const parentStderrBlob = result.parentStderrBlob;
 
     // The negative-assertion suite covers every captured surface.
-    // The specific error message wording for the malformed path
-    // depends on the sync script's parser implementation. The
-    // binding contract is the redaction property: no token-shaped
-    // content in any captured surface. (The current parser treats
-    // "\trefs/heads/main" as a valid SHA after trim, so the script
-    // proceeds to clone and the post-clone "Missing required path"
-    // check fires. Either error path is acceptable; the redaction
-    // contract is what this scenario defends.)
+    // The redaction contract is the binding invariant this scenario
+    // defends: no token-shaped content in any captured surface, no
+    // matter which error path the sync script took.
     assertNoLeaks({
       parentStderrBlob,
       fakeGitLog,
@@ -537,12 +534,65 @@ test(
       base64Token,
     });
 
-    // Positive witness: the canonical URL must appear in argv (the
-    // parent test can observe it via the fake-git's log file).
+    // Positive witness (1): the canonical URL must appear in argv
+    // (the parent test can observe it via the fake-git's log file).
     assert.match(
       argvLines.join("\n"),
       new RegExp(canonicalUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
       "canonical URL must appear in the fake git argv (the sync script passed it through unchanged)",
+    );
+
+    // Positive witness (2): the strict `parseLsRemoteObjectId`
+    // parser in `scripts/git-remote-ref.mjs` rejects
+    // "\trefs/heads/main" (no leading 40/64-hex SHA), so the sync
+    // script throws "Unable to parse remote ref ... from <canonical>"
+    // BEFORE attempting the clone. The exception reaches parent
+    // stderr via Node's default uncaught-exception dump. The
+    // canonical URL in the exception is the canonical form, with
+    // no userinfo.
+    assert.match(
+      parentStderrBlob,
+      /Unable to parse remote ref\s+\S+\s+from\s+https:\/\/github\.com\/metyatech\/teacher-profile-docs\.git/iu,
+      `parent stderr must contain the strict-parser 'Unable to parse remote ref' exception message; got: ${parentStderrBlob}`,
+    );
+
+    // Positive witness (3): the strict parser rejected the
+    // malformed ls-remote output before the clone was attempted, so
+    // the fake-git's log file must NOT contain a `clone` argv line.
+    // If a `clone` argv were present, it would mean the parser
+    // regressed to "accept any first non-blank token" and the script
+    // proceeded past ls-remote — that is the failure mode this
+    // scenario exists to defend against.
+    const parsedArgvs = argvLines.map((line) => {
+      const raw = line.slice("[argv] ".length);
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return raw.split(" ");
+      }
+    });
+    const commands = parsedArgvs.map((argv) => argv[0]);
+    assert.ok(
+      commands.includes("ls-remote"),
+      `expected fake git to be invoked with ls-remote, got: ${commands.join(", ")}`,
+    );
+    assert.ok(
+      !commands.includes("clone"),
+      `clone must not be attempted when ls-remote returns malformed output (strict parser must reject pre-clone); got: ${commands.join(", ")}`,
+    );
+
+    // Positive witness (4): the strict-parser error path must also
+    // never fall through to the post-clone "Missing required path"
+    // check. If the parser had accepted the malformed line as a
+    // valid SHA, the clone would have succeeded (the fake-git's
+    // "ok" mode) and the post-clone required-path check would have
+    // fired instead. That regression is exactly what this scenario
+    // guards against, so we assert "Missing required path" is
+    // absent from the captured parent stderr.
+    assert.doesNotMatch(
+      parentStderrBlob,
+      /Missing required path/iu,
+      `parent stderr must not contain the post-clone 'Missing required path' error (strict parser should have rejected pre-clone); got: ${parentStderrBlob}`,
     );
   },
 );

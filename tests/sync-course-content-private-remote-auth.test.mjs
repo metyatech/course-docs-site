@@ -234,7 +234,7 @@ const countOccurrences = (haystack, needle) => {
 };
 
 test(
-  "private remote sync delivers the PAT via GIT_CONFIG extraheader in a fresh empty tmpdir, with no token in argv and no credentialed origin URL in the clone's .git/config",
+  "private remote sync delivers the PAT via GIT_CONFIG extraheader in a fresh empty tmpdir with the triple-isolated GIT_CONFIG_GLOBAL/NOSYSTEM/SYSTEM triple, with no token in argv and no credentialed origin URL in the clone's .git/config",
   { timeout: 60_000 },
   async (t) => {
     const fakeSiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-site-private-"));
@@ -369,22 +369,54 @@ test(
       'GIT_TERMINAL_PROMPT must be set to "0" to disable interactive prompts',
     );
 
-    // The new design scrubs the override / credential env vars from the
-    // inherited parent env. The fake records each as null when absent.
-    for (const scrubbedKey of [
-      "GIT_DIR",
-      "GIT_WORK_TREE",
-      "GIT_CONFIG_PARAMETERS",
-      "GIT_CONFIG_GLOBAL",
-      "GIT_CONFIG_SYSTEM",
-      "GIT_CONFIG_NOSYSTEM",
-    ]) {
+    // The new design applies a TRIPLE-ISOLATION: GIT_CONFIG_GLOBAL
+    // is REPLACED with an empty tmpfile (so Git's global config is a
+    // file we control, not the user's ~/.gitconfig), GIT_CONFIG_NOSYSTEM
+    // is set to "1" (so Git does not read /etc/gitconfig), and
+    // GIT_CONFIG_SYSTEM is pointed at the OS null device (so any code
+    // path that ignores GIT_CONFIG_NOSYSTEM still reads an empty
+    // file). The other Git override vars (GIT_DIR, GIT_WORK_TREE,
+    // GIT_CONFIG_PARAMETERS) remain scrubbed. The fake records each
+    // env value as the literal string it observed.
+    for (const scrubbedKey of ["GIT_DIR", "GIT_WORK_TREE", "GIT_CONFIG_PARAMETERS"]) {
       assert.equal(
         envMap[scrubbedKey],
         null,
         `${scrubbedKey} must be scrubbed from the spawned process env (saw ${JSON.stringify(envMap[scrubbedKey])})`,
       );
     }
+    // Triple-isolation positive witnesses:
+    assert.equal(
+      envMap.GIT_CONFIG_NOSYSTEM,
+      "1",
+      'GIT_CONFIG_NOSYSTEM must be set to "1" (disable system gitconfig)',
+    );
+    const expectedNullDevice = process.platform === "win32" ? "NUL" : "/dev/null";
+    assert.equal(
+      envMap.GIT_CONFIG_SYSTEM,
+      expectedNullDevice,
+      `GIT_CONFIG_SYSTEM must point at the OS null device (${expectedNullDevice})`,
+    );
+    // GIT_CONFIG_GLOBAL is an empty tmpfile under os.tmpdir() with the
+    // production prefix. By the time the fake git records it, the
+    // tmpfile exists (the auth context disposes in the finally block,
+    // which runs after the spawn returns). The path must end with the
+    // production 'empty.gitconfig' tmpfile name.
+    const recordedGlobal = envMap.GIT_CONFIG_GLOBAL;
+    assert.ok(
+      typeof recordedGlobal === "string" && recordedGlobal.length > 0,
+      `GIT_CONFIG_GLOBAL must be set to the empty tmpfile path; got ${JSON.stringify(recordedGlobal)}`,
+    );
+    assert.ok(
+      recordedGlobal.endsWith("empty.gitconfig"),
+      `GIT_CONFIG_GLOBAL must end with the production 'empty.gitconfig' tmpfile name; got ${recordedGlobal}`,
+    );
+    const tmpRootForGlobal = path.resolve(os.tmpdir());
+    assert.ok(
+      path.resolve(recordedGlobal).startsWith(tmpRootForGlobal + path.sep) ||
+        path.basename(path.dirname(recordedGlobal)).startsWith("course-docs-git-global-"),
+      `GIT_CONFIG_GLOBAL must live under os.tmpdir() (or be a production-prefixed tmpfile path); got ${recordedGlobal}`,
+    );
 
     // The spawned process's cwd is a fresh empty tmpdir (the
     // createIsolatedGitAuthContext cwd), not the project root, not
@@ -492,7 +524,7 @@ test(
 );
 
 test(
-  "private remote sync bypasses a stale ~/.gitconfig extraheader because the spawned git's cwd is an empty tmpdir (no includeIf.gitdir: can match)",
+  "private remote sync bypasses a stale ~/.gitconfig extraheader via the triple-isolated GIT_CONFIG_GLOBAL/NOSYSTEM/SYSTEM triple (empty tmpfile + 1 + null device) plus an empty cwd tmpdir",
   { timeout: 60_000 },
   async (t) => {
     const fakeSiteRoot = await fs.mkdtemp(
@@ -599,20 +631,92 @@ test(
       "GIT_CONFIG_VALUE_0 must start with the structural AUTHORIZATION: basic prefix and carry a non-empty credential value",
     );
     assert.equal(envMap.GIT_TERMINAL_PROMPT, "0", 'GIT_TERMINAL_PROMPT must be set to "0"');
-    for (const scrubbedKey of [
-      "GIT_DIR",
-      "GIT_WORK_TREE",
-      "GIT_CONFIG_PARAMETERS",
-      "GIT_CONFIG_GLOBAL",
-      "GIT_CONFIG_SYSTEM",
-      "GIT_CONFIG_NOSYSTEM",
-    ]) {
+
+    // The new design applies a TRIPLE-ISOLATION: GIT_CONFIG_GLOBAL
+    // is REPLACED with an empty tmpfile (so Git's global config is a
+    // file we control, not the user's ~/.gitconfig), GIT_CONFIG_NOSYSTEM
+    // is set to "1" (so Git does not read /etc/gitconfig), and
+    // GIT_CONFIG_SYSTEM is pointed at the OS null device (so any code
+    // path that ignores GIT_CONFIG_NOSYSTEM still reads an empty
+    // file). The other Git override vars (GIT_DIR, GIT_WORK_TREE,
+    // GIT_CONFIG_PARAMETERS, the multi-value GIT_CONFIG_KEY_<n> /
+    // GIT_CONFIG_VALUE_<n> family) remain scrubbed.
+    for (const scrubbedKey of ["GIT_DIR", "GIT_WORK_TREE", "GIT_CONFIG_PARAMETERS"]) {
       assert.equal(
         envMap[scrubbedKey],
         null,
         `${scrubbedKey} must be scrubbed from the spawned process env`,
       );
     }
+    // Triple-isolation positive witnesses:
+    assert.equal(
+      envMap.GIT_CONFIG_NOSYSTEM,
+      "1",
+      'GIT_CONFIG_NOSYSTEM must be set to "1" (disable system gitconfig)',
+    );
+    // GIT_CONFIG_SYSTEM is the OS null device (NUL on Windows, /dev/null
+    // elsewhere). The helper returns the platform-specific path; the
+    // fake git records it as a string in the log.
+    const expectedNullDevice = process.platform === "win32" ? "NUL" : "/dev/null";
+    assert.equal(
+      envMap.GIT_CONFIG_SYSTEM,
+      expectedNullDevice,
+      `GIT_CONFIG_SYSTEM must point at the OS null device (${expectedNullDevice})`,
+    );
+    // GIT_CONFIG_GLOBAL is an empty tmpfile under os.tmpdir() with the
+    // production prefix. By the time the fake git records it, the
+    // tmpfile exists (the auth context disposes in the finally block,
+    // which runs after the spawn returns). The path must live under
+    // os.tmpdir() and start with the production prefix.
+    const recordedGlobal = envMap.GIT_CONFIG_GLOBAL;
+    assert.ok(
+      typeof recordedGlobal === "string" && recordedGlobal.length > 0,
+      `GIT_CONFIG_GLOBAL must be set to the empty tmpfile path; got ${JSON.stringify(recordedGlobal)}`,
+    );
+    const tmpRootForGlobal = path.resolve(os.tmpdir());
+    assert.ok(
+      path.resolve(recordedGlobal).startsWith(tmpRootForGlobal + path.sep) ||
+        path.resolve(recordedGlobal) === tmpRootForGlobal ||
+        // On Windows, fs.mkdtempSync can return an 8.3 short path that
+        // does not start with the long-path form of os.tmpdir(). Accept
+        // any path that lives under a known production prefix family
+        // (course-docs-git-global-) — the structural assertion is
+        // "this is a tmpfile path we control, not the user's
+        // ~/.gitconfig".
+        path.basename(path.dirname(recordedGlobal)).startsWith("course-docs-git-global-"),
+      `GIT_CONFIG_GLOBAL must live under os.tmpdir() (or be a production-prefixed tmpfile path); got ${recordedGlobal}`,
+    );
+    assert.ok(
+      recordedGlobal.endsWith("empty.gitconfig"),
+      `GIT_CONFIG_GLOBAL must end with the production 'empty.gitconfig' tmpfile name; got ${recordedGlobal}`,
+    );
+    // The injected GIT_CONFIG_KEY_0 / GIT_CONFIG_VALUE_0 triple is
+    // the only one installed (the count is 1, enforced by the
+    // authEnv shape). The multi-value KEY_<n> / VALUE_<n> family
+    // from the parent env is scrubbed by the production
+    // SCRUBBED_GIT_ENV_KEY_PATTERN; the fake git only logs env vars
+    // it actually inspects, so absent entries are simply not present
+    // in envMap (undefined).
+    assert.equal(
+      envMap.GIT_CONFIG_KEY_0,
+      "http.https://github.com/.extraheader",
+      "GIT_CONFIG_KEY_0 must be set by the auth context (not scrubbed) when the auth triple is installed",
+    );
+    assert.match(
+      envMap.GIT_CONFIG_VALUE_0 ?? "",
+      /^AUTHORIZATION: basic \S+$/u,
+      "GIT_CONFIG_VALUE_0 must carry the structural AUTHORIZATION: basic prefix",
+    );
+    assert.equal(
+      envMap.GIT_CONFIG_KEY_1,
+      undefined,
+      "GIT_CONFIG_KEY_1 must be absent from the spawned process env (multi-value entries are scrubbed; the fake git only logs vars it inspects, so absent == scrubbed)",
+    );
+    assert.equal(
+      envMap.GIT_CONFIG_VALUE_1,
+      undefined,
+      "GIT_CONFIG_VALUE_1 must be absent from the spawned process env (multi-value entries are scrubbed)",
+    );
 
     // The spawned process's cwd is still a fresh empty tmpdir. The
     // seeded ~/.gitconfig is irrelevant because the spawned git has

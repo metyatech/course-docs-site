@@ -5,7 +5,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { normalizeOriginUrl } from "../scripts/sync-course-content.mjs";
+import { normalizeOriginUrl } from "../scripts/git-origin-normalize.mjs";
 
 // `git` is required for these tests. If the host has no real `git` binary
 // on PATH (or it is not executable), we skip the entire file rather than
