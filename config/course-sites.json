@@ -3,6 +3,7 @@
   "sites": [
     {
       "id": "course-common-docs",
+      "requiresContentReadToken": false,
       "contentRepository": "metyatech/course-common-docs",
       "defaultContentRef": "main",
       "productionUrl": "https://course-common-docs.vercel.app",
@@ -26,6 +27,7 @@
     },
     {
       "id": "javascript-course-docs",
+      "requiresContentReadToken": false,
       "contentRepository": "metyatech/javascript-course-docs",
       "defaultContentRef": "master",
       "productionUrl": "https://javascript-course-docs.vercel.app",
@@ -51,6 +53,7 @@
     },
     {
       "id": "programming-course-docs",
+      "requiresContentReadToken": false,
       "contentRepository": "metyatech/programming-course-docs",
       "defaultContentRef": "master",
       "productionUrl": "https://programming-course-docs.vercel.app",
@@ -76,6 +79,7 @@
     },
     {
       "id": "web-foundations-docs",
+      "requiresContentReadToken": false,
       "contentRepository": "metyatech/web-foundations-docs",
       "defaultContentRef": "main",
       "productionUrl": "https://web-foundations-docs.vercel.app",
@@ -99,6 +103,7 @@
     },
     {
       "id": "open-campus-unreal-90min",
+      "requiresContentReadToken": false,
       "contentRepository": "metyatech/open-campus-unreal-90min",
       "defaultContentRef": "main",
       "productionUrl": "https://open-campus-unreal-90min.vercel.app",
@@ -124,6 +129,7 @@
     },
     {
       "id": "teacher-profile-docs",
+      "requiresContentReadToken": true,
       "contentRepository": "metyatech/teacher-profile-docs",
       "defaultContentRef": "main",
       "productionUrl": "https://teacher-profile-docs.vercel.app",

@@ -151,6 +151,16 @@ export const validateCrossConstraints = (manifest) => {
     }
   }
 
+  // requiresContentReadToken: fixed per-site, with strict required values.
+  for (const site of sites) {
+    const expected = site.id === "teacher-profile-docs";
+    if (site.requiresContentReadToken !== expected) {
+      errors.push(
+        `site ${site.id} must set requiresContentReadToken=${expected}`,
+      );
+    }
+  }
+
   // Exactly one representative per profile, with the fixed expected id.
   for (const profile of E2E_PROFILES) {
     const reps = sites.filter((s) => s.e2eProfile === profile && s.representativeE2E === true);
@@ -191,6 +201,7 @@ export const buildMatrix = (manifest = readManifestFile()) =>
   manifest.sites.map((site) => ({
     siteId: site.id,
     courseSource: courseSourceOf(site),
+    requiresContentReadToken: site.requiresContentReadToken === true,
   }));
 
 export const representativeE2EMatrix = (manifest = readManifestFile()) =>
@@ -201,6 +212,7 @@ export const representativeE2EMatrix = (manifest = readManifestFile()) =>
       courseSource: courseSourceOf(site),
       e2ePort: site.e2ePort,
       e2eProfile: site.e2eProfile,
+      requiresContentReadToken: site.requiresContentReadToken === true,
     }));
 
 export const redeployMatrix = (manifest = readManifestFile()) =>

@@ -26,6 +26,7 @@ export type E2EProfile = "docs-only" | "submissions" | "protected-admin";
 
 export type CourseSite = {
   id: string;
+  requiresContentReadToken: boolean;
   contentRepository: string;
   defaultContentRef: string;
   productionUrl: string;

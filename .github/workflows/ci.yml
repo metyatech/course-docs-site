@@ -86,6 +86,7 @@ jobs:
     env:
       COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
       COURSE_DOCS_NEXT_DIST_DIR: .next-build-${{ matrix.siteId }}
+      GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -99,6 +100,17 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - name: Validate private content read token
+        if: ${{ matrix.requiresContentReadToken }}
+        shell: bash
+        env:
+          CONTENT_READ_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: |
+          if [ -z "$CONTENT_READ_TOKEN" ]; then
+            echo "::error::COURSE_CONTENT_READ_TOKEN is required to read private course content repositories."
+            exit 1
+          fi
 
       - name: Typecheck
         run: npm run typecheck
@@ -118,6 +130,7 @@ jobs:
       COURSE_DOCS_NEXT_DIST_DIR: .next-e2e-${{ matrix.siteId }}
       E2E_PORT: ${{ matrix.e2ePort }}
       PLAYWRIGHT_MAX_FAILURES: "1"
+      GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -134,6 +147,17 @@ jobs:
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+
+      - name: Validate private content read token
+        if: ${{ matrix.requiresContentReadToken }}
+        shell: bash
+        env:
+          CONTENT_READ_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: |
+          if [ -z "$CONTENT_READ_TOKEN" ]; then
+            echo "::error::COURSE_CONTENT_READ_TOKEN is required to read private course content repositories."
+            exit 1
+          fi
 
       - name: Typecheck
         run: npm run typecheck

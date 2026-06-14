@@ -221,3 +221,75 @@ test("matrix CLI: top-level shape is `{ include: [...] }`, not a bare array", ()
     );
   }
 });
+
+test("build matrix: teacher-profile-docs entry has requiresContentReadToken === true", () => {
+  const matrix = buildMatrix(readManifestFile());
+  const entry = matrix.find((m) => m.siteId === "teacher-profile-docs");
+  assert.ok(entry, "teacher-profile-docs must be present in the build matrix");
+  assert.equal(entry.requiresContentReadToken, true);
+});
+
+test("build matrix: every non-teacher-profile entry has requiresContentReadToken === false", () => {
+  const matrix = buildMatrix(readManifestFile());
+  const others = matrix.filter((m) => m.siteId !== "teacher-profile-docs");
+  assert.equal(others.length, 5);
+  for (const entry of others) {
+    assert.equal(entry.requiresContentReadToken, false);
+  }
+});
+
+test("E2E matrix: every entry has requiresContentReadToken === false (current reps are public)", () => {
+  const matrix = representativeE2EMatrix(readManifestFile());
+  assert.equal(matrix.length, 3);
+  for (const entry of matrix) {
+    assert.equal(entry.requiresContentReadToken, false);
+  }
+});
+
+test("cross constraints: teacher-profile-docs requiresContentReadToken=false is rejected", () => {
+  const m = baseManifest();
+  siteById(m, "teacher-profile-docs").requiresContentReadToken = false;
+  const errors = validateManifest(m);
+  assert.ok(
+    errors.some((e) => /teacher-profile-docs must set requiresContentReadToken=true/.test(e)),
+    `expected teacher-profile-docs error, got: ${errors.join("\n")}`,
+  );
+});
+
+test("cross constraints: a public site requiresContentReadToken=true is rejected", () => {
+  const m = baseManifest();
+  siteById(m, "javascript-course-docs").requiresContentReadToken = true;
+  const errors = validateManifest(m);
+  assert.ok(
+    errors.some((e) => /javascript-course-docs must set requiresContentReadToken=false/.test(e)),
+    `expected javascript-course-docs error, got: ${errors.join("\n")}`,
+  );
+});
+
+test("matrix CLI: build output includes requiresContentReadToken for every entry", () => {
+  const stdout = runMatrixCli("build");
+  const parsed = JSON.parse(stdout);
+  assert.equal(parsed.include.length, 6);
+  for (const entry of parsed.include) {
+    assert.equal(
+      typeof entry.requiresContentReadToken,
+      "boolean",
+      `entry ${entry.siteId} must include a boolean requiresContentReadToken`,
+    );
+  }
+  const teacher = parsed.include.find((e) => e.siteId === "teacher-profile-docs");
+  assert.equal(teacher.requiresContentReadToken, true);
+});
+
+test("matrix CLI: e2e output includes requiresContentReadToken for every entry", () => {
+  const stdout = runMatrixCli("e2e");
+  const parsed = JSON.parse(stdout);
+  assert.equal(parsed.include.length, 3);
+  for (const entry of parsed.include) {
+    assert.equal(
+      typeof entry.requiresContentReadToken,
+      "boolean",
+      `entry ${entry.siteId} must include a boolean requiresContentReadToken`,
+    );
+  }
+});
