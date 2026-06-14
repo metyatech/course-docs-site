@@ -135,5 +135,11 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build (verified)
+        run: npm run build:verified
+
       - name: Run course E2E (CI)
         run: npm run test:course:ci
