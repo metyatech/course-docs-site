@@ -40,7 +40,10 @@ moderation), two server-only environment variables are required to actually unlo
   after a successful `ADMIN_MODE_TOKEN` check and is verified on every protected request.
 
 Both values must be set in production. The two values **must not be the same** — using the same value for both
-would let anyone who learns the user-entered code forge valid session cookies. `ADMIN_SESSION_SECRET` must be
+would let anyone who learns the user-entered code forge valid session cookies. When the two values are equal,
+`isAdminModeConfigured()` returns false, the `/api/admin/mode` endpoint reports
+`unavailableReason: "admin-token-must-differ-from-session-secret"` with `configured: false`, and any `POST` to
+`/api/admin/mode` returns `503` without issuing a session cookie. `ADMIN_SESSION_SECRET` must be
 at least 32 bytes of UTF-8 randomness; anything shorter disables the configured admin-mode gate (the
 `/api/admin/mode` endpoint reports `invalid-admin-session-secret` and the admin footer shows the setup hint).
 Generate one with:
@@ -61,6 +64,33 @@ of protected pages also requires both values in `.env.local`; otherwise the foot
 the protected routes will remain locked and show a setup hint.
 
 See `.env.example` for the full list.
+
+### Private course content authentication (Site CI)
+
+Site CI checks out the course content for every site in `config/course-sites.json` over the GitHub API.
+Most sites are public, but a small number (currently `metyatech/teacher-profile-docs`) are private.
+To allow Site CI to read private content repositories, register a GitHub Actions repository secret:
+
+- Secret name: `COURSE_CONTENT_READ_TOKEN`
+- Token type: **fine-grained Personal Access Token**
+- Repository access: **Only select repositories** → `metyatech/teacher-profile-docs`
+- Repository permissions:
+  - `Contents`: **Read-only**
+  - `Metadata`: **Read-only**
+- Token value: NEVER store it in `.env`, `.env.local`, `.env.example`, or any tracked source file. The token
+  only ever lives in GitHub Actions repository secrets.
+- When the secret is registered, Site CI exposes it to the relevant jobs as `GH_TOKEN`. A per-matrix
+  preflight step validates that the secret is present for any site whose manifest entry sets
+  `requiresContentReadToken: true`; if the secret is missing, the build fails fast with a clear error.
+- When the secret is NOT registered, the only thing that fails is the Site CI build for the private site.
+  The PR is still mergeable, but the `teacher-profile-docs` build will report failure until the secret
+  is added.
+
+Add or rotate the secret with:
+
+```sh
+gh secret set COURSE_CONTENT_READ_TOKEN --repo metyatech/course-docs-site
+```
 
 ## Local development
 

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getAdminModeCookieName, isAdminSessionValid } from "../admin-mode";
+import { getAdminModeCookieName, isAdminModeConfigured, isAdminSessionValid } from "../admin-mode";
 import { getCurrentCourseSite } from "../current-course-site";
 import { isSameOriginMutation } from "./same-origin";
 import { deleteComment } from "./comment-delete";
@@ -43,12 +43,35 @@ const defaultGetCookieValue: GetCookieValue = async () => {
 const defaultIsAdminCommentModerationEnabled: IsAdminCommentModerationEnabled = () =>
   getCurrentCourseSite()?.features.adminCommentModeration === true;
 
+/**
+ * Testable helper that combines the configured-check and the cookie check.
+ * Returns true only when admin mode is fully configured (token + 32-byte
+ * secret + admin capability) AND the supplied session cookie is valid.
+ *
+ * The optional `options.isAdminModeConfigured` injection exists so tests
+ * can exercise the success path without needing a real admin-capable site
+ * config. Production callers (and the route factory default) use the real
+ * `isAdminModeConfigured`.
+ */
+export const isAdminAuthorizedForCommentDelete: IsAdminSessionValidFn = async (
+  cookieValue,
+  options: { isAdminModeConfigured?: () => boolean } = {},
+) => {
+  const configured = options.isAdminModeConfigured ?? isAdminModeConfigured;
+  return configured() && (await isAdminSessionValid(cookieValue ?? undefined));
+};
+
+const defaultIsAdminSessionValid: IsAdminSessionValidFn = async (cookie) => {
+  if (!isAdminModeConfigured()) return false;
+  return isAdminSessionValid(cookie);
+};
+
 export const createAdminCommentDeleteRoute = (
   options: CreateAdminCommentDeleteRouteOptions = {},
 ) => {
   const isSameOrigin = options.isSameOriginMutation ?? isSameOriginMutation;
   const getCookieValue = options.getCookieValue ?? defaultGetCookieValue;
-  const isSessionValid = options.isAdminSessionValid ?? isAdminSessionValid;
+  const isSessionValid = options.isAdminSessionValid ?? defaultIsAdminSessionValid;
   const isAdminCommentModerationEnabledFn =
     options.isAdminCommentModerationEnabled ?? defaultIsAdminCommentModerationEnabled;
   const deleteCommentFn = options.deleteComment ?? deleteComment;

@@ -14,7 +14,7 @@ import {
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const secret = "unit-test-secret-please-ignore";
+const secret = "unit-test-secret-please-ignore-32+bytes";
 const baseNow = 1_700_000_000;
 
 const enc = new TextEncoder();
@@ -137,7 +137,11 @@ test("期限切れ: cookie past exp is rejected as expired", async () => {
 
 test("異なるsecret: cookie signed with a different key fails verification", async () => {
   const cookie = await signAdminSession(secret, { now: baseNow });
-  const result = await verifyAdminSession(cookie, "a-different-secret", { now: baseNow + 30 });
+  // Use a 32+ byte secret so the new 32-byte gate passes and we exercise the
+  // bad-signature path (the wrong key produces a wrong HMAC).
+  const result = await verifyAdminSession(cookie, "a-different-secret-32-bytes-long-okay", {
+    now: baseNow + 30,
+  });
   assert.equal(result.ok, false);
   if (!result.ok) {
     assert.equal(result.reason, "bad-signature");
@@ -229,11 +233,15 @@ test("ADMIN_SESSION_SECRET 未設定: getAdminSessionSecret returns empty string
 
 test("ADMIN_MODE_TOKEN と署名secretの分離: a cookie signed with ADMIN_SESSION_SECRET is not verified as ADMIN_MODE_TOKEN", async () => {
   await withEnv("ADMIN_SESSION_SECRET", secret, async () => {
-    await withEnv("ADMIN_MODE_TOKEN", "user-supplied-token", async () => {
+    // Use a 32+ byte token string so the new 32-byte gate passes and we
+    // exercise the bad-signature path (the user-supplied token cannot sign
+    // cookies that match the ADMIN_SESSION_SECRET HMAC).
+    const userSuppliedToken = "user-supplied-token-32-bytes-long-ok-x";
+    await withEnv("ADMIN_MODE_TOKEN", userSuppliedToken, async () => {
       const cookie = await signAdminSession(secret, { now: baseNow });
       // ADMIN_MODE_TOKEN is a *user-supplied* code and must never validate
       // the same cookie that ADMIN_SESSION_SECRET signs.
-      const wrong = await verifyAdminSession(cookie, "user-supplied-token", {
+      const wrong = await verifyAdminSession(cookie, userSuppliedToken, {
         now: baseNow + 30,
       });
       assert.equal(wrong.ok, false);
@@ -330,4 +338,51 @@ test("isAdminSessionSecretValid: defaults to env when no argument is given", () 
   withEnv("ADMIN_SESSION_SECRET", "", () => {
     assert.equal(isAdminSessionSecretValid(), false);
   });
+});
+
+test("signAdminSession: 31-byte secret throws 'at least 32 UTF-8 bytes'", async () => {
+  await assert.rejects(
+    () => signAdminSession("a".repeat(31), { now: baseNow }),
+    /at least 32 UTF-8 bytes/,
+  );
+});
+
+test("verifyAdminSession: 31-byte secret returns invalid-secret", async () => {
+  // Build a cookie that is correctly HMAC-signed with a 31-byte secret,
+  // then verify with the same 31-byte secret. The cookie must be rejected
+  // for invalid-secret (NOT bad-signature) because the length check runs
+  // before any HMAC import.
+  const shortSecret = "a".repeat(31);
+  const cookie = await signWithPayload(
+    { v: 1, iat: baseNow, exp: baseNow + 60 },
+    shortSecret,
+  );
+  const result = await verifyAdminSession(cookie, shortSecret, { now: baseNow + 30 });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.reason, "invalid-secret");
+  }
+});
+
+test("isAdminSessionValid: 31-byte secret returns false", async () => {
+  const shortSecret = "a".repeat(31);
+  const cookie = await signWithPayload(
+    { v: 1, iat: baseNow, exp: baseNow + 60 },
+    shortSecret,
+  );
+  assert.equal(
+    await isAdminSessionValid(cookie, shortSecret, { now: baseNow + 30 }),
+    false,
+  );
+});
+
+test("32-byte secret: sign and verify still work normally", async () => {
+  const validSecret = "a".repeat(32); // exactly 32 ASCII bytes
+  const cookie = await signAdminSession(validSecret, { now: baseNow });
+  const result = await verifyAdminSession(cookie, validSecret, { now: baseNow + 30 });
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.payload.iat, baseNow);
+    assert.equal(result.payload.exp, baseNow + 8 * 60 * 60);
+  }
 });

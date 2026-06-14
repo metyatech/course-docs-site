@@ -86,8 +86,8 @@ export const signAdminSession = async (
   secret: string,
   options: SignOptions = {},
 ): Promise<string> => {
-  if (!secret) {
-    throw new Error("Admin session secret is not configured");
+  if (!isAdminSessionSecretValid(secret)) {
+    throw new Error("Admin session secret must be at least 32 UTF-8 bytes");
   }
   // The session TTL is fixed at SESSION_TTL_SECONDS (8 hours). There is no
   // public `ttlSeconds` option. `now` is accepted only for deterministic
@@ -107,7 +107,16 @@ export const signAdminSession = async (
 
 export type VerifyResult =
   | { ok: true; payload: AdminSessionPayload }
-  | { ok: false; reason: "missing" | "malformed" | "bad-version" | "bad-signature" | "expired" };
+  | {
+      ok: false;
+      reason:
+        | "missing"
+        | "invalid-secret"
+        | "malformed"
+        | "bad-version"
+        | "bad-signature"
+        | "expired";
+    };
 
 export const verifyAdminSession = async (
   value: string | undefined | null,
@@ -115,6 +124,10 @@ export const verifyAdminSession = async (
   options: { now?: number } = {},
 ): Promise<VerifyResult> => {
   if (!value || typeof value !== "string") return { ok: false, reason: "missing" };
+
+  if (!isAdminSessionSecretValid(secret)) {
+    return { ok: false, reason: "invalid-secret" };
+  }
   if (!secret) return { ok: false, reason: "missing" };
   if (value.length > MAX_COOKIE_LENGTH) return { ok: false, reason: "malformed" };
 

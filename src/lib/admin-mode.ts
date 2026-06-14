@@ -102,6 +102,21 @@ export const getAdminModeToken = (): string => (process.env.ADMIN_MODE_TOKEN ?? 
  */
 export const getAdminSessionSecret = (): string => getSessionSecret();
 
+/**
+ * Configuration-integrity check that the admin-mode shared token and the
+ * admin-session HMAC secret are configured as two distinct values. Using the
+ * same value for both would let anyone who learns the user-entered code
+ * forge valid session cookies, so admin mode refuses to enable when they
+ * match. This is a synchronous string comparison of two configured values
+ * and is intentionally NOT a timing-safe primitive.
+ */
+export const areAdminSecretsDistinct = (): boolean => {
+  const token = getAdminModeToken();
+  const secret = getAdminSessionSecret();
+
+  return token !== "" && secret !== "" && token !== secret;
+};
+
 export const getProtectedAdminLinks = () => protectedLinks;
 
 /** True when the active course site defines at least one protected route. */
@@ -130,7 +145,8 @@ export const hasAnyAdminCapability = (): boolean =>
 export const isAdminModeConfigured = (): boolean =>
   hasAnyAdminCapability() &&
   getAdminModeToken() !== "" &&
-  isAdminSessionSecretValid(getAdminSessionSecret());
+  isAdminSessionSecretValid(getAdminSessionSecret()) &&
+  areAdminSecretsDistinct();
 
 export const isAdminSessionValid = (cookieValue: string | null | undefined) =>
   isAdminSessionValidImpl(cookieValue ?? undefined, getAdminSessionSecret());

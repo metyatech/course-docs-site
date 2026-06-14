@@ -11,6 +11,7 @@ import {
   isAdminSessionValid,
   getAdminModeToken,
   getAdminSessionSecret,
+  areAdminSecretsDistinct,
 } from "../../../../lib/admin-mode";
 import {
   getAdminSessionTtlSeconds,
@@ -27,6 +28,7 @@ type UnavailableReason =
   | "missing-admin-mode-token"
   | "missing-admin-session-secret"
   | "invalid-admin-session-secret"
+  | "admin-token-must-differ-from-session-secret"
   | null;
 
 type AdminModeStatus = {
@@ -42,6 +44,7 @@ type AdminModeStatus = {
   tokenConfigured: boolean;
   sessionSecretConfigured: boolean;
   sessionSecretValid: boolean;
+  secretsDistinct: boolean;
   unavailableReason: UnavailableReason;
   setupHint: string | null;
 };
@@ -56,6 +59,8 @@ const setupHintFor = (reason: UnavailableReason) => {
       return "ADMIN_SESSION_SECRET が未設定です。.env.local に ADMIN_SESSION_SECRET を設定して再起動してください。";
     case "invalid-admin-session-secret":
       return "ADMIN_SESSION_SECRET は UTF-8 で32バイト以上のランダム値にしてください。";
+    case "admin-token-must-differ-from-session-secret":
+      return "ADMIN_MODE_TOKEN と ADMIN_SESSION_SECRET には異なる値を設定してください。";
     default:
       return null;
   }
@@ -76,6 +81,11 @@ const buildStatus = (enabled: boolean): AdminModeStatus => {
   const sessionSecretValid = isAdminSessionSecretValid(getAdminSessionSecret());
   const capability = protectedDocs || commentModeration;
 
+  const secretsDistinct =
+    tokenConfigured &&
+    sessionSecretValid &&
+    areAdminSecretsDistinct();
+
   const unavailableReason: UnavailableReason = !capability
     ? "no-admin-capability"
     : !tokenConfigured
@@ -84,7 +94,9 @@ const buildStatus = (enabled: boolean): AdminModeStatus => {
         ? "missing-admin-session-secret"
         : !sessionSecretValid
           ? "invalid-admin-session-secret"
-          : null;
+          : !areAdminSecretsDistinct()
+            ? "admin-token-must-differ-from-session-secret"
+            : null;
 
   const configured = unavailableReason === null;
   return {
@@ -97,6 +109,7 @@ const buildStatus = (enabled: boolean): AdminModeStatus => {
     tokenConfigured,
     sessionSecretConfigured,
     sessionSecretValid,
+    secretsDistinct,
     unavailableReason,
     setupHint: setupHintFor(unavailableReason),
   };

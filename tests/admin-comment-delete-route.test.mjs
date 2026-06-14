@@ -550,7 +550,11 @@ test("processing order: same-origin → session → capability → delete", asyn
 
 test("real session integration: a valid cookie is accepted by the real validator", async () => {
   const originalSecret = process.env.ADMIN_SESSION_SECRET;
+  const originalToken = process.env.ADMIN_MODE_TOKEN;
+  // The configured gate now requires ADMIN_MODE_TOKEN and ADMIN_SESSION_SECRET
+  // to be distinct 32+ byte values. Set both so isAdminModeConfigured() opens.
   process.env.ADMIN_SESSION_SECRET = SIGNING_SECRET;
+  process.env.ADMIN_MODE_TOKEN = "unit-test-route-signing-token-please-ignore-32";
   let response;
   let deleteCalls;
   try {
@@ -571,6 +575,8 @@ test("real session integration: a valid cookie is accepted by the real validator
   } finally {
     if (originalSecret === undefined) delete process.env.ADMIN_SESSION_SECRET;
     else process.env.ADMIN_SESSION_SECRET = originalSecret;
+    if (originalToken === undefined) delete process.env.ADMIN_MODE_TOKEN;
+    else process.env.ADMIN_MODE_TOKEN = originalToken;
   }
   assert.equal(response.status, 200);
   assert.equal(deleteCalls, 1);

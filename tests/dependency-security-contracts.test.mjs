@@ -33,10 +33,37 @@ test("security scripts gate high audits and hard-fail broken patches", async () 
     "patch-package --error-on-fail && node scripts/check-platform-cache.mjs",
   );
   assert.equal(pkg.scripts["audit:ci"], "npm audit --audit-level=high");
-  // Note: pkg.scripts["verify:ci"] composition is asserted by verify:course:ci
-  // and the test:e2e-config matrix; pinning the exact string here would couple
-  // this contract test to unrelated CI-shape changes.
-  void pkg.scripts["verify:ci"];
+});
+
+test("verify:ci script contains every required CI gate", async () => {
+  const pkg = JSON.parse(await readFile(packageJsonPath, "utf8"));
+  const verifyCi = pkg.scripts["verify:ci"];
+
+  assert.equal(
+    typeof verifyCi,
+    "string",
+    "verify:ci must be a string script definition",
+  );
+  assert.match(
+    verifyCi,
+    /npm run verify:sites/,
+    "verify:ci must run verify:sites (manifest validation)",
+  );
+  assert.match(
+    verifyCi,
+    /npm run audit:ci/,
+    "verify:ci must run audit:ci (high-severity dependency audit)",
+  );
+  assert.match(
+    verifyCi,
+    /npm run build\b/,
+    "verify:ci must run build",
+  );
+  assert.match(
+    verifyCi,
+    /npm run verify:course:ci/,
+    "verify:ci must run verify:course:ci (course E2E + build:verified)",
+  );
 });
 
 test("patch-package files match installed package versions", async () => {

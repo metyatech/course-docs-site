@@ -14,6 +14,7 @@ type AdminModeUnavailableReason =
   | "missing-admin-mode-token"
   | "missing-admin-session-secret"
   | "invalid-admin-session-secret"
+  | "admin-token-must-differ-from-session-secret"
   | null;
 
 type AdminModeStatus = {
@@ -26,6 +27,7 @@ type AdminModeStatus = {
   tokenConfigured: boolean;
   sessionSecretConfigured: boolean;
   sessionSecretValid: boolean;
+  secretsDistinct: boolean;
   unavailableReason: AdminModeUnavailableReason;
   setupHint: string | null;
 };
@@ -40,6 +42,7 @@ const defaultStatus: AdminModeStatus = {
   tokenConfigured: false,
   sessionSecretConfigured: false,
   sessionSecretValid: false,
+  secretsDistinct: false,
   unavailableReason: null,
   setupHint: null,
 };

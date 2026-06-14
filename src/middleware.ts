@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  isAdminModeConfigured,
   isProtectedRoute,
   getAdminModeCookieName,
   getAdminModePublicFallbackPath,
@@ -15,10 +16,12 @@ export const config = {
 export async function middleware(request: AssetMiddlewareRequest) {
   if (isProtectedRoute(request.nextUrl.pathname)) {
     const secret = getAdminSessionSecret();
-    const enabled = await isAdminSessionValid(
-      request.cookies.get(getAdminModeCookieName())?.value,
-      secret,
-    );
+    const enabled =
+      isAdminModeConfigured() &&
+      (await isAdminSessionValid(
+        request.cookies.get(getAdminModeCookieName())?.value,
+        secret,
+      ));
 
     if (!enabled) {
       const url = request.nextUrl.clone();

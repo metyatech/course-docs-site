@@ -7,6 +7,7 @@ import {
   filterProtectedPageMap,
   getAdminModeCookieName,
   hasProtectedAdminRoutes,
+  isAdminModeConfigured,
   isAdminSessionValid,
 } from "../../lib/admin-mode";
 
@@ -16,7 +17,9 @@ export default async function DocsLayout({ children }: { children: ReactNode }) 
   let visiblePageMap = pageMap;
   if (hasProtectedAdminRoutes()) {
     const cookieStore = await cookies();
-    const enabled = await isAdminSessionValid(cookieStore.get(getAdminModeCookieName())?.value);
+    const cookieValue = cookieStore.get(getAdminModeCookieName())?.value;
+    const enabled =
+      isAdminModeConfigured() && (await isAdminSessionValid(cookieValue));
     if (!enabled) {
       visiblePageMap = filterProtectedPageMap(pageMap);
     }
