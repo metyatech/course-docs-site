@@ -114,6 +114,13 @@ is set (the public path skips all of them):
   `GIT_CONFIG_KEY_<n>` / `GIT_CONFIG_VALUE_<n>` family matched by pattern) before the isolated
   triple is installed. (`GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM`, and `GIT_CONFIG_NOSYSTEM` are
   installed by the auth context, not scrubbed.)
+- The raw GitHub credential env vars `GH_TOKEN` and `GITHUB_TOKEN`
+  (`SCRUBBED_GIT_CREDENTIAL_ENV_KEYS`) are deleted from the spawned Git process's env copy. The PAT
+  reaches Git **only** inside the `GIT_CONFIG_VALUE_0` Authorization header — never as a raw
+  `GH_TOKEN` (which Git credential helpers / `gh`-aware subprocesses could read) and never as a
+  competing `GITHUB_TOKEN` (the PR-scoped Actions token, which could otherwise shadow the
+  content-read PAT). The scrub operates on the spawned env copy only; `process.env.GH_TOKEN`
+  survives so the failure-output redactor can still scrub it.
 - The real-git regression test `tests/git-auth-context.test.mjs` verifies the triple-isolation
   by spawning `git config --get-all http.https://github.com/.extraheader` with the isolated env
   and asserting that exactly one Authorization header survives, with no `BADBASIC` contribution
@@ -150,6 +157,27 @@ is set (the public path skips all of them):
 - On the public path (no `GH_TOKEN`) none of the above isolation is installed: the canonical URL,
   the inherited env, and the project-root `cwd` are used as-is.
 
+#### How does the sync stay in step with the remote?
+
+`scripts/sync-course-content.mjs` records the synced state in
+`.course-content/active-source.txt` as `repo:<owner>/<repo>#<ref>@<headSha>`. The clone is reused
+**only** when the full active source id — repo, ref, **and** the resolved head SHA — is unchanged:
+
+- After `git ls-remote` resolves the current head SHA, the script builds the full
+  `activeSourceId` and re-clones whenever it differs from the persisted `previousSourceId` (or no
+  clone exists). A head SHA change for the **same** repo/ref still forces a fresh clone, because
+  `git ls-remote` only reads the remote SHA — it never updates an existing clone's working tree.
+  Reusing the clone on a SHA change would leave stale content on disk while `active-source.txt`
+  advanced to the new SHA.
+- Before any network access, the script repairs or removes the existing clone: if
+  `previousSourceId` matches the current repo/ref, `normalizeOriginUrl` rewrites any leftover
+  credentialed origin URL to the canonical form first; if it names a different repo/ref (or no
+  state was recorded), the clone directory is removed outright. Either way a credentialed
+  `.git/config` from a prior run can never be observed after the network step.
+- `active-source.txt` is written **only after a successful clone**. If `git ls-remote` resolves a
+  new SHA but the re-clone fails, the script throws before persisting the new id, so the recorded
+  SHA never advances past content that is actually on disk.
+
 #### How is the secret scoped in CI?
 
 The secret is **never** placed at job level. `.github/workflows/ci.yml` splits the consumer steps
@@ -169,7 +197,7 @@ only on the few steps that actually need it. The `npm ci`, `actions/checkout`, a
 
 #### Regression tests
 
-Five test files guard this design against regression:
+Eight test files guard this design against regression:
 
 - `tests/sync-course-content-origin-url-normalize.test.mjs` uses the real `git` binary to create a
   throwaway repo, set `remote.origin.url` to a credentialed URL, run the production
@@ -191,7 +219,21 @@ Five test files guard this design against regression:
   token in argv, no `x-access-token:` prefix, no `@github.com` userinfo), that the
   triple-isolated `GIT_CONFIG_GLOBAL` (empty tmpfile under `os.tmpdir()`),
   `GIT_CONFIG_NOSYSTEM` (`1`), and `GIT_CONFIG_SYSTEM` (OS null device) env vars are installed,
-  and that a stale seeded `~/.gitconfig` extraheader does NOT leak through.
+  that the spawned Git env has `GH_TOKEN` and `GITHUB_TOKEN` unset while `GIT_CONFIG_VALUE_0`
+  is set (the PAT lives only in the Authorization header) even though the parent set both raw
+  credential env vars, and that a stale seeded `~/.gitconfig` extraheader does NOT leak through.
+- `tests/sync-course-content-remote-cache.test.mjs` uses a fake `git` to drive four sequential
+  runs and asserts the clone-reuse contract: an initial cold clone, reuse on an unchanged
+  repo/ref/SHA, a forced re-clone (with content body + `active-source.txt` advancing and the Next
+  dist dir cleared) when the head SHA changes for the same repo/ref, and a re-clone on a ref
+  switch. It counts `clone` / `ls-remote` invocations and verifies the synced content body and
+  `active-source.txt` per run.
+- `tests/sync-course-content-pre-network-repair.test.mjs` uses a fake `git` to prove the
+  pre-network safety contract on the real on-disk `.git/config`: a matching existing clone has
+  its credentialed origin repaired by `normalizeOriginUrl` BEFORE `ls-remote` (canonical config
+  survives a subsequent `ls-remote` exit 128, no clone attempted); a different-source or
+  unknown-state clone is deleted before `ls-remote`; and a failed re-clone after a new resolved
+  SHA does NOT advance `active-source.txt`.
 - `tests/git-auth-context.test.mjs` (real-git, skipped when no `git` on PATH) verifies the
   `createIsolatedGitAuthContext` / `disposeIsolatedGitAuthContext` /
   `buildScrubbedIsolatedEnv` helpers in isolation: it asserts the authEnv shape, the

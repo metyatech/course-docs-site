@@ -121,11 +121,16 @@ const redactBase64HeaderValue = (value) => {
   append("[env] GIT_CONFIG_GLOBAL=" + JSON.stringify(process.env.GIT_CONFIG_GLOBAL ?? null));
   append("[env] GIT_CONFIG_SYSTEM=" + JSON.stringify(process.env.GIT_CONFIG_SYSTEM ?? null));
   append("[env] GIT_CONFIG_NOSYSTEM=" + JSON.stringify(process.env.GIT_CONFIG_NOSYSTEM ?? null));
-  // Intentionally do NOT log GH_TOKEN directly. The token is delivered
-  // to the spawned process only via the GIT_CONFIG_VALUE_0
-  // extraheader Authorization header, and the b64 value is redacted
-  // before the line is written. The test asserts the literal fixture
-  // token never appears anywhere in the log.
+  // Intentionally do NOT log GH_TOKEN / GITHUB_TOKEN values directly.
+  // We only record a boolean "is set" witness so the test can prove the
+  // raw credential env vars were scrubbed from the spawned git process
+  // (the token is delivered exclusively via the GIT_CONFIG_VALUE_0
+  // extraheader Authorization header). The b64 value is redacted before
+  // it is written. The test asserts the literal fixture token never
+  // appears anywhere in the log.
+  append("[env] GH_TOKEN_IS_SET=" + JSON.stringify(process.env.GH_TOKEN != null));
+  append("[env] GITHUB_TOKEN_IS_SET=" + JSON.stringify(process.env.GITHUB_TOKEN != null));
+  append("[env] GIT_CONFIG_VALUE_0_IS_SET=" + JSON.stringify(process.env.GIT_CONFIG_VALUE_0 != null));
 
 const writeFixtureCourse = (targetDir) => {
   const siteConfig = \`export const siteConfig = {
@@ -260,6 +265,10 @@ test(
       env: {
         COURSE_CONTENT_SOURCE: "github:metyatech/teacher-profile-docs#main",
         GH_TOKEN: fixtureToken,
+        // Seed a competing GITHUB_TOKEN (the PR-scoped Actions token in
+        // real CI) so the test proves BOTH raw credential env vars are
+        // scrubbed from the spawned git process.
+        GITHUB_TOKEN: "fixture-github-token-NEVER-LEAK",
         COURSE_DOCS_GIT_COMMAND: process.execPath,
         COURSE_DOCS_GIT_SCRIPT: path.join(fakeBin, "git.mjs"),
         COURSE_DOCS_NEXT_DIST_DIR: distDir,
@@ -367,6 +376,25 @@ test(
       envMap.GIT_TERMINAL_PROMPT,
       "0",
       'GIT_TERMINAL_PROMPT must be set to "0" to disable interactive prompts',
+    );
+
+    // The raw GitHub credential env vars must be scrubbed from the
+    // spawned git process even though the parent set BOTH GH_TOKEN and
+    // GITHUB_TOKEN. The PAT travels only inside GIT_CONFIG_VALUE_0.
+    assert.equal(
+      envMap.GH_TOKEN_IS_SET,
+      false,
+      "GH_TOKEN must be unset in the spawned git process env",
+    );
+    assert.equal(
+      envMap.GITHUB_TOKEN_IS_SET,
+      false,
+      "GITHUB_TOKEN must be unset in the spawned git process env",
+    );
+    assert.equal(
+      envMap.GIT_CONFIG_VALUE_0_IS_SET,
+      true,
+      "GIT_CONFIG_VALUE_0 (the Authorization header carrying the PAT) must be set",
     );
 
     // The new design applies a TRIPLE-ISOLATION: GIT_CONFIG_GLOBAL
@@ -566,6 +594,7 @@ test(
       env: {
         COURSE_CONTENT_SOURCE: "github:metyatech/teacher-profile-docs#main",
         GH_TOKEN: fixtureToken,
+        GITHUB_TOKEN: "fixture-github-token-NEVER-LEAK-LEFTOVER",
         COURSE_DOCS_GIT_COMMAND: process.execPath,
         COURSE_DOCS_GIT_SCRIPT: path.join(fakeBin, "git.mjs"),
         COURSE_DOCS_NEXT_DIST_DIR: distDir,
@@ -631,6 +660,24 @@ test(
       "GIT_CONFIG_VALUE_0 must start with the structural AUTHORIZATION: basic prefix and carry a non-empty credential value",
     );
     assert.equal(envMap.GIT_TERMINAL_PROMPT, "0", 'GIT_TERMINAL_PROMPT must be set to "0"');
+
+    // Raw GitHub credential env vars are scrubbed even with a stale
+    // gitconfig in HOME and a competing GITHUB_TOKEN present.
+    assert.equal(
+      envMap.GH_TOKEN_IS_SET,
+      false,
+      "GH_TOKEN must be unset in the spawned git process env",
+    );
+    assert.equal(
+      envMap.GITHUB_TOKEN_IS_SET,
+      false,
+      "GITHUB_TOKEN must be unset in the spawned git process env",
+    );
+    assert.equal(
+      envMap.GIT_CONFIG_VALUE_0_IS_SET,
+      true,
+      "GIT_CONFIG_VALUE_0 (the Authorization header carrying the PAT) must be set",
+    );
 
     // The new design applies a TRIPLE-ISOLATION: GIT_CONFIG_GLOBAL
     // is REPLACED with an empty tmpfile (so Git's global config is a

@@ -112,13 +112,14 @@ const gitCommandPrefix = process.env.COURSE_DOCS_GIT_SCRIPT
 //   1. Build the canonical URL and the active-source-id skeleton from
 //      `courseSource.repo` and `courseSource.ref`.
 //   2. Inspect the existing clone directory. If it exists and its
-//      `previousSourceId` matches the would-be active source id, call
-//      `normalizeOriginUrl` to repair any leftover credentialed origin
-//      URL BEFORE any network access. If it exists and its
-//      `previousSourceId` does NOT match (different repo or ref), `rm`
-//      the clone directory before network access so a credentialed
-//      `.git/config` from a different content source can never be
-//      observed. If it does not exist, do nothing.
+//      `previousSourceId` matches the current source's repo/ref
+//      skeleton, call `normalizeOriginUrl` to repair any leftover
+//      credentialed origin URL BEFORE any network access. If it exists
+//      and its `previousSourceId` does NOT match (different repo or
+//      ref, or no recorded state), `rm` the clone directory before
+//      network access so a credentialed `.git/config` from a different
+//      content source can never be observed. If it does not exist, do
+//      nothing.
 //   3. Run `git ls-remote` against the canonical URL. The output is
 //      parsed by `parseLsRemoteObjectId`, which enforces a 40-hex
 //      (SHA-1) or 64-hex (SHA-256) prefix followed by whitespace.
@@ -126,7 +127,12 @@ const gitCommandPrefix = process.env.COURSE_DOCS_GIT_SCRIPT
 //      malformed stdout throws "Unable to parse remote ref ...". Both
 //      error messages mention only the canonical URL, never the
 //      malformed line.
-//   4. If a clone is needed, run `git clone`.
+//   4. Build the FULL active source id (`repo:<repo>#<ref>@<headSha>`)
+//      and re-clone whenever it differs from `previousSourceId` (a head
+//      SHA change for the same repo/ref still requires a fresh clone,
+//      because `git ls-remote` never updates an existing working tree)
+//      or no clone exists. The existing clone is reused ONLY when the
+//      full active source id is unchanged.
 //   5. After the clone, call `normalizeOriginUrl` again as a
 //      defense-in-depth repair. The clone's `.git/config` is rewritten
 //      to contain exactly one canonical `url = <canonicalUrl>` line
@@ -466,8 +472,19 @@ if (courseSource.kind === "local") {
     });
     activeSourceId = `${activeIdSkeleton}${headSha}`;
 
-    // Step 4: clone if needed.
-    if (!hasGitClone(cloneDir)) {
+    // Step 4: clone (or re-clone) the content. A `git ls-remote` only
+    // reads the remote head SHA; it does NOT update an existing clone's
+    // working tree. So the reuse decision must be made against the FULL
+    // active source id (repo + ref + head SHA), not just (repo, ref).
+    // When the resolved head SHA changes for the same (repo, ref), the
+    // persisted clone is stale: its working tree still holds the old
+    // SHA's content even though `active-source.txt` would record the new
+    // SHA. Removing the directory and re-cloning is the only way to make
+    // the synced content match the recorded SHA. The clone is reused
+    // ONLY when `previousSourceId === activeSourceId` (same repo, same
+    // ref, same head SHA) and a clone already exists on disk.
+    if (previousSourceId !== activeSourceId || !hasGitClone(cloneDir)) {
+      rmIfExists(cloneDir);
       run(
         gitCommand,
         ["clone", "--depth", "1", "--branch", courseSource.ref, canonicalUrl, cloneDir],

@@ -59,6 +59,18 @@ export const SCRUBBED_GIT_ENV_KEYS = [
 // index from the parent env).
 export const SCRUBBED_GIT_ENV_KEY_PATTERN = /^GIT_CONFIG_(KEY|VALUE)_\d+$/u;
 
+// Raw GitHub credential env vars that must NOT be inherited by the
+// spawned git process. The PAT is delivered to git EXCLUSIVELY through
+// the `GIT_CONFIG_VALUE_0` Authorization header; leaving `GH_TOKEN` /
+// `GITHUB_TOKEN` in the spawned env would (a) hand git's credential
+// helpers and any `gh`-aware subprocess a second, raw copy of the
+// credential, and (b) let a competing `GITHUB_TOKEN` (the PR-scoped
+// Actions token) shadow the intended content-read PAT. We scrub them
+// from the spawned env copy only; `process.env` itself is never
+// mutated (the redactor still reads `process.env.GH_TOKEN` to scrub
+// failure output).
+export const SCRUBBED_GIT_CREDENTIAL_ENV_KEYS = ["GH_TOKEN", "GITHUB_TOKEN"];
+
 // Build a short-lived, isolated auth context for the spawned git
 // process. The returned `cwd` is a fresh, empty tmpdir that the spawned
 // process should chdir into; the returned `authEnv` is meant to be
@@ -152,14 +164,17 @@ export const disposeIsolatedGitAuthContext = (context) => {
   }
 };
 
-// Clone `process.env`, scrub every Git override variable (the 8 named
+// Clone `process.env`, scrub every Git override variable (the named
 // keys in `SCRUBBED_GIT_ENV_KEYS` plus every `GIT_CONFIG_KEY_<n>` /
-// `GIT_CONFIG_VALUE_<n>` matched by `SCRUBBED_GIT_ENV_KEY_PATTERN`),
+// `GIT_CONFIG_VALUE_<n>` matched by `SCRUBBED_GIT_ENV_KEY_PATTERN`) and
+// every raw GitHub credential env var (`SCRUBBED_GIT_CREDENTIAL_ENV_KEYS`),
 // then merge `authEnv` on top so the spawned git process has exactly
-// the Authorization header we want and nothing else.
+// the Authorization header we want and no raw credential of its own.
 //
 // Accepts a `baseEnv` override for testability; defaults to
-// `process.env` for production use.
+// `process.env` for production use. `baseEnv` itself is never mutated:
+// we scrub a shallow copy, so `process.env.GH_TOKEN` survives for the
+// failure-output redactor.
 //
 // @param {Record<string, string> | null | undefined} authEnv
 // @param {Record<string, string | undefined>} [baseEnv]
@@ -167,6 +182,11 @@ export const disposeIsolatedGitAuthContext = (context) => {
 export const buildScrubbedIsolatedEnv = (authEnv, baseEnv = process.env) => {
   const env = { ...baseEnv };
   for (const key of SCRUBBED_GIT_ENV_KEYS) {
+    delete env[key];
+  }
+  // Raw GitHub credential env vars never reach the spawned git: the PAT
+  // travels only inside the `GIT_CONFIG_VALUE_0` Authorization header.
+  for (const key of SCRUBBED_GIT_CREDENTIAL_ENV_KEYS) {
     delete env[key];
   }
   // Multi-value `GIT_CONFIG_KEY_<n>` / `GIT_CONFIG_VALUE_<n>` entries

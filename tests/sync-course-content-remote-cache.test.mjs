@@ -137,7 +137,7 @@ process.exit(1);
 };
 
 test(
-  "remote content sync reuses the existing clone until the resolved ref changes",
+  "remote content sync reuses the clone only when the full active source id (repo+ref+SHA) is unchanged, and re-clones when the resolved head SHA changes for the same repo/ref",
   { timeout: 60_000 },
   async (t) => {
     const fakeSiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-site-"));
@@ -146,6 +146,12 @@ test(
     const logPath = path.join(tempRoot, "git.log");
     const distDir = createIsolatedNextDistDir("sync-course-content-remote-cache");
     const distDirPath = path.join(fakeSiteRoot, ...distDir.split("/"));
+    const introPath = path.join(fakeSiteRoot, "content", "docs", "intro", "index.mdx");
+    const activeSourcePath = path.join(fakeSiteRoot, ".course-content", "active-source.txt");
+
+    const SHA_1 = "1111111111111111111111111111111111111111";
+    const SHA_2 = "2222222222222222222222222222222222222222";
+    const SHA_3 = "3333333333333333333333333333333333333333";
 
     await writeFakeGit({ binDir: fakeBin });
 
@@ -165,68 +171,113 @@ test(
       Path: `${fakeBin}${path.delimiter}${process.env.Path ?? process.env.PATH ?? ""}`,
     };
 
+    const countLog = async (prefix) => {
+      const logLines = (await fs.readFile(logPath, "utf8"))
+        .split(/\r?\n/u)
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      return logLines.filter((entry) => entry.startsWith(prefix)).length;
+    };
+
     await safeRm(path.join(fakeSiteRoot, ".course-content"));
     await safeRm(distDirPath);
+
+    // ---- Case A: initial cold clone (repo/ref fake-course#main, SHA 1) ----
+    const aExit = await runSync({
+      cwd: fakeSiteRoot,
+      env: { ...baseEnv, FAKE_GIT_SHA: SHA_1 },
+    });
+    assert.equal(aExit, 0, "case A: initial sync must succeed");
+    assert.equal(await countLog("clone "), 1, "case A: exactly one clone so far");
+    assert.equal(await countLog("ls-remote "), 1, "case A: exactly one ls-remote so far");
+    assert.match(
+      await fs.readFile(introPath, "utf8"),
+      new RegExp(SHA_1),
+      "case A: content body must carry SHA 1",
+    );
+    assert.equal(
+      (await fs.readFile(activeSourcePath, "utf8")).trim(),
+      `repo:metyatech/fake-course#main@${SHA_1}`,
+      "case A: active-source.txt must record main@SHA1",
+    );
+
+    // ---- Case B: same repo/ref, same SHA -> reuse the clone ----
     await fs.mkdir(distDirPath, { recursive: true });
-    await fs.writeFile(path.join(distDirPath, "keep-first.txt"), "keep", "utf8");
-
-    const firstExit = await runSync({
+    await fs.writeFile(path.join(distDirPath, "keep-b.txt"), "keep", "utf8");
+    const bExit = await runSync({
       cwd: fakeSiteRoot,
-      env: {
-        ...baseEnv,
-        FAKE_GIT_SHA: "1111111111111111111111111111111111111111",
-      },
+      env: { ...baseEnv, FAKE_GIT_SHA: SHA_1 },
     });
-    assert.equal(firstExit, 0);
-    assert.equal(await fileExists(path.join(distDirPath, "keep-first.txt")), true);
+    assert.equal(bExit, 0, "case B: same-SHA sync must succeed");
+    assert.equal(await countLog("clone "), 1, "case B: clone count must NOT increase (reuse)");
+    assert.equal(await countLog("ls-remote "), 2, "case B: a second ls-remote ran");
+    assert.match(
+      await fs.readFile(introPath, "utf8"),
+      new RegExp(SHA_1),
+      "case B: content body stays SHA 1",
+    );
+    assert.equal(
+      (await fs.readFile(activeSourcePath, "utf8")).trim(),
+      `repo:metyatech/fake-course#main@${SHA_1}`,
+      "case B: active-source.txt unchanged",
+    );
+    assert.equal(
+      await fileExists(path.join(distDirPath, "keep-b.txt")),
+      true,
+      "case B: Next dist must NOT be cleared when the active source id is unchanged",
+    );
 
-    await fs.writeFile(path.join(distDirPath, "keep-second.txt"), "keep", "utf8");
-
-    const secondExit = await runSync({
+    // ---- Case C: same repo/ref, NEW SHA -> re-clone + dist clear ----
+    await fs.writeFile(path.join(distDirPath, "keep-c.txt"), "clear", "utf8");
+    const cExit = await runSync({
       cwd: fakeSiteRoot,
-      env: {
-        ...baseEnv,
-        FAKE_GIT_SHA: "1111111111111111111111111111111111111111",
-      },
+      env: { ...baseEnv, FAKE_GIT_SHA: SHA_2 },
     });
-    assert.equal(secondExit, 0);
-    assert.equal(await fileExists(path.join(distDirPath, "keep-second.txt")), true);
+    assert.equal(cExit, 0, "case C: SHA-update sync must succeed");
+    assert.equal(await countLog("clone "), 2, "case C: clone count must increase by one (re-clone)");
+    assert.equal(await countLog("ls-remote "), 3, "case C: a third ls-remote ran");
+    assert.match(
+      await fs.readFile(introPath, "utf8"),
+      new RegExp(SHA_2),
+      "case C: content body must update to SHA 2",
+    );
+    assert.doesNotMatch(
+      await fs.readFile(introPath, "utf8"),
+      new RegExp(SHA_1),
+      "case C: stale SHA 1 content must be gone",
+    );
+    assert.equal(
+      (await fs.readFile(activeSourcePath, "utf8")).trim(),
+      `repo:metyatech/fake-course#main@${SHA_2}`,
+      "case C: active-source.txt must advance to main@SHA2",
+    );
+    assert.equal(
+      await fileExists(distDirPath),
+      false,
+      "case C: Next dist must be cleared when the active source id changes",
+    );
 
-    await fs.writeFile(path.join(distDirPath, "keep-third.txt"), "clear", "utf8");
-
-    // The third run switches to a DIFFERENT REF (`feature-branch`).
-    // The new design reuses the existing clone on the SAME (repo, ref)
-    // even when the resolved head SHA changes (a `git clone --depth 1
-    // --branch <ref>` pins content to the ref, so a SHA change for the
-    // same ref does not require a re-clone). Switching the ref
-    // exercises the cold-clone path: the script removes the existing
-    // clone directory and re-clones for the new ref.
-    const thirdExit = await runSync({
+    // ---- Case D: switch ref (feature-branch, SHA 3) -> re-clone ----
+    const dExit = await runSync({
       cwd: fakeSiteRoot,
       env: {
         ...baseEnv,
         COURSE_CONTENT_SOURCE: "github:metyatech/fake-course#feature-branch",
-        FAKE_GIT_SHA: "2222222222222222222222222222222222222222",
+        FAKE_GIT_SHA: SHA_3,
       },
     });
-    assert.equal(thirdExit, 0);
-    assert.equal(await fileExists(distDirPath), false);
-
-    const logLines = (await fs.readFile(logPath, "utf8"))
-      .split(/\r?\n/u)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-    const cloneCount = logLines.filter((entry) => entry.startsWith("clone ")).length;
-    const lsRemoteCount = logLines.filter((entry) => entry.startsWith("ls-remote ")).length;
-
-    // Two clones total: one on the cold-start path (first run), one
-    // on the ref-switch path (third run). The second run reuses the
-    // existing clone because the (repo, ref) is unchanged.
-    assert.equal(cloneCount, 2, `expected exactly 2 clone calls; got ${cloneCount}`);
-    assert.equal(lsRemoteCount, 3, `expected exactly 3 ls-remote calls; got ${lsRemoteCount}`);
+    assert.equal(dExit, 0, "case D: ref-switch sync must succeed");
+    assert.equal(await countLog("clone "), 3, "case D: clone count must increase by one (re-clone)");
+    assert.equal(await countLog("ls-remote "), 4, "case D: a fourth ls-remote ran");
     assert.match(
-      await fs.readFile(path.join(fakeSiteRoot, "content", "docs", "intro", "index.mdx"), "utf8"),
-      /2222222222222222222222222222222222222222/,
+      await fs.readFile(introPath, "utf8"),
+      new RegExp(SHA_3),
+      "case D: content body must update to SHA 3",
+    );
+    assert.equal(
+      (await fs.readFile(activeSourcePath, "utf8")).trim(),
+      `repo:metyatech/fake-course#feature-branch@${SHA_3}`,
+      "case D: active-source.txt must record feature-branch@SHA3",
     );
   },
 );

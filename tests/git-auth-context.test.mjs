@@ -16,6 +16,7 @@ import {
   createIsolatedGitAuthContext,
   disposeIsolatedGitAuthContext,
   getNullDevicePath,
+  SCRUBBED_GIT_CREDENTIAL_ENV_KEYS,
   SCRUBBED_GIT_ENV_KEYS,
 } from "../scripts/git-auth-context.mjs";
 
@@ -180,6 +181,61 @@ test("buildScrubbedIsolatedEnv merges the authEnv over the scrubbed base env", (
   assert.equal(env.GIT_CONFIG_NOSYSTEM, "1");
   assert.equal(env.GIT_CONFIG_SYSTEM, "/dev/null");
   assert.equal(env.GIT_TERMINAL_PROMPT, "0");
+});
+
+test("SCRUBBED_GIT_CREDENTIAL_ENV_KEYS lists the raw GitHub credential env vars", () => {
+  assert.deepEqual([...SCRUBBED_GIT_CREDENTIAL_ENV_KEYS].sort(), ["GH_TOKEN", "GITHUB_TOKEN"]);
+});
+
+test("buildScrubbedIsolatedEnv strips raw GH_TOKEN / GITHUB_TOKEN credentials from the base env (no authEnv)", () => {
+  const baseEnv = {
+    PATH: "/usr/bin",
+    GH_TOKEN: "raw-gh-token",
+    GITHUB_TOKEN: "raw-github-token",
+  };
+  const env = buildScrubbedIsolatedEnv(null, baseEnv);
+  assert.equal(env.GH_TOKEN, undefined, "GH_TOKEN must be scrubbed from the spawned env copy");
+  assert.equal(
+    env.GITHUB_TOKEN,
+    undefined,
+    "GITHUB_TOKEN must be scrubbed from the spawned env copy",
+  );
+  assert.equal(env.PATH, "/usr/bin", "unrelated env vars must be preserved");
+  // The base env object itself must not be mutated.
+  assert.equal(baseEnv.GH_TOKEN, "raw-gh-token", "baseEnv must not be mutated by the scrubber");
+  assert.equal(
+    baseEnv.GITHUB_TOKEN,
+    "raw-github-token",
+    "baseEnv must not be mutated by the scrubber",
+  );
+});
+
+test("buildScrubbedIsolatedEnv removes raw GH_TOKEN / GITHUB_TOKEN while keeping the injected GIT_CONFIG_VALUE_0 Authorization header", () => {
+  const baseEnv = {
+    HOME: "/home/test",
+    GH_TOKEN: "raw-gh-token",
+    GITHUB_TOKEN: "raw-github-token",
+  };
+  const authEnv = {
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: "http.https://github.com/.extraheader",
+    GIT_CONFIG_VALUE_0: "AUTHORIZATION: basic Zm9v",
+    GIT_CONFIG_GLOBAL: "/tmp/empty",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_SYSTEM: "/dev/null",
+    GIT_TERMINAL_PROMPT: "0",
+  };
+  const env = buildScrubbedIsolatedEnv(authEnv, baseEnv);
+  // Raw credentials gone, Authorization header preserved: the PAT lives
+  // only inside GIT_CONFIG_VALUE_0.
+  assert.equal(env.GH_TOKEN, undefined, "GH_TOKEN must be undefined in the spawned env");
+  assert.equal(env.GITHUB_TOKEN, undefined, "GITHUB_TOKEN must be undefined in the spawned env");
+  assert.equal(
+    env.GIT_CONFIG_VALUE_0,
+    "AUTHORIZATION: basic Zm9v",
+    "the injected Authorization header must survive",
+  );
+  assert.equal(env.HOME, "/home/test");
 });
 
 test("disposeIsolatedGitAuthContext removes both cwd and globalConfigPath", async (t) => {
