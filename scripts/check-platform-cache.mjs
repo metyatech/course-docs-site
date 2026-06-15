@@ -8,11 +8,7 @@ import path from "node:path";
 import { resolveNextDistDirPath } from "./next-dist-dir.mjs";
 
 const projectRoot = process.cwd();
-const statePath = path.join(
-  projectRoot,
-  ".course-content",
-  "active-platform-sha.txt",
-);
+const statePath = path.join(projectRoot, ".course-content", "active-platform-sha.txt");
 
 // ── helpers (same conventions as sync-course-content.mjs) ──
 
@@ -44,11 +40,8 @@ const rmIfExists = (targetPath) => {
 
 // ── main ──
 
-const pkg = JSON.parse(
-  fs.readFileSync(path.join(projectRoot, "package.json"), "utf8"),
-);
-const platformSpec =
-  pkg.dependencies?.["@metyatech/course-docs-platform"] ?? "";
+const pkg = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8"));
+const platformSpec = pkg.dependencies?.["@metyatech/course-docs-platform"] ?? "";
 const match = platformSpec.match(/#([0-9a-f]+)$/i);
 const currentSha = match?.[1] ?? "";
 

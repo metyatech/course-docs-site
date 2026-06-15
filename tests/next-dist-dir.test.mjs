@@ -49,17 +49,19 @@ const loadPlaywrightConfigWithoutOverride = async (configUrl = playwrightConfigU
   }
 };
 
-const parseVerifyCourseJobEnv = (workflowText) => {
-  const lines = workflowText.split(/\r?\n/);
-  const jobStart = lines.findIndex((line) => line === "  verify-course:");
-  assert.notEqual(jobStart, -1, "Expected CI workflow to define verify-course job.");
+const findJobLines = (lines, jobName) => {
+  const jobStart = lines.findIndex((line) => line === `  ${jobName}:`);
+  assert.notEqual(jobStart, -1, `Expected CI workflow to define ${jobName} job.`);
 
   const nextJobStart = lines.findIndex(
     (line, index) => index > jobStart && /^  [A-Za-z0-9_-]+:$/.test(line),
   );
-  const jobLines = lines.slice(jobStart, nextJobStart === -1 ? undefined : nextJobStart);
+  return lines.slice(jobStart, nextJobStart === -1 ? undefined : nextJobStart);
+};
+
+const parseJobEnv = (jobLines) => {
   const envStart = jobLines.findIndex((line) => line === "    env:");
-  assert.notEqual(envStart, -1, "Expected verify-course job to define a job-level env block.");
+  assert.notEqual(envStart, -1, "Expected job to define a job-level env block.");
 
   const env = new Map();
   for (const line of jobLines.slice(envStart + 1)) {
@@ -68,6 +70,14 @@ const parseVerifyCourseJobEnv = (workflowText) => {
     const match = /^      ([A-Z0-9_]+):\s*(.*)$/.exec(line);
     if (match) env.set(match[1], match[2].replace(/^"(.*)"$/, "$1"));
   }
+
+  return env;
+};
+
+const parseE2eCourseJob = (workflowText) => {
+  const lines = workflowText.split(/\r?\n/);
+  const jobLines = findJobLines(lines, "e2e-course");
+  const env = parseJobEnv(jobLines);
 
   return { env, jobText: jobLines.join("\n") };
 };
@@ -217,21 +227,58 @@ test("playwright CI web server uses the test Next dist dir by default", async ()
   );
 });
 
-test("CI verify-course runs the canonical verify:ci command under the test Next dist dir", async () => {
+test("CI e2e-course job depends on prepare-matrix and runs test:course:ci under the e2e Next dist dir", async () => {
   const workflowText = await readFile(ciWorkflowPath, "utf8");
-  const { env, jobText } = parseVerifyCourseJobEnv(workflowText);
+  const { env, jobText } = parseE2eCourseJob(workflowText);
 
-  assert.equal(env.get("COURSE_DOCS_NEXT_DIST_DIR"), TEST_NEXT_DIST_DIR);
-  assert.match(jobText, /      - name: Verify CI\n        run: npm run verify:ci/);
+  assert.match(
+    jobText,
+    /^    needs: prepare-matrix$/m,
+    "e2e-course job MUST declare `needs: prepare-matrix`.",
+  );
+
+  const e2eDistDir = env.get("COURSE_DOCS_NEXT_DIST_DIR");
+  assert.ok(
+    typeof e2eDistDir === "string",
+    "e2e-course job MUST set COURSE_DOCS_NEXT_DIST_DIR at the job env level.",
+  );
+  assert.match(
+    e2eDistDir,
+    /^\.next-e2e-\$\{\{\s*matrix\.siteId\s*\}\}$/,
+    "e2e-course job MUST set COURSE_DOCS_NEXT_DIST_DIR to `.next-e2e-${{ matrix.siteId }}`.",
+  );
+  assert.equal(
+    e2eDistDir,
+    ".next-e2e-${{ matrix.siteId }}",
+    "e2e-course job MUST use the canonical `.next-e2e-` prefix with the matrix siteId.",
+  );
+
+  assert.equal(
+    env.get("E2E_PORT"),
+    "${{ matrix.e2ePort }}",
+    "e2e-course job MUST forward E2E_PORT from the matrix entry.",
+  );
+
+  assert.match(
+    jobText,
+    /      - name: Run course E2E \(CI\)\n        if: \$\{\{ !matrix\.requiresContentReadToken \}\}\n        run: npm run test:course:ci/,
+    "e2e-course job MUST run `npm run test:course:ci` as the public E2E step (no GH_TOKEN).",
+  );
+
+  assert.match(
+    jobText,
+    /      - name: Run course E2E \(CI, private content\)\n        if: \$\{\{ matrix\.requiresContentReadToken \}\}\n        env:\n          GH_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}\n        run: npm run test:course:ci/,
+    "e2e-course job MUST run `npm run test:course:ci` as the private E2E step (with GH_TOKEN).",
+  );
+  assert.equal(
+    /run: npm run verify:ci/.test(jobText),
+    false,
+    "e2e-course job MUST NOT call `verify:ci`; it owns the E2E step only.",
+  );
   assert.equal(
     /run: npm run build(?!:|\w)/.test(jobText),
     false,
-    "verify-course job MUST NOT call `npm run build` separately; it is part of verify:ci.",
-  );
-  assert.equal(
-    /run: npm run verify:course:ci/.test(jobText),
-    false,
-    "verify-course job MUST NOT call verify:course:ci directly; it runs via verify:ci.",
+    "e2e-course job MUST NOT call `npm run build`; the build job is separate.",
   );
 });
 
@@ -239,13 +286,13 @@ test("package.json exposes verify:precommit (fast local gate) and verify:ci (CI-
   const pkg = JSON.parse(await readFile(packageJsonPath, "utf8"));
 
   assert.equal(
-    pkg.scripts["verify:precommit"],
-    "npm run lint && npm test",
-    "verify:precommit MUST be the fast local gate: lint + fast tests.",
+    pkg.scripts["verify:course:ci"],
+    "npm run verify:sites && npm run test:course:ci && npm run build:verified",
+    "verify:course:ci MUST chain verify:sites, the Playwright CI test, and the verified build so local repro matches CI.",
   );
   assert.equal(
     pkg.scripts["verify:ci"],
-    "npm run audit:ci && npm run build && npm run verify:course:ci",
+    "npm run verify:sites && npm run audit:ci && npm run build && npm run verify:course:ci",
     "verify:ci MUST chain the high audit gate, `build`, then `verify:course:ci` so local repro matches CI.",
   );
   assert.equal(

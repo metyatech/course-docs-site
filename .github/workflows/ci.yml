@@ -10,12 +10,27 @@ concurrency:
   group: course-docs-site-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  shared:
+  prepare-matrix:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      build: ${{ steps.set-build-matrix.outputs.build }}
+      e2e: ${{ steps.set-e2e-matrix.outputs.e2e }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # Do not persist the PR-scoped GITHUB_TOKEN in this checkout. The
+          # matrix jobs run `npm run sync:content`, which invokes `git
+          # ls-remote` and `git clone` against course content repos. A stale
+          # `http.https://github.com/.extraheader` from this checkout would
+          # override the per-content `GH_TOKEN` (COURSE_CONTENT_READ_TOKEN)
+          # and break private content authentication.
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -24,11 +39,40 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Cache Playwright Chromium
-        uses: actions/cache@v5
+      - name: Install
+        run: npm ci
+
+      - name: Verify site manifest
+        run: npm run verify:sites
+
+      - name: Generate build matrix
+        id: set-build-matrix
+        run: echo "build=$(node scripts/print-course-sites-matrix.mjs --kind build)" >> $GITHUB_OUTPUT
+
+      - name: Generate E2E matrix
+        id: set-e2e-matrix
+        run: echo "e2e=$(node scripts/print-course-sites-matrix.mjs --kind e2e)" >> $GITHUB_OUTPUT
+
+  shared:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COURSE_CONTENT_SOURCE: github:metyatech/javascript-course-docs#master
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          # See prepare-matrix. The shared job also runs sync-course-content
+          # and must not let a leftover PR-scoped GITHUB_TOKEN interfere
+          # with the per-content token.
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: package-lock.json
 
       - name: Install
         run: npm ci
@@ -36,29 +80,111 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Verify shared tests (repeat-clean gate)
+      - name: Audit (high severity gate)
+        run: npm run audit:ci
+
+      - name: Verify (repeat-clean)
         run: npm run verify:repeat-clean
 
-  verify-course:
+      - name: Verify (precommit)
+        run: npm run verify:precommit
+
+  build-course:
+    needs: prepare-matrix
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - courseSource: "github:metyatech/javascript-course-docs#master"
-            e2ePort: 3101
-          - courseSource: "github:metyatech/programming-course-docs#master"
-            e2ePort: 3102
-          - courseSource: "github:metyatech/open-campus-unreal-90min#main"
-            e2ePort: 3103
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.build) }}
     env:
       COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
-      COURSE_DOCS_NEXT_DIST_DIR: .next-test
+      COURSE_DOCS_NEXT_DIST_DIR: .next-build-${{ matrix.siteId }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # The build-course job runs `npm run sync:content`, which invokes
+          # `git ls-remote` and `git clone` against the matrix-defined
+          # `courseSource`. For private repos, only the per-content
+          # `GH_TOKEN` (mapped from COURSE_CONTENT_READ_TOKEN) should be
+          # used, and it is delivered to those few steps only — not at
+          # job level. Disabling persist-credentials here prevents the
+          # PR-scoped GITHUB_TOKEN from being written to the local
+          # `.git/config` as an `http.https://github.com/.extraheader`,
+          # which would otherwise be preferred over the per-content
+          # GH_TOKEN and cause exit 128.
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate private content read token
+        if: ${{ matrix.requiresContentReadToken }}
+        shell: bash
+        env:
+          CONTENT_READ_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: |
+          if [ -z "$CONTENT_READ_TOKEN" ]; then
+            echo "::error::COURSE_CONTENT_READ_TOKEN is required to read private course content repositories."
+            exit 1
+          fi
+
+      # Public/private step split: the `GH_TOKEN` (COURSE_CONTENT_READ_TOKEN)
+      # is delivered only to the `(private content)` variants when
+      # `matrix.requiresContentReadToken` is true. Public matrix entries
+      # must not see the secret, so they have no `env:` block at all and
+      # are skipped via `if: ${{ !matrix.requiresContentReadToken }}`.
+      # This keeps the secret out of `npm ci`, `npm run typecheck`, and
+      # `npm run build:verified` logs for public sites, and limits it to
+      # the steps that actually need it for private sites.
+
+      - name: Typecheck
+        if: ${{ !matrix.requiresContentReadToken }}
+        run: npm run typecheck
+
+      - name: Typecheck (private content)
+        if: ${{ matrix.requiresContentReadToken }}
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: npm run typecheck
+
+      - name: Build (verified)
+        if: ${{ !matrix.requiresContentReadToken }}
+        run: npm run build:verified
+
+      - name: Build (verified, private content)
+        if: ${{ matrix.requiresContentReadToken }}
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: npm run build:verified
+
+  e2e-course:
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.e2e) }}
+    env:
+      COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
+      COURSE_DOCS_NEXT_DIST_DIR: .next-e2e-${{ matrix.siteId }}
       E2E_PORT: ${{ matrix.e2ePort }}
       PLAYWRIGHT_MAX_FAILURES: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # See build-course. The e2e-course job also runs sync:content
+          # and must not let a leftover PR-scoped GITHUB_TOKEN interfere
+          # with the per-content token.
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -67,17 +193,59 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
-      - name: Cache Playwright Chromium
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
-
       - name: Install
         run: npm ci
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Verify CI
-        run: npm run verify:ci
+      - name: Validate private content read token
+        if: ${{ matrix.requiresContentReadToken }}
+        shell: bash
+        env:
+          CONTENT_READ_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: |
+          if [ -z "$CONTENT_READ_TOKEN" ]; then
+            echo "::error::COURSE_CONTENT_READ_TOKEN is required to read private course content repositories."
+            exit 1
+          fi
+
+      # Public/private step split: the `GH_TOKEN` (COURSE_CONTENT_READ_TOKEN)
+      # is delivered only to the `(private content)` variants when
+      # `matrix.requiresContentReadToken` is true. Public matrix entries
+      # must not see the secret, so they have no `env:` block at all and
+      # are skipped via `if: ${{ !matrix.requiresContentReadToken }}`.
+      # This keeps the secret out of `npm ci`, `npm run typecheck`,
+      # `npm run build:verified`, and `npm run test:course:ci` logs for
+      # public sites, and limits it to the steps that actually need it
+      # for private sites.
+
+      - name: Typecheck
+        if: ${{ !matrix.requiresContentReadToken }}
+        run: npm run typecheck
+
+      - name: Typecheck (private content)
+        if: ${{ matrix.requiresContentReadToken }}
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: npm run typecheck
+
+      - name: Build (verified)
+        if: ${{ !matrix.requiresContentReadToken }}
+        run: npm run build:verified
+
+      - name: Build (verified, private content)
+        if: ${{ matrix.requiresContentReadToken }}
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: npm run build:verified
+
+      - name: Run course E2E (CI)
+        if: ${{ !matrix.requiresContentReadToken }}
+        run: npm run test:course:ci
+
+      - name: Run course E2E (CI, private content)
+        if: ${{ matrix.requiresContentReadToken }}
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: npm run test:course:ci

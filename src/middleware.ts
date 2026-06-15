@@ -1,21 +1,27 @@
 import { NextResponse } from "next/server";
-import { middleware as platformMiddleware } from "@metyatech/course-docs-platform/next-app/middleware";
 import {
+  isAdminModeConfigured,
+  isProtectedRoute,
   getAdminModeCookieName,
   getAdminModePublicFallbackPath,
-  isAdminModeConfigured,
-  isAdminModeCookieEnabled,
-  isProtectedRoute,
+  getAdminSessionSecret,
 } from "./lib/admin-mode";
+import { isAdminSessionValid } from "./lib/admin/session";
+import { rewriteAssetRequests, type AssetMiddlewareRequest } from "./lib/next-app/middleware";
 
 export const config = {
   matcher: ["/docs/:path*", "/exams/:path*", "/layout-preview/:path*", "/submissions/:path*"],
 };
-export function middleware(request: Parameters<typeof platformMiddleware>[0]) {
+
+export async function middleware(request: AssetMiddlewareRequest) {
   if (isProtectedRoute(request.nextUrl.pathname)) {
+    const secret = getAdminSessionSecret();
     const enabled =
       isAdminModeConfigured() &&
-      isAdminModeCookieEnabled(request.cookies.get(getAdminModeCookieName())?.value);
+      (await isAdminSessionValid(
+        request.cookies.get(getAdminModeCookieName())?.value,
+        secret,
+      ));
 
     if (!enabled) {
       const url = request.nextUrl.clone();
@@ -25,5 +31,5 @@ export function middleware(request: Parameters<typeof platformMiddleware>[0]) {
     }
   }
 
-  return platformMiddleware(request);
+  return rewriteAssetRequests(request);
 }

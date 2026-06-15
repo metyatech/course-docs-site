@@ -1,14 +1,15 @@
-import type { ReactNode } from 'react';
-import { cookies } from 'next/headers';
-import { Layout } from 'nextra-theme-docs';
-import { getPageMap } from 'nextra/page-map';
-import themeConfig from '../../../theme.config';
+import type { ReactNode } from "react";
+import { cookies } from "next/headers";
+import { Layout } from "nextra-theme-docs";
+import { getPageMap } from "nextra/page-map";
+import themeConfig from "../../../theme.config";
 import {
   filterProtectedPageMap,
   getAdminModeCookieName,
   hasProtectedAdminRoutes,
-  isAdminModeCookieEnabled,
-} from '../../lib/admin-mode';
+  isAdminModeConfigured,
+  isAdminSessionValid,
+} from "../../lib/admin-mode";
 
 export default async function DocsLayout({ children }: { children: ReactNode }) {
   const pageMap = await getPageMap();
@@ -16,9 +17,9 @@ export default async function DocsLayout({ children }: { children: ReactNode }) 
   let visiblePageMap = pageMap;
   if (hasProtectedAdminRoutes()) {
     const cookieStore = await cookies();
-    const enabled = isAdminModeCookieEnabled(
-      cookieStore.get(getAdminModeCookieName())?.value
-    );
+    const cookieValue = cookieStore.get(getAdminModeCookieName())?.value;
+    const enabled =
+      isAdminModeConfigured() && (await isAdminSessionValid(cookieValue));
     if (!enabled) {
       visiblePageMap = filterProtectedPageMap(pageMap);
     }

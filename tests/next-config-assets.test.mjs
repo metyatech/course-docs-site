@@ -93,7 +93,10 @@ test("next config treats arbitrary files inside content assets directories as re
       rule.test.flags === "i",
   );
 
-  assert.ok(arbitraryAssetRule, "Expected a fallback resource rule for content/**/assets/** paths.");
+  assert.ok(
+    arbitraryAssetRule,
+    "Expected a fallback resource rule for content/**/assets/** paths.",
+  );
   assert.match("/tmp/project/content/docs/models/assets/Item.fbx", arbitraryAssetRule.test);
   assert.doesNotMatch("/tmp/project/content/docs/models/Item.fbx", arbitraryAssetRule.test);
   assert.match("theme.css", arbitraryAssetRule.exclude);

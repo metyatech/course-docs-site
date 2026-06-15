@@ -126,17 +126,25 @@ const worktreeDevProcessCleanupCommand =
   "}; " +
   "$remaining = @(Get-CimInstance Win32_Process | Where-Object { -not $protectedIds.Contains([int]$_.ProcessId) -and (Test-CourseDocsRootDevProcess $_) }); " +
   "if ($remaining.Count -gt 0) { " +
-  "$remaining | ForEach-Object { Write-Error (\"Leftover dev process did not exit: {0} {1}\" -f $_.ProcessId, $_.CommandLine) }; " +
+  '$remaining | ForEach-Object { Write-Error ("Leftover dev process did not exit: {0} {1}" -f $_.ProcessId, $_.CommandLine) }; ' +
   "exit 1 " +
   "}; " +
   "exit 0";
 
-export const cleanupWorktreeDevProcesses = ({ projectRoot = process.cwd(), timeoutSeconds = 30 } = {}) => {
+export const cleanupWorktreeDevProcesses = ({
+  projectRoot = process.cwd(),
+  timeoutSeconds = 30,
+} = {}) => {
   if (process.platform !== "win32") {
     return;
   }
 
-  const cleanupArgs = ["-NoProfile", "-NonInteractive", "-Command", worktreeDevProcessCleanupCommand];
+  const cleanupArgs = [
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    worktreeDevProcessCleanupCommand,
+  ];
   const cleanupOptions = {
     encoding: "utf8",
     env: {
@@ -221,7 +229,8 @@ export const spawnRunDevForTest = ({
  */
 export const killProcessTree = async (child) => {
   if (!child || child.pid == null) return;
-  if (process.platform !== "win32" && (child.exitCode !== null || child.signalCode !== null)) return;
+  if (process.platform !== "win32" && (child.exitCode !== null || child.signalCode !== null))
+    return;
 
   const waitForExit = new Promise((resolve) => {
     if (child.exitCode !== null || child.signalCode !== null) {

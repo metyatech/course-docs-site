@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/metyatech/course-docs-site/config/course-sites.schema.json",
+  "title": "Course Docs Sites Manifest",
+  "description": "Single source of truth for all metyatech course documentation sites. Consumed by build matrix, E2E, redeploy dispatch, smoke test, and local dev tooling.",
+  "type": "object",
+  "required": ["version", "sites"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "sites": {
+      "type": "array",
+      "minItems": 6,
+      "items": { "$ref": "#/$defs/site" }
+    }
+  },
+  "$defs": {
+    "site": {
+      "type": "object",
+      "required": [
+        "id",
+        "requiresContentReadToken",
+        "contentRepository",
+        "defaultContentRef",
+        "productionUrl",
+        "features",
+        "e2eProfile",
+        "representativeE2E",
+        "smokeTestPaths",
+        "redeployOnSiteChange",
+        "dispatchTarget"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,80}$" },
+        "requiresContentReadToken": { "type": "boolean" },
+        "contentRepository": { "type": "string", "pattern": "^metyatech/[a-z0-9._-]+$" },
+        "defaultContentRef": { "type": "string", "minLength": 1 },
+        "productionUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "features": {
+          "type": "object",
+          "required": [
+            "submissions",
+            "protectedDocs",
+            "adminCommentModeration",
+            "pagefind",
+            "codePreview",
+            "exercises"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "submissions": { "type": "boolean" },
+            "protectedDocs": { "type": "boolean" },
+            "adminCommentModeration": { "type": "boolean" },
+            "pagefind": { "type": "boolean" },
+            "codePreview": { "type": "boolean" },
+            "exercises": { "type": "boolean" }
+          }
+        },
+        "e2eProfile": {
+          "type": "string",
+          "enum": ["docs-only", "submissions", "protected-admin"]
+        },
+        "representativeE2E": { "type": "boolean" },
+        "e2ePort": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+        "e2eSourceEnv": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "smokeTestPaths": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "pattern": "^/" }
+        },
+        "redeployOnSiteChange": { "type": "boolean" },
+        "dispatchTarget": {
+          "type": "object",
+          "required": ["owner", "repo", "workflow"],
+          "additionalProperties": false,
+          "properties": {
+            "owner": { "type": "string", "minLength": 1 },
+            "repo": { "type": "string", "minLength": 1 },
+            "workflow": { "type": "string", "pattern": "\\.ya?ml$" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "representativeE2E": { "const": true } },
+            "required": ["representativeE2E"]
+          },
+          "then": { "required": ["e2ePort", "e2eSourceEnv"] }
+        },
+        {
+          "if": {
+            "properties": { "representativeE2E": { "const": false } },
+            "required": ["representativeE2E"]
+          },
+          "then": {
+            "properties": {
+              "e2ePort": false,
+              "e2eSourceEnv": false
+            }
+          }
+        }
+      ]
+    }
+  }
+}

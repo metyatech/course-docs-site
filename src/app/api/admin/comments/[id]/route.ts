@@ -1,2 +1,3 @@
-export { DELETE } from '@metyatech/course-docs-platform/next-app/admin-comment-delete-route';
+import { createAdminCommentDeleteRoute } from "../../../../../lib/admin/comment-delete-route";
 
+export const DELETE = createAdminCommentDeleteRoute();

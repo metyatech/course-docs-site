@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dispatch:
+  prepare-matrix:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
@@ -27,22 +27,58 @@ jobs:
       )
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      site_sha: ${{ steps.set-sha.outputs.site_sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          # This job never pushes to the checkout. Leaving the PR-scoped
+          # GITHUB_TOKEN behind in `.git/config` would be dead weight at
+          # best and could leak into future steps that run git. Match the
+          # CI workflow's checkout posture.
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify site manifest
+        run: npm run verify:sites
+
+      - name: Generate redeploy matrix
+        id: set-matrix
+        run: echo "matrix=$(node scripts/print-course-sites-matrix.mjs --kind redeploy)" >> $GITHUB_OUTPUT
+
+      - name: Record site SHA
+        id: set-sha
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "site_sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "site_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Record summary
+        run: |
+          echo "## Site SHA" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.set-sha.outputs.site_sha }}" >> $GITHUB_STEP_SUMMARY
+
+  dispatch:
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - repo: metyatech/course-common-docs
-            ref: main
-          - repo: metyatech/javascript-course-docs
-            ref: master
-          - repo: metyatech/programming-course-docs
-            ref: master
-          - repo: metyatech/open-campus-unreal-90min
-            ref: main
-          - repo: metyatech/teacher-profile-docs
-            ref: main
-          - repo: metyatech/web-foundations-docs
-            ref: main
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
     name: Dispatch ${{ matrix.repo }}
     steps:
       - name: Validate dispatch token
@@ -58,5 +94,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.COURSE_CONTENT_REDEPLOY_TOKEN }}
         run: |
-          echo "Dispatching deploy-vercel.yml for ${{ matrix.repo }} @ ${{ matrix.ref }}"
-          gh workflow run deploy-vercel.yml --repo "${{ matrix.repo }}" --ref "${{ matrix.ref }}"
+          echo "Dispatching ${{ matrix.workflow }} for ${{ matrix.repo }} @ ${{ matrix.ref }}"
+          gh workflow run "${{ matrix.workflow }}" --repo "metyatech/${{ matrix.repo }}" --ref "${{ matrix.ref }}"
+
+      - name: Record dispatch summary
+        if: always()
+        env:
+          SITE_ID: ${{ matrix.siteId }}
+          REPO: ${{ matrix.repo }}
+          REF: ${{ matrix.ref }}
+          WORKFLOW: ${{ matrix.workflow }}
+          SITE_SHA: ${{ needs.prepare-matrix.outputs.site_sha }}
+        run: |
+          echo "## Dispatch ${{ matrix.siteId }}" >> $GITHUB_STEP_SUMMARY
+          echo "- siteId: ${{ matrix.siteId }}" >> $GITHUB_STEP_SUMMARY
+          echo "- repo: metyatech/${{ matrix.repo }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ref: ${{ matrix.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- workflow: ${{ matrix.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "- site_sha: ${{ needs.prepare-matrix.outputs.site_sha }}" >> $GITHUB_STEP_SUMMARY

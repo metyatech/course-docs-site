@@ -38,7 +38,9 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
       throw new Error(
-        typeof onTimeoutMessage === "function" ? onTimeoutMessage() : (onTimeoutMessage ?? "Timed out"),
+        typeof onTimeoutMessage === "function"
+          ? onTimeoutMessage()
+          : (onTimeoutMessage ?? "Timed out"),
       );
     }
     const result = await fn();
@@ -196,6 +198,7 @@ test(
         overrides: {
           COURSE_CONTENT_SOURCE: fixtureCourse,
           ADMIN_MODE_TOKEN: "",
+          ADMIN_SESSION_SECRET: "",
           ADMIN_DELETE_TOKEN: "legacy-secret",
         },
       }),
@@ -238,7 +241,7 @@ test(
           },
           body: JSON.stringify({ token: "legacy-secret" }),
         });
-        return enableAdmin?.status === 200;
+        return enableAdmin?.status === 503;
       },
       {
         timeoutMs: 60_000,
@@ -246,7 +249,7 @@ test(
         onTimeoutMessage: "Admin mode POST did not become ready for legacy token test.",
       },
     );
-    assert.equal(enableAdmin.status, 200);
+    assert.equal(enableAdmin.status, 503);
     assert.equal(enableAdmin.setCookie, null);
     assert.match(enableAdmin.text, /"configured":false/);
     assert.match(enableAdmin.text, /"enabled":false/);
