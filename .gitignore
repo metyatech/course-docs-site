@@ -33,3 +33,6 @@
 next-env.d.ts
 tsconfig.next.generated*.json
 .vercel/
+
+# AI agent working files
+/.omo/

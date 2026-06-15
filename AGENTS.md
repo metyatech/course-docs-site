@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD025 -->
 # Tool Rules (compose-agentsmd)
 
-- **Session gate**: before responding to ANY user message, run `compose-agentsmd` from the project root. AGENTS.md contains the rules you operate under; stale rules cause rule violations. If you discover you skipped this step mid-session, stop, run it immediately, re-read the diff, and adjust your behavior before continuing.
+- **Session gate**: before starting substantive work for each externally supplied human/operator instruction, run `compose-agentsmd` once from the project root. AGENTS.md contains the rules you operate under; stale rules cause rule violations. Do not rerun this gate within the same instruction after tool results, retries, generated continuations, or resumed execution. If you discover you skipped this step mid-session, stop, run it immediately, re-read the diff, and adjust your behavior before continuing.
 - `compose-agentsmd` intentionally regenerates `AGENTS.md`; any resulting `AGENTS.md` diff is expected and must not be treated as an unexpected external change.
 - If `compose-agentsmd` is not available, run it via `npx compose-agentsmd`. If `npx` is unavailable or cannot fetch the package, install it via npm with an environment-appropriate method such as `npm install -g compose-agentsmd` when global installs are permitted, or a user-local npm prefix when global installs are not permitted.
 - To update shared/global rules, use `compose-agentsmd edit-rules` to locate the writable rules workspace, make changes only in that workspace, then run `compose-agentsmd apply-rules` (do not manually clone or edit the rules source repo outside this workflow).
@@ -94,8 +94,18 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-autho
   explicitly asks for an extension-level assessment.
 - Questions MUST have a single defensible answer, or explicitly state the
   accepted answer range.
-- Multiple-choice distractors MUST be plausible and based on likely
-  misconceptions or mistakes.
+- Multiple-choice distractors MUST be plausible, close to the correct answer,
+  and based on likely misconceptions or mistakes.
+- Each multiple-choice distractor MUST differ from the correct answer by one
+  meaningful concept, target, condition, order, or effect.
+- Multiple-choice distractors MUST NOT be obviously unrelated options from a
+  different feature area when the question assesses specific technical
+  understanding.
+- For technical workflow questions, multiple-choice distractors SHOULD remain
+  within the same tool, editor, panel, node family, command family, or
+  operation category as the correct answer.
+- Multiple-choice distractors MAY be obviously wrong only when the learning
+  objective is basic vocabulary recognition for first exposure.
 - Fill-in questions MUST specify the expected answer format and any forbidden or
   equivalent answers when ambiguity is likely.
 - Explanations MUST state the reasoning, concept, procedure, or misconception
@@ -105,6 +115,32 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-autho
 - When authoring a short question set, order items from lower intrinsic load to
   higher intrinsic load and cover multiple important taught targets rather than
   repeating one surface pattern.
+
+## Course exam question authoring
+
+- When creating course exam questions, check the syllabus and course materials
+  specified by the user, and limit questions to the taught scope at the time of
+  the exam.
+- Confirm the exam's full score and time limit before finalizing the question
+  set.
+- Match the total scoring points to the exam's full score.
+- For midterm exams in this course context, use 20 points unless the user
+  specifies otherwise.
+- For beginner course exams, write questions that students can answer when they
+  can solve the course exercises for the taught scope.
+- When the user specifies that certain skills are more important for continuing
+  later classes, assign higher scoring weight to those skills.
+- Before writing each question, decide its `出題意図`. Write the question so
+  that it tests that intent.
+- Put `出題意図` at the beginning of `## Explanation`.
+- When creating a preparation set for a regular exam:
+  - match each preparation question one-to-one with the regular exam question;
+  - keep the same assessed skill;
+  - use exactly the same `## Scoring` text;
+  - change surface details so the student must apply the skill rather than copy
+    the preparation answer.
+- Write shared scoring text abstractly enough to apply to both the preparation
+  question and the paired regular exam question.
 
 Source: agent-rules-private/rules/course-site-metadata.md
 
