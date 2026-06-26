@@ -391,6 +391,29 @@ E2E_OPEN_CAMPUS_CONTENT_SOURCE="github:metyatech/open-campus-unreal-90min#main"
 There are three verification tiers. Pick the smallest tier that proves the
 change you are making.
 
+### `npm run verify:content` — synced-content quality gate
+
+```sh
+npm run verify:content
+```
+
+A site-owned quality gate that inspects the synced root `content/` directory
+(the same one produced by `npm run sync:content`) for content-shape invariants
+that used to live in each individual course content repo. It runs:
+
+- Exercise heading rules: every `<Exercise>` opening tag must be immediately
+  preceded by a Markdown heading (`###` through `######`), allowing only blank
+  lines between them, and must not carry a `title` prop.
+- Code-block / asset indentation: fenced code in `html / css / js / jsx / json /
+  ts / tsx / typescript` blocks and standalone `*.css / *.html / *.js / *.json /
+  *.ts` assets under `content/` must use spaces and four-space indentation
+  steps.
+
+The verifier never reads the upstream content repository — it inspects only the
+working `content/` directory, so it works for any course source. `typecheck`,
+`build`, and `build:verified` invoke it automatically immediately after
+`sync:content` so violations are caught before the expensive Next.js build.
+
 ### `npm run verify:precommit` — fast pre-commit gate
 
 ```sh

@@ -485,3 +485,45 @@ test("ci.yml checkout steps in shared, build-course, e2e-course, and prepare-mat
     assertCheckoutHasPersistCredentialsFalse(jobBody, `ci.yml:${jobName}`);
   }
 });
+
+test("verify-content is a site-owned synced-content quality gate, run after sync:content", async () => {
+  const pkg = await readPackageJson();
+
+  assert.equal(
+    pkg.scripts["verify:content"],
+    "node scripts/verify-content.mjs",
+    "verify:content must invoke the shared content checker.",
+  );
+
+  for (const command of ["build", "build:verified", "typecheck"]) {
+    const value = pkg.scripts[command];
+    assert.ok(
+      typeof value === "string" && value.length > 0,
+      `${command} script must be defined and non-empty.`,
+    );
+    assert.match(
+      value,
+      /npm run sync:content/,
+      `${command} must start with \`npm run sync:content\` so sync always runs first.`,
+    );
+    assert.match(
+      value,
+      /npm run verify:content/,
+      `${command} must invoke verify:content immediately after sync:content so course content quality is checked before any expensive build/typecheck work.`,
+    );
+    const syncIndex = value.indexOf("npm run sync:content");
+    const verifyIndex = value.indexOf("npm run verify:content");
+    assert.ok(
+      syncIndex >= 0 && verifyIndex >= 0 && verifyIndex > syncIndex,
+      `${command} must run verify:content after sync:content (sync at ${syncIndex}, verify at ${verifyIndex}).`,
+    );
+  }
+
+  // The shared checker must not drag @metyatech/course-docs-platform into a
+  // content-validation path; the verifier is intentionally platform-free.
+  assert.doesNotMatch(
+    pkg.scripts["verify:content"],
+    /course-docs-platform/,
+    "verify:content must remain platform-free (course-docs-platform is deprecated).",
+  );
+});

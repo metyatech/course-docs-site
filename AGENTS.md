@@ -90,8 +90,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-autho
 - Prompts, answers, and explanations MUST stand alone without referring to
   "this material", "the attached document", "lesson N", or other external
   source context unless that source context is included in the prompt itself.
-- Questions MUST NOT require untaught or extension-only content unless the task
-  explicitly asks for an extension-level assessment.
+- Questions, prompts, options, answers, scoring criteria, and explanations MUST NOT introduce, require, or casually reference untaught concepts, features, parameters, APIs, syntax, techniques, tools, or extension-only content unless the user explicitly requests extension-level assessment.
 - Questions MUST have a single defensible answer, or explicitly state the
   accepted answer range.
 - Multiple-choice distractors MUST be plausible, close to the correct answer,
@@ -130,6 +129,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-autho
   can solve the course exercises for the taught scope.
 - When the user specifies that certain skills are more important for continuing
   later classes, assign higher scoring weight to those skills.
+- Distribute exam points across the important taught targets and avoid overrepresenting one surface pattern unless the user explicitly prioritizes it.
 - Before writing each question, decide its `出題意図`. Write the question so
   that it tests that intent.
 - Put `出題意図` at the beginning of `## Explanation`.
