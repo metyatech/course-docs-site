@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD025 -->
 # Tool Rules (compose-agentsmd)
 
-- **Session gate**: before responding to ANY user message, run `compose-agentsmd` from the project root. AGENTS.md contains the rules you operate under; stale rules cause rule violations. If you discover you skipped this step mid-session, stop, run it immediately, re-read the diff, and adjust your behavior before continuing.
+- **Session gate**: before starting substantive work for each externally supplied human/operator instruction, run `compose-agentsmd` once from the project root. AGENTS.md contains the rules you operate under; stale rules cause rule violations. Do not rerun this gate within the same instruction after tool results, retries, generated continuations, or resumed execution. If you discover you skipped this step mid-session, stop, run it immediately, re-read the diff, and adjust your behavior before continuing.
 - `compose-agentsmd` intentionally regenerates `AGENTS.md`; any resulting `AGENTS.md` diff is expected and must not be treated as an unexpected external change.
 - If `compose-agentsmd` is not available, run it via `npx compose-agentsmd`. If `npx` is unavailable or cannot fetch the package, install it via npm with an environment-appropriate method such as `npm install -g compose-agentsmd` when global installs are permitted, or a user-local npm prefix when global installs are not permitted.
 - To update shared/global rules, use `compose-agentsmd edit-rules` to locate the writable rules workspace, make changes only in that workspace, then run `compose-agentsmd apply-rules` (do not manually clone or edit the rules source repo outside this workflow).
@@ -41,14 +41,12 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/web/web-ui-and-testing.m
 
 ## Browser automation
 
-- For web automation, use the agent-browser Skill.
-- If browser launch fails due to missing Playwright binaries, run npx playwright
-  install chromium and retry.
+- For web automation or UI verification, use the browser automation tooling available in the current agent environment.
+- If browser launch fails due to missing Playwright binaries, run `npx playwright install chromium` and retry.
 
 ## UI verification and E2E
 
-- For user-visible UI changes, verify in a real browser using agent-browser; if
-  not possible, explain and provide manual steps.
+- For user-visible UI changes, verify in a real browser; if not possible, explain and provide manual steps.
 - Always add E2E tests for user-visible changes; if no harness exists, add one.
 - Run E2E in CI and require it for PR merges; do not defer correctness coverage
   to scheduled runs.
@@ -65,3 +63,101 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/web/web-ui-and-testing.m
   at the boundary). If impractical, document the limitation and get explicit
   user approval before skipping.
 - Use established icon libraries; do not handcraft custom icons or inline SVGs.
+
+Source: github:metyatech/agent-rules@HEAD/rules/domains/education/course-purpose.md
+
+# Course Teaching Purpose
+
+- Treat the terminal goal of every course as: by graduation, the learner can, with confidence, build the things they want or need, on their own.
+- Evaluate course content, sequencing, exercises, lesson structure, quizzes, and exams against that goal.
+- Treat the learner's own happiness as the highest-level goal this purpose ultimately serves.
+- Apply this purpose to every course, even when time or session count is insufficient to fully reach it.
+
+Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-authoring.md
+
+# Educational Question Authoring
+
+## Scientific foundations
+
+- Apply Cognitive Load Theory: reduce extraneous load by making prompts
+  self-contained, explicit, and free of source-document references.
+- Apply retrieval practice and the testing effect: questions should require
+  learners to recall, explain, or apply taught knowledge, not merely recognize
+  classroom events.
+- Apply transfer-appropriate processing: questions should assess concepts,
+  procedures, judgments, debugging cues, or misconceptions in reusable contexts.
+- Apply formative feedback principles: explanations should help learners repair
+  misconceptions at their current level, not merely reveal the answer.
+
+- Educational questions MUST align with the intended learning target, learner
+  level, and already-taught scope.
+- Each question MUST focus on one concept, skill, judgment, or misconception.
+- Prompts MUST be answerable from the question context without relying on
+  hidden classroom-event memory.
+- Prompts, answers, and explanations MUST stand alone without referring to
+  "this material", "the attached document", "lesson N", or other external
+  source context unless that source context is included in the prompt itself.
+- Questions, prompts, options, answers, scoring criteria, and explanations MUST NOT introduce, require, or casually reference untaught concepts, features, parameters, APIs, syntax, techniques, tools, or extension-only content unless the user explicitly requests extension-level assessment.
+- Questions MUST have a single defensible answer, or explicitly state the
+  accepted answer range.
+- Multiple-choice distractors MUST be plausible, close to the correct answer,
+  and based on likely misconceptions or mistakes.
+- Each multiple-choice distractor MUST differ from the correct answer by one
+  meaningful concept, target, condition, order, or effect.
+- Multiple-choice distractors MUST NOT be obviously unrelated options from a
+  different feature area when the question assesses specific technical
+  understanding.
+- For technical workflow questions, multiple-choice distractors SHOULD remain
+  within the same tool, editor, panel, node family, command family, or
+  operation category as the correct answer.
+- Multiple-choice distractors MAY be obviously wrong only when the learning
+  objective is basic vocabulary recognition for first exposure.
+- Fill-in questions MUST specify the expected answer format and any forbidden or
+  equivalent answers when ambiguity is likely.
+- Explanations MUST state the reasoning, concept, procedure, or misconception
+  behind the answer.
+- Explanations for novice learners MUST be instructional rather than answer-key
+  only: include enough reasoning for the learner to repair the misconception.
+- When authoring a short question set, order items from lower intrinsic load to
+  higher intrinsic load and cover multiple important taught targets rather than
+  repeating one surface pattern.
+
+Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
+
+# Course Docs Authoring
+
+- Course documentation content MUST be written for beginner learners in clear Japanese unless the task explicitly requests another language.
+- Course docs pages MUST use the shared course-docs MDX components when they express page structure, learner actions, verification, concept explanation, reference material, recovery steps, checkpoints, exercises, or solutions.
+- Use `<Section>`, `<Action>`, `<Verify>`, `<Concept>`, `<Reference>`, `<Recovery>`, and `<Checkpoint>` from `course-docs-platform` for structured tutorial pages.
+- A top-level `<Section>` MUST declare `goal`.
+- Learner-facing HTML examples MUST use normal HTML void elements without XHTML-style trailing slashes, such as `<input>` rather than `<input />`.
+- The void-element rule applies to learner-facing HTML code fences and sample/complete files; it does not apply to MDX/JSX component syntax.
+- Exercises MUST use `<Exercise>` and `<Solution>` when the page expects learners to attempt a task and then compare with an answer.
+- Exercise headings MUST use `### 演習N` for standard exercises and `### 演習-発展N` for extension exercises.
+- Exercise statements MUST include the expected result, success criteria, and enough context for learners to start without guessing.
+- Extension exercises MUST be optional and must not be required for the base lesson completion.
+
+Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/repository-and-site.md
+
+# Course Docs Repository and Site Architecture
+
+- `metyatech/course-docs-site` is the only runnable Next.js/Nextra course site app.
+- `course-docs-site` owns routing, layouts, middleware, site runtime wiring, and end-to-end tests for the site runtime.
+- `metyatech/course-docs-platform` owns shared MDX components, remark/rehype configuration, webpack asset rules, and shared course site behavior.
+- `<course>-course-docs` repositories are content-only repositories.
+- Course content repositories MUST keep only course content, static assets, and course-specific configuration such as `content/**`, `public/img/**`, and `site.config.ts`.
+- Course content repositories MUST NOT add Next.js/Nextra app runtime files such as `next.config.js`, `src/app`, app package files, or site runtime implementations.
+- `public/img/favicon.ico` is expected by `site.config.ts` when `faviconHref` references it.
+- Framework boilerplate assets MUST NOT be kept unless referenced by content.
+- Secrets MUST NOT be stored in course content repositories.
+- `.env.local` is local-only and belongs in `course-docs-site`, not in content repositories.
+- Course content MUST be previewed through `course-docs-site` by setting `COURSE_CONTENT_SOURCE`.
+- Shared rendering/runtime behavior that applies to multiple courses MUST be implemented in `course-docs-platform`, not duplicated in `course-docs-site` or content repositories.
+- `course-docs-site` MUST remain composition/wiring only for platform-owned behavior.
+- Vercel deployment for course sites MUST use GitHub Actions with the Vercel CLI, not Vercel's GitHub integration.
+- Generic tool-agnostic specs MUST remain in their dedicated repositories.
+- Course Docs Site-specific presentation conventions MUST be documented in `course-docs-platform` or the `course-docs` domain, not in generic specs.
+- Course docs pages MUST define page titles in frontmatter.
+- `_meta.ts` MUST be used for grouping-only folder labels, not for overriding ordinary page titles.
+- Default sidebar collapse behavior MUST be controlled through `theme.config.tsx` sidebar settings.
+- `theme.collapsed` MUST be used only for true exceptions.

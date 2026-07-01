@@ -1,9 +1,5 @@
 {
-  "source": "github:metyatech/agent-rules",
-  "domains": [
-    "node",
-    "web"
-  ],
+  "sources": ["github:metyatech/agent-rules"],
+  "profile": "course-docs-platform",
   "output": "AGENTS.md"
 }
-
