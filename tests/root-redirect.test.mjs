@@ -59,7 +59,7 @@ const tryFetchRedirect = async (url) => {
   }
 };
 
-const writeFixtureCourseRepo = async ({ rootDir, rootMeta, docsMeta, examsMeta, pages }) => {
+const writeFixtureCourseRepo = async ({ rootDir, rootMeta, docsMeta, pages }) => {
   const siteConfig = `export const siteConfig = {
   logoText: "Redirect Fixture",
   projectLink: "https://example.invalid",
@@ -115,50 +115,6 @@ export default meta;
       );
     }
   }
-
-  if (examsMeta) {
-    const examDir = path.join(
-      rootDir,
-      "content",
-      "exams",
-      "2025",
-      "2semester",
-      "2final-exam",
-      "preparation",
-    );
-
-    await fs.mkdir(examDir, { recursive: true });
-    await fs.writeFile(
-      path.join(rootDir, "content", "exams", "_meta.ts"),
-      'const meta = {\n  "2025": "2025"\n};\n\nexport default meta;\n',
-      "utf8",
-    );
-    await fs.writeFile(
-      path.join(rootDir, "content", "exams", "2025", "_meta.ts"),
-      'const meta = {\n  "2semester": "2semester"\n};\n\nexport default meta;\n',
-      "utf8",
-    );
-    await fs.writeFile(
-      path.join(rootDir, "content", "exams", "2025", "2semester", "_meta.ts"),
-      'const meta = {\n  "2final-exam": "2final-exam"\n};\n\nexport default meta;\n',
-      "utf8",
-    );
-    await fs.writeFile(
-      path.join(rootDir, "content", "exams", "2025", "2semester", "2final-exam", "_meta.ts"),
-      'const meta = {\n  preparation: "Preparation"\n};\n\nexport default meta;\n',
-      "utf8",
-    );
-    await fs.writeFile(
-      path.join(examDir, "_meta.ts"),
-      `const meta = ${JSON.stringify(examsMeta, null, 2)};\n\nexport default meta;\n`,
-      "utf8",
-    );
-    await fs.writeFile(
-      path.join(examDir, "index.mdx"),
-      "---\ntitle: Preparation\n---\n\nPreparation\n",
-      "utf8",
-    );
-  }
 };
 
 
@@ -187,13 +143,6 @@ test(
         ],
         expectedLocation: "/docs/01-overview",
       },
-      {
-        name: "exams-only",
-        rootMeta: { exams: "Exams" },
-        examsMeta: { index: { title: "Preparation" } },
-        pages: [],
-        expectedLocation: "/exams/2025/2semester/2final-exam/preparation",
-      },
     ];
 
     for (const scenario of scenarios) {
@@ -209,7 +158,6 @@ test(
         docsMeta: scenario.docsMeta,
         pages: scenario.pages,
         rootMeta: scenario.rootMeta,
-        examsMeta: scenario.examsMeta,
       });
 
       const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {

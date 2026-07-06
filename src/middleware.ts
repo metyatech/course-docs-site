@@ -10,7 +10,7 @@ import { isAdminSessionValid } from "./lib/admin/session";
 import { rewriteAssetRequests, type AssetMiddlewareRequest } from "./lib/next-app/middleware";
 
 export const config = {
-  matcher: ["/docs/:path*", "/exams/:path*", "/layout-preview/:path*", "/submissions/:path*"],
+  matcher: ["/docs/:path*", "/layout-preview/:path*", "/submissions/:path*"],
 };
 
 export async function middleware(request: AssetMiddlewareRequest) {

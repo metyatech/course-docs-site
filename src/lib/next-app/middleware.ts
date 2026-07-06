@@ -12,7 +12,7 @@ const getExtension = (pathname: string) => {
 };
 
 /**
- * Rewrites direct asset requests under /docs, /exams, /layout-preview,
+ * Rewrites direct asset requests under /docs, /layout-preview,
  * /submissions to the dedicated /asset/* route handler so that file
  * requests inside course content are served consistently.
  *
@@ -25,7 +25,6 @@ export const rewriteAssetRequests = (request: AssetMiddlewareRequest) => {
 
   if (
     !pathname.startsWith("/docs/") &&
-    !pathname.startsWith("/exams/") &&
     !pathname.startsWith("/layout-preview/") &&
     !pathname.startsWith("/submissions/")
   ) {
