@@ -14,11 +14,32 @@ import {
 } from './work-data-mappers.js';
 import WorkIntroEditor from './work-intro-editor.js';
 
+const ADMIN_MODE_STATUS_PATH = '/api/admin/mode/';
+const ADMIN_SESSION_CHANGED_EVENT = 'course-docs-admin-session-changed';
+const SYNC_INTERVAL_MS = 15000;
+
 type SubmissionsClientProps = {
   studentWorks: StudentWorksData;
 };
 
-const SYNC_INTERVAL_MS = 15000;
+type AdminModeStatus = {
+  enabled?: boolean;
+  capabilities?: {
+    commentModeration?: boolean;
+  };
+};
+
+const readAdminModeEnabled = async () => {
+  const response = await fetch(ADMIN_MODE_STATUS_PATH, {
+    cache: 'no-store',
+    credentials: 'same-origin',
+  });
+  if (!response.ok) {
+    return false;
+  }
+  const status = (await response.json()) as AdminModeStatus;
+  return status.enabled === true && status.capabilities?.commentModeration === true;
+};
 
 const formatSupabaseError = (error: unknown) => {
   if (!error || typeof error !== 'object') {
@@ -103,7 +124,7 @@ export default function SubmissionsClient({ studentWorks }: SubmissionsClientPro
   const [commentMap, setCommentMap] = useState<WorkCommentMap>({});
   const [dataError, setDataError] = useState<string | null>(null);
   const supabaseMissing = !supabase;
-  const [adminToken, setAdminToken] = useState('');
+  const [isAdminModeEnabled, setIsAdminModeEnabled] = useState(false);
   const [activeCommentStudentId, setActiveCommentStudentId] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -274,15 +295,13 @@ export default function SubmissionsClient({ studentWorks }: SubmissionsClientPro
 
   const deleteComment = useCallback(
     async (commentId: string, studentId: string) => {
-      if (!adminToken.trim()) {
-        throw new Error('管理者コードが未設定です。');
+      if (!isAdminModeEnabled) {
+        throw new Error('管理者モードが有効ではありません。');
       }
 
       const response = await fetch(`/api/admin/comments/${commentId}`, {
         method: 'DELETE',
-        headers: {
-          'x-admin-token': adminToken.trim(),
-        },
+        credentials: 'same-origin',
       });
 
       if (!response.ok) {
@@ -296,7 +315,7 @@ export default function SubmissionsClient({ studentWorks }: SubmissionsClientPro
       }));
       await fetchComments();
     },
-    [adminToken, fetchComments],
+    [fetchComments, isAdminModeEnabled],
   );
 
   const saveIntro = useCallback(
@@ -335,19 +354,17 @@ export default function SubmissionsClient({ studentWorks }: SubmissionsClientPro
       return;
     }
 
-    const stored = window.sessionStorage.getItem('admin-comment-token');
-    if (stored) {
-      setAdminToken(stored);
-    }
-
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent).detail as { token?: string };
-      setAdminToken(detail?.token ?? '');
+    const refreshAdminMode = () => {
+      void readAdminModeEnabled()
+        .then(setIsAdminModeEnabled)
+        .catch(() => setIsAdminModeEnabled(false));
     };
 
-    window.addEventListener('admin-token', handler);
+    refreshAdminMode();
+
+    window.addEventListener(ADMIN_SESSION_CHANGED_EVENT, refreshAdminMode);
     return () => {
-      window.removeEventListener('admin-token', handler);
+      window.removeEventListener(ADMIN_SESSION_CHANGED_EVENT, refreshAdminMode);
     };
   }, []);
 
@@ -514,11 +531,13 @@ export default function SubmissionsClient({ studentWorks }: SubmissionsClientPro
                       <div className={styles.cardHeader}>
                         <h3 className={styles.studentId}>{work.studentId}</h3>
                       </div>
-                      <div
+                      <button
+                        type="button"
                         className={`${styles.iframeWrapper} ${
                           workUrl ? '' : styles.iframeWrapperDisabled
                         }`}
                         onClick={workUrl ? () => window.open(workUrl, '_blank') : undefined}
+                        disabled={!workUrl}
                         style={{ cursor: workUrl ? 'pointer' : 'default' }}
                         title={
                           workUrl ? 'クリックして新しいタブで開く' : 'index.html が見つかりません'
@@ -539,7 +558,7 @@ export default function SubmissionsClient({ studentWorks }: SubmissionsClientPro
                             <p>フォルダ内に配置してください。</p>
                           </div>
                         )}
-                      </div>
+                      </button>
                       <div className={styles.cardBody}>
                         <section className={styles.introSection}>
                           <h4 className={styles.sectionTitle}>作者からの紹介</h4>
@@ -626,7 +645,7 @@ export default function SubmissionsClient({ studentWorks }: SubmissionsClientPro
                 <WorkComments
                   comments={activeComments}
                   isDisabled={supabaseMissing}
-                  isAdmin={adminToken.trim().length > 0}
+                  isAdmin={isAdminModeEnabled}
                   onSubmit={(name, message) =>
                     submitComment(activeCommentWork.studentId, name, message)
                   }
