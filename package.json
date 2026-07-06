@@ -35,7 +35,7 @@
     "test:course": "npm run test:e2e",
     "test:course:ci": "node scripts/run-playwright.mjs test -c tests/e2e/playwright.ci.config.mjs",
     "test:e2e-config": "node --test --test-concurrency=1 tests/dependency-security-contracts.test.mjs tests/e2e-course-defaults.test.mjs tests/next-dist-dir.test.mjs tests/next-config-assets.test.mjs tests/pagefind-platform-binary.test.mjs tests/sanitize-git-error.test.mjs tests/test-harness-env.test.mjs tests/verification-contracts.test.mjs",
-    "test:dev-switch": "node scripts/run-node-tests-sequential.mjs tests/dev-switch.test.mjs tests/import-asset-resolution.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs tests/e2e-content-source.test.mjs tests/intro-image-resolution.test.mjs tests/qspec-relative-image-resolution.test.mjs tests/asset-route-trace-config.test.mjs && node --import tsx --test --test-concurrency=1 tests/admin-mode-route-protection.test.mjs && node --test --test-concurrency=1 tests/admin-mode-legacy-token.test.mjs",
+    "test:dev-switch": "node scripts/run-node-tests-sequential.mjs tests/dev-switch.test.mjs tests/import-asset-resolution.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-does-not-touch-source.test.mjs tests/submissions-route-source.test.mjs tests/mdx-boundary-source.test.mjs tests/e2e-content-source.test.mjs tests/intro-image-resolution.test.mjs tests/asset-route-trace-config.test.mjs && node --import tsx --test --test-concurrency=1 tests/admin-mode-route-protection.test.mjs && node --test --test-concurrency=1 tests/admin-mode-legacy-token.test.mjs",
     "test:e2e": "node scripts/run-playwright.mjs test -c tests/e2e/playwright.config.mjs",
     "lint:contrast": "node scripts/run-playwright.mjs test -c tests/e2e/playwright.config.mjs tests/e2e/contrast.spec.cjs",
     "verify": "npm run verify:precommit",
@@ -51,7 +51,7 @@
   },
   "dependencies": {
     "@mdx-js/react": "^3.1.1",
-    "@metyatech/course-docs-platform": "github:metyatech/course-docs-platform#964c6f44145592beabff3a7eb790e4355280b20a",
+    "@metyatech/course-docs-platform": "github:metyatech/course-docs-platform#2becf2fd5de527eed55d058e49ddb6c8f2d46db3",
     "@supabase/supabase-js": "^2.49.1",
     "dotenv": "^17.2.3",
     "konva": "^10.2.3",
