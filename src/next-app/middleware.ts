@@ -14,7 +14,6 @@ export function middleware(request: NextRequest) {
 
   if (
     !pathname.startsWith('/docs/') &&
-    !pathname.startsWith('/exams/') &&
     !pathname.startsWith('/layout-preview/') &&
     !pathname.startsWith('/submissions/')
   ) {
@@ -36,5 +35,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/docs/:path*', '/exams/:path*', '/layout-preview/:path*', '/submissions/:path*'],
+  matcher: ['/docs/:path*', '/layout-preview/:path*', '/submissions/:path*'],
 };
