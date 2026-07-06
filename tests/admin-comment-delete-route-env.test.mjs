@@ -6,12 +6,13 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-test('admin comment delete route reads ADMIN_MODE_TOKEN only', async () => {
+test('admin comment delete route validates signed admin session cookies', async () => {
   const source = await fs.readFile(
     path.join(projectRoot, 'src', 'next-app', 'admin-comment-delete-route.ts'),
     'utf8',
   );
 
-  assert.match(source, /process\.env\.ADMIN_MODE_TOKEN/);
+  assert.match(source, /process\.env\.ADMIN_SESSION_SECRET/);
   assert.doesNotMatch(source, /process\.env\.ADMIN_DELETE_TOKEN/);
+  assert.doesNotMatch(source, /ADMIN_MODE_TOKEN/);
 });
