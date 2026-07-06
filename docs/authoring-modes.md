@@ -44,8 +44,8 @@ authoringMode: tutorial
 ---
 
 <Prerequisites>
-- Unreal Engine 5.4 以上がインストール済みであること
-- 前回のチュートリアル（Step 1〜3）を完了していること
+  - Unreal Engine 5.4 以上がインストール済みであること - 前回のチュートリアル（Step
+  1〜3）を完了していること
 </Prerequisites>
 
 <Section title="Step 1" goal="...">
@@ -53,8 +53,8 @@ authoringMode: tutorial
 </Section>
 
 <NextSteps>
-- [次のチュートリアル: アイテム収集](/tutorials/item-pickup)
-- [コリジョン設定リファレンス](/reference/collision)
+  - [次のチュートリアル: アイテム収集](/tutorials/item-pickup) -
+  [コリジョン設定リファレンス](/reference/collision)
 </NextSteps>
 ```
 

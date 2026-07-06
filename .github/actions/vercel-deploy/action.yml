@@ -28,4 +28,3 @@ runs:
       run: |
         npx vercel@${{ inputs.cli_version }} deploy --prebuilt --prod --archive=tgz --token=${{ inputs.token }} || \
         npx vercel@${{ inputs.cli_version }} deploy --prebuilt --prod --archive=tgz --token=${{ inputs.token }}
-

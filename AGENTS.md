@@ -6,7 +6,7 @@
 - If `compose-agentsmd` is not available, run it via `npx compose-agentsmd`. If `npx` is unavailable or cannot fetch the package, install it via npm with an environment-appropriate method such as `npm install -g compose-agentsmd` when global installs are permitted, or a user-local npm prefix when global installs are not permitted.
 - To update shared/global rules, use `compose-agentsmd edit-rules` to locate the writable rules workspace, make changes only in that workspace, then run `compose-agentsmd apply-rules` (do not manually clone or edit the rules source repo outside this workflow).
 - If you find an existing clone of the rules source repo elsewhere, do not assume it is the correct rules workspace; always treat `compose-agentsmd edit-rules` output as the source of truth.
-- `compose-agentsmd apply-rules` pushes the rules workspace when `source` is GitHub (if the workspace is clean), then regenerates `AGENTS.md` with refreshed rules.
+- `compose-agentsmd apply-rules` pushes each GitHub source workspace when its workspace is clean, then regenerates instruction files with refreshed rules.
 - Do not edit `AGENTS.md` directly; update the source rules and regenerate.
 - `tools/tool-rules.md` is the shared rule source for all repositories that use compose-agentsmd.
 - Before applying any rule updates, present the planned changes first with an ANSI-colored diff-style preview, ask for explicit approval, then make the edits.
@@ -98,6 +98,8 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-autho
   "this material", "the attached document", "lesson N", or other external
   source context unless that source context is included in the prompt itself.
 - Questions, prompts, options, answers, scoring criteria, and explanations MUST NOT introduce, require, or casually reference untaught concepts, features, parameters, APIs, syntax, techniques, tools, or extension-only content unless the user explicitly requests extension-level assessment.
+- Scoring criteria (also called rubric criteria) are the individual bullet items of a question's `## Scoring` section, each describing one thing the answer must demonstrate.
+- The number of scoring criteria and their ordering determine the assessment manifest `points` array: the `points` length MUST equal the criterion count, and each `points` entry maps to the criterion at the same index.
 - Questions MUST have a single defensible answer, or explicitly state the
   accepted answer range.
 - Multiple-choice distractors MUST be plausible, close to the correct answer,
@@ -136,6 +138,26 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
 - Exercise headings MUST use `### 演習N` for standard exercises and `### 演習-発展N` for extension exercises.
 - Exercise statements MUST include the expected result, success criteria, and enough context for learners to start without guessing.
 - Extension exercises MUST be optional and must not be required for the base lesson completion.
+
+## Beginner lesson material ordering
+
+- Materials MUST be written assuming learners will read every word carefully, in natural reading order: top to bottom and left to right.
+- At any point in the material, do not introduce a term or feature that has not been explained earlier in that same material (or in a strictly earlier lesson within the same course, when curriculum ordering guarantees it was already taught). Introduce new terms or features at the point where learners first need them.
+- "Term or feature" is not limited to HTML/CSS/JS syntax or APIs. It also includes: quoted literal values used in prose or tables (e.g. a string like `active` used as a rule's classification key), variable/identifier names, and any word or metaphor used in a `<Section>`/`<Concept>`/heading title or in body prose, a table cell, or a bullet, before its meaning has been established.
+- A `<Concept>` or `<Section>` title MUST NOT rely on a word, abbreviation, or metaphor that is only explained in that block's own body or in a later block. Titles MUST either be self-explanatory to a reader who has not yet read the body, or be phrased so the metaphor/label appears only after the body has explained the underlying idea (e.g. as a closing summary label, not as the heading itself).
+- When a rule, table, or summary statement needs to reference a specific value, label, or term (e.g. a classification-rule sentence naming a value to count), the term MUST already be defined by that point, or the sentence MUST explicitly flag it as forthcoming rather than using it as if already known.
+- When creating materials, first decide how learners should behave in each section, then write the content so that it naturally leads them to behave that way.
+- Introduce only one new concept or element at a time.
+- Do not include elements, such as terms, features, code, or markup, that learners will not use or engage with just because they might be realistic or useful later.
+
+### Verification method for this rule
+
+- Checking this rule requires a literal top-to-bottom "cold read" simulation, not a structural/component-level scan. To review material against this rule:
+  1. Walk the material from the first word to the last, in rendered reading order, including titles/headings (which render before their own body).
+  2. Maintain a running set of terms, values, and metaphors that have been explicitly explained so far.
+  3. At each sentence, heading, table cell, and code comment, check every technical term, quoted value, and metaphor against that running set before accepting it as understandable at that point.
+  4. Flag the first point where a word could not be resolved by a first-time reader using only what has been read so far. Headings/titles MUST be checked against content read strictly before that heading, never against the body that follows it.
+- A structural check (e.g. "does this page use the required MDX components", "is `goal` present") does NOT satisfy this rule's verification requirement and MUST NOT be treated as a substitute for the cold-read simulation above.
 
 Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/repository-and-site.md
 

@@ -33,7 +33,6 @@ await run(process.execPath, [
   'tests/exercise-contrast-styles.test.mjs',
   'tests/mdx-code-preview-boundary.test.mjs',
   'tests/remark-admonitions-to-mdx.test.mjs',
-  'tests/remark-question-spec-to-exercise.test.mjs',
   'tests/remark-inject-tutorial-shot-legend.test.mjs',
   'tests/remark-section-headings.test.mjs',
   'tests/remark-tutorial-lint.test.mjs',

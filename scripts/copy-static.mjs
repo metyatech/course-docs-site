@@ -30,9 +30,7 @@ const walk = async (dirPath) => {
 
 const run = async () => {
   const files = await walk(srcRootPath);
-  const cssFiles = files.filter((filePath) =>
-    filePath.toLowerCase().endsWith('.css')
-  );
+  const cssFiles = files.filter((filePath) => filePath.toLowerCase().endsWith('.css'));
 
   await Promise.all(
     cssFiles.map(async (filePath) => {
@@ -40,7 +38,7 @@ const run = async () => {
       const toPath = path.join(distRootPath, relativePath);
       await ensureDir(path.dirname(toPath));
       await fs.copyFile(filePath, toPath);
-    })
+    }),
   );
 };
 
