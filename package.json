@@ -36,7 +36,6 @@
     "./next-app/admin-comment-delete-route": "./dist/next-app/admin-comment-delete-route.js",
     "./submissions": "./dist/submissions/index.js",
     "./submissions/submissions-page": "./dist/submissions/submissions-page.js",
-    "./submissions/admin-footer-toggle": "./dist/submissions/admin-footer-toggle.js",
     "./styles/*": "./styles/*"
   },
   "scripts": {
