@@ -1,40 +1,71 @@
+diff --git a/node_modules/@metyatech/exercise/dist/theme/Exercise/GuidedTask.js b/node_modules/@metyatech/exercise/dist/theme/Exercise/GuidedTask.js
+index 0e0cd8c..f76a63f 100644
+--- a/node_modules/@metyatech/exercise/dist/theme/Exercise/GuidedTask.js
++++ b/node_modules/@metyatech/exercise/dist/theme/Exercise/GuidedTask.js
+@@ -325,13 +325,20 @@ function createStructureError(componentName, childrenArray, expectedOrder, reaso
+ }
+ function extractGuidedTaskChildren(children, componentName) {
+     const childrenArray = Children.toArray(children).filter(hasMeaningfulContent);
+-    const expectedOrder = 'problem content, one or more Hint, then exactly one Answer';
++    const expectedOrder = 'problem content, optional Hint, then exactly one Answer';
+     const nestedChild = childrenArray.find(isNestedGuidedTaskElement);
+     if (nestedChild) {
+         throw createStructureError(componentName, childrenArray, expectedOrder, 'nested Exercise or QuickCheck is not allowed');
+     }
+     const answerChildren = childrenArray.filter(isAnswerElement);
+     const hintChildren = childrenArray.filter(isHintElement);
++    if (answerChildren.length !== 1) {
++        return {
++            answerContent: null,
++            hintChildren: [],
++            problemChildren: childrenArray,
++        };
++    }
+     const problemChildren = [];
+     let seenHint = false;
+     let seenAnswer = false;
+@@ -358,12 +365,6 @@ function extractGuidedTaskChildren(children, componentName) {
+     if (!problemChildren.some(hasMeaningfulContent)) {
+         throw createStructureError(componentName, childrenArray, expectedOrder, 'problem content is required');
+     }
+-    if (hintChildren.length < 1) {
+-        throw createStructureError(componentName, childrenArray, expectedOrder, 'at least one Hint is required');
+-    }
+-    if (answerChildren.length !== 1) {
+-        throw createStructureError(componentName, childrenArray, expectedOrder, 'exactly one Answer is required');
+-    }
+     const emptyHint = hintChildren.find((hintChild) => !hasMeaningfulContent(hintChild.props.children));
+     if (emptyHint) {
+         throw createStructureError(componentName, childrenArray, expectedOrder, 'Hint content must not be empty');
 diff --git a/node_modules/@metyatech/exercise/dist/theme/Exercise/answerDetection.js b/node_modules/@metyatech/exercise/dist/theme/Exercise/answerDetection.js
-index 9132cf6..4bd4e4b 100644
+index 7faa0a9..166ffb7 100644
 --- a/node_modules/@metyatech/exercise/dist/theme/Exercise/answerDetection.js
 +++ b/node_modules/@metyatech/exercise/dist/theme/Exercise/answerDetection.js
-@@ -6,6 +6,10 @@ import { matchesMarkedComponentType } from './componentMarkers.js';
+@@ -4,5 +4,11 @@ import Hint, { HINT_COMPONENT_NAME } from './Hint.js';
+ import { matchesMarkedComponentType } from './componentMarkers.js';
  const matchesAnswerType = (type) => matchesMarkedComponentType(type, Answer, '__exerciseAnswer', ANSWER_COMPONENT_NAME);
- const matchesLegacySolutionType = (type) => matchesMarkedComponentType(type, Solution, '__exerciseSolution', SOLUTION_COMPONENT_NAME);
  const matchesHintType = (type) => matchesMarkedComponentType(type, Hint, '__exerciseHint', HINT_COMPONENT_NAME);
+-export const isAnswerElement = (child) => React.isValidElement(child) && matchesAnswerType(child.type);
+-export const isHintElementLike = (child) => React.isValidElement(child) && matchesHintType(child.type);
 +const INTRINSIC_ANSWER_ELEMENT = 'exercise-answer';
 +const INTRINSIC_HINT_ELEMENT = 'exercise-hint';
-+const isIntrinsicAnswerElement = (child) => React.isValidElement(child) && child.type === INTRINSIC_ANSWER_ELEMENT;
-+const isIntrinsicHintElement = (child) => React.isValidElement(child) && child.type === INTRINSIC_HINT_ELEMENT;
- function hasLegacySolutionMarker(child) {
-     var _a;
-     if (!React.isValidElement(child)) {
-@@ -15,12 +19,12 @@ function hasLegacySolutionMarker(child) {
-     return props[LEGACY_SOLUTION_MARKER] === true;
- }
- export const isAnswerElement = (child) => React.isValidElement(child) &&
--    matchesAnswerType(child.type) &&
-+    (matchesAnswerType(child.type) || isIntrinsicAnswerElement(child)) &&
-     !hasLegacySolutionMarker(child);
- export const isLegacySolutionElement = (child) => React.isValidElement(child) &&
-     (matchesLegacySolutionType(child.type) ||
-         (matchesAnswerType(child.type) && hasLegacySolutionMarker(child)));
--export const isHintElementLike = (child) => React.isValidElement(child) && matchesHintType(child.type);
-+export const isHintElementLike = (child) => React.isValidElement(child) && (matchesHintType(child.type) || isIntrinsicHintElement(child));
- /**
-  * Component-name strings that identify structural exercise wrappers. The
-  * legacy compatibility scan treats any element whose `displayName` or `name`
++const mdxElementName = (child) => {
++    const props = React.isValidElement(child) ? child.props : null;
++    return props?.mdxType ?? props?.originalType ?? null;
++};
++export const isAnswerElement = (child) => React.isValidElement(child) && (matchesAnswerType(child.type) || child.type === INTRINSIC_ANSWER_ELEMENT || child.type === ANSWER_COMPONENT_NAME || child.type === 'Answer' || mdxElementName(child) === 'Answer');
++export const isHintElementLike = (child) => React.isValidElement(child) && (matchesHintType(child.type) || child.type === INTRINSIC_HINT_ELEMENT || child.type === HINT_COMPONENT_NAME || child.type === 'Hint' || mdxElementName(child) === 'Hint');
 diff --git a/node_modules/@metyatech/exercise/dist/theme/Exercise/hintDetection.js b/node_modules/@metyatech/exercise/dist/theme/Exercise/hintDetection.js
-index b5db048..a0dd003 100644
+index b5db048..f63c1b4 100644
 --- a/node_modules/@metyatech/exercise/dist/theme/Exercise/hintDetection.js
 +++ b/node_modules/@metyatech/exercise/dist/theme/Exercise/hintDetection.js
-@@ -2,4 +2,4 @@ import React from 'react';
+@@ -2,4 +2,8 @@ import React from 'react';
  import Hint, { HINT_COMPONENT_NAME } from './Hint.js';
  import { matchesMarkedComponentType } from './componentMarkers.js';
  const matchesHintType = (type) => matchesMarkedComponentType(type, Hint, '__exerciseHint', HINT_COMPONENT_NAME);
 -export const isHintElement = (child) => React.isValidElement(child) && matchesHintType(child.type);
-+export const isHintElement = (child) => React.isValidElement(child) && (matchesHintType(child.type) || child.type === 'exercise-hint');
++const mdxElementName = (child) => {
++    const props = React.isValidElement(child) ? child.props : null;
++    return props?.mdxType ?? props?.originalType ?? null;
++};
++export const isHintElement = (child) => React.isValidElement(child) && (matchesHintType(child.type) || child.type === 'exercise-hint' || child.type === HINT_COMPONENT_NAME || child.type === 'Hint' || mdxElementName(child) === 'Hint');

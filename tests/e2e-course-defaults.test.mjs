@@ -50,6 +50,33 @@ test("javascript-course-docs keeps submissions disabled", () => {
   assert.equal(config.enableCodePreview, true);
 });
 
+test("web-foundations-docs uses its first real docs page and disables unsupported feature checks", () => {
+  const config = resolveCourseSuiteConfig("../web-foundations-docs");
+
+  assert.equal(config.docsIntroPath, "/docs/web-page-basics");
+  assert.deepEqual(config.exerciseContrastPaths, []);
+  assert.equal(config.enableSubmissions, false);
+  assert.equal(config.enableCodePreview, false);
+});
+
+test("course-common-docs disables unsupported feature checks", () => {
+  const config = resolveCourseSuiteConfig("../course-common-docs");
+
+  assert.equal(config.docsIntroPath, "/docs/intro");
+  assert.deepEqual(config.exerciseContrastPaths, []);
+  assert.equal(config.enableSubmissions, false);
+  assert.equal(config.enableCodePreview, false);
+});
+
+test("game-development-course-docs uses its docs index and disables unsupported feature checks", () => {
+  const config = resolveCourseSuiteConfig("../game-development-course-docs");
+
+  assert.equal(config.docsIntroPath, "/docs");
+  assert.deepEqual(config.exerciseContrastPaths, []);
+  assert.equal(config.enableSubmissions, false);
+  assert.equal(config.enableCodePreview, false);
+});
+
 test("open-campus-unreal-90min disables submissions and code preview", () => {
   const config = resolveCourseSuiteConfig("../open-campus-unreal-90min");
 

@@ -9,9 +9,23 @@ const GENERIC_DEFAULTS = {
 };
 
 const COURSE_DEFAULTS = {
+  "course-common-docs": {
+    enableSubmissions: false,
+    enableCodePreview: false,
+  },
+  "game-development-course-docs": {
+    docsIntroPath: "/docs",
+    enableSubmissions: false,
+    enableCodePreview: false,
+  },
   "programming-course-docs": {
     codePreviewPath: "/docs/html-basics/introduction",
     codePreviewExpectedText: "<body>",
+  },
+  "web-foundations-docs": {
+    docsIntroPath: "/docs/web-page-basics",
+    enableSubmissions: false,
+    enableCodePreview: false,
   },
   "javascript-course-docs": {
     exerciseContrastPaths: [
