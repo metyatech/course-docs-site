@@ -383,52 +383,36 @@ const syncDirectory = ({ from, to, shouldSkip }) => {
 const legacyExerciseClientMarkerExportPattern =
   /\n?export const (?:Hint|Answer) = Object\.assign\(\(props\) => props\.children,\s*\{\s*__(?:exerciseHint|exerciseAnswer): true,\s*displayName: ["']Exercise(?:Hint|Answer)["'],?\s*\}\);\s*/g;
 
-const mergeExerciseClientImportNames = (names) => {
+const mergeExerciseClientImportNames = (names, hasHint, hasAnswer) => {
   const merged = new Set(
-    names
+    (names || "")
       .split(",")
       .map((name) => name.trim())
       .filter(Boolean),
   );
-  merged.delete("Answer");
-  merged.delete("Hint");
+  if (hasHint) merged.add("Hint");
+  if (hasAnswer) merged.add("Answer");
   return [...merged].join(", ");
 };
 
-const normalizeExerciseStructuralTags = (text) => {
-  const lines = text.split(/(\r?\n)/);
-  let inFence = false;
-  for (let i = 0; i < lines.length; i += 2) {
-    const line = lines[i];
-    const trimmed = line.trimStart();
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-    lines[i] = line
-      .replace(/<Hint(?=[\s>])/g, "<exercise-hint")
-      .replace(/<\/Hint>/g, "</exercise-hint>")
-      .replace(/<Answer(?=[\s>])/g, "<exercise-answer")
-      .replace(/<\/Answer>/g, "</exercise-answer>");
-  }
-  return lines.join("");
-};
 
 const normalizeExerciseClientReferences = (text) => {
   if (!text.includes("@metyatech/exercise/client")) return text;
 
   let normalized = text.replace(legacyExerciseClientMarkerExportPattern, "\n");
+  const hasHint = normalized.includes("<Hint");
+  const hasAnswer = normalized.includes("<Answer");
+
   normalized = normalized.replace(
-    /^import\s+Exercise\s*,\s*\{([^}]*)\}\s+from\s+(["'])@metyatech\/exercise\/client\2;$/m,
+    /^import\s+Exercise(?:,\s*\{([^}]*)\})?\s+from\s+(["'])@metyatech\/exercise\/client\2;$/m,
     (_match, names, quote) => {
-      const mergedNames = mergeExerciseClientImportNames(names);
+      const mergedNames = mergeExerciseClientImportNames(names, hasHint, hasAnswer);
       return mergedNames
         ? `import Exercise, { ${mergedNames} } from ${quote}@metyatech/exercise/client${quote};`
         : `import Exercise from ${quote}@metyatech/exercise/client${quote};`;
     },
   );
-  normalized = normalizeExerciseStructuralTags(normalized);
+
   return normalized.replace(/\n{3,}/g, "\n\n");
 };
 

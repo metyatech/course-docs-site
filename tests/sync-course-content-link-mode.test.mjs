@@ -201,11 +201,11 @@ test("sync normalizes legacy exercise client marker shims in the mirrored conten
 
   assert.match(sourceMdx, /__exerciseHint/u);
   assert.match(sourceMdx, /__exerciseAnswer/u);
-  assert.match(mirroredMdx, /import Exercise, \{ QuickCheck \} from '@metyatech\/exercise\/client';/u);
-  assert.match(mirroredMdx, /<exercise-hint>Hint text<\/exercise-hint>/u);
-  assert.match(mirroredMdx, /<exercise-answer>Answer text<\/exercise-answer>/u);
-  assert.doesNotMatch(mirroredMdx, /<Hint>/u);
-  assert.doesNotMatch(mirroredMdx, /<Answer>/u);
+  assert.match(mirroredMdx, /import Exercise, \{ QuickCheck, Hint, Answer \} from '@metyatech\/exercise\/client';/u);
+  assert.match(mirroredMdx, /<Hint>Hint text<\/Hint>/u);
+  assert.match(mirroredMdx, /<Answer>Answer text<\/Answer>/u);
+  assert.doesNotMatch(mirroredMdx, /<exercise-hint>/u);
+  assert.doesNotMatch(mirroredMdx, /<exercise-answer>/u);
   assert.doesNotMatch(mirroredMdx, /__exerciseHint/u);
   assert.doesNotMatch(mirroredMdx, /__exerciseAnswer/u);
 });
