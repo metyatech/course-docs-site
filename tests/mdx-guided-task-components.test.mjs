@@ -49,7 +49,7 @@ test('@metyatech/exercise dependency is pinned to the platform-compat SHA', asyn
   const packageJson = JSON.parse(await fs.readFile(path.join(projectRoot, 'package.json'), 'utf8'));
   const lock = JSON.parse(await fs.readFile(path.join(projectRoot, 'package-lock.json'), 'utf8'));
 
-  const expectedSha = 'd27ed7d2c47018ac0f7df205568bc502fc6c3eb3';
+  const expectedSha = '4e2c460dd44dafc67a5656bad36cb9dde943f3f4';
 
   assert.equal(
     packageJson.dependencies['@metyatech/exercise'],
