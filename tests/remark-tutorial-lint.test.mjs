@@ -88,11 +88,6 @@ const yamlFrontmatter = (value) => ({
   value,
 });
 
-const mdxEsm = (value) => ({
-  type: 'mdxjsEsm',
-  value,
-});
-
 const tutorialRoot = (...children) =>
   root(yamlFrontmatter('title: Tutorial\nauthoringMode: tutorial'), ...children);
 
@@ -766,64 +761,64 @@ test('TUTORIAL_LINT_COLLECT=1 passes clean documents without throwing', async ()
   }
 });
 
-test('authoringMode: tutorial without <Section> fails', async () => {
+test('invalid authoringMode frontmatter is ignored as unused metadata', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
-    yamlFrontmatter('title: Tutorial\nauthoringMode: tutorial'),
-    paragraph('ここから始めましょう'),
-  );
-  const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /page-mode-tutorial-requires-section/);
-});
-
-test('authoringMode: non-tutorial with <Section> fails', async () => {
-  const { default: plugin } = await import(pluginModulePath);
-  const tree = root(
-    yamlFrontmatter('title: Memo\nauthoringMode: non-tutorial'),
+    yamlFrontmatter('title: Broken\nauthoringMode: hybrid'),
     section({ goal: 'foo します' }, jsxElement('Checkpoint', {}, paragraph('done'))),
   );
   const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /page-mode-non-tutorial-has-section/);
+  assert.doesNotThrow(() => plugin()(tree, file));
 });
 
-test('invalid authoringMode value fails fast', async () => {
-  const { default: plugin } = await import(pluginModulePath);
-  const tree = root(yamlFrontmatter('title: Broken\nauthoringMode: hybrid'), paragraph('invalid'));
-  const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /page-authoring-mode-invalid/);
-});
-
-test('pages with <Section> but no authoringMode fail because default mode is non-tutorial', async () => {
+test('Section with no authoringMode is linted normally', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
-    section(
-      { goal: 'foo します' },
-      action({ img: './a.png' }, paragraph('進めます')),
-      jsxElement('Verify', {}, paragraph('成功')),
-      jsxElement('Checkpoint', {}, paragraph('done')),
-    ),
+    section({ goal: 'foo します' }, jsxElement('Checkpoint', {}, paragraph('done'))),
   );
-  const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /page-mode-non-tutorial-has-section/);
+  const { file, warnings } = createVFileStub();
+  assert.doesNotThrow(() => plugin()(tree, file));
+  assert.deepEqual(warnings, []);
 });
 
-test('mdx metadata export can declare tutorial mode explicitly', async () => {
+test('Section-less markdown skips page-wide tutorial notes', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
-    mdxEsm("export const metadata = { title: 'Tutorial', authoringMode: 'tutorial' }"),
-    section(
-      { goal: 'foo します' },
-      action({ img: './a.png' }, paragraph('進めます')),
-      jsxElement('Verify', {}, paragraph('成功')),
-      jsxElement('Checkpoint', {}, paragraph('done')),
-    ),
+    paragraph('このページは、授業を止めないための運営メモです 🎉'),
+    paragraph('受講者は事前に確認してください'),
   );
   const stub = createVFileStub();
-  assert.doesNotThrow(() => plugin()(tree, stub.file));
+  plugin()(tree, stub.file);
   assert.deepEqual(stub.warnings, []);
+  assert.deepEqual(stub.notes, []);
 });
 
-test('pages without <Section> are treated as non-tutorials and skipped', async () => {
+test('Action-only page still runs Action component rules', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(action({ img: './a.png' }, paragraph('text'), mdImage('./b.png')));
+  const { file } = createVFileStub();
+  assert.throws(() => plugin()(tree, file), /action-single-image/);
+});
+
+test('Verify-only page still runs Verify component rules', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const tree = root(jsxElement('Verify', {}, paragraph('→ 成功です')));
+  const { file, warnings } = createVFileStub();
+  plugin()(tree, file);
+  assert.ok(
+    warnings.some((w) => w.origin?.includes('verify-no-duplicate-arrow')),
+    'expected verify-no-duplicate-arrow warning outside Section',
+  );
+});
+
+test('authoringMode parser source is removed from platform code', async () => {
+  await assert.rejects(
+    fs.access(new URL('../src/mdx/tutorial/page-authoring-mode.ts', import.meta.url)),
+    /ENOENT/,
+  );
+});
+
+test('pages without <Section> skip page-wide tutorial findings', async () => {
   const { default: plugin } = await import(pluginModulePath);
   // A teacher-facing memo that would violate Personalization
   // (page-opens-with-doc-description) and decorative-emoji, but carries
@@ -834,10 +829,10 @@ test('pages without <Section> are treated as non-tutorials and skipped', async (
   );
   const { file, warnings } = createVFileStub();
   plugin()(tree, file);
-  assert.deepEqual(warnings, [], 'non-tutorial pages must not emit any tutorial-lint findings');
+  assert.deepEqual(warnings, [], 'Section-less pages must not emit page-wide findings');
 });
 
-test('pages without <Section> skip even in strict/collect modes', async () => {
+test('pages without <Section> skip page-wide rules even in strict/collect modes', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(paragraph('このページは運営メモです 🎉'), paragraph('学習者は〜'));
   const { file } = createVFileStub();

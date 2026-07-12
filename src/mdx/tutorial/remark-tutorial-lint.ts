@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Node } from 'unist';
-import { resolvePageAuthoringMode } from './page-authoring-mode.js';
 
 /**
  * Remark plugin that lints `<Section>` / `<Action>` / `<Verify>` /
@@ -25,9 +24,6 @@ import { resolvePageAuthoringMode } from './page-authoring-mode.js';
  * Rules implemented:
  *
  *  Structural / technical:
- *  - tutorial/page-authoring-mode-invalid      (error) — invalid page metadata
- *  - tutorial/page-mode-tutorial-requires-section (error) — tutorial page boundary missing
- *  - tutorial/page-mode-non-tutorial-has-section (error) — non-tutorial page uses tutorial boundary
  *  - tutorial/section-goal-required     (error) — missing metadata
  *  - tutorial/action-single-image       (error) — structural break
  *  - tutorial/checkpoint-placement      (warn)  — structure rule
@@ -462,6 +458,9 @@ const isCollectMode = (): boolean => {
   return raw === '1' || raw.toLowerCase() === 'true';
 };
 
+const hasTopLevelSection = (tree: Node): boolean =>
+  hasChildren(tree) && tree.children.some((child) => isJsxElement(child, 'Section'));
+
 type Finding = {
   severity: 'note' | 'warn' | 'error';
   reason: string;
@@ -569,51 +568,14 @@ export default function remarkTutorialLint() {
   return function transform(tree: Node, file: VFileLike) {
     if (isCollectMode()) startCollection(file);
 
-    const pageMode = resolvePageAuthoringMode(tree);
-
-    if (pageMode.mode === null) {
-      emitError(
-        file,
-        `Page frontmatter uses invalid authoringMode "${pageMode.rawValue}"; use "tutorial" or "non-tutorial"`,
-        tree,
-        'page-authoring-mode-invalid',
-      );
-      flushCollection(file);
-      return;
-    }
-
-    if (pageMode.mode === 'non-tutorial') {
-      if (pageMode.hasTutorialSection) {
-        const reason = pageMode.explicit
-          ? 'Page declares `authoringMode: non-tutorial` but still uses <Section>; keep short procedural blocks inline or split the tutorial into its own page'
-          : 'Page uses <Section> but omits `authoringMode`; pages without `authoringMode` default to `non-tutorial`, so add `authoringMode: tutorial` or remove <Section>';
-        emitError(file, reason, tree, 'page-mode-non-tutorial-has-section');
-        flushCollection(file);
-        return;
-      }
-
-      // Non-tutorial pages are intentionally out of scope for tutorial lint.
-      flushCollection(file);
-      return;
-    }
-
-    if (!pageMode.hasTutorialSection) {
-      emitError(
-        file,
-        'Page declares `authoringMode: tutorial` but has no <Section>; tutorial pages must use <Section> to mark the page-level learning milestones',
-        tree,
-        'page-mode-tutorial-requires-section',
-      );
-      flushCollection(file);
-      return;
-    }
-
     // Page-level checks that need the full tree root.
-    validatePageOpener(file, tree);
-    validateThirdPersonReader(file, tree);
-    validateDecorativeEmoji(file, tree);
-    validatePrerequisitesPlacement(file, tree);
-    validateNextStepsPlacement(file, tree);
+    if (hasTopLevelSection(tree)) {
+      validatePageOpener(file, tree);
+      validateThirdPersonReader(file, tree);
+      validateDecorativeEmoji(file, tree);
+      validatePrerequisitesPlacement(file, tree);
+      validateNextStepsPlacement(file, tree);
+    }
 
     const walk = (node: Node, stepContext: StepContext | null, sectionDepth: number) => {
       if (!hasChildren(node)) return;

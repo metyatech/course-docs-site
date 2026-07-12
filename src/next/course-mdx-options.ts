@@ -4,12 +4,14 @@ import remarkAdmonitionsToMdx from '../mdx/remark-admonitions-to-mdx.js';
 import remarkSectionHeadings from '../mdx/remark-section-headings.js';
 import remarkTutorialLint from '../mdx/tutorial/remark-tutorial-lint.js';
 import remarkInjectTutorialShotLegend from '../mdx/remark-inject-tutorial-shot-legend.js';
+import remarkTaskStructure from '../mdx/remark-task-structure.js';
 
 export const courseRemarkPlugins = [
   remarkGfm,
   remarkDirective,
   remarkAdmonitionsToMdx,
   remarkInjectTutorialShotLegend,
+  remarkTaskStructure,
   remarkTutorialLint,
   remarkSectionHeadings,
 ] as const;

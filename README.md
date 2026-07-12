@@ -16,7 +16,7 @@ Primary consumers:
 
 - Shared Next/Nextra integration helpers, including MDX remark plugins and webpack asset rules
 - Shared MDX and runtime features, such as exercise rendering, code preview wiring, submissions UI, and admin routes
-- Shared tutorial/non-tutorial page-mode enforcement for Course Docs Site MDX authoring
+- Shared MDX syntax checks and tutorial component linting for Course Docs Site authoring
 
 ## Requirements
 
@@ -46,7 +46,6 @@ Useful commands:
 
 ## Documentation
 
-- [docs/authoring-modes.md](./docs/authoring-modes.md)
 - [docs/admonition-authoring.md](./docs/admonition-authoring.md)
 - [LICENSE](./LICENSE)
 - [SECURITY.md](./SECURITY.md)
