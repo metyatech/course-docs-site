@@ -320,11 +320,6 @@ should migrate to the static UI WebP output policy:
 - box / arrow / short label annotations
 - generated page-local WebP output image for static UI screenshots, with animated WebP raw uploads preserved as animated WebP
 
-The editor also warns when the scanned page still uses `<Section>` without
-declaring `authoringMode: tutorial`, so local fixtures and in-progress course
-repos surface page-mode drift in the same repo where the stricter platform
-enforcement now runs.
-
 See [Tutorial Shot Editor](./docs/tutorial-shot-editor.md) for the architecture,
 canonical files, and authoring rules.
 
@@ -472,7 +467,6 @@ dir, and cleans deterministic matrix state before and after each course. Set
 
 ## Documentation
 
-- [Authoring Modes](./docs/authoring-modes.md)
 - [Content Quality Boundary](./docs/content-quality-boundary.md)
 - [Tutorial Shot Editor](./docs/tutorial-shot-editor.md)
 - [LICENSE](./LICENSE)
@@ -490,6 +484,3 @@ dir, and cleans deterministic matrix state before and after each course. Set
 - Cross-repo workflow dispatch uses the `COURSE_CONTENT_REDEPLOY_TOKEN` Actions secret in this repository.
 - `@metyatech/course-docs-platform` is pinned in `package.json` / `package-lock.json`, so platform-only changes
   do not reach production until this repo updates the pinned commit and `main` passes `CI`.
-- Content repos should use the two-mode authoring boundary documented in
-  [Authoring Modes](./docs/authoring-modes.md): **Tutorial** for sequential
-  build/do flows, **Non-tutorial** for explanation/reference pages.

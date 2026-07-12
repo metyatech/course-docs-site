@@ -12,7 +12,6 @@ import {
   extractVerifyImageRefsFromMdx,
   getTutorialShotGeneratedImageFormat,
   getTutorialShotImageContentType,
-  getTutorialPageModeWarnings,
   getTutorialShotWarnings,
   isTutorialShotSourceImageFile,
   isTutorialShotSourceImageFileName,
@@ -47,7 +46,6 @@ const writeTutorialFixture = async (
     path.join(pageDir, "index.mdx"),
     `---
 title: Student Guide
-authoringMode: tutorial
 ---
 
 <Section title="Step 1" goal="Unreal Editor を開いた状態">
@@ -603,7 +601,6 @@ test("extractActionImageRefsFromMdx derives output, raw, and manifest paths", ()
     sourceText: `
 ---
 title: Tutorial
-authoringMode: tutorial
 ---
 
 <Section title="Step 1" goal="ready">
@@ -644,7 +641,6 @@ test("extractActionImageRefsFromMdx decodes URL-encoded Action image filenames",
     sourceText: `
 ---
 title: Tutorial
-authoringMode: tutorial
 ---
 
 <Section title="Step 1" goal="ready">
@@ -687,7 +683,6 @@ test("extractVerifyImageRefsFromMdx derives output, raw, and manifest paths", ()
     sourceText: `
 ---
 title: Tutorial
-authoringMode: tutorial
 ---
 
 <Section title="Step 1" goal="ready">
@@ -730,7 +725,6 @@ test("extractVerifyImageRefsFromMdx decodes URL-encoded Verify image filenames",
     sourceText: `
 ---
 title: Tutorial
-authoringMode: tutorial
 ---
 
 <Section title="Step 1" goal="ready">
@@ -771,7 +765,6 @@ test("scanTutorialShots includes Verify img references alongside Action img refe
       path.join(pageDir, "index.mdx"),
       `---
 title: Student Guide
-authoringMode: tutorial
 ---
 
 <Section title="Step 1" goal="Unreal Editor を開いた状態">
@@ -964,39 +957,6 @@ test("getTutorialShotWarnings emits verify-role warning for Verify shots with ac
     [],
     "Missing shotSource should not trigger role warning",
   );
-});
-
-test("getTutorialPageModeWarnings warns when a Section page omits authoringMode", () => {
-  const warnings = getTutorialPageModeWarnings({
-    sourceText: `---
-title: Tutorial
----
-
-<Section title="Step 1" goal="ready">
-  <Action img="./img/startup.png">A</Action>
-</Section>
-`,
-  });
-
-  assert.deepEqual(warnings, [
-    "このページは <Section> を使っていますが `authoringMode: tutorial` がありません。course-docs-platform の新ルールに合わせて frontmatter か metadata export に追加してください。",
-  ]);
-});
-
-test("getTutorialPageModeWarnings stays quiet for tutorial pages with authoringMode", () => {
-  const warnings = getTutorialPageModeWarnings({
-    sourceText: `---
-title: Tutorial
-authoringMode: tutorial
----
-
-<Section title="Step 1" goal="ready">
-  <Action img="./img/startup.png">A</Action>
-</Section>
-`,
-  });
-
-  assert.deepEqual(warnings, []);
 });
 
 test("tutorial shot editor crop state stays isolated per image and restores per selection", () => {
@@ -1312,114 +1272,6 @@ test("scanTutorialShots and saveTutorialShot migrate static Action output to Web
   assert.equal(rescannedShots[0].hasRawImage, true);
   assert.equal(rescannedShots[0].hasManifest, true);
   assert.deepEqual(rescannedShots[0].warnings, []);
-});
-
-test("scanTutorialShots warns when a tutorial page still lacks authoringMode", async (t) => {
-  const sourceRoot = await fs.mkdtemp(
-    path.join(os.tmpdir(), "course-tutorial-shots-mode-warning-"),
-  );
-
-  t.after(async () => {
-    await fs.rm(sourceRoot, { recursive: true, force: true });
-  });
-
-  const pageDir = path.join(sourceRoot, "content", "docs", "student-guide");
-  const imageDir = path.join(pageDir, "img");
-  await fs.mkdir(imageDir, { recursive: true });
-  await fs.writeFile(
-    path.join(pageDir, "index.mdx"),
-    `---
-title: Student Guide
----
-
-<Section title="Step 1" goal="Unreal Editor を開いた状態">
-  <Action img="./img/startup.png">
-    **起動** を確認します
-  </Action>
-</Section>
-`,
-    "utf8",
-  );
-  await sharp({
-    create: {
-      width: 640,
-      height: 360,
-      channels: 4,
-      background: "#dbe4f0",
-    },
-  })
-    .png()
-    .toFile(path.join(imageDir, "startup.png"));
-
-  const shots = await scanTutorialShots({ sourceRoot });
-
-  assert.equal(shots.length, 1);
-  assert.deepEqual(shots[0].warnings, [
-    "このページは <Section> を使っていますが `authoringMode: tutorial` がありません。course-docs-platform の新ルールに合わせて frontmatter か metadata export に追加してください。",
-  ]);
-});
-
-test("saveTutorialShot keeps returning the page-mode warning until authoringMode is added", async (t) => {
-  const sourceRoot = await fs.mkdtemp(
-    path.join(os.tmpdir(), "course-tutorial-shots-save-warning-"),
-  );
-
-  t.after(async () => {
-    await fs.rm(sourceRoot, { recursive: true, force: true });
-  });
-
-  const pageDir = path.join(sourceRoot, "content", "docs", "student-guide");
-  const imageDir = path.join(pageDir, "img");
-  await fs.mkdir(imageDir, { recursive: true });
-  await fs.writeFile(
-    path.join(pageDir, "index.mdx"),
-    `---
-title: Student Guide
----
-
-<Section title="Step 1" goal="Unreal Editor を開いた状態">
-  <Action img="./img/startup.png">
-    **起動** を確認します
-  </Action>
-</Section>
-`,
-    "utf8",
-  );
-  await sharp({
-    create: {
-      width: 640,
-      height: 360,
-      channels: 4,
-      background: "#dbe4f0",
-    },
-  })
-    .png()
-    .toFile(path.join(imageDir, "startup.png"));
-
-  const manifest = createDefaultTutorialShotManifest({
-    pagePath: "content/docs/student-guide/index.mdx",
-    outputImagePath: "content/docs/student-guide/img/startup.png",
-  });
-
-  const result = await saveTutorialShot({
-    sourceRoot,
-    bootstrapFromOutput: true,
-    bootstrapImagePath: "content/docs/student-guide/img/startup.png",
-    manifestInput: {
-      ...manifest,
-      crop: {
-        x: 16,
-        y: 16,
-        width: 320,
-        height: 180,
-      },
-      annotations: [],
-    },
-  });
-
-  assert.deepEqual(result.warnings, [
-    "このページは <Section> を使っていますが `authoringMode: tutorial` がありません。course-docs-platform の新ルールに合わせて frontmatter か metadata export に追加してください。",
-  ]);
 });
 
 test("scanTutorialShots and saveTutorialShot treat URL-encoded Action image filenames as real local files", async (t) => {
