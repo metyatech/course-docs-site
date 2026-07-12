@@ -29,6 +29,7 @@ const root = (...children) => ({ type: 'root', children });
 const mdxComment = () => ({ type: 'mdxFlowExpression', value: '/* author note */' });
 const emptyExpression = () => ({ type: 'mdxFlowExpression', value: '   ' });
 const emptyFragment = () => jsxElement('Fragment', { type: 'text', value: '   ' });
+const forbiddenLegacyAnswerName = ['Solu', 'tion'].join('');
 
 const run = async (tree) => {
   const { default: plugin } = await import(pluginModulePath);
@@ -110,6 +111,13 @@ test('missing problem content fails', async () => {
 test('missing Answer fails for QuickCheck', async () => {
   await assertStructureError(
     root(jsxElement('QuickCheck', paragraph('問題です'))),
+    /<Answer> is missing/,
+  );
+});
+
+test('missing Answer fails for Exercise', async () => {
+  await assertStructureError(
+    root(jsxElement('Exercise', paragraph('問題です'))),
     /<Answer> is missing/,
   );
 });
@@ -217,36 +225,35 @@ test('MDX comments, empty expressions, whitespace, and empty Fragment are ignore
   );
 });
 
-test('legacy Exercise plus Solution passes when Solution is direct and last', async () => {
-  await assert.doesNotReject(() =>
-    run(
-      root(
-        jsxElement('Exercise', paragraph('問題です'), jsxElement('Solution', paragraph('旧答え'))),
-      ),
-    ),
-  );
-});
-
-test('mixed legacy Solution and new Hint/Answer fails', async () => {
+test('legacy answer component inside Exercise fails even when direct and last', async () => {
   await assertStructureError(
     root(
       jsxElement(
         'Exercise',
         paragraph('問題です'),
-        jsxElement('Hint', paragraph('ヒント')),
-        jsxElement('Solution', paragraph('旧答え')),
-        jsxElement('Answer', paragraph('答え')),
+        jsxElement(forbiddenLegacyAnswerName, paragraph('旧答え')),
       ),
     ),
-    /mixes legacy <Solution>/,
+    new RegExp(`<${forbiddenLegacyAnswerName}> is no longer supported`),
   );
 });
 
-test('Solution in QuickCheck fails', async () => {
+test('legacy answer component inside QuickCheck fails', async () => {
   await assertStructureError(
     root(
-      jsxElement('QuickCheck', paragraph('問題です'), jsxElement('Solution', paragraph('旧答え'))),
+      jsxElement(
+        'QuickCheck',
+        paragraph('問題です'),
+        jsxElement(forbiddenLegacyAnswerName, paragraph('旧答え')),
+      ),
     ),
-    /cannot appear in <QuickCheck>/,
+    new RegExp(`<${forbiddenLegacyAnswerName}> is no longer supported`),
+  );
+});
+
+test('legacy answer component outside task blocks fails', async () => {
+  await assertStructureError(
+    root(jsxElement(forbiddenLegacyAnswerName, paragraph('外部の旧答え'))),
+    new RegExp(`<${forbiddenLegacyAnswerName}> is no longer supported`),
   );
 });

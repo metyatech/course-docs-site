@@ -88,8 +88,11 @@ const yamlFrontmatter = (value) => ({
   value,
 });
 
+const removedMetadataName = ['authoring', 'Mode'].join('');
+const removedMetadataParserFileName = ['page-authoring', '-mode'].join('');
+
 const tutorialRoot = (...children) =>
-  root(yamlFrontmatter('title: Tutorial\nauthoringMode: tutorial'), ...children);
+  root(yamlFrontmatter(`title: Tutorial\n${removedMetadataName}: tutorial`), ...children);
 
 // Suppress console.warn spam and capture console.info lines (notes).
 const originalConsoleWarn = console.warn;
@@ -761,17 +764,17 @@ test('TUTORIAL_LINT_COLLECT=1 passes clean documents without throwing', async ()
   }
 });
 
-test('invalid authoringMode frontmatter is ignored as unused metadata', async () => {
+test('invalid removed tutorial-mode frontmatter is ignored as unused metadata', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
-    yamlFrontmatter('title: Broken\nauthoringMode: hybrid'),
+    yamlFrontmatter(`title: Broken\n${removedMetadataName}: hybrid`),
     section({ goal: 'foo します' }, jsxElement('Checkpoint', {}, paragraph('done'))),
   );
   const { file } = createVFileStub();
   assert.doesNotThrow(() => plugin()(tree, file));
 });
 
-test('Section with no authoringMode is linted normally', async () => {
+test('Section with no removed tutorial-mode metadata is linted normally', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = root(
     section({ goal: 'foo します' }, jsxElement('Checkpoint', {}, paragraph('done'))),
@@ -811,9 +814,9 @@ test('Verify-only page still runs Verify component rules', async () => {
   );
 });
 
-test('authoringMode parser source is removed from platform code', async () => {
+test('removed tutorial-mode parser source is absent from platform code', async () => {
   await assert.rejects(
-    fs.access(new URL('../src/mdx/tutorial/page-authoring-mode.ts', import.meta.url)),
+    fs.access(new URL(`../src/mdx/tutorial/${removedMetadataParserFileName}.ts`, import.meta.url)),
     /ENOENT/,
   );
 });

@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from 'react';
 import type { MDXComponents } from 'nextra/mdx-components';
 import { CodePreview } from '@metyatech/code-preview/server';
-import Exercise, { Answer, Hint, QuickCheck, Solution } from '@metyatech/exercise/client';
+import Exercise, { Answer, Hint, QuickCheck } from '@metyatech/exercise/client';
 import { useMDXComponents as getThemeComponents } from 'nextra-theme-docs';
 import Admonition from './Admonition.js';
 import DownloadLink from './DownloadLink.js';
@@ -34,7 +34,6 @@ const baseComponents: MDXComponents = {
   QuickCheck,
   Hint,
   Answer,
-  Solution,
   Admonition,
   DownloadLink,
   Section,

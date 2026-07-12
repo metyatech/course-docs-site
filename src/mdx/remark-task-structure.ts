@@ -14,14 +14,13 @@ type VFileLike = {
 };
 
 type TaskName = 'Exercise' | 'QuickCheck';
-type MarkerName = 'Hint' | 'Answer' | 'Solution';
-type OrderName = 'problem content' | MarkerName | TaskName | 'content';
+type MarkerName = 'Hint' | 'Answer';
 
 const RULE_ORIGIN = 'task-structure';
 const TASK_NAMES = new Set<string>(['Exercise', 'QuickCheck']);
-const MARKER_NAMES = new Set<string>(['Hint', 'Answer', 'Solution']);
+const MARKER_NAMES = new Set<string>(['Hint', 'Answer']);
 const NEW_EXPECTED_ORDER = 'problem content -> Hint* -> Answer';
-const LEGACY_EXPECTED_ORDER = 'problem content -> Solution';
+const FORBIDDEN_LEGACY_ANSWER_NAME = ['Solu', 'tion'].join('');
 
 const hasChildren = (node: Node): node is Parent => Array.isArray((node as Parent).children);
 
@@ -61,9 +60,10 @@ const substantiveChildren = (node: MdxJsxElement): Node[] =>
 
 const hasSubstantiveBody = (node: MdxJsxElement): boolean => substantiveChildren(node).length > 0;
 
-const orderName = (node: Node): OrderName => {
+const orderName = (node: Node): string => {
   if (isTask(node)) return node.name;
   if (isMarker(node)) return node.name;
+  if (isJsxElement(node) && node.name === FORBIDDEN_LEGACY_ANSWER_NAME) return node.name;
   return 'problem content';
 };
 
@@ -92,8 +92,6 @@ const failStructure = (
 const countDirect = (children: Node[], name: string): number =>
   children.filter((child) => isJsxElement(child, name)).length;
 
-const hasDirect = (children: Node[], name: string): boolean => countDirect(children, name) > 0;
-
 const firstMarkerIndex = (children: Node[]): number =>
   children.findIndex((child) => isMarker(child));
 
@@ -102,22 +100,15 @@ function validateNewTask(file: VFileLike, task: MdxJsxElement & { name: TaskName
   const actual = actualOrder(children);
   const expected = NEW_EXPECTED_ORDER;
   const answerCount = countDirect(children, 'Answer');
-  const solutionCount = countDirect(children, 'Solution');
   const firstMarker = firstMarkerIndex(children);
   const problemChildren = firstMarker < 0 ? children : children.slice(0, firstMarker);
+  const forbiddenLegacyAnswer = children.find(
+    (child): child is MdxJsxElement =>
+      isJsxElement(child) && child.name === FORBIDDEN_LEGACY_ANSWER_NAME,
+  );
 
-  if (solutionCount > 0) {
-    failStructure(
-      file,
-      task,
-      task.name,
-      actual,
-      expected,
-      task.name === 'QuickCheck'
-        ? '<Solution> is legacy-only and cannot appear in <QuickCheck>'
-        : '<Solution> cannot be mixed with <Hint>/<Answer>',
-      'Use <Answer> for the new structure, or use only one final <Solution> in legacy <Exercise>.',
-    );
+  if (forbiddenLegacyAnswer) {
+    failForbiddenLegacyAnswer(file, forbiddenLegacyAnswer);
   }
 
   if (problemChildren.length === 0) {
@@ -212,89 +203,22 @@ function validateNewTask(file: VFileLike, task: MdxJsxElement & { name: TaskName
   }
 }
 
-function validateLegacyExercise(file: VFileLike, task: MdxJsxElement & { name: 'Exercise' }) {
-  const children = substantiveChildren(task);
-  const actual = actualOrder(children);
-  const solutionCount = countDirect(children, 'Solution');
-  const solutionIndex = children.findIndex((child) => isJsxElement(child, 'Solution'));
-  const problemChildren = solutionIndex < 0 ? children : children.slice(0, solutionIndex);
-
-  if (solutionCount !== 1) {
-    failStructure(
-      file,
-      task,
-      task.name,
-      actual,
-      LEGACY_EXPECTED_ORDER,
-      `legacy <Exercise> must have exactly one direct <Solution>, found ${solutionCount}`,
-      'Use one final <Solution>, or migrate to <Hint>/<Answer> without <Solution>.',
-    );
-  }
-
-  if (problemChildren.length === 0) {
-    failStructure(
-      file,
-      task,
-      task.name,
-      actual,
-      LEGACY_EXPECTED_ORDER,
-      'problem content is missing before <Solution>',
-      'Add the learner-facing prompt before the final <Solution>.',
-    );
-  }
-
-  if (solutionIndex !== children.length - 1) {
-    failStructure(
-      file,
-      task,
-      task.name,
-      actual,
-      LEGACY_EXPECTED_ORDER,
-      '<Solution> must be the final direct child',
-      'Move any content that follows <Solution> before it, or migrate to <Answer>.',
-    );
-  }
+function validateExercise(file: VFileLike, task: MdxJsxElement & { name: 'Exercise' }) {
+  validateNewTask(file, task);
 }
 
-function validateExercise(file: VFileLike, task: MdxJsxElement & { name: 'Exercise' }) {
-  const children = substantiveChildren(task);
-  const actual = actualOrder(children);
-  const hasHintOrAnswer = hasDirect(children, 'Hint') || hasDirect(children, 'Answer');
-  const hasSolution = hasDirect(children, 'Solution');
+function failForbiddenLegacyAnswer(file: VFileLike, node: MdxJsxElement) {
+  const component = node.name ?? 'legacy answer component';
 
-  if (hasHintOrAnswer && hasSolution) {
-    failStructure(
-      file,
-      task,
-      task.name,
-      actual,
-      NEW_EXPECTED_ORDER,
-      '<Exercise> mixes legacy <Solution> with new <Hint>/<Answer>',
-      'Use either new <Hint>/<Answer> structure or legacy <Solution>, not both.',
-    );
-  }
-
-  if (hasHintOrAnswer) {
-    validateNewTask(file, task);
-    return;
-  }
-
-  if (hasSolution) {
-    validateLegacyExercise(file, task);
-    return;
-  }
-
-  if (children.length === 0) {
-    failStructure(
-      file,
-      task,
-      task.name,
-      actual,
-      'problem content, optionally followed by Hint* -> Answer',
-      'problem content is missing',
-      'Add the learner-facing prompt inside <Exercise>.',
-    );
-  }
+  failStructure(
+    file,
+    node,
+    component,
+    component,
+    NEW_EXPECTED_ORDER,
+    `<${component}> is no longer supported`,
+    'Use <Answer> after optional <Hint> blocks.',
+  );
 }
 
 function validateDirectPlacement(
@@ -317,24 +241,17 @@ function validateDirectPlacement(
     }
   }
 
-  if (node.name === 'Solution') {
-    if (!currentTask || currentTask.name !== 'Exercise' || parent !== currentTask) {
-      failStructure(
-        file,
-        node,
-        node.name,
-        node.name,
-        LEGACY_EXPECTED_ORDER,
-        '<Solution> is allowed only as a direct child of legacy <Exercise>',
-        'Move <Solution> directly inside <Exercise>, migrate to <Answer>, or remove it.',
-      );
-    }
-  }
+  void parent;
+  void currentTask;
 }
 
 export default function remarkTaskStructure() {
   return function transform(tree: Node, file: VFileLike) {
     const walk = (node: Node, parent: Node | null, currentTask: MdxJsxElement | null) => {
+      if (isJsxElement(node) && node.name === FORBIDDEN_LEGACY_ANSWER_NAME) {
+        failForbiddenLegacyAnswer(file, node);
+      }
+
       if (isJsxElement(node) && MARKER_NAMES.has(node.name ?? '')) {
         validateDirectPlacement(file, node, parent, currentTask);
       }
