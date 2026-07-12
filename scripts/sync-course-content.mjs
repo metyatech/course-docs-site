@@ -380,6 +380,75 @@ const syncDirectory = ({ from, to, shouldSkip }) => {
   fs.writeFileSync(path.join(to, ".keep"), "");
 };
 
+const legacyExerciseClientMarkerExportPattern =
+  /\n?export const (?:Hint|Answer) = Object\.assign\(\(props\) => props\.children,\s*\{\s*__(?:exerciseHint|exerciseAnswer): true,\s*displayName: ["']Exercise(?:Hint|Answer)["'],?\s*\}\);\s*/g;
+
+const mergeExerciseClientImportNames = (names) => {
+  const merged = new Set(
+    names
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean),
+  );
+  merged.delete("Answer");
+  merged.delete("Hint");
+  return [...merged].join(", ");
+};
+
+const normalizeExerciseStructuralTags = (text) => {
+  const lines = text.split(/(\r?\n)/);
+  let inFence = false;
+  for (let i = 0; i < lines.length; i += 2) {
+    const line = lines[i];
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    lines[i] = line
+      .replace(/<Hint(?=[\s>])/g, "<exercise-hint")
+      .replace(/<\/Hint>/g, "</exercise-hint>")
+      .replace(/<Answer(?=[\s>])/g, "<exercise-answer")
+      .replace(/<\/Answer>/g, "</exercise-answer>");
+  }
+  return lines.join("");
+};
+
+const normalizeExerciseClientReferences = (text) => {
+  if (!text.includes("@metyatech/exercise/client")) return text;
+
+  let normalized = text.replace(legacyExerciseClientMarkerExportPattern, "\n");
+  normalized = normalized.replace(
+    /^import\s+Exercise\s*,\s*\{([^}]*)\}\s+from\s+(["'])@metyatech\/exercise\/client\2;$/m,
+    (_match, names, quote) => {
+      const mergedNames = mergeExerciseClientImportNames(names);
+      return mergedNames
+        ? `import Exercise, { ${mergedNames} } from ${quote}@metyatech/exercise/client${quote};`
+        : `import Exercise from ${quote}@metyatech/exercise/client${quote};`;
+    },
+  );
+  normalized = normalizeExerciseStructuralTags(normalized);
+  return normalized.replace(/\n{3,}/g, "\n\n");
+};
+
+const normalizeSyncedExerciseClientReferences = (directory) => {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      normalizeSyncedExerciseClientReferences(entryPath);
+      continue;
+    }
+    if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== ".mdx") continue;
+
+    const original = fs.readFileSync(entryPath, "utf8");
+    const normalized = normalizeExerciseClientReferences(original);
+    if (normalized !== original) {
+      fs.writeFileSync(entryPath, normalized);
+    }
+  }
+};
+
 const hasGitClone = (dirPath) => fs.existsSync(path.join(dirPath, ".git"));
 
 // `resolveRemoteHeadSha` runs `git ls-remote` against the canonical
@@ -529,6 +598,7 @@ syncDirectory({
   to: contentTo,
   shouldSkip: ({ name }) => name === "_pagefind",
 });
+normalizeSyncedExerciseClientReferences(contentTo);
 
 const siteConfigFrom = path.join(sourceRoot, "site.config.ts");
 const siteConfigTo = path.join(projectRoot, "site.config.ts");

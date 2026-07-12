@@ -1,0 +1,40 @@
+diff --git a/node_modules/@metyatech/exercise/dist/theme/Exercise/answerDetection.js b/node_modules/@metyatech/exercise/dist/theme/Exercise/answerDetection.js
+index 9132cf6..4bd4e4b 100644
+--- a/node_modules/@metyatech/exercise/dist/theme/Exercise/answerDetection.js
++++ b/node_modules/@metyatech/exercise/dist/theme/Exercise/answerDetection.js
+@@ -6,6 +6,10 @@ import { matchesMarkedComponentType } from './componentMarkers.js';
+ const matchesAnswerType = (type) => matchesMarkedComponentType(type, Answer, '__exerciseAnswer', ANSWER_COMPONENT_NAME);
+ const matchesLegacySolutionType = (type) => matchesMarkedComponentType(type, Solution, '__exerciseSolution', SOLUTION_COMPONENT_NAME);
+ const matchesHintType = (type) => matchesMarkedComponentType(type, Hint, '__exerciseHint', HINT_COMPONENT_NAME);
++const INTRINSIC_ANSWER_ELEMENT = 'exercise-answer';
++const INTRINSIC_HINT_ELEMENT = 'exercise-hint';
++const isIntrinsicAnswerElement = (child) => React.isValidElement(child) && child.type === INTRINSIC_ANSWER_ELEMENT;
++const isIntrinsicHintElement = (child) => React.isValidElement(child) && child.type === INTRINSIC_HINT_ELEMENT;
+ function hasLegacySolutionMarker(child) {
+     var _a;
+     if (!React.isValidElement(child)) {
+@@ -15,12 +19,12 @@ function hasLegacySolutionMarker(child) {
+     return props[LEGACY_SOLUTION_MARKER] === true;
+ }
+ export const isAnswerElement = (child) => React.isValidElement(child) &&
+-    matchesAnswerType(child.type) &&
++    (matchesAnswerType(child.type) || isIntrinsicAnswerElement(child)) &&
+     !hasLegacySolutionMarker(child);
+ export const isLegacySolutionElement = (child) => React.isValidElement(child) &&
+     (matchesLegacySolutionType(child.type) ||
+         (matchesAnswerType(child.type) && hasLegacySolutionMarker(child)));
+-export const isHintElementLike = (child) => React.isValidElement(child) && matchesHintType(child.type);
++export const isHintElementLike = (child) => React.isValidElement(child) && (matchesHintType(child.type) || isIntrinsicHintElement(child));
+ /**
+  * Component-name strings that identify structural exercise wrappers. The
+  * legacy compatibility scan treats any element whose `displayName` or `name`
+diff --git a/node_modules/@metyatech/exercise/dist/theme/Exercise/hintDetection.js b/node_modules/@metyatech/exercise/dist/theme/Exercise/hintDetection.js
+index b5db048..a0dd003 100644
+--- a/node_modules/@metyatech/exercise/dist/theme/Exercise/hintDetection.js
++++ b/node_modules/@metyatech/exercise/dist/theme/Exercise/hintDetection.js
+@@ -2,4 +2,4 @@ import React from 'react';
+ import Hint, { HINT_COMPONENT_NAME } from './Hint.js';
+ import { matchesMarkedComponentType } from './componentMarkers.js';
+ const matchesHintType = (type) => matchesMarkedComponentType(type, Hint, '__exerciseHint', HINT_COMPONENT_NAME);
+-export const isHintElement = (child) => React.isValidElement(child) && matchesHintType(child.type);
++export const isHintElement = (child) => React.isValidElement(child) && (matchesHintType(child.type) || child.type === 'exercise-hint');

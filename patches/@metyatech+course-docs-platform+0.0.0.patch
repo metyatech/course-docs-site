@@ -1,0 +1,85 @@
+diff --git a/node_modules/@metyatech/course-docs-platform/dist/mdx/remark-task-structure.js b/node_modules/@metyatech/course-docs-platform/dist/mdx/remark-task-structure.js
+index bea33f7..6582493 100644
+--- a/node_modules/@metyatech/course-docs-platform/dist/mdx/remark-task-structure.js
++++ b/node_modules/@metyatech/course-docs-platform/dist/mdx/remark-task-structure.js
+@@ -1,6 +1,6 @@
+ const RULE_ORIGIN = 'task-structure';
+ const TASK_NAMES = new Set(['Exercise', 'QuickCheck']);
+-const MARKER_NAMES = new Set(['Hint', 'Answer', 'Solution']);
++const MARKER_NAMES = new Set(['Hint', 'Answer', 'Solution', 'exercise-hint', 'exercise-answer']);
+ const NEW_EXPECTED_ORDER = 'problem content -> Hint* -> Answer';
+ const LEGACY_EXPECTED_ORDER = 'problem content -> Solution';
+ const hasChildren = (node) => Array.isArray(node.children);
+@@ -13,6 +13,15 @@ const isJsxElement = (node, name) => {
+ };
+ const isTask = (node) => isJsxElement(node) && TASK_NAMES.has(node.name ?? '');
+ const isMarker = (node) => isJsxElement(node) && MARKER_NAMES.has(node.name ?? '');
++const markerName = (node) => {
++    if (!isJsxElement(node))
++        return null;
++    if (node.name === 'exercise-hint')
++        return 'Hint';
++    if (node.name === 'exercise-answer')
++        return 'Answer';
++    return node.name ?? null;
++};
+ const isEmptyOrCommentExpression = (node) => {
+     if (node.type !== 'mdxFlowExpression' && node.type !== 'mdxTextExpression')
+         return false;
+@@ -40,7 +49,7 @@ const orderName = (node) => {
+     if (isTask(node))
+         return node.name;
+     if (isMarker(node))
+-        return node.name;
++        return markerName(node);
+     return 'problem content';
+ };
+ const actualOrder = (children) => {
+@@ -52,7 +61,7 @@ const failStructure = (file, node, component, actual, expected, problem, fix) =>
+     const where = file.path ?? 'unknown file';
+     file.fail(`${where}: <${component}> invalid task structure: ${problem}. Actual order: ${actual}. Expected order: ${expected}. Fix: ${fix}.`, node, `${RULE_ORIGIN}:${component}`);
+ };
+-const countDirect = (children, name) => children.filter((child) => isJsxElement(child, name)).length;
++const countDirect = (children, name) => children.filter((child) => markerName(child) === name).length;
+ const hasDirect = (children, name) => countDirect(children, name) > 0;
+ const firstMarkerIndex = (children) => children.findIndex((child) => isMarker(child));
+ function validateNewTask(file, task) {
+@@ -100,9 +109,10 @@ function validateNewTask(file, task) {
+         }
+     }
+     for (const child of children) {
+-        if ((isJsxElement(child, 'Hint') || isJsxElement(child, 'Answer')) &&
++        if ((markerName(child) === 'Hint' || markerName(child) === 'Answer') &&
+             !hasSubstantiveBody(child)) {
+-            failStructure(file, child, task.name, actual, expected, `<${child.name}> is empty`, `Add useful content inside <${child.name}> or remove the empty block.`);
++            const name = markerName(child);
++            failStructure(file, child, task.name, actual, expected, `<${name}> is empty`, `Add useful content inside <${name}> or remove the empty block.`);
+         }
+     }
+ }
+@@ -110,7 +120,7 @@ function validateLegacyExercise(file, task) {
+     const children = substantiveChildren(task);
+     const actual = actualOrder(children);
+     const solutionCount = countDirect(children, 'Solution');
+-    const solutionIndex = children.findIndex((child) => isJsxElement(child, 'Solution'));
++    const solutionIndex = children.findIndex((child) => markerName(child) === 'Solution');
+     const problemChildren = solutionIndex < 0 ? children : children.slice(0, solutionIndex);
+     if (solutionCount !== 1) {
+         failStructure(file, task, task.name, actual, LEGACY_EXPECTED_ORDER, `legacy <Exercise> must have exactly one direct <Solution>, found ${solutionCount}`, 'Use one final <Solution>, or migrate to <Hint>/<Answer> without <Solution>.');
+@@ -143,12 +153,13 @@ function validateExercise(file, task) {
+     }
+ }
+ function validateDirectPlacement(file, node, parent, currentTask) {
+-    if (node.name === 'Hint' || node.name === 'Answer') {
++    const name = markerName(node);
++    if (name === 'Hint' || name === 'Answer') {
+         if (!currentTask || parent !== currentTask) {
+-            failStructure(file, node, node.name, node.name, NEW_EXPECTED_ORDER, `<${node.name}> must be a direct child of <Exercise> or <QuickCheck>`, `Move <${node.name}> directly inside the task block after the problem content.`);
++            failStructure(file, node, name, name, NEW_EXPECTED_ORDER, `<${name}> must be a direct child of <Exercise> or <QuickCheck>`, `Move <${name}> directly inside the task block after the problem content.`);
+         }
+     }
+-    if (node.name === 'Solution') {
++    if (name === 'Solution') {
+         if (!currentTask || currentTask.name !== 'Exercise' || parent !== currentTask) {
+             failStructure(file, node, node.name, node.name, LEGACY_EXPECTED_ORDER, '<Solution> is allowed only as a direct child of legacy <Exercise>', 'Move <Solution> directly inside <Exercise>, migrate to <Answer>, or remove it.');
+         }

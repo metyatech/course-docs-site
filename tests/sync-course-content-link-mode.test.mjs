@@ -147,3 +147,65 @@ test(
     );
   },
 );
+
+test("sync normalizes legacy exercise client marker shims in the mirrored content only", async (t) => {
+  const fakeSiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-site-"));
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-exercise-client-"));
+  const courseA = path.join(tempRoot, "course-a");
+  const legacyMdx = [
+    "import Exercise, { QuickCheck } from '@metyatech/exercise/client';",
+    "",
+    "export const Hint = Object.assign((props) => props.children, {",
+    "    __exerciseHint: true,",
+    "    displayName: 'ExerciseHint',",
+    "});",
+    "",
+    "export const Answer = Object.assign((props) => props.children, {",
+    "    __exerciseAnswer: true,",
+    "    displayName: 'ExerciseAnswer',",
+    "});",
+    "",
+    "<QuickCheck>",
+    "",
+    "Question",
+    "",
+    "<Hint>Hint text</Hint>",
+    "",
+    "<Answer>Answer text</Answer>",
+    "",
+    "</QuickCheck>",
+  ].join("\n");
+
+  await writeCourseRepo({
+    rootDir: courseA,
+    courseName: "Course A",
+    introBody: legacyMdx,
+  });
+
+  t.after(async () => {
+    await safeRm(fakeSiteRoot);
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  });
+
+  const exitCode = await runSync({ cwd: fakeSiteRoot, env: { COURSE_CONTENT_SOURCE: courseA } });
+  assert.equal(exitCode, 0);
+
+  const sourceMdx = await fs.readFile(
+    path.join(courseA, "content", "docs", "intro", "index.mdx"),
+    "utf8",
+  );
+  const mirroredMdx = await fs.readFile(
+    path.join(fakeSiteRoot, "content", "docs", "intro", "index.mdx"),
+    "utf8",
+  );
+
+  assert.match(sourceMdx, /__exerciseHint/u);
+  assert.match(sourceMdx, /__exerciseAnswer/u);
+  assert.match(mirroredMdx, /import Exercise, \{ QuickCheck \} from '@metyatech\/exercise\/client';/u);
+  assert.match(mirroredMdx, /<exercise-hint>Hint text<\/exercise-hint>/u);
+  assert.match(mirroredMdx, /<exercise-answer>Answer text<\/exercise-answer>/u);
+  assert.doesNotMatch(mirroredMdx, /<Hint>/u);
+  assert.doesNotMatch(mirroredMdx, /<Answer>/u);
+  assert.doesNotMatch(mirroredMdx, /__exerciseHint/u);
+  assert.doesNotMatch(mirroredMdx, /__exerciseAnswer/u);
+});
