@@ -51,7 +51,7 @@
   },
   "dependencies": {
     "@metyatech/code-preview": "github:metyatech/code-preview#main",
-    "@metyatech/exercise": "github:metyatech/exercise-module#ba51b4ed76d507dd524a5dd5a63817ae739f41c9",
+    "@metyatech/exercise": "github:metyatech/exercise-module#d27ed7d2c47018ac0f7df205568bc502fc6c3eb3",
     "@re-dev/react-truncate": "^0.5.2",
     "@supabase/supabase-js": "^2.49.1",
     "lucide-react": "^0.563.0",
