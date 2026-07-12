@@ -42,7 +42,11 @@ test("verify-content exits 0 when no content directory is present", async () => 
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
   try {
     const result = await runVerifier(tempDir);
-    assert.equal(result.code, 0, `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+    assert.equal(
+      result.code,
+      0,
+      `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
     assert.match(result.stdout, /no content directory/i);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
@@ -117,14 +121,7 @@ test("verify-content flags a title prop on <Exercise>", async () => {
     await writeFixture(
       tempDir,
       "content/docs/foo/index.mdx",
-      [
-        "### 演習1",
-        "",
-        '<Exercise title="bad">',
-        "本文",
-        "</Exercise>",
-        "",
-      ].join("\n"),
+      ["### 演習1", "", '<Exercise title="bad">', "本文", "</Exercise>", ""].join("\n"),
     );
 
     const result = await runVerifier(tempDir);
@@ -160,7 +157,10 @@ test("verify-content flags a <Exercise> opening tag inside a fenced code block",
     assert.notEqual(result.code, 0);
     assert.match(result.stdout, /Exercise heading verification failed/);
     // The fenced <Exercise> must not be counted; only the real one (with no heading) should fail.
-    assert.equal((result.stdout.match(/preceded by a non-empty Markdown exercise heading/g) ?? []).length, 1);
+    assert.equal(
+      (result.stdout.match(/preceded by a non-empty Markdown exercise heading/g) ?? []).length,
+      1,
+    );
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -190,7 +190,18 @@ test("verify-content flags 2-space fenced indentation and tab indentation", asyn
     await writeFixture(
       tempDir,
       "content/docs/foo/tab.mdx",
-      ["### 演習1", "", "<Exercise>", "", "```js", "const x = 1;", "```", "", "</Exercise>", ""].join("\n"),
+      [
+        "### 演習1",
+        "",
+        "<Exercise>",
+        "",
+        "```js",
+        "const x = 1;",
+        "```",
+        "",
+        "</Exercise>",
+        "",
+      ].join("\n"),
     );
 
     const result = await runVerifier(tempDir);
@@ -282,12 +293,7 @@ test("verify-content accepts Exercise with JSX-expr title inside braces (no real
     await writeFixture(
       tempDir,
       "content/docs/foo/index.mdx",
-      [
-        "### 演習1",
-        "",
-        "<Exercise>{`title`}</Exercise>",
-        "",
-      ].join("\n"),
+      ["### 演習1", "", "<Exercise>{`title`}</Exercise>", ""].join("\n"),
     );
 
     const result = await runVerifier(tempDir);
@@ -344,14 +350,11 @@ test("verify-content ignores MDX files outside content/ (does not scan scripts o
       "scripts/notes/index.mdx",
       ["<Exercise>", "本文", "</Exercise>", ""].join("\n"),
     );
-    await writeFixture(tempDir, "content/docs/clean/index.mdx", [
-      "### 演習1",
-      "",
-      "<Exercise>",
-      "本文",
-      "</Exercise>",
-      "",
-    ].join("\n"));
+    await writeFixture(
+      tempDir,
+      "content/docs/clean/index.mdx",
+      ["### 演習1", "", "<Exercise>", "本文", "</Exercise>", ""].join("\n"),
+    );
 
     const result = await runVerifier(tempDir);
     assert.equal(
@@ -405,6 +408,170 @@ test("verify-content exit code is 1 even when only one of multiple checks fails"
     assert.notEqual(result.code, 0);
     assert.match(result.stdout, /Exercise heading verification failed/);
     assert.match(result.stdout, /Code block indentation verification failed/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("verify-content accepts Nextra _meta.ts control metadata with 2-space indentation", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
+  try {
+    // This fixture uses 2-space indentation to prove _meta.ts is governed
+    // by source/control-file gates, not by the learner-facing four-space
+    // asset gate.
+    await writeFixture(
+      tempDir,
+      "content/_meta.ts",
+      [
+        "const meta = {",
+        "  '*': {",
+        "    type: 'page',",
+        "    theme: {",
+        "      timestamp: false,",
+        "    },",
+        "  },",
+        "  docs: 'Docs',",
+        "};",
+        "",
+        "export default meta;",
+        "",
+      ].join("\n"),
+    );
+    await writeFixture(
+      tempDir,
+      "content/docs/_meta.ts",
+      [
+        "const meta = {",
+        "  intro: {},",
+        "  'teacher-guide': {",
+        "    display: 'hidden',",
+        "  },",
+        "};",
+        "",
+        "export default meta;",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await runVerifier(tempDir);
+    assert.equal(
+      result.code,
+      0,
+      `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
+    assert.doesNotMatch(result.stdout, /content\/_meta\.ts/);
+    assert.doesNotMatch(result.stdout, /content\/docs\/_meta\.ts/);
+    assert.match(result.stdout, /0 asset files/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("verify-content still flags ordinary .ts assets with 2-space indentation", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
+  try {
+    // An ordinary .ts asset (e.g. a learner-facing example file) must still
+    // be caught — only _meta.ts is excluded from the gate.
+    await writeFixture(
+      tempDir,
+      "content/docs/foo/example.ts",
+      ["export function add(a: number, b: number) {", "  return a + b;", "}", ""].join("\n"),
+    );
+
+    const result = await runVerifier(tempDir);
+    assert.notEqual(result.code, 0);
+    assert.match(result.stdout, /Code block indentation verification failed/);
+    assert.match(result.stdout, /content\/docs\/foo\/example\.ts/);
+    assert.match(result.stdout, /four-space steps/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("verify-content distinguishes _meta.ts from ordinary .ts assets in the same fixture", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
+  try {
+    // 2-space _meta.ts is allowed.
+    await writeFixture(
+      tempDir,
+      "content/_meta.ts",
+      ["const meta = {", "  docs: 'Docs',", "};", "", "export default meta;", ""].join("\n"),
+    );
+    // 2-space ordinary .ts asset is still caught.
+    await writeFixture(
+      tempDir,
+      "content/docs/foo/example.ts",
+      ["export const greeting = () => {", "  return 'hi';", "};", ""].join("\n"),
+    );
+
+    const result = await runVerifier(tempDir);
+    assert.notEqual(result.code, 0);
+    assert.match(result.stdout, /content\/docs\/foo\/example\.ts/);
+    assert.doesNotMatch(result.stdout, /content\/_meta\.ts/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("verify-content does not scan a _meta.ts placed outside content/", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
+  try {
+    // A _meta.ts at the repo root is not a synced Nextra control file —
+    // the verifier walks only content/. A file outside content/ must not
+    // be touched at all. We also confirm that placing it next to a clean
+    // content tree does not regress.
+    await writeFixture(
+      tempDir,
+      "_meta.ts",
+      ["const meta = {", "  docs: 'Docs',", "};", "", "export default meta;", ""].join("\n"),
+    );
+    await writeFixture(
+      tempDir,
+      "content/docs/foo/index.mdx",
+      ["### 演習1", "", "<Exercise>", "本文", "</Exercise>", ""].join("\n"),
+    );
+
+    const result = await runVerifier(tempDir);
+    assert.equal(
+      result.code,
+      0,
+      `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
+    assert.doesNotMatch(result.stdout, /_meta\.ts/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("verify-content _meta.ts exclusion is path-scoped to content/ (not site root)", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
+  try {
+    // A 2-space _meta.ts under content/ is allowed (Nextra control metadata),
+    // and a 2-space ordinary .ts asset under content/ is still caught. This
+    // confirms the exclusion is path-scoped: only content/**/_meta.ts is
+    // skipped, not every _meta.ts-shaped file the verifier encounters.
+    await writeFixture(
+      tempDir,
+      "content/section/_meta.ts",
+      [
+        "const meta = {",
+        "  index: { display: 'hidden' },",
+        "};",
+        "",
+        "export default meta;",
+        "",
+      ].join("\n"),
+    );
+    await writeFixture(
+      tempDir,
+      "content/section/example.ts",
+      ["export const value = () => {", "  return 1;", "};", ""].join("\n"),
+    );
+
+    const result = await runVerifier(tempDir);
+    assert.notEqual(result.code, 0);
+    assert.match(result.stdout, /content\/section\/example\.ts/);
+    assert.doesNotMatch(result.stdout, /content\/section\/_meta\.ts/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

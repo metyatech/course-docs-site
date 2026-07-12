@@ -404,10 +404,19 @@ that used to live in each individual course content repo. It runs:
 - Exercise heading rules: every `<Exercise>` opening tag must be immediately
   preceded by a Markdown heading (`###` through `######`), allowing only blank
   lines between them, and must not carry a `title` prop.
-- Code-block / asset indentation: fenced code in `html / css / js / jsx / json /
-  ts / tsx / typescript` blocks and standalone `*.css / *.html / *.js / *.json /
-  *.ts` assets under `content/` must use spaces and four-space indentation
-  steps.
+- Code-block / asset indentation: supported fenced code blocks and standalone
+  code assets under `content/` must use spaces and four-space indentation steps.
+  The supported fenced languages are `html`, `css`, `js`, `jsx`, `json`, `ts`,
+  `tsx`, and `typescript`; asset files include `*.css`, `*.html`, `*.js`,
+  `*.json`, and `*.ts`.
+
+The gate is a **learner-facing teaching-material** quality contract — it
+protects the snippets and assets that learners read and copy. Nextra
+`content/**/_meta.ts` control metadata is intentionally excluded from the
+asset-indentation rule and is left to each content repository's own
+Prettier / lint / typecheck gates. See
+[Content Quality Boundary](./docs/content-quality-boundary.md) for the full
+boundary between teaching-material and source-code quality.
 
 The verifier never reads the upstream content repository — it inspects only the
 working `content/` directory, so it works for any course source. `typecheck`,
@@ -464,6 +473,7 @@ dir, and cleans deterministic matrix state before and after each course. Set
 ## Documentation
 
 - [Authoring Modes](./docs/authoring-modes.md)
+- [Content Quality Boundary](./docs/content-quality-boundary.md)
 - [Tutorial Shot Editor](./docs/tutorial-shot-editor.md)
 - [LICENSE](./LICENSE)
 - [SECURITY.md](./SECURITY.md)

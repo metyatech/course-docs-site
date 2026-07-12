@@ -6,6 +6,14 @@
 // content source because `content/` is a normalized mirror regardless of the
 // upstream repo.
 //
+// This verifier enforces the **learner-facing teaching-material** quality
+// contract: it protects the snippets and assets that learners read and copy.
+// It is intentionally separate from the source/control-file formatting
+// contract — Nextra `_meta.ts` control metadata is excluded from the
+// asset-indentation rule and is left to each content repository's own
+// Prettier / lint / typecheck gates. See `docs/content-quality-boundary.md`
+// for the full boundary between teaching-material and source-code quality.
+//
 // Output is POSIX-style relative paths so CI logs stay consistent across
 // Windows and Linux runners. The verifier never writes to the source
 // content repository — it inspects only the local `content/` working copy.
@@ -27,13 +35,26 @@ const validatedFenceLanguages = new Set([
   "tsx",
   "typescript",
 ]);
-const validatedAssetExtensions = new Set([
-  ".css",
-  ".html",
-  ".js",
-  ".json",
-  ".ts",
-]);
+const validatedAssetExtensions = new Set([".css", ".html", ".js", ".json", ".ts"]);
+
+// Learner-facing code assets are enforced with a four-space indentation
+// rule so the snippets that learners read and copy are visually consistent
+// across courses. Nextra's `_meta.ts` files are control metadata that
+// configure sidebar / page labels and ordering at the site runtime level;
+// they are not learner-facing code, so the source repository's Prettier /
+// lint / typecheck gates are the authoritative formatter for them. The
+// verifier inspects the synced
+// `content/` mirror only, so it must not re-enforce the learner-code rule
+// on `_meta.ts` — doing so would force the source repo to either fork
+// Prettier or carry a `_meta.ts`-specific override, both of which would
+// leak site-runtime policy into a content repository.
+const isNextraControlMetadata = (filePath) => {
+  const base = path.basename(filePath);
+  if (base !== "_meta.ts") return false;
+  const relative = path.relative(process.cwd(), filePath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return false;
+  return relative.split(path.sep).join("/").startsWith("content/");
+};
 
 const repoPosixPath = (absolutePath) => {
   const relative = path.relative(process.cwd(), absolutePath);
@@ -159,9 +180,7 @@ const verifyExerciseHeadings = async (mdxFiles) => {
       exerciseCount += 1;
       const openEnd = findExerciseOpeningEnd(line, match.index + "<Exercise".length);
       if (openEnd === -1) {
-        errors.push(
-          `${repoPosixPath(filePath)}:${i + 1}: Unterminated <Exercise> opening tag.`,
-        );
+        errors.push(`${repoPosixPath(filePath)}:${i + 1}: Unterminated <Exercise> opening tag.`);
         continue;
       }
       const openingTag = line.slice(match.index, openEnd + 1);
@@ -297,7 +316,8 @@ const main = async () => {
   const mdxFiles = await collectFiles(contentDir, (p) => /\.mdx$/i.test(p));
   const assetFiles = await collectFiles(
     contentDir,
-    (p) => validatedAssetExtensions.has(path.extname(p).toLowerCase()),
+    (p) =>
+      validatedAssetExtensions.has(path.extname(p).toLowerCase()) && !isNextraControlMetadata(p),
   );
 
   const exerciseResult = await verifyExerciseHeadings(mdxFiles);
