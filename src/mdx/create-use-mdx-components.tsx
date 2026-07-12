@@ -1,7 +1,7 @@
-import { Fragment, type ComponentType, type ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import type { MDXComponents } from 'nextra/mdx-components';
 import { CodePreview } from '@metyatech/code-preview/server';
-import Exercise, { Solution } from '@metyatech/exercise/client';
+import Exercise, { Answer, Hint, QuickCheck, Solution } from '@metyatech/exercise/client';
 import { useMDXComponents as getThemeComponents } from 'nextra-theme-docs';
 import Admonition from './Admonition.js';
 import DownloadLink from './DownloadLink.js';
@@ -31,9 +31,9 @@ type NextraMDXComponents = MDXComponents & {
 const baseComponents: MDXComponents = {
   CodePreview,
   Exercise,
-  QuickCheck: Exercise,
-  Hint: Fragment,
-  Answer: Solution,
+  QuickCheck,
+  Hint,
+  Answer,
   Solution,
   Admonition,
   DownloadLink,
