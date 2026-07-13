@@ -380,59 +380,6 @@ const syncDirectory = ({ from, to, shouldSkip }) => {
   fs.writeFileSync(path.join(to, ".keep"), "");
 };
 
-const legacyExerciseClientMarkerExportPattern =
-  /\n?export const (?:Hint|Answer) = Object\.assign\(\(props\) => props\.children,\s*\{\s*__(?:exerciseHint|exerciseAnswer): true,\s*displayName: ["']Exercise(?:Hint|Answer)["'],?\s*\}\);\s*/g;
-
-const mergeExerciseClientImportNames = (names, hasHint, hasAnswer) => {
-  const merged = new Set(
-    (names || "")
-      .split(",")
-      .map((name) => name.trim())
-      .filter(Boolean),
-  );
-  if (hasHint) merged.add("Hint");
-  if (hasAnswer) merged.add("Answer");
-  return [...merged].join(", ");
-};
-
-
-const normalizeExerciseClientReferences = (text) => {
-  if (!text.includes("@metyatech/exercise/client")) return text;
-
-  let normalized = text.replace(legacyExerciseClientMarkerExportPattern, "\n");
-  const hasHint = normalized.includes("<Hint");
-  const hasAnswer = normalized.includes("<Answer");
-
-  normalized = normalized.replace(
-    /^import\s+Exercise(?:,\s*\{([^}]*)\})?\s+from\s+(["'])@metyatech\/exercise\/client\2;$/m,
-    (_match, names, quote) => {
-      const mergedNames = mergeExerciseClientImportNames(names, hasHint, hasAnswer);
-      return mergedNames
-        ? `import Exercise, { ${mergedNames} } from ${quote}@metyatech/exercise/client${quote};`
-        : `import Exercise from ${quote}@metyatech/exercise/client${quote};`;
-    },
-  );
-
-  return normalized.replace(/\n{3,}/g, "\n\n");
-};
-
-const normalizeSyncedExerciseClientReferences = (directory) => {
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      normalizeSyncedExerciseClientReferences(entryPath);
-      continue;
-    }
-    if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== ".mdx") continue;
-
-    const original = fs.readFileSync(entryPath, "utf8");
-    const normalized = normalizeExerciseClientReferences(original);
-    if (normalized !== original) {
-      fs.writeFileSync(entryPath, normalized);
-    }
-  }
-};
-
 const hasGitClone = (dirPath) => fs.existsSync(path.join(dirPath, ".git"));
 
 // `resolveRemoteHeadSha` runs `git ls-remote` against the canonical
@@ -582,7 +529,6 @@ syncDirectory({
   to: contentTo,
   shouldSkip: ({ name }) => name === "_pagefind",
 });
-normalizeSyncedExerciseClientReferences(contentTo);
 
 const siteConfigFrom = path.join(sourceRoot, "site.config.ts");
 const siteConfigTo = path.join(projectRoot, "site.config.ts");
