@@ -52,11 +52,16 @@ const assertStructureError = async (tree, pattern) => {
   );
 };
 
-test('valid QuickCheck with problem and Answer passes', async () => {
+test('valid QuickCheck with problem, Hint, and Answer passes', async () => {
   await assert.doesNotReject(() =>
     run(
       root(
-        jsxElement('QuickCheck', paragraph('問題です'), jsxElement('Answer', paragraph('答え'))),
+        jsxElement(
+          'QuickCheck',
+          paragraph('問題です'),
+          jsxElement('Hint', paragraph('ヒント')),
+          jsxElement('Answer', paragraph('答え')),
+        ),
       ),
     ),
   );
@@ -93,11 +98,14 @@ test('multiple hints are allowed before Answer', async () => {
   );
 });
 
-test('no hint is valid when problem and Answer exist', async () => {
-  await assert.doesNotReject(() =>
-    run(
-      root(jsxElement('Exercise', paragraph('問題です'), jsxElement('Answer', paragraph('答え')))),
-    ),
+test('missing Hint fails for QuickCheck and Exercise', async () => {
+  await assertStructureError(
+    root(jsxElement('QuickCheck', paragraph('問題です'), jsxElement('Answer', paragraph('答え')))),
+    /at least one <Hint> is required/,
+  );
+  await assertStructureError(
+    root(jsxElement('Exercise', paragraph('問題です'), jsxElement('Answer', paragraph('答え')))),
+    /at least one <Hint> is required/,
   );
 });
 
@@ -128,6 +136,7 @@ test('multiple answers fail', async () => {
       jsxElement(
         'QuickCheck',
         paragraph('問題です'),
+        jsxElement('Hint', paragraph('ヒント')),
         jsxElement('Answer', paragraph('答え 1')),
         jsxElement('Answer', paragraph('答え 2')),
       ),
@@ -142,6 +151,7 @@ test('Answer in the middle fails', async () => {
       jsxElement(
         'QuickCheck',
         paragraph('問題です'),
+        jsxElement('Hint', paragraph('ヒント')),
         jsxElement('Answer', paragraph('答え')),
         jsxElement('Hint', paragraph('遅いヒント')),
       ),
@@ -156,6 +166,7 @@ test('content after Answer fails', async () => {
       jsxElement(
         'QuickCheck',
         paragraph('問題です'),
+        jsxElement('Hint', paragraph('ヒント')),
         jsxElement('Answer', paragraph('答え')),
         paragraph('補足を後ろに置いてしまった'),
       ),
@@ -175,6 +186,7 @@ test('indirect Hint and Answer fail inside task blocks', async () => {
       jsxElement(
         'QuickCheck',
         paragraph('問題です'),
+        jsxElement('Hint', paragraph('ヒント')),
         jsxElement('div', jsxElement('Hint', paragraph('間接ヒント'))),
         jsxElement('Answer', paragraph('答え')),
       ),
@@ -186,6 +198,7 @@ test('indirect Hint and Answer fail inside task blocks', async () => {
       jsxElement(
         'QuickCheck',
         paragraph('問題です'),
+        jsxElement('Hint', paragraph('ヒント')),
         jsxElement('div', jsxElement('Answer', paragraph('間接答え'))),
       ),
     ),
@@ -199,6 +212,7 @@ test('nested task fails', async () => {
       jsxElement(
         'Exercise',
         paragraph('問題です'),
+        jsxElement('Hint', paragraph('ヒント')),
         jsxElement('QuickCheck', paragraph('小問'), jsxElement('Answer', paragraph('答え'))),
         jsxElement('Answer', paragraph('答え')),
       ),
@@ -218,6 +232,7 @@ test('MDX comments, empty expressions, whitespace, and empty Fragment are ignore
           emptyExpression(),
           emptyFragment(),
           paragraph('問題です'),
+          jsxElement('Hint', paragraph('ヒント')),
           jsxElement('Answer', mdxComment(), paragraph('答え')),
         ),
       ),

@@ -19,7 +19,7 @@ type MarkerName = 'Hint' | 'Answer';
 const RULE_ORIGIN = 'task-structure';
 const TASK_NAMES = new Set<string>(['Exercise', 'QuickCheck']);
 const MARKER_NAMES = new Set<string>(['Hint', 'Answer']);
-const NEW_EXPECTED_ORDER = 'problem content -> Hint* -> Answer';
+const NEW_EXPECTED_ORDER = 'problem content -> Hint+ -> Answer';
 const FORBIDDEN_LEGACY_ANSWER_NAME = ['Solu', 'tion'].join('');
 
 const hasChildren = (node: Node): node is Parent => Array.isArray((node as Parent).children);
@@ -100,6 +100,7 @@ function validateNewTask(file: VFileLike, task: MdxJsxElement & { name: TaskName
   const actual = actualOrder(children);
   const expected = NEW_EXPECTED_ORDER;
   const answerCount = countDirect(children, 'Answer');
+  const hintCount = countDirect(children, 'Hint');
   const firstMarker = firstMarkerIndex(children);
   const problemChildren = firstMarker < 0 ? children : children.slice(0, firstMarker);
   const forbiddenLegacyAnswer = children.find(
@@ -134,6 +135,18 @@ function validateNewTask(file: VFileLike, task: MdxJsxElement & { name: TaskName
         ? '<Answer> is missing'
         : `expected exactly one <Answer>, found ${answerCount}`,
       'Add one final <Answer> after all optional <Hint> blocks.',
+    );
+  }
+
+  if (hintCount < 1) {
+    failStructure(
+      file,
+      task,
+      task.name,
+      actual,
+      expected,
+      'at least one <Hint> is required',
+      'Add one or more useful <Hint> blocks before the final <Answer>.',
     );
   }
 
