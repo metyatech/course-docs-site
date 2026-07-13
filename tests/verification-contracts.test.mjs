@@ -239,7 +239,7 @@ test("CI matrix drives build and e2e jobs per course source from the manifest", 
 
   // e2e-course must consume the e2e matrix and run the CI course E2E command per course source.
   assert.match(e2eJobText, /matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\) \}\}/);
-  assert.match(e2eJobText, /needs: prepare-matrix/);
+  assert.match(e2eJobText, /needs: \[prepare-matrix, platform\]/);
   assert.match(e2eJobText, /COURSE_CONTENT_SOURCE: \$\{\{ matrix\.courseSource \}\}/);
   // The job exposes a public step and a `(private content)` step that both
   // invoke `npm run test:course:ci`. The public step has no `env:` block;

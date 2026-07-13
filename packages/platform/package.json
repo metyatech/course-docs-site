@@ -1,0 +1,129 @@
+{
+  "name": "@metyatech/course-docs-platform",
+  "version": "0.0.0",
+  "description": "Reusable platform package for metyatech course documentation sites.",
+  "author": "metyatech",
+  "license": "MIT",
+  "keywords": [
+    "education",
+    "course-docs",
+    "course-platform",
+    "mdx",
+    "nextra",
+    "qti",
+    "code-preview"
+  ],
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist",
+    "styles"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/metyatech/course-docs-site.git",
+    "directory": "packages/platform"
+  },
+  "bugs": {
+    "url": "https://github.com/metyatech/course-docs-site/issues"
+  },
+  "homepage": "https://github.com/metyatech/course-docs-site/tree/main/packages/platform#readme",
+  "exports": {
+    ".": "./dist/index.js",
+    "./next": "./dist/next/index.js",
+    "./mdx": "./dist/mdx/index.js",
+    "./nextra": "./dist/nextra/index.js",
+    "./next-app": "./dist/next-app/index.js",
+    "./next-app/create-docs-layout": "./dist/next-app/create-docs-layout.js",
+    "./next-app/create-root-layout": "./dist/next-app/create-root-layout.js",
+    "./next-app/home-page": "./dist/next-app/home-page.js",
+    "./next-app/mdx-page": "./dist/next-app/mdx-page.js",
+    "./next-app/middleware": "./dist/next-app/middleware.js",
+    "./next-app/asset-route": "./dist/next-app/asset-route.js",
+    "./next-app/download-asset-route": "./dist/next-app/download-asset-route.js",
+    "./next-app/admin-comment-delete-route": "./dist/next-app/admin-comment-delete-route.js",
+    "./submissions": "./dist/submissions/index.js",
+    "./submissions/submissions-page": "./dist/submissions/submissions-page.js",
+    "./styles/*": "./styles/*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
+    "test": "node scripts/test.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "npm run lint && npm run typecheck && npm run build && npm test",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@metyatech/code-preview": "github:metyatech/code-preview#main",
+    "@metyatech/exercise": "github:metyatech/exercise-module#e98b93cf0b6e7b235de7637b58626a2ce6f63fba",
+    "@re-dev/react-truncate": "^0.5.2",
+    "@supabase/supabase-js": "^2.49.1",
+    "lucide-react": "^0.563.0",
+    "remark-directive": "^4.0.0",
+    "remark-gfm": "^4.0.1",
+    "unist-util-visit": "^5.0.0"
+  },
+  "peerDependencies": {
+    "next": "*",
+    "nextra": "*",
+    "nextra-theme-docs": "*",
+    "react": "*"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/node": "^25.0.9",
+    "@types/react": "^19.2.9",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.55.0",
+    "@typescript-eslint/parser": "^8.55.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^17.3.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "next": "^15.5.14",
+    "nextra": "^4.6.1",
+    "nextra-theme-docs": "^4.6.1",
+    "prettier": "^3.8.1",
+    "react": "^19.2.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.55.0"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "prettier --check",
+      "eslint"
+    ],
+    "*.{json,md}": [
+      "prettier --check"
+    ]
+  },
+  "engines": {
+    "node": ">=20.0"
+  },
+  "overrides": {
+    "@chevrotain/cst-dts-gen": "11.1.2",
+    "@chevrotain/gast": "11.1.2",
+    "@chevrotain/regexp-to-ast": "11.1.2",
+    "@chevrotain/types": "11.1.2",
+    "@chevrotain/utils": "11.1.2",
+    "@mermaid-js/parser": "1.1.0",
+    "@xmldom/xmldom": "0.9.10",
+    "chevrotain": "11.1.2",
+    "dompurify": "3.4.7",
+    "lodash": "4.18.1",
+    "lodash-es": "4.18.1",
+    "mermaid": "11.15.0",
+    "minimatch": "10.2.5",
+    "qs": ">=6.14.2",
+    "serialize-javascript": "7.0.5",
+    "speech-rule-engine": "4.1.3"
+  }
+}

@@ -20,9 +20,12 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { normalizeOriginUrl } from "../scripts/git-origin-normalize.mjs";
+import { createIsolatedGitFixtureEnv } from "./git-fixture-env.mjs";
+
+const fixtureGitEnv = createIsolatedGitFixtureEnv();
 
 const gitAvailable = (() => {
-  const result = spawnSync("git", ["--version"], { encoding: "utf8" });
+  const result = spawnSync("git", ["--version"], { encoding: "utf8", env: fixtureGitEnv });
   return result.status === 0;
 })();
 
@@ -35,10 +38,10 @@ const BACKUP_CANONICAL_URL = "https://github.com/metyatech/backup-repo.git";
 
 const initRepo = (cloneDir) => {
   let result = spawnSync("git", ["init", "--initial-branch=main", cloneDir], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
   if (result.status !== 0) {
-    result = spawnSync("git", ["init", cloneDir], { encoding: "utf8" });
+    result = spawnSync("git", ["init", cloneDir], { encoding: "utf8", env: fixtureGitEnv });
     if (result.status !== 0) {
       throw new Error(
         `git init ${cloneDir} failed: ${result.stderr || result.stdout || "no stderr"}`,
@@ -47,7 +50,7 @@ const initRepo = (cloneDir) => {
     const refResult = spawnSync(
       "git",
       ["-C", cloneDir, "symbolic-ref", "HEAD", "refs/heads/main"],
-      { encoding: "utf8" },
+      { encoding: "utf8", env: fixtureGitEnv },
     );
     if (refResult.status !== 0) {
       throw new Error(
@@ -56,19 +59,19 @@ const initRepo = (cloneDir) => {
     }
   }
   spawnSync("git", ["-C", cloneDir, "config", "user.email", "fixture@example.invalid"], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
   spawnSync("git", ["-C", cloneDir, "config", "user.name", "Fixture"], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
   spawnSync("git", ["-C", cloneDir, "config", "commit.gpgsign", "false"], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
 };
 
 const getAllOriginUrls = (cloneDir) => {
   const result = spawnSync("git", ["-C", cloneDir, "config", "--get-all", "remote.origin.url"], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
   if (result.status !== 0) {
     return [];

@@ -30,7 +30,7 @@ test("security scripts gate high audits and hard-fail broken patches", async () 
   assert.equal(pkg.overrides["@xmldom/xmldom"], "0.9.10");
   assert.equal(
     pkg.scripts.postinstall,
-    "patch-package --error-on-fail && node scripts/check-platform-cache.mjs",
+    "patch-package --error-on-fail && npm run platform:build",
   );
   assert.equal(pkg.scripts["audit:ci"], "npm audit --audit-level=high");
 });

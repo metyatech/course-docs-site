@@ -233,8 +233,8 @@ test("CI e2e-course job depends on prepare-matrix and runs test:course:ci under 
 
   assert.match(
     jobText,
-    /^    needs: prepare-matrix$/m,
-    "e2e-course job MUST declare `needs: prepare-matrix`.",
+    /^    needs: \[prepare-matrix, platform\]$/m,
+    "e2e-course job MUST wait for both prepare-matrix and platform.",
   );
 
   const e2eDistDir = env.get("COURSE_DOCS_NEXT_DIST_DIR");

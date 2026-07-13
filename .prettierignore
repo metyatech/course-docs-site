@@ -10,6 +10,7 @@ out/
 content/
 public/
 site.config.ts
+packages/platform/
 
 # Misc
 .DS_Store

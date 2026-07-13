@@ -1,6 +1,23 @@
 # course-docs-site
 
-Shared site runtime (Next.js + Nextra) for multiple course content repositories.
+Course Docs のモノレポです。実行可能なNext.js/Nextraサイトはリポジトリルートにあり、内部共有packageは
+[`packages/platform`](./packages/platform) にあります。共有packageは引き続き
+`@metyatech/course-docs-platform` という名前で利用します。
+
+教材本文は `COURSE_CONTENT_SOURCE` で指定した外部content repositoryから同期します。旧
+[`metyatech/course-docs-platform`](https://github.com/metyatech/course-docs-platform) repositoryは
+archive済みであり、active implementationはこのmonorepoにあります。
+
+## Local development
+
+```powershell
+npm ci
+npm run dev
+npm run platform:verify
+npm run verify:precommit
+npm run build:verified
+npm run test:e2e:matrix
+```
 
 ## Content sync
 
@@ -482,5 +499,4 @@ dir, and cleans deterministic matrix state before and after each course. Set
 - After a successful `CI` run on `main`, GitHub Actions in this repo automatically triggers `deploy-vercel.yml`
   in the content repos so production sites pick up the latest shared runtime.
 - Cross-repo workflow dispatch uses the `COURSE_CONTENT_REDEPLOY_TOKEN` Actions secret in this repository.
-- `@metyatech/course-docs-platform` is pinned in `package.json` / `package-lock.json`, so platform-only changes
-  do not reach production until this repo updates the pinned commit and `main` passes `CI`.
+- Platformとsiteにまたがる変更は、このrepositoryの同じcommit / PRで検証・配布します。

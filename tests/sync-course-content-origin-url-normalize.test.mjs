@@ -6,13 +6,16 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { normalizeOriginUrl } from "../scripts/git-origin-normalize.mjs";
+import { createIsolatedGitFixtureEnv } from "./git-fixture-env.mjs";
+
+const fixtureGitEnv = createIsolatedGitFixtureEnv();
 
 // `git` is required for these tests. If the host has no real `git` binary
 // on PATH (or it is not executable), we skip the entire file rather than
 // fail. The skip uses `node --test`'s `t.skip` so the file is still
 // reported as a pass.
 const gitAvailable = (() => {
-  const result = spawnSync("git", ["--version"], { encoding: "utf8" });
+  const result = spawnSync("git", ["--version"], { encoding: "utf8", env: fixtureGitEnv });
   return result.status === 0;
 })();
 
@@ -25,10 +28,10 @@ const BARE_TOKEN_URL = `https://${FIXTURE_TOKEN}@github.com/metyatech/teacher-pr
 // added in git 2.28; fall back to `init` + symbolic-ref when needed.
 const initRepo = (cloneDir) => {
   let result = spawnSync("git", ["init", "--initial-branch=main", cloneDir], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
   if (result.status !== 0) {
-    result = spawnSync("git", ["init", cloneDir], { encoding: "utf8" });
+    result = spawnSync("git", ["init", cloneDir], { encoding: "utf8", env: fixtureGitEnv });
     if (result.status !== 0) {
       throw new Error(
         `git init ${cloneDir} failed: ${result.stderr || result.stdout || "no stderr"}`,
@@ -37,7 +40,7 @@ const initRepo = (cloneDir) => {
     const refResult = spawnSync(
       "git",
       ["-C", cloneDir, "symbolic-ref", "HEAD", "refs/heads/main"],
-      { encoding: "utf8" },
+      { encoding: "utf8", env: fixtureGitEnv },
     );
     if (refResult.status !== 0) {
       throw new Error(
@@ -48,19 +51,19 @@ const initRepo = (cloneDir) => {
   // Make `git` commits deterministic in this throwaway repo so any
   // failure path that reads config or refs does not depend on caller env.
   spawnSync("git", ["-C", cloneDir, "config", "user.email", "fixture@example.invalid"], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
   spawnSync("git", ["-C", cloneDir, "config", "user.name", "Fixture"], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
   spawnSync("git", ["-C", cloneDir, "config", "commit.gpgsign", "false"], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
 };
 
 const setRemoteOriginUrl = (cloneDir, url) => {
   const result = spawnSync("git", ["-C", cloneDir, "config", "remote.origin.url", url], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
   if (result.status !== 0) {
     throw new Error(
@@ -71,7 +74,7 @@ const setRemoteOriginUrl = (cloneDir, url) => {
 
 const getRemoteOriginUrl = (cloneDir) => {
   const result = spawnSync("git", ["-C", cloneDir, "remote", "get-url", "origin"], {
-    encoding: "utf8",
+    encoding: "utf8", env: fixtureGitEnv,
   });
   if (result.status !== 0) {
     throw new Error(
