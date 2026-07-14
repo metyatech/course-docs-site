@@ -14,7 +14,11 @@ const maxFailures =
 export default defineConfig({
   testDir: fileURLToPath(new URL(".", import.meta.url)),
   timeout: 120_000,
-  workers: 1,
+  // Course CI runs a complete matrix under the ten-minute workflow cap. The
+  // specs are isolated by browser context and can safely run in parallel,
+  // preserving the full suite without extending the job timeout.
+  workers: 4,
+  fullyParallel: true,
   maxFailures,
   expect: {
     timeout: 10_000,

@@ -8,7 +8,16 @@ const compat = new FlatCompat({ baseDirectory: __dirname });
 const config = [
   ...compat.extends('next/core-web-vitals'),
   {
-    ignores: ['out/**/*', '.next/**/*', '.next-test/**/*', '.course-content/**/*', 'test-results/**/*'],
+    ignores: [
+      'out/**/*',
+      '.next/**/*',
+      '.next-test/**/*',
+      '.course-content/**/*',
+      'content/**/*',
+      'public/**/*',
+      'test-results/**/*',
+      'packages/platform/**/*',
+    ],
   },
 ];
 

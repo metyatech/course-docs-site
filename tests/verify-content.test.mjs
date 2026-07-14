@@ -4,9 +4,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname.replace(/^\//, "")),
+  path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
 const scriptPath = path.join(projectRoot, "scripts", "verify-content.mjs");
@@ -461,6 +462,37 @@ test("verify-content accepts Nextra _meta.ts control metadata with 2-space inden
     );
     assert.doesNotMatch(result.stdout, /content\/_meta\.ts/);
     assert.doesNotMatch(result.stdout, /content\/docs\/_meta\.ts/);
+    assert.match(result.stdout, /0 asset files/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("verify-content accepts tutorial-shot manifests with editor formatting", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
+  try {
+    await writeFixture(
+      tempDir,
+      "content/docs/tutorial/shots/first-step.shot.json",
+      [
+        "{",
+        '  "version": 1,',
+        '  "annotations": [',
+        "    {",
+        '      "type": "box"',
+        "    }",
+        "  ]",
+        "}",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await runVerifier(tempDir);
+    assert.equal(
+      result.code,
+      0,
+      `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
     assert.match(result.stdout, /0 asset files/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });

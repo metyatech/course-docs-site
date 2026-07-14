@@ -1,0 +1,398 @@
+/* ==========================================================================
+   Tutorial components – visual layer
+   All structural rules are enforced by the React components themselves.
+   This file controls only appearance and can be changed without touching
+   content or component logic.
+   ========================================================================== */
+
+/* --- Section ------------------------------------------------------------- */
+/* Recursive container that replaces both Step and Procedure.
+   Depth is exposed via data-section-depth so styles can adapt without
+   needing separate component types. */
+
+.tutorial-section {
+  margin: 1.5rem 0 2rem;
+  counter-reset: tutorial-action;
+}
+
+/* Top-level section: more breathing room. */
+.tutorial-section[data-section-depth='0'] {
+  margin: 2.5rem 0 3rem;
+}
+
+/* Goal banner: prominent at depth 0, lighter at deeper depths. */
+.tutorial-section__goal {
+  background: hsl(var(--nextra-primary-hue) var(--nextra-primary-saturation) 95%);
+  border-left: 4px solid
+    hsl(var(--nextra-primary-hue) var(--nextra-primary-saturation) var(--nextra-primary-lightness));
+  border-radius: 0 8px 8px 0;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.tutorial-section__goal[data-section-depth='0'] {
+  padding: 1rem 1.25rem;
+  font-size: 1.05rem;
+}
+
+.tutorial-section__goal[data-section-depth='1'] {
+  padding: 0.6rem 0.9rem;
+  font-size: 0.975rem;
+}
+
+.tutorial-section__goal[data-section-depth='2'],
+.tutorial-section__goal[data-section-depth='3'],
+.tutorial-section__goal[data-section-depth='4'] {
+  padding: 0.5rem 0.8rem;
+  font-size: 0.925rem;
+  font-weight: 500;
+}
+
+.dark .tutorial-section__goal {
+  background: hsl(var(--nextra-primary-hue) 30% 18%);
+}
+
+.tutorial-section__body {
+  /* No special styling; child components manage their own spacing. */
+}
+
+/* --- Action -------------------------------------------------------------- */
+/* Atomic unit. Auto-numbered via CSS counter scoped to nearest Section.
+   Renders as a div, no longer a list item. */
+
+.tutorial-action {
+  counter-increment: tutorial-action;
+  position: relative;
+  margin: 1.25rem 0 1.5rem;
+  padding-left: 2.25rem;
+}
+
+.tutorial-action::before {
+  content: counter(tutorial-action) '.';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.75rem;
+  font-weight: 700;
+  color: hsl(
+    var(--nextra-primary-hue) var(--nextra-primary-saturation) var(--nextra-primary-lightness)
+  );
+  font-variant-numeric: tabular-nums;
+}
+
+.dark .tutorial-action::before {
+  color: hsl(var(--nextra-primary-hue) 60% 70%);
+}
+
+.tutorial-action__img {
+  display: block;
+  max-width: min(600px, 100%);
+  border-radius: 8px;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.tutorial-action__text {
+  margin-top: 0.25rem;
+}
+
+/* --- Verify -------------------------------------------------------------- */
+
+.tutorial-verify {
+  margin: 0.75rem 0 1.25rem;
+  padding: 0.5rem 0.75rem;
+  background: hsl(145 60% 95%);
+  border-radius: 6px;
+}
+
+.dark .tutorial-verify {
+  background: hsl(145 30% 15%);
+}
+
+/* Optional result-state screenshot: shown above the arrow + text line. */
+.tutorial-verify__img {
+  display: block;
+  max-width: min(600px, 100%);
+  border-radius: 6px;
+  margin: 0 0 0.5rem;
+}
+
+/* Arrow + result text row. */
+.tutorial-verify__body {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.tutorial-verify__arrow {
+  color: hsl(145 60% 40%);
+  font-size: 1.15em;
+  flex-shrink: 0;
+}
+
+.dark .tutorial-verify__arrow {
+  color: hsl(145 60% 60%);
+}
+
+/* --- Concept ------------------------------------------------------------- */
+
+.tutorial-concept {
+  margin: 0.75rem 0;
+  border: 1px solid hsl(45 60% 80%);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dark .tutorial-concept {
+  border-color: hsl(45 30% 30%);
+}
+
+.tutorial-concept__summary {
+  cursor: pointer;
+  padding: 0.6rem 1rem;
+  font-weight: 500;
+  background: hsl(45 60% 96%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  user-select: none;
+}
+
+.dark .tutorial-concept__summary {
+  background: hsl(45 20% 16%);
+}
+
+.tutorial-concept__summary:hover {
+  background: hsl(45 60% 92%);
+}
+
+.dark .tutorial-concept__summary:hover {
+  background: hsl(45 20% 20%);
+}
+
+.tutorial-concept__icon {
+  flex-shrink: 0;
+}
+
+.tutorial-concept__body {
+  padding: 0.75rem 1rem;
+}
+
+/* --- Reference ----------------------------------------------------------- */
+
+.tutorial-reference {
+  margin: 0.75rem 0;
+  border: 1px solid hsl(210 20% 82%);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dark .tutorial-reference {
+  border-color: hsl(210 15% 30%);
+}
+
+.tutorial-reference__summary {
+  cursor: pointer;
+  padding: 0.6rem 1rem;
+  font-weight: 500;
+  background: hsl(210 20% 96%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  user-select: none;
+}
+
+.dark .tutorial-reference__summary {
+  background: hsl(210 15% 16%);
+}
+
+.tutorial-reference__summary:hover {
+  background: hsl(210 20% 92%);
+}
+
+.dark .tutorial-reference__summary:hover {
+  background: hsl(210 15% 20%);
+}
+
+.tutorial-reference__icon {
+  flex-shrink: 0;
+}
+
+.tutorial-reference__body {
+  padding: 0.75rem 1rem;
+}
+
+/* --- Recovery ------------------------------------------------------------ */
+/* Inline fallback for an Action that can fail. Always visible (not
+   collapsible) so learners on the failure path find it without extra
+   interaction, but visually subordinate to the main path. */
+
+.tutorial-recovery {
+  margin: 0.5rem 0 1.25rem 2.25rem;
+  border-left: 3px solid hsl(35 85% 55%);
+  background: hsl(35 90% 97%);
+  border-radius: 0 6px 6px 0;
+  padding: 0.6rem 0.9rem;
+}
+
+.dark .tutorial-recovery {
+  background: hsl(35 30% 14%);
+  border-left-color: hsl(35 70% 55%);
+}
+
+.tutorial-recovery__title {
+  font-weight: 600;
+  color: hsl(35 70% 35%);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.dark .tutorial-recovery__title {
+  color: hsl(35 80% 70%);
+}
+
+.tutorial-recovery__icon {
+  flex-shrink: 0;
+}
+
+.tutorial-recovery__body {
+  font-size: 0.95rem;
+}
+
+.tutorial-recovery__body > :first-child {
+  margin-top: 0;
+}
+
+.tutorial-recovery__body > :last-child {
+  margin-bottom: 0;
+}
+
+/* --- Checkpoint ---------------------------------------------------------- */
+
+.tutorial-checkpoint {
+  margin: 1.5rem 0;
+  border: 2px solid hsl(145 50% 55%);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.dark .tutorial-checkpoint {
+  border-color: hsl(145 40% 40%);
+}
+
+.tutorial-checkpoint__title {
+  background: hsl(145 50% 55%);
+  color: white;
+  padding: 0.4rem 1rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.dark .tutorial-checkpoint__title {
+  background: hsl(145 40% 35%);
+}
+
+.tutorial-checkpoint__body {
+  padding: 0.75rem 1rem;
+}
+
+.tutorial-checkpoint__body ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.tutorial-checkpoint__body li {
+  padding: 0.15rem 0;
+}
+
+.tutorial-checkpoint__body li::before {
+  content: '✅ ';
+}
+
+/* --- Prerequisites ------------------------------------------------------- */
+
+.tutorial-prerequisites {
+  margin: 0 0 2rem;
+  border: 2px solid hsl(210 50% 60%);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.dark .tutorial-prerequisites {
+  border-color: hsl(210 40% 40%);
+}
+
+.tutorial-prerequisites__title {
+  background: hsl(210 50% 60%);
+  color: white;
+  padding: 0.4rem 1rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.dark .tutorial-prerequisites__title {
+  background: hsl(210 40% 35%);
+}
+
+.tutorial-prerequisites__body {
+  padding: 0.75rem 1rem;
+}
+
+.tutorial-prerequisites__body ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.tutorial-prerequisites__body li {
+  padding: 0.15rem 0;
+}
+
+.tutorial-prerequisites__body li::before {
+  content: '📋 ';
+}
+
+/* --- NextSteps ----------------------------------------------------------- */
+
+.tutorial-nextsteps {
+  margin: 1.5rem 0 0;
+  border: 2px solid hsl(270 45% 60%);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.dark .tutorial-nextsteps {
+  border-color: hsl(270 35% 40%);
+}
+
+.tutorial-nextsteps__title {
+  background: hsl(270 45% 60%);
+  color: white;
+  padding: 0.4rem 1rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.dark .tutorial-nextsteps__title {
+  background: hsl(270 35% 35%);
+}
+
+.tutorial-nextsteps__body {
+  padding: 0.75rem 1rem;
+}
+
+.tutorial-nextsteps__body ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.tutorial-nextsteps__body li {
+  padding: 0.15rem 0;
+}
+
+.tutorial-nextsteps__body li::before {
+  content: '→ ';
+}

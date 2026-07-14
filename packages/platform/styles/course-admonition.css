@@ -1,0 +1,8 @@
+.course-callout__title {
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.course-callout__content > :first-child {
+  margin-top: 0;
+}

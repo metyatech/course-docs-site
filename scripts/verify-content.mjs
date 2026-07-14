@@ -56,6 +56,18 @@ const isNextraControlMetadata = (filePath) => {
   return relative.split(path.sep).join("/").startsWith("content/");
 };
 
+// Tutorial-shot manifests drive the site-side screenshot annotation editor.
+// They are runtime metadata, not snippets learners read or copy, and the
+// editor deliberately persists compact two-space JSON. The tutorial-shot
+// contract and validation live with the screenshot tooling, so the
+// learner-facing asset indentation gate must leave these manifests alone.
+const isTutorialShotManifest = (filePath) => {
+  if (!path.basename(filePath).endsWith(".shot.json")) return false;
+  const relative = path.relative(process.cwd(), filePath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return false;
+  return relative.split(path.sep).join("/").startsWith("content/");
+};
+
 const repoPosixPath = (absolutePath) => {
   const relative = path.relative(process.cwd(), absolutePath);
   return relative.split(path.sep).join("/");
@@ -317,7 +329,9 @@ const main = async () => {
   const assetFiles = await collectFiles(
     contentDir,
     (p) =>
-      validatedAssetExtensions.has(path.extname(p).toLowerCase()) && !isNextraControlMetadata(p),
+      validatedAssetExtensions.has(path.extname(p).toLowerCase()) &&
+      !isNextraControlMetadata(p) &&
+      !isTutorialShotManifest(p),
   );
 
   const exerciseResult = await verifyExerciseHeadings(mdxFiles);

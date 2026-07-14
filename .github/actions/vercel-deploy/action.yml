@@ -1,0 +1,30 @@
+name: Vercel Deploy (Course Docs)
+description: Deploy a Next.js/Nextra course site to Vercel with a small retry to reduce flaky upload failures.
+
+inputs:
+  token:
+    description: Vercel token
+    required: true
+  environment:
+    description: Vercel environment
+    required: false
+    default: production
+  cli_version:
+    description: Vercel CLI version
+    required: false
+    default: 50.9.6
+
+runs:
+  using: composite
+  steps:
+    - name: Vercel pull
+      shell: bash
+      run: npx vercel@${{ inputs.cli_version }} pull --yes --environment=${{ inputs.environment }} --token=${{ inputs.token }}
+    - name: Vercel build
+      shell: bash
+      run: npx vercel@${{ inputs.cli_version }} build --prod --token=${{ inputs.token }}
+    - name: Vercel deploy (retry once)
+      shell: bash
+      run: |
+        npx vercel@${{ inputs.cli_version }} deploy --prebuilt --prod --archive=tgz --token=${{ inputs.token }} || \
+        npx vercel@${{ inputs.cli_version }} deploy --prebuilt --prod --archive=tgz --token=${{ inputs.token }}

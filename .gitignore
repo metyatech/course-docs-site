@@ -1,10 +1,15 @@
 # Dependencies
 /node_modules
+/packages/platform/node_modules
 
 # Next output
 /.next
 /.next-test
+/.next-e2e-*
 /out
+/packages/platform/dist
+/packages/platform/coverage
+/packages/platform/.next
 
 # Generated content (synced from external repo)
 /.course-content

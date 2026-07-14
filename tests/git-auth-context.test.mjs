@@ -19,9 +19,12 @@ import {
   SCRUBBED_GIT_CREDENTIAL_ENV_KEYS,
   SCRUBBED_GIT_ENV_KEYS,
 } from "../scripts/git-auth-context.mjs";
+import { createIsolatedGitFixtureEnv } from "./git-fixture-env.mjs";
+
+const fixtureGitEnv = createIsolatedGitFixtureEnv();
 
 const gitAvailable = (() => {
-  const result = spawnSync("git", ["--version"], { encoding: "utf8" });
+  const result = spawnSync("git", ["--version"], { encoding: "utf8", env: fixtureGitEnv });
   return result.status === 0;
 })();
 
@@ -44,7 +47,7 @@ const buildSeededGitconfig = (badbasic) =>
 const createBareRepo = (parentDir) => {
   const bareDir = path.join(parentDir, "bare.git");
   fs.mkdirSync(bareDir, { recursive: true });
-  const result = spawnSync("git", ["init", "--bare", bareDir], { encoding: "utf8" });
+  const result = spawnSync("git", ["init", "--bare", bareDir], { encoding: "utf8", env: fixtureGitEnv });
   if (result.status !== 0) {
     throw new Error(
       `git init --bare ${bareDir} failed: ${result.stderr || result.stdout || "no stderr"}`,

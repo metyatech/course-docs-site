@@ -54,8 +54,9 @@ jobs:
         run: echo "e2e=$(node scripts/print-course-sites-matrix.mjs --kind e2e)" >> $GITHUB_OUTPUT
 
   shared:
+    needs: platform
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     env:
       COURSE_CONTENT_SOURCE: github:metyatech/javascript-course-docs#master
     steps:
@@ -83,16 +84,42 @@ jobs:
       - name: Audit (high severity gate)
         run: npm run audit:ci
 
-      - name: Verify (repeat-clean)
-        run: npm run verify:repeat-clean
+      # `verify:repeat-clean` deliberately runs this expensive suite twice and
+      # is retained as the local clean-worktree gate. A pull-request job has a
+      # hard ten-minute cap, so CI runs the complete shared suite once here;
+      # the independent site-verify job covers lint, typecheck, and fast tests.
+      - name: Verify (shared)
+        run: npm run test:shared
+
+  site-verify:
+    needs: platform
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      COURSE_CONTENT_SOURCE: github:metyatech/javascript-course-docs#master
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
 
       - name: Verify (precommit)
         run: npm run verify:precommit
 
   build-course:
-    needs: prepare-matrix
+    needs: [prepare-matrix, platform]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.prepare-matrix.outputs.build) }}
@@ -166,9 +193,9 @@ jobs:
         run: npm run build:verified
 
   e2e-course:
-    needs: prepare-matrix
+    needs: [prepare-matrix, platform]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.prepare-matrix.outputs.e2e) }}
@@ -249,3 +276,28 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
         run: npm run test:course:ci
+
+  platform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify platform workspace
+        run: npm run platform:verify
+
+      - name: Check platform package contents
+        run: npm run platform:pack:check

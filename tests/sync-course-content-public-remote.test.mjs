@@ -7,6 +7,7 @@ import process from "node:process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createIsolatedNextDistDir } from "../scripts/next-dist-dir.mjs";
+import { createIsolatedGitFixtureEnv } from "./git-fixture-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const syncScriptPath = path.join(projectRoot, "scripts/sync-course-content.mjs");
@@ -19,7 +20,7 @@ const runSync = ({ env, cwd }) =>
   new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [syncScriptPath], {
       cwd,
-      env: { ...process.env, ...env },
+      env: { ...createIsolatedGitFixtureEnv(), ...env },
       stdio: "inherit",
     });
     child.on("error", reject);
