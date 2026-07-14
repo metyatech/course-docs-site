@@ -172,11 +172,13 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/repository-a
 - `metyatech/course-docs-site` is the Course Docs monorepo and the only runnable Next.js/Nextra course site app.
 - The runnable site remains at the repository root.
 - `packages/platform` is the internal workspace package named `@metyatech/course-docs-platform`.
+- The Course Docs monorepo MUST keep a single root `package-lock.json`; workspace packages MUST NOT contain their own lockfiles.
 - `packages/platform` owns shared MDX components, remark/rehype configuration, webpack asset rules, reusable Next app factories/routes, and shared course-site behavior.
 - The root site owns content synchronization, site composition, deployment wiring, development tooling, and end-to-end tests.
 - Shared behavior that applies to multiple courses belongs in `packages/platform`.
 - Root site code MUST remain composition/wiring for platform-owned behavior.
 - Site/platform cross-boundary changes MUST be committed and verified atomically in the same repository.
+- Platform, site, course build, and end-to-end verification MUST run together for changes that cross the site/platform boundary.
 - The archived `metyatech/course-docs-platform` repository is historical only.
 - Active code MUST NOT depend on the archived repository through Git, GitHub SHA dependencies, submodules, or subtree synchronization.
 - Content repositories remain content-only repositories.
