@@ -225,6 +225,11 @@ test("playwright CI web server uses the test Next dist dir by default", async ()
     playwrightConfig.webServer?.env?.COURSE_DOCS_NEXT_DIST_DIR,
     `${TEST_NEXT_DIST_DIR}/playwright-webserver-ci`,
   );
+  assert.equal(
+    playwrightConfig.workers,
+    2,
+    "CI must run two isolated Playwright workers so the full course suite fits the workflow time cap.",
+  );
 });
 
 test("CI e2e-course job depends on prepare-matrix and runs test:course:ci under the e2e Next dist dir", async () => {

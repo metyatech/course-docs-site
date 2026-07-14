@@ -467,6 +467,37 @@ test("verify-content accepts Nextra _meta.ts control metadata with 2-space inden
   }
 });
 
+test("verify-content accepts tutorial-shot manifests with editor formatting", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
+  try {
+    await writeFixture(
+      tempDir,
+      "content/docs/tutorial/shots/first-step.shot.json",
+      [
+        "{",
+        '  "version": 1,',
+        '  "annotations": [',
+        "    {",
+        '      "type": "box"',
+        "    }",
+        "  ]",
+        "}",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await runVerifier(tempDir);
+    assert.equal(
+      result.code,
+      0,
+      `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
+    assert.match(result.stdout, /0 asset files/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("verify-content still flags ordinary .ts assets with 2-space indentation", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
   try {

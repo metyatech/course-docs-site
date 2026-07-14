@@ -6,13 +6,13 @@ Course Docs Site syncs course content from external content repositories into a 
 
 ## Two contracts, three layers
 
-| Layer                                   | Lives in                                                                              | What it owns                                                                                                                   | Example files                                                         |
-| --------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Site runtime source                     | `course-docs-site/src/**`, `course-docs-site/scripts/**`, `course-docs-site/tests/**` | This repository's own formatter / lint / typecheck / build gates                                                               | `src/lib/foo.ts`, `scripts/verify-content.mjs`                        |
-| Synced learner-facing teaching material | `content/**` (the synced mirror)                                                      | The `verify-content` four-space code-block / asset gate, Exercise heading rules, and the learner-facing MDX component contract | `content/docs/<course>/index.mdx`, `content/docs/<course>/example.ts` |
-| Synced Nextra control metadata          | `content/**/_meta.ts`                                                                 | The source content repository's own Prettier / lint / typecheck gates                                                          | `content/_meta.ts`, `content/docs/_meta.ts`                           |
+| Layer                                   | Lives in                                                                              | What it owns                                                                                                                   | Example files                                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| Site runtime source                     | `course-docs-site/src/**`, `course-docs-site/scripts/**`, `course-docs-site/tests/**` | This repository's own formatter / lint / typecheck / build gates                                                               | `src/lib/foo.ts`, `scripts/verify-content.mjs`                                            |
+| Synced learner-facing teaching material | `content/**` (the synced mirror)                                                      | The `verify-content` four-space code-block / asset gate, Exercise heading rules, and the learner-facing MDX component contract | `content/docs/<course>/index.mdx`, `content/docs/<course>/example.ts`                     |
+| Synced runtime metadata                 | `content/**/_meta.ts`, `content/**/*.shot.json`                                       | The source content repository's formatter and the corresponding runtime tooling                                                | `content/_meta.ts`, `content/docs/_meta.ts`, `content/docs/tutorial/shots/step.shot.json` |
 
-The boundary is the `_meta.ts` file name. Files with that exact name under `content/` are **Nextra control metadata** and follow the source-repo formatter contract. Everything else under `content/` that is a code asset (`.css`, `.html`, `.js`, `.json`, `.ts`) follows the `verify-content` learner-code contract.
+The boundary consists of the `_meta.ts` file name and the `.shot.json` suffix. Files with that exact name or suffix under `content/` are runtime metadata and follow their source/runtime formatter contracts. Everything else under `content/` that is a code asset (`.css`, `.html`, `.js`, `.json`, `.ts`) follows the `verify-content` learner-code contract.
 
 ## What is the `verify-content` gate for?
 
@@ -70,7 +70,7 @@ A broken `_meta.ts` typically shows up as a Nextra build error or as a missing s
 - `<Exercise>` tags with a `title` prop.
 - Unterminated `<Exercise>` opening tags.
 
-`_meta.ts` is the only file name that is excluded from the asset-indentation check. The exclusion is **path-scoped to `content/**`** and is intentionally narrow: any future `\*.ts` asset that learners will see is still caught.
+`_meta.ts` and `*.shot.json` are the only excluded runtime-metadata paths. The exclusion is **path-scoped to `content/**`** and is intentionally narrow: any future `\*.ts` asset or ordinary JSON asset that learners will see is still caught.
 
 ## How to read the boundary in CI
 
