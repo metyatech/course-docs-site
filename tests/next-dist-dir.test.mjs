@@ -206,6 +206,11 @@ test("default dist dir keeps the tracked root tsconfig", () => {
 test("generated Next tsconfig files are ignored", async () => {
   const gitignore = await readFile(gitignorePath, "utf8");
   assert.match(gitignore, /^tsconfig\.next\.generated\*\.json$/m);
+  assert.match(
+    gitignore,
+    /^\/\.next-e2e-\*$/m,
+    "course-matrix E2E build output must remain an untracked generated artifact.",
+  );
 });
 
 test("playwright web server uses an isolated Next dist dir by default", async () => {
@@ -225,12 +230,17 @@ test("playwright CI web server uses the test Next dist dir by default", async ()
     playwrightConfig.webServer?.env?.COURSE_DOCS_NEXT_DIST_DIR,
     `${TEST_NEXT_DIST_DIR}/playwright-webserver-ci`,
   );
-  assert.equal(
-    playwrightConfig.workers,
-    2,
-    "CI must run two isolated Playwright workers so the full course suite fits the workflow time cap.",
-  );
-});
+    assert.equal(
+      playwrightConfig.workers,
+      4,
+      "CI must run four isolated Playwright workers so the full course suite fits the workflow time cap.",
+    );
+    assert.equal(
+      playwrightConfig.fullyParallel,
+      true,
+      "CI must distribute isolated tests within a spec file across its workers so the full course suite fits the workflow time cap.",
+    );
+  });
 
 test("CI e2e-course job depends on prepare-matrix and runs test:course:ci under the e2e Next dist dir", async () => {
   const workflowText = await readFile(ciWorkflowPath, "utf8");
