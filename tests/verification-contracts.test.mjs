@@ -237,22 +237,27 @@ test("CI matrix drives build and e2e jobs per course source from the manifest", 
     /outputs:[\s\S]*?e2e: \$\{\{ steps\.set-e2e-matrix\.outputs\.e2e \}\}/,
   );
 
-  // e2e-course must consume the e2e matrix and run the CI course E2E command per course source.
-  assert.match(e2eJobText, /matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\) \}\}/);
+  // e2e-course must consume every manifest entry and run both Playwright
+  // shards for each course source.
+  assert.match(e2eJobText, /shard: \["1\/2", "2\/2"\]/);
+  assert.match(
+    e2eJobText,
+    /include: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\)\.include \}\}/,
+  );
   assert.match(e2eJobText, /needs: \[prepare-matrix, platform\]/);
   assert.match(e2eJobText, /COURSE_CONTENT_SOURCE: \$\{\{ matrix\.courseSource \}\}/);
   // The job exposes a public step and a `(private content)` step that both
-  // invoke `npm run test:course:ci`. The public step has no `env:` block;
-  // the private step carries `GH_TOKEN` for the secret-aware run. T8 will
-  // expand this with full public/private step-split invariants.
+  // invoke a distinct `npm run test:course:ci` Playwright shard. The public
+  // step has no `env:` block; the private step carries `GH_TOKEN` for the
+  // secret-aware run. T8 expands this with full public/private invariants.
   assert.equal((e2eJobText.match(/run: npm run test:course:ci/g) ?? []).length, 2);
   assert.match(
     e2eJobText,
-    /- name: Run course E2E \(CI\)\n        if: \$\{\{ !matrix\.requiresContentReadToken \}\}\n        run: npm run test:course:ci/,
+    /- name: Run course E2E \(CI\)\n        if: \$\{\{ !matrix\.requiresContentReadToken \}\}\n        run: npm run test:course:ci -- --shard=\$\{\{ matrix\.shard \}\}/,
   );
   assert.match(
     e2eJobText,
-    /- name: Run course E2E \(CI, private content\)\n        if: \$\{\{ matrix\.requiresContentReadToken \}\}\n        env:\n          GH_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}\n        run: npm run test:course:ci/,
+    /- name: Run course E2E \(CI, private content\)\n        if: \$\{\{ matrix\.requiresContentReadToken \}\}\n        env:\n          GH_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}\n        run: npm run test:course:ci -- --shard=\$\{\{ matrix\.shard \}\}/,
   );
   assert.doesNotMatch(e2eJobText, /run: npm run verify:ci/);
   assert.doesNotMatch(e2eJobText, /run: npm run build(?!:)/);

@@ -276,14 +276,25 @@ test("CI e2e-course job depends on prepare-matrix and runs test:course:ci under 
 
   assert.match(
     jobText,
-    /      - name: Run course E2E \(CI\)\n        if: \$\{\{ !matrix\.requiresContentReadToken \}\}\n        run: npm run test:course:ci/,
-    "e2e-course job MUST run `npm run test:course:ci` as the public E2E step (no GH_TOKEN).",
+    /^        shard: \["1\/2", "2\/2"\]$/m,
+    "e2e-course must split every generated matrix entry into two shards.",
+  );
+  assert.match(
+    jobText,
+    /^        include: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\)\.include \}\}$/m,
+    "e2e-course must retain every generated E2E matrix entry when sharding.",
   );
 
   assert.match(
     jobText,
-    /      - name: Run course E2E \(CI, private content\)\n        if: \$\{\{ matrix\.requiresContentReadToken \}\}\n        env:\n          GH_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}\n        run: npm run test:course:ci/,
-    "e2e-course job MUST run `npm run test:course:ci` as the private E2E step (with GH_TOKEN).",
+    /      - name: Run course E2E \(CI\)\n        if: \$\{\{ !matrix\.requiresContentReadToken \}\}\n        run: npm run test:course:ci -- --shard=\$\{\{ matrix\.shard \}\}/,
+    "e2e-course job MUST run each public E2E shard without GH_TOKEN.",
+  );
+
+  assert.match(
+    jobText,
+    /      - name: Run course E2E \(CI, private content\)\n        if: \$\{\{ matrix\.requiresContentReadToken \}\}\n        env:\n          GH_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}\n        run: npm run test:course:ci -- --shard=\$\{\{ matrix\.shard \}\}/,
+    "e2e-course job MUST run each private E2E shard with GH_TOKEN.",
   );
   assert.equal(
     /run: npm run verify:ci/.test(jobText),

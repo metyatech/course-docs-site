@@ -198,7 +198,12 @@ jobs:
     timeout-minutes: 10
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-matrix.outputs.e2e) }}
+      matrix:
+        # Keep every representative course test, but split each Playwright
+        # suite across two independent runners so the full matrix stays
+        # within the ten-minute pull-request job cap.
+        shard: ["1/2", "2/2"]
+        include: ${{ fromJson(needs.prepare-matrix.outputs.e2e).include }}
     env:
       COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
       COURSE_DOCS_NEXT_DIST_DIR: .next-e2e-${{ matrix.siteId }}
@@ -269,13 +274,13 @@ jobs:
 
       - name: Run course E2E (CI)
         if: ${{ !matrix.requiresContentReadToken }}
-        run: npm run test:course:ci
+        run: npm run test:course:ci -- --shard=${{ matrix.shard }}
 
       - name: Run course E2E (CI, private content)
         if: ${{ matrix.requiresContentReadToken }}
         env:
           GH_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
-        run: npm run test:course:ci
+        run: npm run test:course:ci -- --shard=${{ matrix.shard }}
 
   platform:
     runs-on: ubuntu-latest
