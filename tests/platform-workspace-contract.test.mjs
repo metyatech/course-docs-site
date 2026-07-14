@@ -32,6 +32,12 @@ test("platform is a root npm workspace with matching package metadata", () => {
   );
 });
 
+test("root ESLint excludes the workspace package and synced course content", () => {
+  const eslintConfig = fs.readFileSync(path.join(root, "eslint.config.mjs"), "utf8");
+  assert.match(eslintConfig, /'packages\/platform\/\*\*\/\*'/);
+  assert.match(eslintConfig, /'content\/\*\*\/\*'/);
+});
+
 test("root lockfile links the platform workspace without the old Git dependency", () => {
   const lockfile = readJson("package-lock.json");
 
