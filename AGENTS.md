@@ -169,10 +169,17 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/repository-a
 
 # Course Docs Repository and Site Architecture
 
-- `metyatech/course-docs-site` is the only runnable Next.js/Nextra course site app.
-- `course-docs-site` owns routing, layouts, middleware, site runtime wiring, and end-to-end tests for the site runtime.
-- `metyatech/course-docs-platform` owns shared MDX components, remark/rehype configuration, webpack asset rules, and shared course site behavior.
-- `<course>-course-docs` repositories are content-only repositories.
+- `metyatech/course-docs-site` is the Course Docs monorepo and the only runnable Next.js/Nextra course site app.
+- The runnable site remains at the repository root.
+- `packages/platform` is the internal workspace package named `@metyatech/course-docs-platform`.
+- `packages/platform` owns shared MDX components, remark/rehype configuration, webpack asset rules, reusable Next app factories/routes, and shared course-site behavior.
+- The root site owns content synchronization, site composition, deployment wiring, development tooling, and end-to-end tests.
+- Shared behavior that applies to multiple courses belongs in `packages/platform`.
+- Root site code MUST remain composition/wiring for platform-owned behavior.
+- Site/platform cross-boundary changes MUST be committed and verified atomically in the same repository.
+- The archived `metyatech/course-docs-platform` repository is historical only.
+- Active code MUST NOT depend on the archived repository through Git, GitHub SHA dependencies, submodules, or subtree synchronization.
+- Content repositories remain content-only repositories.
 - Course content repositories MUST keep only course content, static assets, and course-specific configuration such as `content/**`, `public/img/**`, and `site.config.ts`.
 - Course content repositories MUST NOT add Next.js/Nextra app runtime files such as `next.config.js`, `src/app`, app package files, or site runtime implementations.
 - `public/img/favicon.ico` is expected by `site.config.ts` when `faviconHref` references it.
@@ -180,8 +187,6 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/repository-a
 - Secrets MUST NOT be stored in course content repositories.
 - `.env.local` is local-only and belongs in `course-docs-site`, not in content repositories.
 - Course content MUST be previewed through `course-docs-site` by setting `COURSE_CONTENT_SOURCE`.
-- Shared rendering/runtime behavior that applies to multiple courses MUST be implemented in `course-docs-platform`, not duplicated in `course-docs-site` or content repositories.
-- `course-docs-site` MUST remain composition/wiring only for platform-owned behavior.
 - Vercel deployment for course sites MUST use GitHub Actions with the Vercel CLI, not Vercel's GitHub integration.
 - Generic tool-agnostic specs MUST remain in their dedicated repositories.
 - Course Docs Site-specific presentation conventions MUST be documented in `course-docs-platform` or the `course-docs` domain, not in generic specs.
