@@ -36,12 +36,22 @@ try {
   process.exit(1);
 }
 
-const matrix =
+const baseMatrix =
   kind === "build"
     ? buildMatrix(manifest)
     : kind === "e2e"
       ? representativeE2EMatrix(manifest)
       : redeployMatrix(manifest);
+
+// GitHub Actions does not expand a dynamic `include` list against a static
+// axis. Emit the complete course × shard E2E matrix here so every
+// representative course runs both halves of the full Playwright suite.
+const matrix =
+  kind === "e2e"
+    ? baseMatrix.flatMap((entry) =>
+        ["1/2", "2/2"].map((shard) => ({ ...entry, shard })),
+      )
+    : baseMatrix;
 
 // GitHub Actions `strategy.matrix` requires the top-level shape
 // `{ "include": [ ... ] }`. We emit the array wrapped in `include` so

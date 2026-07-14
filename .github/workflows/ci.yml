@@ -198,12 +198,10 @@ jobs:
     timeout-minutes: 10
     strategy:
       fail-fast: false
-      matrix:
-        # Keep every representative course test, but split each Playwright
-        # suite across two independent runners so the full matrix stays
-        # within the ten-minute pull-request job cap.
-        shard: ["1/2", "2/2"]
-        include: ${{ fromJson(needs.prepare-matrix.outputs.e2e).include }}
+      # The generated matrix already expands each representative course into
+      # two Playwright shards, preserving the full suite under the ten-minute
+      # pull-request job cap.
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.e2e) }}
     env:
       COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
       COURSE_DOCS_NEXT_DIST_DIR: .next-e2e-${{ matrix.siteId }}

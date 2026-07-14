@@ -181,14 +181,14 @@ test("matrix CLI: build output is an object with include.length === 6", () => {
   assert.equal(parsed.include.length, 6);
 });
 
-test("matrix CLI: e2e output is an object with include.length === 3", () => {
+test("matrix CLI: e2e output is an object with include.length === 6", () => {
   const stdout = runMatrixCli("e2e");
   const parsed = JSON.parse(stdout);
   assert.equal(typeof parsed, "object");
   assert.ok(parsed !== null, "CLI output must be a JSON object");
   assert.ok(!Array.isArray(parsed), "top-level must not be an array");
   assert.ok(Array.isArray(parsed.include), "parsed.include must be an array");
-  assert.equal(parsed.include.length, 3);
+  assert.equal(parsed.include.length, 6);
 });
 
 test("matrix CLI: redeploy output is an object with include.length === 6", () => {
@@ -281,15 +281,28 @@ test("matrix CLI: build output includes requiresContentReadToken for every entry
   assert.equal(teacher.requiresContentReadToken, true);
 });
 
-test("matrix CLI: e2e output includes requiresContentReadToken for every entry", () => {
+test("matrix CLI: e2e output expands every representative course into two shards", () => {
   const stdout = runMatrixCli("e2e");
   const parsed = JSON.parse(stdout);
-  assert.equal(parsed.include.length, 3);
+  assert.equal(parsed.include.length, 6);
+  const shardsBySite = new Map();
   for (const entry of parsed.include) {
     assert.equal(
       typeof entry.requiresContentReadToken,
       "boolean",
       `entry ${entry.siteId} must include a boolean requiresContentReadToken`,
     );
+    assert.ok(["1/2", "2/2"].includes(entry.shard), `unexpected shard for ${entry.siteId}`);
+    const shards = shardsBySite.get(entry.siteId) ?? [];
+    shards.push(entry.shard);
+    shardsBySite.set(entry.siteId, shards);
+  }
+  assert.deepEqual([...shardsBySite.keys()].sort(), [
+    "javascript-course-docs",
+    "open-campus-unreal-90min",
+    "programming-course-docs",
+  ]);
+  for (const shards of shardsBySite.values()) {
+    assert.deepEqual(shards.sort(), ["1/2", "2/2"]);
   }
 });

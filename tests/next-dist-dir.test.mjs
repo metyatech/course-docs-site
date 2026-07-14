@@ -276,13 +276,8 @@ test("CI e2e-course job depends on prepare-matrix and runs test:course:ci under 
 
   assert.match(
     jobText,
-    /^        shard: \["1\/2", "2\/2"\]$/m,
-    "e2e-course must split every generated matrix entry into two shards.",
-  );
-  assert.match(
-    jobText,
-    /^        include: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\)\.include \}\}$/m,
-    "e2e-course must retain every generated E2E matrix entry when sharding.",
+    /^      matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\) \}\}$/m,
+    "e2e-course must consume the generated course-and-shard matrix directly.",
   );
 
   assert.match(

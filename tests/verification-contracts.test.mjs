@@ -237,13 +237,8 @@ test("CI matrix drives build and e2e jobs per course source from the manifest", 
     /outputs:[\s\S]*?e2e: \$\{\{ steps\.set-e2e-matrix\.outputs\.e2e \}\}/,
   );
 
-  // e2e-course must consume every manifest entry and run both Playwright
-  // shards for each course source.
-  assert.match(e2eJobText, /shard: \["1\/2", "2\/2"\]/);
-  assert.match(
-    e2eJobText,
-    /include: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\)\.include \}\}/,
-  );
+  // e2e-course must consume the generated course-and-shard matrix.
+  assert.match(e2eJobText, /matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\) \}\}/);
   assert.match(e2eJobText, /needs: \[prepare-matrix, platform\]/);
   assert.match(e2eJobText, /COURSE_CONTENT_SOURCE: \$\{\{ matrix\.courseSource \}\}/);
   // The job exposes a public step and a `(private content)` step that both
