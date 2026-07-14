@@ -359,7 +359,7 @@ test("findFirstFreePort skips an occupied preferred port", async () => {
 
   await new Promise((resolve, reject) => {
     blocker.once("error", reject);
-    blocker.listen(basePort, resolve);
+    blocker.listen(basePort, '127.0.0.1', resolve);
   });
 
   try {

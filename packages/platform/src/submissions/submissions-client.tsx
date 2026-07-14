@@ -13,6 +13,7 @@ import {
   type WorkIntroMap,
 } from './work-data-mappers.js';
 import WorkIntroEditor from './work-intro-editor.js';
+import { buildAdminCommentDeletePath, getAdminCommentDeleteFailure } from './admin-comment-api.js';
 
 const ADMIN_MODE_STATUS_PATH = '/api/admin/mode/';
 const ADMIN_SESSION_CHANGED_EVENT = 'course-docs-admin-session-changed';
@@ -299,14 +300,17 @@ export default function SubmissionsClient({ studentWorks }: SubmissionsClientPro
         throw new Error('管理者モードが有効ではありません。');
       }
 
-      const response = await fetch(`/api/admin/comments/${commentId}`, {
+      const response = await fetch(buildAdminCommentDeletePath(commentId), {
         method: 'DELETE',
         credentials: 'same-origin',
       });
 
       if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || '削除に失敗しました。');
+        const failure = await getAdminCommentDeleteFailure(response);
+        if (failure.disableAdminMode) {
+          setIsAdminModeEnabled(false);
+        }
+        throw new Error(failure.message);
       }
 
       setCommentMap((prev) => ({

@@ -50,7 +50,7 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
     "test": "node scripts/test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
