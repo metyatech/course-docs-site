@@ -117,6 +117,99 @@ test("conditionals page renders the Answer-only guided task flow", async ({ page
   expect(visualStyles.hint?.backgroundColor).not.toBe(visualStyles.answer?.backgroundColor);
   expect(visualStyles.hint?.borderColor).not.toBe(visualStyles.answer?.borderColor);
 
+  const assertHoverSurface = async (details, label) => {
+    const summary = details.locator(":scope > summary");
+    await summary.scrollIntoViewIfNeeded();
+    const metrics = await details.evaluate((element) => {
+      const summaryElement = element.querySelector(":scope > summary");
+      const contentElement = element.querySelector(
+        ":scope > .rensyuHintNaiyou, :scope > .rensyuKaitouNaiyou",
+      );
+      if (!summaryElement || !contentElement) return null;
+
+      const detailsStyle = getComputedStyle(element);
+      const summaryStyle = getComputedStyle(summaryElement);
+      const contentStyle = getComputedStyle(contentElement);
+      const detailsRect = element.getBoundingClientRect();
+      const summaryRect = summaryElement.getBoundingClientRect();
+      const parsePixels = (value) => Number.parseFloat(value) || 0;
+
+      return {
+        details: {
+          left: detailsRect.left,
+          right: detailsRect.right,
+          top: detailsRect.top,
+          borderLeft: parsePixels(detailsStyle.borderLeftWidth),
+          borderRight: parsePixels(detailsStyle.borderRightWidth),
+          paddingLeft: parsePixels(detailsStyle.paddingLeft),
+          paddingRight: parsePixels(detailsStyle.paddingRight),
+          overflow: detailsStyle.overflow,
+        },
+        summary: {
+          left: summaryRect.left,
+          right: summaryRect.right,
+          top: summaryRect.top,
+          height: summaryRect.height,
+          paddingLeft: parsePixels(summaryStyle.paddingLeft),
+          paddingRight: parsePixels(summaryStyle.paddingRight),
+          backgroundColor: summaryStyle.backgroundColor,
+        },
+        content: {
+          marginLeft: parsePixels(contentStyle.marginLeft),
+          marginRight: parsePixels(contentStyle.marginRight),
+        },
+      };
+    });
+
+    expect(metrics, `${label}: layout metrics should exist`).not.toBeNull();
+    expect(metrics.details.paddingLeft, `${label}: details left padding`).toBe(0);
+    expect(metrics.details.paddingRight, `${label}: details right padding`).toBe(0);
+    expect(metrics.summary.paddingLeft, `${label}: summary left padding`).toBeCloseTo(12, 0);
+    expect(metrics.summary.paddingRight, `${label}: summary right padding`).toBeCloseTo(12, 0);
+    expect(metrics.content.marginLeft, `${label}: content left margin`).toBeCloseTo(12, 0);
+    expect(metrics.content.marginRight, `${label}: content right margin`).toBeCloseTo(12, 0);
+    expect(metrics.details.overflow, `${label}: rounded clipping`).toBe("hidden");
+
+    expect(
+      Math.abs(metrics.summary.left - (metrics.details.left + metrics.details.borderLeft)),
+      `${label}: summary left boundary`,
+    ).toBeLessThanOrEqual(2);
+    expect(
+      Math.abs(metrics.summary.right - (metrics.details.right - metrics.details.borderRight)),
+      `${label}: summary right boundary`,
+    ).toBeLessThanOrEqual(2);
+
+    const hoverBackgroundAt = async (positionX) => {
+      await summary.hover({ position: { x: positionX, y: metrics.summary.height / 2 } });
+      return summary.evaluate((element) => ({
+        backgroundColor: getComputedStyle(element).backgroundColor,
+        isHovered: element.matches(":hover"),
+      }));
+    };
+    const leftHoverBackground = await hoverBackgroundAt(1);
+    const rightHoverBackground = await hoverBackgroundAt(
+      metrics.summary.right - metrics.summary.left - 1,
+    );
+    expect(leftHoverBackground.isHovered, `${label}: left edge is inside summary`).toBeTruthy();
+    expect(rightHoverBackground.isHovered, `${label}: right edge is inside summary`).toBeTruthy();
+    expect(leftHoverBackground.backgroundColor, `${label}: left edge hover background`).not.toBe(
+      metrics.summary.backgroundColor,
+    );
+    expect(rightHoverBackground.backgroundColor, `${label}: right edge hover background`).not.toBe(
+      metrics.summary.backgroundColor,
+    );
+  };
+
+  const guidedSurfaces = [
+    ["QuickCheck Hint", firstQuickCheck.locator("details.rensyuHint")],
+    ["QuickCheck Answer", firstQuickCheck.locator("details.rensyuKaitou")],
+    ["Exercise Hint", firstExercise.locator("details.rensyuHint")],
+    ["Exercise Answer", firstExercise.locator("details.rensyuKaitou")],
+  ];
+  for (const [label, details] of guidedSurfaces) {
+    await assertHoverSurface(details, label);
+  }
+
   const allGuidedDetails = page.locator(
     ".rensyuBlock details.rensyuHint, .rensyuBlock details.rensyuKaitou",
   );
@@ -142,10 +235,15 @@ test("conditionals page renders the Answer-only guided task flow", async ({ page
   await hintSummary.focus();
   const focusStyles = await hintSummary.evaluate((element) => {
     const styles = getComputedStyle(element);
-    return { outlineStyle: styles.outlineStyle, outlineWidth: styles.outlineWidth };
+    return {
+      outlineStyle: styles.outlineStyle,
+      outlineWidth: styles.outlineWidth,
+      outlineOffset: styles.outlineOffset,
+    };
   });
   expect(focusStyles.outlineStyle).not.toBe("none");
   expect(focusStyles.outlineWidth).not.toBe("0px");
+  expect(focusStyles.outlineOffset).toBe("-2px");
   await page.keyboard.press("Space");
   await expect(hintDetails).toHaveAttribute("open", "");
   await page.keyboard.press("Space");
@@ -183,10 +281,17 @@ test("conditionals page renders the Answer-only guided task flow", async ({ page
   expect(darkStyles.hint?.backgroundColor).not.toBe(darkStyles.answer?.backgroundColor);
   expect(darkStyles.hint?.borderColor).not.toBe(darkStyles.answer?.borderColor);
 
+  for (const [label, details] of guidedSurfaces) {
+    await assertHoverSurface(details, `${label} dark`);
+  }
+
   await page.evaluate(() => document.documentElement.classList.remove("dark"));
   await page.setViewportSize({ width: 375, height: 812 });
   await page.reload();
   await expect(page.locator("#metyatech-exercise-style")).toHaveCount(1);
+  for (const [label, details] of guidedSurfaces) {
+    await assertHoverSurface(details, `${label} 375px`);
+  }
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
