@@ -347,6 +347,10 @@
   outline-offset: 2px;
 }
 
+.dark .rensyuBlock :where(.rensyuHint, .rensyuKaitou) > summary:focus-visible {
+  outline-offset: -2px !important;
+}
+
 [class*="styles-module__consoleSection__"] {
   border-top-color: #5f7da8 !important;
 }

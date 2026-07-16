@@ -282,6 +282,47 @@ test("conditionals page renders the Answer-only guided task flow", async ({ page
   expect(darkStyles.hint?.borderColor).not.toBe(darkStyles.answer?.borderColor);
 
   for (const [label, details] of guidedSurfaces) {
+    await expect(details, `${label} dark: details starts closed`).not.toHaveAttribute("open", "");
+    const summary = details.locator(":scope > summary");
+    await summary.focus();
+    const darkFocusStyles = await summary.evaluate((element) => {
+      const detailsElement = element.parentElement;
+      const detailsStyle = detailsElement && getComputedStyle(detailsElement);
+      const detailsRect = detailsElement?.getBoundingClientRect();
+      const summaryRect = element.getBoundingClientRect();
+      const pixels = (value) => Number.parseFloat(value) || 0;
+      return {
+        outlineStyle: getComputedStyle(element).outlineStyle,
+        outlineWidth: getComputedStyle(element).outlineWidth,
+        outlineOffset: getComputedStyle(element).outlineOffset,
+        detailsOpen: detailsElement?.hasAttribute("open"),
+        detailsInnerLeft:
+          detailsRect && detailsStyle
+            ? detailsRect.left + pixels(detailsStyle.borderLeftWidth)
+            : null,
+        detailsInnerRight:
+          detailsRect && detailsStyle
+            ? detailsRect.right - pixels(detailsStyle.borderRightWidth)
+            : null,
+        summaryLeft: summaryRect.left,
+        summaryRight: summaryRect.right,
+      };
+    });
+    expect(darkFocusStyles.outlineStyle, `${label} dark: focus outline style`).not.toBe("none");
+    expect(darkFocusStyles.outlineWidth, `${label} dark: focus outline width`).not.toBe("0px");
+    expect(darkFocusStyles.outlineOffset, `${label} dark: focus outline offset`).toBe("-2px");
+    expect(darkFocusStyles.detailsOpen, `${label} dark: focus does not open details`).toBeFalsy();
+    expect(
+      Math.abs(darkFocusStyles.summaryLeft - darkFocusStyles.detailsInnerLeft),
+      `${label} dark: summary left inner boundary`,
+    ).toBeLessThanOrEqual(2);
+    expect(
+      Math.abs(darkFocusStyles.summaryRight - darkFocusStyles.detailsInnerRight),
+      `${label} dark: summary right inner boundary`,
+    ).toBeLessThanOrEqual(2);
+  }
+
+  for (const [label, details] of guidedSurfaces) {
     await assertHoverSurface(details, `${label} dark`);
   }
 
