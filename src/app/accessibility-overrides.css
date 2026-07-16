@@ -369,3 +369,115 @@
 .dark .subheading-anchor {
   border-color: #93c5fd !important;
 }
+
+/* Keep guided-task variants distinct after the high-contrast dark-mode overrides above. */
+.rensyuBlock {
+  --ifm-background-color: #ffffff;
+  --ifm-background-surface-color: #f8fafc;
+  --ifm-color-emphasis-100: #f1f5f9;
+  --ifm-color-emphasis-300: #cbd5e1;
+  --ifm-color-emphasis-600: #475569;
+  --ifm-color-emphasis-700: #334155;
+  --ifm-color-emphasis-800: #1e293b;
+  --ifm-color-primary: #2563eb;
+  --ifm-color-primary-light: #60a5fa;
+  --ifm-color-primary-lighter: #93c5fd;
+  --ifm-color-warning: #a16207;
+  --ifm-color-success: #0f766e;
+}
+
+.dark .rensyuBlock {
+  --ifm-background-color: #0b1020;
+  --ifm-background-surface-color: #0f172a;
+  --ifm-color-emphasis-100: #1e293b;
+  --ifm-color-emphasis-300: #475569;
+  --ifm-color-emphasis-600: #cbd5e1;
+  --ifm-color-emphasis-700: #e2e8f0;
+  --ifm-color-emphasis-800: #f8fafc;
+  --ifm-color-primary: #60a5fa;
+  --ifm-color-primary-light: #93c5fd;
+  --ifm-color-primary-lighter: #bfdbfe;
+  --ifm-color-warning: #fbbf24;
+  --ifm-color-success: #2dd4bf;
+}
+
+.rensyuBlock:not(.rensyuQuickCheck) {
+  border-top: 5px solid var(--ifm-color-primary) !important;
+  background-color: var(--ifm-background-surface-color) !important;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.1) !important;
+}
+
+.rensyuBlock.rensyuQuickCheck {
+  border-top: 3px solid var(--ifm-color-primary-light) !important;
+  background-color: var(--ifm-background-color) !important;
+  box-shadow: none !important;
+}
+
+.rensyuBlock .rensyuHint {
+  border-color: #b8965f !important;
+  background-color: #fffaf0 !important;
+}
+
+.rensyuBlock .rensyuHint[open] {
+  background-color: #fff4d9 !important;
+}
+
+.rensyuBlock .rensyuKaitou {
+  border-color: #72afa5 !important;
+  background-color: #f0fbf8 !important;
+}
+
+.rensyuBlock .rensyuKaitou[open] {
+  background-color: #e2f7f2 !important;
+}
+
+.rensyuBlock .rensyuHint .rensyuSummaryIcon {
+  color: #8a5d13 !important;
+}
+
+.rensyuBlock .rensyuKaitou .rensyuSummaryIcon {
+  color: #0f766e !important;
+}
+
+.dark .rensyuBlock:not(.rensyuQuickCheck) {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.26) !important;
+}
+
+.dark .rensyuBlock .rensyuHint {
+  border-color: #b89d69 !important;
+  background-color: #251f16 !important;
+}
+
+.dark .rensyuBlock .rensyuHint[open] {
+  background-color: #302716 !important;
+}
+
+.dark .rensyuBlock .rensyuKaitou {
+  border-color: #5a9d91 !important;
+  background-color: #102420 !important;
+}
+
+.dark .rensyuBlock .rensyuKaitou[open] {
+  background-color: #15332e !important;
+}
+
+.dark .rensyuBlock .rensyuHint > summary {
+  color: #f8fafc !important;
+}
+
+.dark .rensyuBlock .rensyuKaitou > summary {
+  color: #f8fafc !important;
+}
+
+.dark .rensyuBlock .rensyuHint .rensyuSummaryIcon {
+  color: #f3c875 !important;
+}
+
+.dark .rensyuBlock .rensyuKaitou .rensyuSummaryIcon {
+  color: #6fd1c1 !important;
+}
+
+.dark .rensyuBlock .rensyuHint .rensyuSummaryChevron,
+.dark .rensyuBlock .rensyuKaitou .rensyuSummaryChevron {
+  color: #cbd5e1 !important;
+}
