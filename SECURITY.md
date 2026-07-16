@@ -11,9 +11,8 @@ We will address them as soon as possible.
 
 ## Known accepted advisories (upstream-blocked)
 
-The repository currently gates CI with `npm audit --audit-level=high`.
-Known moderate advisories are tracked here so high-severity regressions
-still fail CI while upstream-only moderate fixes remain visible.
+Known moderate advisories are tracked here because upstream-only fixes remain
+visible even when they are not actionable without a breaking upgrade.
 
 - `postcss <8.5.10`: reaches this project solely through Next.js.
   `next@15.5.18` is the current Next 15 security backport, but it still

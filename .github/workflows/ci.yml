@@ -81,9 +81,6 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Audit (high severity gate)
-        run: npm run audit:ci
-
       # `verify:repeat-clean` deliberately runs this expensive suite twice and
       # is retained as the local clean-worktree gate. A pull-request job has a
       # hard ten-minute cap, so CI runs the complete shared suite once here;

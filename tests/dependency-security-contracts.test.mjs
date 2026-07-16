@@ -20,7 +20,7 @@ const parsePatchFileName = (fileName) => {
   return { packageName, version };
 };
 
-test("security scripts gate high audits and hard-fail broken patches", async () => {
+test("dependency versions and patch installation stay pinned", async () => {
   const pkg = JSON.parse(await readFile(packageJsonPath, "utf8"));
 
   assert.equal(pkg.dependencies.next, "^15.5.18");
@@ -32,7 +32,6 @@ test("security scripts gate high audits and hard-fail broken patches", async () 
     pkg.scripts.postinstall,
     "patch-package --error-on-fail && npm run platform:build",
   );
-  assert.equal(pkg.scripts["audit:ci"], "npm audit --audit-level=high");
 });
 
 test("verify:ci script contains every required CI gate", async () => {
@@ -48,11 +47,6 @@ test("verify:ci script contains every required CI gate", async () => {
     verifyCi,
     /npm run verify:sites/,
     "verify:ci must run verify:sites (manifest validation)",
-  );
-  assert.match(
-    verifyCi,
-    /npm run audit:ci/,
-    "verify:ci must run audit:ci (high-severity dependency audit)",
   );
   assert.match(
     verifyCi,

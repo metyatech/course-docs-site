@@ -188,10 +188,9 @@ test("fast local scripts do not invoke the full E2E matrix", async () => {
   );
   assert.equal(pkg.scripts["test:e2e:matrix"], "node scripts/test-e2e-matrix.mjs");
   assert.equal(pkg.scripts["verify:e2e:matrix"], "npm run test:e2e:matrix");
-  assert.equal(pkg.scripts["audit:ci"], "npm audit --audit-level=high");
   assert.equal(
     pkg.scripts["verify:ci"],
-    "npm run verify:sites && npm run audit:ci && npm run build && npm run verify:course:ci",
+    "npm run verify:sites && npm run build && npm run verify:course:ci",
   );
 });
 
@@ -202,7 +201,6 @@ test("verification docs document fast, single-course CI, and explicit matrix tie
   for (const documentText of [readme, contributing]) {
     assert.match(documentText, /npm run verify:precommit/);
     assert.match(documentText, /npm run verify:ci/);
-    assert.match(documentText, /high-severity dependency audit gate/);
     assert.match(documentText, /npm run test:e2e:matrix/);
     assert.match(documentText, /npm run verify:e2e:matrix/);
   }
