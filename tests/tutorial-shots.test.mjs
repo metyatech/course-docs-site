@@ -28,10 +28,13 @@ import {
   updateTutorialShotCropStateMap,
 } from "../src/lib/tutorial-shot-editor-crop-state.mjs";
 import {
+  commitTutorialShotFiles,
+  getTutorialShotArtifactIdentity,
   getTutorialShotAuthoringContext,
   readTutorialShotImage,
   saveTutorialShot as saveTutorialShotImpl,
   scanTutorialShots,
+  tutorialShotRefsShareArtifacts,
 } from "../src/lib/tutorial-shots-server.mjs";
 
 const writeTutorialFixture = async (
@@ -172,6 +175,75 @@ title: Other Page
     `${JSON.stringify(manifest, null, 2)}\n`,
     "utf8",
   );
+};
+
+const writeArtifactCollisionFixture = async (rootDir, { kind }) => {
+  const pageDir = path.join(rootDir, "content", "docs", "student-guide");
+  const imageDir = path.join(pageDir, "img");
+  const screensDir = path.join(pageDir, "screens");
+  const shotsDir = path.join(pageDir, "shots");
+  await Promise.all([
+    fs.mkdir(imageDir, { recursive: true }),
+    fs.mkdir(screensDir, { recursive: true }),
+    fs.mkdir(shotsDir, { recursive: true }),
+  ]);
+
+  const isOutputPolicyCollision = kind === "output-policy";
+  const actionSrc = "./img/result.png";
+  const verifySrc = isOutputPolicyCollision ? "./img/result.webp" : "./screens/result.png";
+  await fs.writeFile(
+    path.join(pageDir, "index.mdx"),
+    `---
+title: Student Guide
+---
+
+<Section title="Step 1" goal="結果を確認する">
+  <Action img="${actionSrc}">操作結果を保存します。</Action>
+  <Verify img="${verifySrc}">保存結果を確認します。</Verify>
+</Section>
+`,
+    "utf8",
+  );
+
+  const makeImage = (background) =>
+    sharp({
+      create: { width: 64, height: 48, channels: 4, background },
+    });
+  await makeImage("#2563eb").png().toFile(path.join(imageDir, "result.png"));
+  await makeImage("#16a34a").webp({ lossless: true }).toFile(path.join(imageDir, "result.webp"));
+
+  if (!isOutputPolicyCollision) {
+    await makeImage("#9333ea").png().toFile(path.join(screensDir, "result.png"));
+    await makeImage("#ea580c")
+      .webp({ lossless: true })
+      .toFile(path.join(screensDir, "result.webp"));
+  }
+
+  const rawExtension = isOutputPolicyCollision ? ".webp" : ".png";
+  const rawPath = path.join(shotsDir, `result.raw${rawExtension}`);
+  if (isOutputPolicyCollision) {
+    await makeImage("#dc2626").webp({ lossless: true }).toFile(rawPath);
+  } else {
+    await makeImage("#dc2626").png().toFile(rawPath);
+  }
+  const manifest = {
+    ...createDefaultTutorialShotManifest({
+      pagePath: "content/docs/student-guide/index.mdx",
+      outputImagePath: "content/docs/student-guide/img/result.webp",
+    }),
+    rawImagePath: `content/docs/student-guide/shots/result.raw${rawExtension}`,
+    alt: "保存前の生成物",
+  };
+  const manifestPath = path.join(shotsDir, "result.shot.json");
+  await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+  return {
+    imageDir,
+    manifestPath,
+    pagePath: path.join(pageDir, "index.mdx"),
+    rawPath,
+    screensDir,
+  };
 };
 
 const toDataUrl = (buffer, mimeType = "image/png") =>
@@ -1094,6 +1166,366 @@ test("saveTutorialShot branches only the selected source reference when an image
   );
   assert.equal(new Set(rescannedShots.map((shot) => shot.outputImagePath)).size, 2);
   assert.equal(result.sourceRef.referenceKey, rescannedShots[0].referenceKey);
+});
+
+test("saveTutorialShot branches when PNG and WebP references converge on the same generated artifacts", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "output-policy-collision-"));
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+  const fixture = await writeArtifactCollisionFixture(sourceRoot, { kind: "output-policy" });
+  const originalPaths = [
+    path.join(fixture.imageDir, "result.webp"),
+    fixture.rawPath,
+    fixture.manifestPath,
+  ];
+  const originalArtifacts = await Promise.all(
+    originalPaths.map((artifactPath) => fs.readFile(artifactPath)),
+  );
+  const shots = await scanTutorialShots({ sourceRoot });
+  const actionShot = shots.find((shot) => shot.tagName === "Action");
+  assert.ok(actionShot);
+
+  const result = await saveTutorialShot({
+    sourceRoot,
+    sourceRef: toTutorialShotSourceRef(actionShot),
+    manifestInput: { ...actionShot.manifest, alt: "分岐した PNG 参照" },
+  });
+
+  assert.match(
+    result.manifest.outputImagePath,
+    /^content\/docs\/student-guide\/img\/result--[a-f0-9]{6}\.webp$/u,
+  );
+  assert.match(
+    result.manifest.rawImagePath,
+    /^content\/docs\/student-guide\/shots\/result--[a-f0-9]{6}\.raw\.webp$/u,
+  );
+  const savedPage = await fs.readFile(fixture.pagePath, "utf8");
+  assert.match(savedPage, /<Action img="\.\/img\/result--[a-f0-9]{6}\.webp">/u);
+  assert.match(savedPage, /<Verify img="\.\/img\/result\.webp">/u);
+  const currentArtifacts = await Promise.all(
+    originalPaths.map((artifactPath) => fs.readFile(artifactPath)),
+  );
+  assert.deepEqual(currentArtifacts, originalArtifacts);
+});
+
+test("saveTutorialShot branches when different image directories share manifest and raw artifacts", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "same-stem-collision-"));
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+  const fixture = await writeArtifactCollisionFixture(sourceRoot, { kind: "directories" });
+  const originalPaths = [
+    path.join(fixture.imageDir, "result.webp"),
+    path.join(fixture.screensDir, "result.webp"),
+    fixture.rawPath,
+    fixture.manifestPath,
+  ];
+  const originalArtifacts = await Promise.all(
+    originalPaths.map((artifactPath) => fs.readFile(artifactPath)),
+  );
+  const shots = await scanTutorialShots({ sourceRoot });
+  const verifyShot = shots.find((shot) => shot.tagName === "Verify");
+  assert.ok(verifyShot);
+  assert.notEqual(shots[0].outputImagePath, shots[1].outputImagePath);
+  assert.equal(shots[0].manifestPath, shots[1].manifestPath);
+  assert.equal(shots[0].rawImagePath, shots[1].rawImagePath);
+
+  const result = await saveTutorialShot({
+    sourceRoot,
+    sourceRef: toTutorialShotSourceRef(verifyShot),
+    manifestInput: { ...verifyShot.manifest, alt: "分岐した別ディレクトリ参照" },
+  });
+
+  assert.match(
+    result.manifest.outputImagePath,
+    /^content\/docs\/student-guide\/screens\/result--[a-f0-9]{6}\.webp$/u,
+  );
+  assert.match(
+    result.manifest.rawImagePath,
+    /^content\/docs\/student-guide\/shots\/result--[a-f0-9]{6}\.raw\.png$/u,
+  );
+  const savedPage = await fs.readFile(fixture.pagePath, "utf8");
+  assert.match(savedPage, /<Action img="\.\/img\/result\.png">/u);
+  assert.match(savedPage, /<Verify img="\.\/screens\/result--[a-f0-9]{6}\.webp">/u);
+  const currentArtifacts = await Promise.all(
+    originalPaths.map((artifactPath) => fs.readFile(artifactPath)),
+  );
+  assert.deepEqual(currentArtifacts, originalArtifacts);
+});
+
+test("tutorial shot artifact identity is case-insensitive only for Windows semantics", () => {
+  const sourceRoot = path.resolve("artifact-identity-root");
+  const upperPath = "content/docs/Guide/img/Result.webp";
+  const lowerPath = "content/docs/guide/img/result.webp";
+
+  assert.equal(
+    getTutorialShotArtifactIdentity({
+      sourceRoot,
+      contentRelativePath: upperPath,
+      platform: "win32",
+    }),
+    getTutorialShotArtifactIdentity({
+      sourceRoot,
+      contentRelativePath: lowerPath,
+      platform: "win32",
+    }),
+  );
+  assert.notEqual(
+    getTutorialShotArtifactIdentity({
+      sourceRoot,
+      contentRelativePath: upperPath,
+      platform: "linux",
+    }),
+    getTutorialShotArtifactIdentity({
+      sourceRoot,
+      contentRelativePath: lowerPath,
+      platform: "linux",
+    }),
+  );
+
+  const upperRef = {
+    pagePath: "content/docs/Guide/index.mdx",
+    referencedImagePath: "content/docs/Guide/img/Result.png",
+  };
+  const lowerRef = {
+    pagePath: "content/docs/guide/index.mdx",
+    referencedImagePath: "content/docs/guide/img/result.png",
+  };
+  assert.equal(
+    tutorialShotRefsShareArtifacts({
+      sourceRoot,
+      left: upperRef,
+      right: lowerRef,
+      platform: "win32",
+    }),
+    true,
+  );
+  assert.equal(
+    tutorialShotRefsShareArtifacts({
+      sourceRoot,
+      left: upperRef,
+      right: lowerRef,
+      platform: "linux",
+    }),
+    false,
+  );
+});
+
+test("commitTutorialShotFiles restores every changed target when the second install fails", async (t) => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "shot-transaction-install-failure-"));
+  t.after(async () => {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  });
+  const firstTarget = path.join(rootDir, "first.txt");
+  const secondTarget = path.join(rootDir, "second.txt");
+  await Promise.all([
+    fs.writeFile(firstTarget, "old first", "utf8"),
+    fs.writeFile(secondTarget, "old second", "utf8"),
+  ]);
+  let installCount = 0;
+  const events = [];
+  const fileOps = {
+    ...fs,
+    async rename(sourcePath, targetPath) {
+      if (sourcePath.endsWith(".tmp")) {
+        installCount += 1;
+        events.push(`install:${installCount}:${targetPath}`);
+        if (installCount === 2) {
+          throw new Error("injected second install failure");
+        }
+      }
+      return fs.rename(sourcePath, targetPath);
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      commitTutorialShotFiles(
+        [
+          { targetPath: firstTarget, data: "new first" },
+          { targetPath: secondTarget, data: "new second" },
+        ],
+        { fileOps },
+      ),
+    /injected second install failure/u,
+  );
+  assert.deepEqual(events, [`install:1:${firstTarget}`, `install:2:${secondTarget}`]);
+  assert.equal(await fs.readFile(firstTarget, "utf8"), "old first");
+  assert.equal(await fs.readFile(secondTarget, "utf8"), "old second");
+  assert.deepEqual(
+    (await fs.readdir(rootDir)).filter((fileName) => /\.(?:tmp|bak)$/u.test(fileName)),
+    [],
+  );
+});
+
+test("commitTutorialShotFiles retains and reports a backup when restoration fails", async (t) => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "shot-transaction-restore-failure-"));
+  t.after(async () => {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  });
+  const firstTarget = path.join(rootDir, "first.txt");
+  const secondTarget = path.join(rootDir, "second.txt");
+  await Promise.all([
+    fs.writeFile(firstTarget, "old first", "utf8"),
+    fs.writeFile(secondTarget, "old second", "utf8"),
+  ]);
+  let installCount = 0;
+  const fileOps = {
+    ...fs,
+    async rename(sourcePath, targetPath) {
+      if (sourcePath.endsWith(".tmp")) {
+        installCount += 1;
+        if (installCount === 2) {
+          throw new Error("injected second install failure");
+        }
+      }
+      if (sourcePath.endsWith(".bak") && targetPath === firstTarget) {
+        throw new Error("injected backup restore failure");
+      }
+      return fs.rename(sourcePath, targetPath);
+    },
+  };
+
+  let transactionError;
+  try {
+    await commitTutorialShotFiles(
+      [
+        { targetPath: firstTarget, data: "new first" },
+        { targetPath: secondTarget, data: "new second" },
+      ],
+      { fileOps },
+    );
+  } catch (error) {
+    transactionError = error;
+  }
+  assert.ok(transactionError instanceof AggregateError);
+  const retainedBackups = (await fs.readdir(rootDir))
+    .filter((fileName) => fileName.endsWith(".bak"))
+    .map((fileName) => path.join(rootDir, fileName));
+  assert.equal(retainedBackups.length, 1);
+  assert.equal(await fs.readFile(retainedBackups[0], "utf8"), "old first");
+  assert.equal(
+    transactionError.errors.some((error) => error.message.includes(retainedBackups[0])),
+    true,
+  );
+  assert.equal(await fs.readFile(secondTarget, "utf8"), "old second");
+  assert.deepEqual(
+    (await fs.readdir(rootDir)).filter((fileName) => fileName.endsWith(".tmp")),
+    [],
+  );
+});
+
+test("commitTutorialShotFiles removes a newly created target without restoring a nonexistent backup", async (t) => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "shot-transaction-new-target-"));
+  t.after(async () => {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  });
+  const newTarget = path.join(rootDir, "new.txt");
+  const existingTarget = path.join(rootDir, "existing.txt");
+  await fs.writeFile(existingTarget, "old existing", "utf8");
+  let installCount = 0;
+  const restoredTargets = [];
+  const fileOps = {
+    ...fs,
+    async rename(sourcePath, targetPath) {
+      if (sourcePath.endsWith(".tmp")) {
+        installCount += 1;
+        if (installCount === 2) {
+          throw new Error("injected second install failure");
+        }
+      }
+      if (sourcePath.endsWith(".bak")) {
+        restoredTargets.push(targetPath);
+      }
+      return fs.rename(sourcePath, targetPath);
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      commitTutorialShotFiles(
+        [
+          { targetPath: newTarget, data: "new file" },
+          { targetPath: existingTarget, data: "new existing" },
+        ],
+        { fileOps },
+      ),
+    /injected second install failure/u,
+  );
+  await assert.rejects(fs.stat(newTarget), { code: "ENOENT" });
+  assert.equal(await fs.readFile(existingTarget, "utf8"), "old existing");
+  assert.deepEqual(restoredTargets, [existingTarget]);
+  assert.deepEqual(
+    (await fs.readdir(rootDir)).filter((fileName) => /\.(?:tmp|bak)$/u.test(fileName)),
+    [],
+  );
+});
+
+test("commitTutorialShotFiles reports cleanup warnings without rolling back installed targets", async (t) => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "shot-transaction-cleanup-failure-"));
+  t.after(async () => {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  });
+  const targetPath = path.join(rootDir, "target.txt");
+  await fs.writeFile(targetPath, "old value", "utf8");
+  const fileOps = {
+    ...fs,
+    async rm(cleanupPath, options) {
+      if (cleanupPath.endsWith(".bak")) {
+        throw new Error("injected backup cleanup failure");
+      }
+      return fs.rm(cleanupPath, options);
+    },
+  };
+
+  const result = await commitTutorialShotFiles([{ targetPath, data: "new value" }], { fileOps });
+
+  assert.equal(await fs.readFile(targetPath, "utf8"), "new value");
+  const retainedBackup = (await fs.readdir(rootDir)).find((fileName) => fileName.endsWith(".bak"));
+  assert.equal(typeof retainedBackup, "string");
+  assert.equal(result.cleanupWarnings.length, 1);
+  assert.match(result.cleanupWarnings[0], /injected backup cleanup failure/u);
+  assert.equal(result.cleanupWarnings[0].includes(path.join(rootDir, retainedBackup)), true);
+});
+
+test("saveTutorialShot succeeds with a cleanup warning after every official file is installed", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "shot-save-cleanup-warning-"));
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+  await writeTutorialFixture(sourceRoot);
+  const [shot] = await scanTutorialShots({ sourceRoot });
+  const fileOps = {
+    ...fs,
+    async rm(cleanupPath, options) {
+      if (cleanupPath.endsWith(".bak")) {
+        throw new Error("injected save cleanup failure");
+      }
+      return fs.rm(cleanupPath, options);
+    },
+  };
+
+  const result = await saveTutorialShot({
+    sourceRoot,
+    sourceRef: toTutorialShotSourceRef(shot),
+    manifestInput: { ...shot.manifest, alt: "cleanup warningでも保存成功" },
+    bootstrapFromOutput: true,
+    bootstrapImagePath: shot.bootstrapImagePath,
+    fileOps,
+  });
+
+  assert.equal(result.manifest.alt, "cleanup warningでも保存成功");
+  assert.equal(
+    result.warnings.some((warning) => warning.includes("injected save cleanup failure")),
+    true,
+  );
+  assert.match(await fs.readFile(path.join(sourceRoot, shot.pagePath), "utf8"), /startup\.webp/u);
+  await Promise.all([
+    fs.stat(path.join(sourceRoot, result.manifest.outputImagePath)),
+    fs.stat(path.join(sourceRoot, result.manifest.rawImagePath)),
+    fs.stat(path.join(sourceRoot, "content/docs/student-guide/shots/startup.shot.json")),
+  ]);
 });
 
 test("saveTutorialShot reuses a branched path and its raw image on later edits", async (t) => {

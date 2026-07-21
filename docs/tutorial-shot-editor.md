@@ -64,7 +64,10 @@ project-contract:
     - MDX stays authoritative for which Action/Verify image references exist
     - each Action/Verify reference is selected by its scanned source range and page revision, not by its image path
     - a stale page revision rejects the save before MDX or image artifacts are changed
-    - saving one of several references to the same image branches only that reference to a collision-free `--<hex>.webp` path
+    - saving branches only the selected reference when its generated WebP, manifest, or raw image path collides with another reference
+    - generated artifact comparisons resolve inside the content source root and are case-insensitive on Windows
+    - a failed multi-file install rolls back in reverse order and retains any backup that cannot be restored
+    - cleanup-only failures after every authoritative file is installed return a successful save with a warning
     - shot manifest stays authoritative for crop/annotations
     - generated img/*.webp is overwritten from manifest on save for static UI screenshots and tested animated WebP uploads
     - legacy PNG Action/Verify references are rewritten to the policy WebP path on save
@@ -127,7 +130,7 @@ MVP goals:
 
 - detect existing `Action img="./img/...png"` / `Verify img="./img/...png"` references and migrate static UI output to WebP on save
 - list repeated uses of the same image as independent editable references, including cross-page uses
-- branch only the saved reference to an automatically suffixed image when its current image is shared
+- branch only the saved reference to automatically suffixed WebP, manifest, and raw paths when any generated artifact would be shared
 - bootstrap a raw source from the current output image when needed
 - import source images through the upload button, drag-and-drop, or `Ctrl + V`
 - save crop + annotations beside the page in `shots/`

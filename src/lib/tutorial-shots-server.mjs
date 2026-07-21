@@ -20,6 +20,7 @@ import {
   isExpectedTutorialShotRawImagePath,
   isTutorialShotManifestPath,
   isTutorialShotOutputImagePath,
+  isTutorialShotRawImagePath,
   isTutorialShotReadableImagePath,
   normalizeDecodedPosixPath,
   normalizePosixPath,
@@ -27,6 +28,7 @@ import {
   replaceTutorialShotPathExtension,
   renderTutorialShotOverlaySvg,
   isTutorialShotSourceImageMimeType,
+  TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS,
 } from "./tutorial-shots-shared.mjs";
 
 const PAGE_PATH_PATTERN = /^content\/.+\/index\.mdx?$/iu;
@@ -43,6 +45,9 @@ const SHARP_RAW_UPLOAD_FORMAT_EXTENSIONS = new Map([
   ["svg", new Set([".svg"])],
   ["bmp", new Set([".bmp", ".dib"])],
 ]);
+const TUTORIAL_SHOT_RAW_IMAGE_EXTENSIONS = [
+  ...new Set(TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS.flatMap((format) => format.extensions)),
+];
 
 const isLocalPathLike = (value) =>
   value.startsWith(".") ||
@@ -176,8 +181,84 @@ const resolveSourcePath = ({ sourceRoot, contentRelativePath, validator }) => {
   });
 };
 
-const ensureParentDir = async (filePath) => {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
+const isTutorialShotArtifactPath = (contentPath) =>
+  isTutorialShotOutputImagePath(contentPath) ||
+  isTutorialShotManifestPath(contentPath) ||
+  isTutorialShotRawImagePath(contentPath);
+
+export const getTutorialShotArtifactPaths = (ref) => {
+  const requestedOutputImagePath = ref.referencedImagePath ?? ref.outputImagePath;
+  const derived = deriveTutorialShotPaths({
+    pagePath: ref.pagePath,
+    outputImagePath: requestedOutputImagePath,
+    rawImageExtension: getTutorialShotFileExtension(ref.rawImagePath ?? requestedOutputImagePath),
+  });
+  const rawImagePath = isExpectedTutorialShotRawImagePath({
+    pagePath: ref.pagePath,
+    outputImagePath: derived.outputImagePath,
+    rawImagePath: ref.rawImagePath,
+  })
+    ? normalizeDecodedPosixPath(ref.rawImagePath)
+    : derived.rawImagePath;
+
+  return {
+    outputImagePath: derived.outputImagePath,
+    manifestPath: derived.manifestPath,
+    rawImagePath,
+  };
+};
+
+export const getTutorialShotArtifactIdentity = ({
+  sourceRoot,
+  contentRelativePath,
+  platform = process.platform,
+}) => {
+  const absolutePath = resolveSourcePath({
+    sourceRoot,
+    contentRelativePath,
+    validator: isTutorialShotArtifactPath,
+  });
+  return platform === "win32" ? absolutePath.toLowerCase() : absolutePath;
+};
+
+const getFileSystemPathIdentity = ({ sourceRoot, absolutePath, platform = process.platform }) => {
+  const insideRootPath = ensureInsideRoot({ rootDir: sourceRoot, resolvedPath: absolutePath });
+  return platform === "win32" ? insideRootPath.toLowerCase() : insideRootPath;
+};
+
+const tutorialShotArtifactPathsShareArtifacts = ({
+  sourceRoot,
+  leftPaths,
+  rightPaths,
+  platform = process.platform,
+}) => {
+  const leftIdentities = new Set(
+    Object.values(leftPaths).map((contentRelativePath) =>
+      getTutorialShotArtifactIdentity({ sourceRoot, contentRelativePath, platform }),
+    ),
+  );
+  return Object.values(rightPaths).some((contentRelativePath) =>
+    leftIdentities.has(
+      getTutorialShotArtifactIdentity({ sourceRoot, contentRelativePath, platform }),
+    ),
+  );
+};
+
+export const tutorialShotRefsShareArtifacts = ({
+  sourceRoot,
+  left,
+  right,
+  platform = process.platform,
+}) =>
+  tutorialShotArtifactPathsShareArtifacts({
+    sourceRoot,
+    leftPaths: getTutorialShotArtifactPaths(left),
+    rightPaths: getTutorialShotArtifactPaths(right),
+    platform,
+  });
+
+const ensureParentDir = async (filePath, fileOps = fs) => {
+  await fileOps.mkdir(path.dirname(filePath), { recursive: true });
 };
 
 const hydrateManifest = (manifestInput) => {
@@ -539,8 +620,36 @@ const scanTutorialShotSourceState = async ({ sourceRoot }) => {
     return left.tagStart - right.tagStart;
   });
 
+  const artifactPathsByReferenceKey = new Map();
+  for (const ref of refs) {
+    const defaultArtifactPaths = getTutorialShotArtifactPaths(ref);
+    const manifestAbsolutePath = resolveSourcePath({
+      sourceRoot,
+      contentRelativePath: defaultArtifactPaths.manifestPath,
+      validator: isTutorialShotManifestPath,
+    });
+    const rawManifest = await readJsonIfExists(manifestAbsolutePath);
+    const manifest = hydrateManifest(
+      rawManifest
+        ? {
+            ...rawManifest,
+            pagePath: ref.pagePath,
+            outputImagePath: defaultArtifactPaths.outputImagePath,
+          }
+        : createDefaultTutorialShotManifest({
+            pagePath: ref.pagePath,
+            outputImagePath: defaultArtifactPaths.outputImagePath,
+          }),
+    );
+    artifactPathsByReferenceKey.set(
+      ref.referenceKey,
+      getTutorialShotArtifactPaths({ ...ref, rawImagePath: manifest.rawImagePath }),
+    );
+  }
+
   return {
     allFiles,
+    artifactPathsByReferenceKey,
     pages,
     refs,
   };
@@ -722,9 +831,9 @@ const assertTutorialShotSourceStateUnchanged = async ({ sourceRoot, sourceState 
   }
 };
 
-const resolveExistingFile = async (filePath) => {
+const resolveExistingFile = async (filePath, fileOps = fs) => {
   try {
-    const stats = await fs.stat(filePath);
+    const stats = await fileOps.stat(filePath);
     return stats.isFile();
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
@@ -738,9 +847,18 @@ const allocateBranchedTutorialShotPaths = ({ sourceRoot, sourceState, manifest }
   const outputExtension = path.posix.extname(manifest.outputImagePath);
   const outputStem = manifest.outputImagePath.slice(0, -outputExtension.length);
   const rawExtension = getTutorialShotFileExtension(manifest.rawImagePath);
-  const existingContentPaths = new Set(
-    sourceState.allFiles.map((filePath) => normalizePosixPath(path.relative(sourceRoot, filePath))),
+  const existingArtifactIdentities = new Set(
+    sourceState.allFiles.map((absolutePath) =>
+      getFileSystemPathIdentity({ sourceRoot, absolutePath }),
+    ),
   );
+  for (const artifactPaths of sourceState.artifactPathsByReferenceKey.values()) {
+    for (const contentRelativePath of Object.values(artifactPaths)) {
+      existingArtifactIdentities.add(
+        getTutorialShotArtifactIdentity({ sourceRoot, contentRelativePath }),
+      );
+    }
+  }
 
   for (let attempt = 0; attempt < 128; attempt += 1) {
     const suffix = randomBytes(3).toString("hex");
@@ -754,17 +872,17 @@ const allocateBranchedTutorialShotPaths = ({ sourceRoot, sourceState, manifest }
       0,
       derived.rawImagePath.length - getTutorialShotFileExtension(derived.rawImagePath).length,
     );
-    const collidesWithReference = sourceState.refs.some(
-      (ref) =>
-        ref.referencedImagePath === derived.outputImagePath ||
-        ref.outputImagePath === derived.outputImagePath ||
-        ref.id === derived.id,
+    const candidatePaths = [
+      derived.outputImagePath,
+      derived.manifestPath,
+      ...TUTORIAL_SHOT_RAW_IMAGE_EXTENSIONS.map((extension) => `${rawStem}${extension}`),
+    ];
+    const collides = candidatePaths.some((contentRelativePath) =>
+      existingArtifactIdentities.has(
+        getTutorialShotArtifactIdentity({ sourceRoot, contentRelativePath }),
+      ),
     );
-    const collidesWithFile =
-      existingContentPaths.has(derived.outputImagePath) ||
-      existingContentPaths.has(derived.manifestPath) ||
-      [...existingContentPaths].some((contentPath) => contentPath.startsWith(`${rawStem}.`));
-    if (!collidesWithReference && !collidesWithFile) {
+    if (!collides) {
       return derived;
     }
   }
@@ -781,59 +899,105 @@ const replaceTutorialShotSourceRef = ({ sourceText, sourceRef, nextImg }) => {
   )}`;
 };
 
-const commitTutorialShotFiles = async (entries) => {
+const createTutorialShotFileOperationError = ({ action, filePath, error }) =>
+  new Error(`${action}: ${filePath}: ${error instanceof Error ? error.message : String(error)}`, {
+    cause: error,
+  });
+
+export const commitTutorialShotFiles = async (entries, { fileOps = fs } = {}) => {
   const transactionId = randomUUID();
   const staged = entries.map((entry, index) => ({
     ...entry,
     backupPath: `${entry.targetPath}.${transactionId}.${index}.bak`,
+    backupCreated: false,
     hadTarget: false,
     installed: false,
+    restored: false,
     temporaryPath: `${entry.targetPath}.${transactionId}.${index}.tmp`,
+    temporaryWritten: false,
   }));
-  let operationError = null;
-  const rollbackErrors = [];
 
   try {
     for (const entry of staged) {
-      await ensureParentDir(entry.targetPath);
-      await fs.writeFile(entry.temporaryPath, entry.data);
+      await ensureParentDir(entry.targetPath, fileOps);
+      entry.temporaryWritten = true;
+      await fileOps.writeFile(entry.temporaryPath, entry.data);
     }
     for (const entry of staged) {
-      entry.hadTarget = await resolveExistingFile(entry.targetPath);
+      entry.hadTarget = await resolveExistingFile(entry.targetPath, fileOps);
       if (entry.hadTarget) {
-        await fs.rename(entry.targetPath, entry.backupPath);
+        await fileOps.rename(entry.targetPath, entry.backupPath);
+        entry.backupCreated = true;
       }
-      await fs.rename(entry.temporaryPath, entry.targetPath);
+      await fileOps.rename(entry.temporaryPath, entry.targetPath);
+      entry.temporaryWritten = false;
       entry.installed = true;
     }
-  } catch (error) {
-    operationError = error;
+  } catch (operationError) {
+    const rollbackErrors = [];
     for (const entry of [...staged].reverse()) {
-      try {
-        if (entry.installed) {
-          await fs.rm(entry.targetPath, { force: true });
+      if (entry.installed) {
+        try {
+          await fileOps.rm(entry.targetPath, { force: true });
+          entry.installed = false;
+        } catch (rollbackError) {
+          rollbackErrors.push(
+            createTutorialShotFileOperationError({
+              action: "設置済みファイルをロールバックできませんでした",
+              filePath: entry.targetPath,
+              error: rollbackError,
+            }),
+          );
         }
-        if (entry.hadTarget && (await resolveExistingFile(entry.backupPath))) {
-          await fs.rename(entry.backupPath, entry.targetPath);
+      }
+      if (entry.backupCreated) {
+        try {
+          await fileOps.rename(entry.backupPath, entry.targetPath);
+          entry.backupCreated = false;
+          entry.restored = true;
+        } catch (rollbackError) {
+          rollbackErrors.push(
+            createTutorialShotFileOperationError({
+              action: "バックアップを復元できませんでした。手動復旧用バックアップを保持します",
+              filePath: entry.backupPath,
+              error: rollbackError,
+            }),
+          );
         }
-      } catch (rollbackError) {
-        rollbackErrors.push(rollbackError);
       }
     }
-  }
 
-  const cleanupErrors = [];
-  for (const entry of staged) {
-    for (const cleanupPath of [entry.temporaryPath, entry.backupPath]) {
-      try {
-        await fs.rm(cleanupPath, { force: true });
-      } catch (cleanupError) {
-        cleanupErrors.push(cleanupError);
+    const cleanupErrors = [];
+    for (const entry of staged) {
+      if (entry.temporaryWritten) {
+        try {
+          await fileOps.rm(entry.temporaryPath, { force: true });
+          entry.temporaryWritten = false;
+        } catch (cleanupError) {
+          cleanupErrors.push(
+            createTutorialShotFileOperationError({
+              action: "ロールバック後の一時ファイルを削除できませんでした",
+              filePath: entry.temporaryPath,
+              error: cleanupError,
+            }),
+          );
+        }
+      }
+      if (entry.restored) {
+        try {
+          await fileOps.rm(entry.backupPath, { force: true });
+        } catch (cleanupError) {
+          cleanupErrors.push(
+            createTutorialShotFileOperationError({
+              action: "復元済みバックアップを削除できませんでした",
+              filePath: entry.backupPath,
+              error: cleanupError,
+            }),
+          );
+        }
       }
     }
-  }
 
-  if (operationError) {
     if (rollbackErrors.length > 0 || cleanupErrors.length > 0) {
       throw new AggregateError(
         [operationError, ...rollbackErrors, ...cleanupErrors],
@@ -842,12 +1006,35 @@ const commitTutorialShotFiles = async (entries) => {
     }
     throw operationError;
   }
-  if (cleanupErrors.length > 0) {
-    throw new AggregateError(
-      cleanupErrors,
-      "チュートリアル画像は保存されましたが、一時ファイルを削除できませんでした。",
-    );
+
+  const cleanupWarnings = [];
+  for (const entry of staged) {
+    const cleanupPaths = [];
+    if (entry.temporaryWritten) {
+      cleanupPaths.push({ kind: "一時ファイル", path: entry.temporaryPath });
+    }
+    if (entry.backupCreated) {
+      cleanupPaths.push({ kind: "バックアップ", path: entry.backupPath });
+    }
+    for (const cleanup of cleanupPaths) {
+      try {
+        await fileOps.rm(cleanup.path, { force: true });
+        if (cleanup.path === entry.temporaryPath) {
+          entry.temporaryWritten = false;
+        } else {
+          entry.backupCreated = false;
+        }
+      } catch (cleanupError) {
+        cleanupWarnings.push(
+          `保存は完了しましたが、${cleanup.kind}を削除できませんでした: ${cleanup.path}: ${
+            cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          }`,
+        );
+      }
+    }
   }
+
+  return { cleanupWarnings };
 };
 
 export const saveTutorialShot = async ({
@@ -858,6 +1045,7 @@ export const saveTutorialShot = async ({
   rawImageFileName = null,
   bootstrapFromOutput = false,
   bootstrapImagePath = null,
+  fileOps = fs,
 }) => {
   const sourceState = await scanTutorialShotSourceState({ sourceRoot });
   const { currentRef, page } = validateTutorialShotSourceRef({ sourceState, sourceRef });
@@ -886,10 +1074,18 @@ export const saveTutorialShot = async ({
   }
 
   const originalManifest = manifest;
-  const referencesToCurrentImage = sourceState.refs.filter(
-    (ref) => ref.referencedImagePath === currentRef.referencedImagePath,
+  const currentArtifactPaths = getTutorialShotArtifactPaths(manifest);
+  const shouldBranch = sourceState.refs.some((ref) =>
+    ref.referenceKey === currentRef.referenceKey
+      ? false
+      : tutorialShotArtifactPathsShareArtifacts({
+          sourceRoot,
+          leftPaths: currentArtifactPaths,
+          rightPaths:
+            sourceState.artifactPathsByReferenceKey.get(ref.referenceKey) ??
+            getTutorialShotArtifactPaths(ref),
+        }),
   );
-  const shouldBranch = referencesToCurrentImage.length > 1;
   if (shouldBranch) {
     const branchedPaths = allocateBranchedTutorialShotPaths({
       sourceRoot,
@@ -1165,12 +1361,15 @@ export const saveTutorialShot = async ({
       data: rawBuffer,
     });
   }
-  await commitTutorialShotFiles(fileEntries);
+  const { cleanupWarnings } = await commitTutorialShotFiles(fileEntries, { fileOps });
 
   return {
     manifest: savedManifest,
     sourceRef: nextSourceRef,
-    warnings: getTutorialShotWarnings(savedManifest, { shotSource: currentRef.shotSource }),
+    warnings: [
+      ...getTutorialShotWarnings(savedManifest, { shotSource: currentRef.shotSource }),
+      ...cleanupWarnings,
+    ],
   };
 };
 
