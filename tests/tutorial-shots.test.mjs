@@ -30,7 +30,7 @@ import {
 import {
   getTutorialShotAuthoringContext,
   readTutorialShotImage,
-  saveTutorialShot,
+  saveTutorialShot as saveTutorialShotImpl,
   scanTutorialShots,
 } from "../src/lib/tutorial-shots-server.mjs";
 
@@ -71,6 +71,107 @@ title: Student Guide
   } else {
     await fixtureImage.png().toFile(imagePath);
   }
+};
+
+const toTutorialShotSourceRef = (shot) => ({
+  pagePath: shot.pagePath,
+  tagName: shot.tagName,
+  tagStart: shot.tagStart,
+  tagEnd: shot.tagEnd,
+  imgValueStart: shot.imgValueStart,
+  imgValueEnd: shot.imgValueEnd,
+  expectedImg: shot.expectedImg,
+  pageRevision: shot.pageRevision,
+  referenceKey: shot.referenceKey,
+});
+
+const getOnlyTutorialShotSourceRef = async (sourceRoot) => {
+  const shots = await scanTutorialShots({ sourceRoot });
+  assert.equal(shots.length, 1, "the fixture must contain exactly one tutorial shot reference");
+  return toTutorialShotSourceRef(shots[0]);
+};
+
+const saveTutorialShot = async (options) =>
+  saveTutorialShotImpl({
+    ...options,
+    sourceRef: options.sourceRef ?? (await getOnlyTutorialShotSourceRef(options.sourceRoot)),
+  });
+
+const writeDuplicateTutorialShotFixture = async (
+  rootDir,
+  { sameTagName = false, crossPage = false, withGeneratedFiles = false } = {},
+) => {
+  const pageDir = path.join(rootDir, "content", "docs", "student-guide");
+  const imageDir = path.join(pageDir, "img");
+  const shotsDir = path.join(pageDir, "shots");
+  await fs.mkdir(imageDir, { recursive: true });
+
+  const secondReference = sameTagName
+    ? '<Action img="./img/compile-success.png">もう一度コンパイルします。</Action>'
+    : '<Verify img="./img/compile-success.png">成功したことを確認します。</Verify>';
+  await fs.writeFile(
+    path.join(pageDir, "index.mdx"),
+    `---
+title: Student Guide
+---
+
+<Section title="Step 1" goal="コンパイル結果を確認する">
+  <Action img="./img/compile-success.png" alt="compile result">
+    コンパイルして、保存します。
+  </Action>
+  ${secondReference}
+</Section>
+`,
+    "utf8",
+  );
+
+  const sourceImage = sharp({
+    create: {
+      width: 640,
+      height: 360,
+      channels: 4,
+      background: "#dbe4f0",
+    },
+  });
+  await sourceImage.png().toFile(path.join(imageDir, "compile-success.png"));
+
+  if (crossPage) {
+    const otherPageDir = path.join(rootDir, "content", "docs", "other-page");
+    await fs.mkdir(otherPageDir, { recursive: true });
+    await fs.writeFile(
+      path.join(otherPageDir, "index.mdx"),
+      `---
+title: Other Page
+---
+
+<Section title="Step 2" goal="同じ結果を確認する">
+  <Verify img="../student-guide/img/compile-success.png">同じ画像を確認します。</Verify>
+</Section>
+`,
+      "utf8",
+    );
+  }
+
+  if (!withGeneratedFiles) {
+    return;
+  }
+
+  await fs.mkdir(shotsDir, { recursive: true });
+  await sourceImage.webp({ lossless: true }).toFile(path.join(imageDir, "compile-success.webp"));
+  await sourceImage.png().toFile(path.join(shotsDir, "compile-success.raw.png"));
+  const manifest = {
+    ...createDefaultTutorialShotManifest({
+      pagePath: "content/docs/student-guide/index.mdx",
+      outputImagePath: "content/docs/student-guide/img/compile-success.webp",
+    }),
+    rawImagePath: "content/docs/student-guide/shots/compile-success.raw.png",
+    alt: "保存前の画像",
+  };
+  await fs.writeFile(
+    path.join(shotsDir, "compile-success.shot.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8",
+  );
 };
 
 const toDataUrl = (buffer, mimeType = "image/png") =>
@@ -305,11 +406,13 @@ test("saveTutorialShot rejects non-image raw uploads before writing raw files", 
     "shots",
     "startup.raw.png",
   );
+  const sourceRef = await getOnlyTutorialShotSourceRef(sourceRoot);
 
   await assert.rejects(
     () =>
       saveTutorialShot({
         sourceRoot,
+        sourceRef,
         manifestInput: manifest,
         rawImageDataUrl: toDataUrl(Buffer.from("not an image"), "text/plain"),
       }),
@@ -347,6 +450,7 @@ test("saveTutorialShot preserves raw PNG uploads and generates cropped annotated
 
   await saveTutorialShot({
     sourceRoot,
+    sourceRef: await getOnlyTutorialShotSourceRef(sourceRoot),
     manifestInput: {
       ...manifest,
       crop: {
@@ -458,6 +562,7 @@ test("saveTutorialShot preserves animated WebP uploads as cropped annotated anim
 
   await saveTutorialShot({
     sourceRoot,
+    sourceRef: await getOnlyTutorialShotSourceRef(sourceRoot),
     manifestInput: {
       ...manifest,
       crop: {
@@ -582,11 +687,13 @@ test("saveTutorialShot rejects MIME-spoofed unsupported raw uploads", async (t) 
     "shots",
     "startup.raw.png",
   );
+  const sourceRef = await getOnlyTutorialShotSourceRef(sourceRoot);
 
   await assert.rejects(
     () =>
       saveTutorialShot({
         sourceRoot,
+        sourceRef,
         manifestInput: manifest,
         rawImageDataUrl: toDataUrl(tiffImageBuffer, "image/png"),
       }),
@@ -811,6 +918,292 @@ title: Student Guide
   } finally {
     await fs.rm(rootDir, { recursive: true, force: true });
   }
+});
+
+test("scanTutorialShots returns distinct source references for Action and Verify tags sharing one image", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "duplicate-shot-scan-"));
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+  await writeDuplicateTutorialShotFixture(sourceRoot);
+
+  const shots = await scanTutorialShots({ sourceRoot });
+  const pageSource = await fs.readFile(
+    path.join(sourceRoot, "content", "docs", "student-guide", "index.mdx"),
+    "utf8",
+  );
+
+  assert.equal(shots.length, 2);
+  assert.equal(shots[0].outputImagePath, shots[1].outputImagePath);
+  assert.equal(shots[0].bootstrapImagePath, shots[1].bootstrapImagePath);
+  assert.notEqual(shots[0].referenceKey, shots[1].referenceKey);
+  assert.deepEqual(
+    shots.map((shot) => shot.tagName),
+    ["Action", "Verify"],
+  );
+  for (const shot of shots) {
+    assert.match(shot.pageRevision, /^[a-f0-9]{64}$/u);
+    assert.match(shot.referenceKey, /^[a-f0-9]{64}$/u);
+    assert.equal(shot.expectedImg, "./img/compile-success.png");
+    assert.equal(
+      pageSource.slice(shot.imgValueStart, shot.imgValueEnd),
+      "./img/compile-success.png",
+    );
+    assert.match(
+      pageSource.slice(shot.tagStart, shot.tagEnd),
+      new RegExp(`^<${shot.tagName}\\b`, "u"),
+    );
+    assert.equal("occurrence" in shot, false);
+  }
+});
+
+test("scanTutorialShots returns distinct source references for repeated tags of the same kind", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "duplicate-action-shot-scan-"));
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+  await writeDuplicateTutorialShotFixture(sourceRoot, { sameTagName: true });
+
+  const shots = await scanTutorialShots({ sourceRoot });
+
+  assert.equal(shots.length, 2);
+  assert.deepEqual(
+    shots.map((shot) => shot.tagName),
+    ["Action", "Action"],
+  );
+  assert.notEqual(shots[0].referenceKey, shots[1].referenceKey);
+  assert.equal(
+    shots.some((shot) => "occurrence" in shot),
+    false,
+  );
+});
+
+test("scanTutorialShots distinguishes references to one image from different pages", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cross-page-shot-scan-"));
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+  await writeDuplicateTutorialShotFixture(sourceRoot, { crossPage: true });
+
+  const shots = await scanTutorialShots({ sourceRoot });
+  const sharedImageShots = shots.filter(
+    (shot) => shot.referencedImagePath === "content/docs/student-guide/img/compile-success.png",
+  );
+
+  assert.equal(sharedImageShots.length, 3);
+  assert.equal(new Set(sharedImageShots.map((shot) => shot.referenceKey)).size, 3);
+  assert.equal(new Set(sharedImageShots.map((shot) => shot.pagePath)).size, 2);
+});
+
+test("saveTutorialShot branches only the selected source reference when an image is shared", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "duplicate-shot-save-"));
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+  await writeDuplicateTutorialShotFixture(sourceRoot, { withGeneratedFiles: true });
+
+  const originalOutputPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "img",
+    "compile-success.webp",
+  );
+  const originalRawPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "shots",
+    "compile-success.raw.png",
+  );
+  const originalManifestPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "shots",
+    "compile-success.shot.json",
+  );
+  const [originalOutput, originalRaw, originalManifest] = await Promise.all([
+    fs.readFile(originalOutputPath),
+    fs.readFile(originalRawPath),
+    fs.readFile(originalManifestPath),
+  ]);
+  const initialShots = await scanTutorialShots({ sourceRoot });
+  const actionShot = initialShots.find((shot) => shot.tagName === "Action");
+  assert.ok(actionShot);
+
+  const result = await saveTutorialShot({
+    sourceRoot,
+    sourceRef: toTutorialShotSourceRef(actionShot),
+    manifestInput: {
+      ...actionShot.manifest,
+      alt: "分岐した Action 画像",
+    },
+  });
+
+  assert.match(
+    result.manifest.outputImagePath,
+    /^content\/docs\/student-guide\/img\/compile-success--[a-f0-9]{6}\.webp$/u,
+  );
+  assert.match(
+    result.manifest.rawImagePath,
+    /^content\/docs\/student-guide\/shots\/compile-success--[a-f0-9]{6}\.raw\.png$/u,
+  );
+  assert.match(result.manifest.id, /^compile-success-[a-f0-9]{6}$/u);
+
+  const savedPageSource = await fs.readFile(
+    path.join(sourceRoot, "content", "docs", "student-guide", "index.mdx"),
+    "utf8",
+  );
+  assert.match(
+    savedPageSource,
+    /<Action img="\.\/img\/compile-success--[a-f0-9]{6}\.webp" alt="compile result">/u,
+  );
+  assert.match(
+    savedPageSource,
+    /<Verify img="\.\/img\/compile-success\.png">成功したことを確認します。<\/Verify>/u,
+  );
+
+  const branchedOutputPath = path.join(sourceRoot, result.manifest.outputImagePath);
+  const branchedRawPath = path.join(sourceRoot, result.manifest.rawImagePath);
+  const branchedManifestPath = path.join(
+    sourceRoot,
+    "content",
+    "docs",
+    "student-guide",
+    "shots",
+    `${path.basename(result.manifest.outputImagePath, ".webp")}.shot.json`,
+  );
+  await Promise.all([
+    fs.stat(branchedOutputPath),
+    fs.stat(branchedRawPath),
+    fs.stat(branchedManifestPath),
+  ]);
+  assert.deepEqual(await fs.readFile(originalOutputPath), originalOutput);
+  assert.deepEqual(await fs.readFile(originalRawPath), originalRaw);
+  assert.deepEqual(await fs.readFile(originalManifestPath), originalManifest);
+
+  const rescannedShots = await scanTutorialShots({ sourceRoot });
+  assert.equal(rescannedShots.length, 2);
+  assert.equal(
+    rescannedShots.some((shot) => shot.referenceKey === actionShot.referenceKey),
+    false,
+  );
+  assert.equal(new Set(rescannedShots.map((shot) => shot.outputImagePath)).size, 2);
+  assert.equal(result.sourceRef.referenceKey, rescannedShots[0].referenceKey);
+});
+
+test("saveTutorialShot reuses a branched path and its raw image on later edits", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "branched-shot-resave-"));
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+  await writeDuplicateTutorialShotFixture(sourceRoot, { withGeneratedFiles: true });
+
+  const initialShots = await scanTutorialShots({ sourceRoot });
+  const actionShot = initialShots.find((shot) => shot.tagName === "Action");
+  assert.ok(actionShot);
+  const firstSave = await saveTutorialShot({
+    sourceRoot,
+    sourceRef: toTutorialShotSourceRef(actionShot),
+    manifestInput: {
+      ...actionShot.manifest,
+      alt: "最初の分岐保存",
+    },
+  });
+  const branchedOutputPath = path.join(sourceRoot, firstSave.manifest.outputImagePath);
+  const firstGeneratedOutput = await fs.readFile(branchedOutputPath);
+
+  await sharp({
+    create: { width: 640, height: 360, channels: 4, background: "#ef4444" },
+  })
+    .webp({ lossless: true })
+    .toFile(branchedOutputPath);
+
+  const rescannedShots = await scanTutorialShots({ sourceRoot });
+  const branchedShot = rescannedShots.find(
+    (shot) => shot.outputImagePath === firstSave.manifest.outputImagePath,
+  );
+  assert.ok(branchedShot);
+  const secondSave = await saveTutorialShot({
+    sourceRoot,
+    sourceRef: toTutorialShotSourceRef(branchedShot),
+    manifestInput: {
+      ...branchedShot.manifest,
+      alt: "再編集した分岐画像",
+    },
+  });
+
+  assert.equal(secondSave.manifest.outputImagePath, firstSave.manifest.outputImagePath);
+  assert.equal(secondSave.manifest.rawImagePath, firstSave.manifest.rawImagePath);
+  assert.deepEqual(await fs.readFile(branchedOutputPath), firstGeneratedOutput);
+  assert.doesNotMatch(secondSave.manifest.outputImagePath, /--[a-f0-9]{6}--/u);
+
+  const imageFiles = await fs.readdir(
+    path.join(sourceRoot, "content", "docs", "student-guide", "img"),
+  );
+  const shotFiles = await fs.readdir(
+    path.join(sourceRoot, "content", "docs", "student-guide", "shots"),
+  );
+  assert.equal(
+    imageFiles.filter((fileName) => /^compile-success--[a-f0-9]{6}\.webp$/u.test(fileName)).length,
+    1,
+  );
+  assert.equal(
+    shotFiles.filter((fileName) => /^compile-success--[a-f0-9]{6}\.shot\.json$/u.test(fileName))
+      .length,
+    1,
+  );
+  assert.equal(
+    shotFiles.filter((fileName) => /^compile-success--[a-f0-9]{6}\.raw\.png$/u.test(fileName))
+      .length,
+    1,
+  );
+});
+
+test("saveTutorialShot rejects a stale source reference before changing any artifact", async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "stale-shot-save-"));
+  t.after(async () => {
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
+  await writeDuplicateTutorialShotFixture(sourceRoot, { withGeneratedFiles: true });
+
+  const initialShots = await scanTutorialShots({ sourceRoot });
+  const actionShot = initialShots.find((shot) => shot.tagName === "Action");
+  assert.ok(actionShot);
+  const pagePath = path.join(sourceRoot, actionShot.pagePath);
+  await fs.appendFile(pagePath, "\n{/* changed after scanning */}\n", "utf8");
+
+  const artifactPaths = [
+    pagePath,
+    path.join(sourceRoot, actionShot.outputImagePath),
+    path.join(sourceRoot, actionShot.rawImagePath),
+    path.join(sourceRoot, actionShot.manifestPath),
+  ];
+  const before = await Promise.all(artifactPaths.map((artifactPath) => fs.readFile(artifactPath)));
+
+  await assert.rejects(
+    () =>
+      saveTutorialShot({
+        sourceRoot,
+        sourceRef: toTutorialShotSourceRef(actionShot),
+        manifestInput: {
+          ...actionShot.manifest,
+          alt: "この変更は保存されない",
+        },
+      }),
+    (error) => {
+      assert.equal(error?.statusCode, 409);
+      assert.match(error?.message ?? "", /教材が更新されています/u);
+      return true;
+    },
+  );
+
+  const after = await Promise.all(artifactPaths.map((artifactPath) => fs.readFile(artifactPath)));
+  assert.deepEqual(after, before);
 });
 
 test("getTutorialShotWarnings validates focal mode annotations", () => {
@@ -1877,7 +2270,10 @@ test("saveTutorialShot keeps reporting a missing raw image once annotations are 
     await fs.rm(sourceRoot, { recursive: true, force: true });
   });
 
-  await writeTutorialFixture(sourceRoot);
+  await writeTutorialFixture(sourceRoot, {
+    actionImageSrc: "./img/missing.png",
+    imageFileName: "startup.png",
+  });
 
   const manifest = createDefaultTutorialShotManifest({
     pagePath: "content/docs/student-guide/index.mdx",

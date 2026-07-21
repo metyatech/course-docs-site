@@ -440,7 +440,7 @@ export const getTutorialShotPageRelativeOutputImagePath = ({ pagePath, outputIma
 
 const isExternalImageSrc = (value) => /^(https?:)?\/\//iu.test(value);
 
-const extractImageRefsFromMdxTag = ({ pagePath, sourceText, tagPattern }) => {
+const extractImageRefsFromMdxTag = ({ pagePath, sourceText, tagName, tagPattern }) => {
   const normalizedPagePath = normalizePosixPath(pagePath);
   const pageDir = posixDirname(normalizedPagePath);
   const refs = [];
@@ -452,14 +452,21 @@ const extractImageRefsFromMdxTag = ({ pagePath, sourceText, tagPattern }) => {
       continue;
     }
 
-    const rawSrc = imgMatch[2]?.trim();
+    const expectedImg = imgMatch[2] ?? "";
+    const rawSrc = expectedImg.trim();
     if (!rawSrc || isExternalImageSrc(rawSrc)) {
       continue;
     }
 
+    const tagStart = match.index ?? 0;
+    const tagEnd = tagStart + tag.length;
+    const imgPropStart = imgMatch.index ?? 0;
+    const quoteStart = imgMatch[0].indexOf(imgMatch[1]);
+    const imgValueStart = tagStart + imgPropStart + quoteStart + 1;
+    const imgValueEnd = imgValueStart + expectedImg.length;
     const sourceImagePath = normalizeDecodedPosixPath(rawSrc);
     const referencedImagePath = normalizeDecodedPosixPath(joinPosixPath(pageDir, rawSrc));
-    const line = sourceText.slice(0, match.index ?? 0).split(/\r?\n/gu).length;
+    const line = sourceText.slice(0, tagStart).split(/\r?\n/gu).length;
     const derived = deriveTutorialShotPaths({
       pagePath: normalizedPagePath,
       outputImagePath: referencedImagePath,
@@ -470,6 +477,12 @@ const extractImageRefsFromMdxTag = ({ pagePath, sourceText, tagPattern }) => {
       id: derived.id,
       line,
       pagePath: normalizedPagePath,
+      tagName,
+      tagStart,
+      tagEnd,
+      imgValueStart,
+      imgValueEnd,
+      expectedImg,
       sourceImagePath,
       referencedImagePath,
       outputImagePath: derived.outputImagePath,
@@ -482,70 +495,20 @@ const extractImageRefsFromMdxTag = ({ pagePath, sourceText, tagPattern }) => {
 };
 
 export const extractActionImageRefsFromMdx = ({ pagePath, sourceText }) =>
-  extractImageRefsFromMdxTag({ pagePath, sourceText, tagPattern: ACTION_TAG_PATTERN });
+  extractImageRefsFromMdxTag({
+    pagePath,
+    sourceText,
+    tagName: "Action",
+    tagPattern: ACTION_TAG_PATTERN,
+  });
 
 export const extractVerifyImageRefsFromMdx = ({ pagePath, sourceText }) =>
-  extractImageRefsFromMdxTag({ pagePath, sourceText, tagPattern: VERIFY_TAG_PATTERN });
-
-export const rewriteTutorialShotImageRefsForOutputPolicy = ({
-  pagePath,
-  sourceText,
-  outputImagePath,
-}) => {
-  const normalizedPagePath = normalizePosixPath(pagePath);
-  const policyOutputPath = applyTutorialShotStaticRasterOutputPolicy(outputImagePath);
-  const pageDir = posixDirname(normalizedPagePath);
-  const targetId = deriveTutorialShotPaths({
-    pagePath: normalizedPagePath,
-    outputImagePath: policyOutputPath,
-  }).id;
-  const pageRelativeOutputPath = getTutorialShotPageRelativeOutputImagePath({
-    pagePath: normalizedPagePath,
-    outputImagePath: policyOutputPath,
+  extractImageRefsFromMdxTag({
+    pagePath,
+    sourceText,
+    tagName: "Verify",
+    tagPattern: VERIFY_TAG_PATTERN,
   });
-  let changed = false;
-
-  const replaceTag = (tag) => {
-    const imgMatch = IMG_PROP_PATTERN.exec(tag);
-    if (!imgMatch) {
-      return tag;
-    }
-
-    const rawSrc = imgMatch[2]?.trim();
-    if (!rawSrc || isExternalImageSrc(rawSrc)) {
-      return tag;
-    }
-
-    const currentImagePath = normalizeDecodedPosixPath(joinPosixPath(pageDir, rawSrc));
-    const currentId = deriveTutorialShotPaths({
-      pagePath: normalizedPagePath,
-      outputImagePath: currentImagePath,
-    }).id;
-    if (currentId !== targetId) {
-      return tag;
-    }
-
-    const quote = imgMatch[1];
-    const nextImgProp = `img=${quote}${pageRelativeOutputPath}${quote}`;
-    if (imgMatch[0] === nextImgProp) {
-      return tag;
-    }
-
-    changed = true;
-    return `${tag.slice(0, imgMatch.index)}${nextImgProp}${tag.slice(
-      imgMatch.index + imgMatch[0].length,
-    )}`;
-  };
-
-  const nextSourceText = sourceText
-    .replace(ACTION_TAG_PATTERN, replaceTag)
-    .replace(VERIFY_TAG_PATTERN, replaceTag);
-
-  return {
-    sourceText: nextSourceText,
-    changed,
-  };
-};
 
 const normalizeAnnotation = (annotation) => {
   if (!annotation || typeof annotation !== "object") {

@@ -3,6 +3,7 @@ import { bumpRevision } from "../../../../../lib/dev-reload-bus";
 import {
   getTutorialShotAuthoringContext,
   saveTutorialShot,
+  TutorialShotConflictError,
 } from "../../../../../lib/tutorial-shots-server.mjs";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,7 @@ export async function POST(request: Request) {
 
     const result = await saveTutorialShot({
       sourceRoot: context.sourceRoot,
+      sourceRef: body.sourceRef,
       manifestInput: body.manifest,
       rawImageDataUrl: typeof body.rawImageDataUrl === "string" ? body.rawImageDataUrl : null,
       rawImageFileName: typeof body.rawImageFileName === "string" ? body.rawImageFileName : null,
@@ -87,6 +89,7 @@ export async function POST(request: Request) {
       {
         ok: true,
         manifest: result.manifest,
+        sourceRef: result.sourceRef,
         warnings: result.warnings,
       },
       {
@@ -96,13 +99,14 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
+    const status = error instanceof TutorialShotConflictError ? 409 : 500;
     return NextResponse.json(
       {
         error:
           error instanceof Error ? error.message : "チュートリアル画像を保存できませんでした。",
       },
       {
-        status: 500,
+        status,
         headers: {
           "cache-control": "no-store, max-age=0",
         },

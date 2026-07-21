@@ -6,6 +6,7 @@ const testFile = "tests/tutorial-shot-editor-flow.test.mjs";
 
 const testNames = [
   "tutorial shot editor saves one boxed focal point with an optional arrow",
+  "tutorial shot editor keeps shared image references independently selectable and saves only one",
   "tutorial shot editor can edit an Action image whose filename contains spaces",
   "tutorial shot editor accepts an image pasted from the clipboard",
   "tutorial shot editor imports a dropped source image",
@@ -28,7 +29,13 @@ const runOne = (testName) =>
     cleanupWorktreeDevProcesses();
     const child = spawn(
       process.execPath,
-      ["--test", "--test-concurrency=1", "--test-name-pattern", `^${escapeRegExp(testName)}$`, testFile],
+      [
+        "--test",
+        "--test-concurrency=1",
+        "--test-name-pattern",
+        `^${escapeRegExp(testName)}$`,
+        testFile,
+      ],
       {
         env: process.env,
         stdio: "inherit",

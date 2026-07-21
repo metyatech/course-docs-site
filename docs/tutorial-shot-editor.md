@@ -54,14 +54,17 @@ project-contract:
     - /dev/tutorial-shots
   ai_surface:
     - shot manifest JSON
-    - MDX Action image references
+    - MDX Action/Verify image references
   sync:
     direction: canonical_to_generated
     trigger:
       - Save Shot in the editor
       - future generate:tutorial-images CLI
   conflict_policy:
-    - MDX stays authoritative for which Action images exist
+    - MDX stays authoritative for which Action/Verify image references exist
+    - each Action/Verify reference is selected by its scanned source range and page revision, not by its image path
+    - a stale page revision rejects the save before MDX or image artifacts are changed
+    - saving one of several references to the same image branches only that reference to a collision-free `--<hex>.webp` path
     - shot manifest stays authoritative for crop/annotations
     - generated img/*.webp is overwritten from manifest on save for static UI screenshots and tested animated WebP uploads
     - legacy PNG Action/Verify references are rewritten to the policy WebP path on save
@@ -123,6 +126,8 @@ Rule of thumb:
 MVP goals:
 
 - detect existing `Action img="./img/...png"` / `Verify img="./img/...png"` references and migrate static UI output to WebP on save
+- list repeated uses of the same image as independent editable references, including cross-page uses
+- branch only the saved reference to an automatically suffixed image when its current image is shared
 - bootstrap a raw source from the current output image when needed
 - import source images through the upload button, drag-and-drop, or `Ctrl + V`
 - save crop + annotations beside the page in `shots/`

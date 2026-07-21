@@ -336,6 +336,7 @@ should migrate to the static UI WebP output policy:
 - crop
 - box / arrow / short label annotations
 - generated page-local WebP output image for static UI screenshots, with animated WebP raw uploads preserved as animated WebP
+- independent editing for every `Action` / `Verify` reference, even when several tags initially share one image path; saving one shared reference automatically branches it to a unique generated image
 
 See [Tutorial Shot Editor](./docs/tutorial-shot-editor.md) for the architecture,
 canonical files, and authoring rules.

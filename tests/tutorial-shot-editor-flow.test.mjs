@@ -55,7 +55,9 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
   while (true) {
     if (Date.now() - startedAt > timeoutMs) {
       throw new Error(
-        typeof onTimeoutMessage === "function" ? onTimeoutMessage() : (onTimeoutMessage ?? "Timed out"),
+        typeof onTimeoutMessage === "function"
+          ? onTimeoutMessage()
+          : (onTimeoutMessage ?? "Timed out"),
       );
     }
     const result = await fn();
@@ -68,7 +70,10 @@ const waitFor = async (fn, { timeoutMs, intervalMs, onTimeoutMessage }) => {
 
 const tryFetchStatus = async (url, { timeoutMs = 10_000 } = {}) => {
   try {
-    const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
+    const response = await fetch(url, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     return response.status;
   } catch {
     return null;
@@ -760,6 +765,226 @@ test(
 );
 
 test(
+  "tutorial shot editor keeps shared image references independently selectable and saves only one",
+  { timeout: 3 * 60_000 },
+  async (t) => {
+    const tempRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "course-tutorial-shot-editor-shared-"),
+    );
+    const fixtureCourse = path.join(tempRoot, "course");
+    const overrideCourse = path.join(tempRoot, "override-course");
+    const port = await getFreePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    await writeFixtureCourseRepo(fixtureCourse);
+    await writeFixtureCourseRepo(overrideCourse, {
+      logoText: "Shared Tutorial Shot Fixture",
+      firstImageName: "shared",
+      secondImageName: "unused",
+    });
+    const tutorialPagePath = path.join(overrideCourse, "content", "docs", "tutorial", "index.mdx");
+    await fs.writeFile(
+      tutorialPagePath,
+      `---
+title: Tutorial
+---
+
+<Section title="Step 1" goal="同じ画像の参照箇所を選ぶ">
+  <Action img="./img/shared.webp" alt="action source">
+    Action 側を編集します。
+  </Action>
+  <Verify img="./img/shared.webp">Verify 側を確認します。</Verify>
+</Section>
+`,
+      "utf8",
+    );
+    const overrideCourseRelativePath = path.relative(projectRoot, overrideCourse);
+    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+      detached: process.platform !== "win32",
+      windowsHide: true,
+      cwd: projectRoot,
+      env: createRunDevTestEnv({
+        label: "tutorial-shot-editor-shared-reference",
+        env: process.env,
+        overrides: {
+          COURSE_CONTENT_SOURCE: fixtureCourse,
+        },
+      }),
+      stdio: "inherit",
+    });
+
+    t.after(async () => {
+      await killProcessTreeAndWaitForPort(dev, port);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+    await waitFor(
+      async () => {
+        const status = await tryFetchStatus(`${baseUrl}/dev/tutorial-shots/`);
+        return status === 200 || status === 308;
+      },
+      {
+        timeoutMs: 120_000,
+        intervalMs: 1000,
+        onTimeoutMessage: "Tutorial shot editor did not become ready for shared references.",
+      },
+    );
+
+    let browser;
+    t.after(async () => {
+      await closeBrowserBounded(browser);
+    });
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({
+      baseURL: baseUrl,
+      viewport: { width: 1440, height: 1100 },
+    });
+    const duplicateKeyMessages = [];
+    page.on("console", (message) => {
+      if (message.text().includes("Encountered two children with the same key")) {
+        duplicateKeyMessages.push(message.text());
+      }
+    });
+
+    await openTutorialShotEditor(page, overrideCourseRelativePath, {
+      firstShotButtonName: /shared.*Action.*6 行目/iu,
+    });
+    const sidebar = page.locator('aside[aria-label="編集する画像の一覧"]');
+    await assert.equal(await sidebar.getByRole("button").count(), 2);
+
+    const verifyButton = sidebar.getByRole("button", { name: /shared.*Verify.*9 行目/iu });
+    await verifyButton.click();
+    const workspace = page.locator('section[aria-label="画像エディタ"]');
+    await workspace.getByText("Verify", { exact: true }).waitFor();
+    await workspace.getByText("9 行目", { exact: true }).waitFor();
+
+    await page.keyboard.press("Shift+Tab");
+    const focusedShotState = await page.evaluate(() => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLButtonElement)) {
+        return null;
+      }
+      const style = getComputedStyle(active);
+      return {
+        outlineStyle: style.outlineStyle,
+        outlineWidth: style.outlineWidth,
+        text: active.textContent,
+      };
+    });
+    assert.match(focusedShotState?.text ?? "", /shared.*Action.*6 行目/isu);
+    assert.notEqual(focusedShotState?.outlineStyle, "none");
+    assert.notEqual(focusedShotState?.outlineWidth, "0px");
+    await page.keyboard.press("Enter");
+    await workspace.getByText("Action", { exact: true }).waitFor();
+    await workspace.getByText("6 行目", { exact: true }).waitFor();
+
+    await page.setViewportSize({ width: 760, height: 1000 });
+    const reducedWidthLayout = await page.evaluate(() => {
+      const documentElement = document.documentElement;
+      const sidebarElement = document.querySelector('aside[aria-label="編集する画像の一覧"]');
+      const shotButtons = Array.from(sidebarElement?.querySelectorAll("button") ?? []);
+      return {
+        hasDocumentOverflow: documentElement.scrollWidth > documentElement.clientWidth,
+        sidebarWithinViewport:
+          sidebarElement instanceof HTMLElement &&
+          sidebarElement.getBoundingClientRect().right <= documentElement.clientWidth,
+        shotButtonsWithinViewport: shotButtons.every(
+          (button) => button.getBoundingClientRect().right <= documentElement.clientWidth,
+        ),
+      };
+    });
+    assert.deepEqual(reducedWidthLayout, {
+      hasDocumentOverflow: false,
+      sidebarWithinViewport: true,
+      shotButtonsWithinViewport: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 1100 });
+
+    await page.getByLabel("画像の説明（Alt テキスト）").fill("Action だけの説明");
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await page.getByText("保存しました").waitFor();
+
+    await sidebar.getByRole("button", { name: /shared.*Verify.*9 行目/iu }).click();
+    await waitFor(
+      async () => (await page.getByLabel("画像の説明（Alt テキスト）").inputValue()) === "",
+      {
+        timeoutMs: 10_000,
+        intervalMs: 100,
+        onTimeoutMessage: "The Verify reference did not become the selected edit state.",
+      },
+    );
+    await assert.equal(await page.getByLabel("画像の説明（Alt テキスト）").inputValue(), "");
+    const branchedActionButton = sidebar.getByRole("button", {
+      name: /shared-[a-f0-9]{6}.*Action.*6 行目/iu,
+    });
+    await branchedActionButton.click();
+    await waitFor(
+      async () =>
+        (await page.getByLabel("画像の説明（Alt テキスト）").inputValue()) === "Action だけの説明",
+      {
+        timeoutMs: 10_000,
+        intervalMs: 100,
+        onTimeoutMessage: "The branched Action manifest did not become the selected edit state.",
+      },
+    );
+    await assert.equal(
+      await page.getByLabel("画像の説明（Alt テキスト）").inputValue(),
+      "Action だけの説明",
+    );
+
+    const savedPageSource = await fs.readFile(tutorialPagePath, "utf8");
+    assert.match(
+      savedPageSource,
+      /<Action img="\.\/img\/shared--[a-f0-9]{6}\.webp" alt="action source">/u,
+    );
+    assert.match(
+      savedPageSource,
+      /<Verify img="\.\/img\/shared\.webp">Verify 側を確認します。<\/Verify>/u,
+    );
+    const imageFiles = await fs.readdir(
+      path.join(overrideCourse, "content", "docs", "tutorial", "img"),
+    );
+    const shotFiles = await fs.readdir(
+      path.join(overrideCourse, "content", "docs", "tutorial", "shots"),
+    );
+    const branchedImageFile = imageFiles.find((fileName) =>
+      /^shared--[a-f0-9]{6}\.webp$/u.test(fileName),
+    );
+    const branchedRawFile = shotFiles.find((fileName) =>
+      /^shared--[a-f0-9]{6}\.raw\.webp$/u.test(fileName),
+    );
+    const branchedManifestFile = shotFiles.find((fileName) =>
+      /^shared--[a-f0-9]{6}\.shot\.json$/u.test(fileName),
+    );
+    assert.equal(typeof branchedImageFile, "string");
+    assert.equal(typeof branchedRawFile, "string");
+    assert.equal(typeof branchedManifestFile, "string");
+
+    await fs.appendFile(tutorialPagePath, "\n{/* changed after the editor scan */}\n", "utf8");
+    const conflictArtifactPaths = [
+      tutorialPagePath,
+      path.join(overrideCourse, "content", "docs", "tutorial", "img", branchedImageFile),
+      path.join(overrideCourse, "content", "docs", "tutorial", "shots", branchedRawFile),
+      path.join(overrideCourse, "content", "docs", "tutorial", "shots", branchedManifestFile),
+    ];
+    const conflictArtifactsBefore = await Promise.all(
+      conflictArtifactPaths.map((artifactPath) => fs.readFile(artifactPath)),
+    );
+    await page.getByLabel("画像の説明（Alt テキスト）").fill("競合時には保存されない説明");
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await page
+      .getByText("教材が更新されています。一覧を再読み込みしてから、もう一度保存してください。", {
+        exact: true,
+      })
+      .waitFor();
+    const conflictArtifactsAfter = await Promise.all(
+      conflictArtifactPaths.map((artifactPath) => fs.readFile(artifactPath)),
+    );
+    assert.deepEqual(conflictArtifactsAfter, conflictArtifactsBefore);
+    assert.deepEqual(duplicateKeyMessages, []);
+  },
+);
+
+test(
   "tutorial shot editor can edit an Action image whose filename contains spaces",
   { timeout: 3 * 60_000 },
   async (t) => {
@@ -1193,7 +1418,14 @@ test(
     await syncContentForDevTest(devEnv);
     await assert.doesNotReject(() =>
       fs.stat(
-        path.join(projectRoot, "content", "docs", "tutorial", "img", `${liveRefreshImageName}.webp`),
+        path.join(
+          projectRoot,
+          "content",
+          "docs",
+          "tutorial",
+          "img",
+          `${liveRefreshImageName}.webp`,
+        ),
       ),
     );
 
@@ -1201,11 +1433,11 @@ test(
       process.execPath,
       [path.join(projectRoot, "scripts", "run-dev.mjs"), "--port", String(port)],
       {
-      detached: process.platform !== "win32",
-      windowsHide: true,
-      cwd: projectRoot,
-      env: devEnv,
-      stdio: "inherit",
+        detached: process.platform !== "win32",
+        windowsHide: true,
+        cwd: projectRoot,
+        env: devEnv,
+        stdio: "inherit",
       },
     );
 
@@ -1244,7 +1476,8 @@ test(
       expectedSourcePath: fixtureCourse,
       expectedShotId: liveRefreshImageName,
       expectedOutputImagePath: liveRefreshOutputImagePath,
-      onTimeoutMessage: "Tutorial shot editor API did not expose the exact live-refresh fixture image.",
+      onTimeoutMessage:
+        "Tutorial shot editor API did not expose the exact live-refresh fixture image.",
     });
 
     let browser;
@@ -1562,15 +1795,12 @@ title: Tutorial
       },
     );
 
-    await waitForTutorialShotsApiReady(
-      baseUrl,
-      {
-        expectedSourcePath: fixtureCourse,
-        expectedShotId: verifyImageName,
-        expectedOutputImagePath: verifyOutputImagePath,
-        onTimeoutMessage: "Tutorial shot editor API did not stay ready for Verify image save.",
-      },
-    );
+    await waitForTutorialShotsApiReady(baseUrl, {
+      expectedSourcePath: fixtureCourse,
+      expectedShotId: verifyImageName,
+      expectedOutputImagePath: verifyOutputImagePath,
+      onTimeoutMessage: "Tutorial shot editor API did not stay ready for Verify image save.",
+    });
 
     await editorPage.goto("/dev/tutorial-shots/", { waitUntil: "domcontentloaded" });
     await editorPage.getByRole("heading", { name: "チュートリアル画像エディタ" }).waitFor();
@@ -1614,10 +1844,12 @@ title: Tutorial
       async () => {
         try {
           return (
-            await evaluateExactTutorialImage(previewPage, verifyProbeImageDescriptor, {
-              scanForAnnotationStroke: true,
-            })
-          ).hasAnnotationStrokePixel === true;
+            (
+              await evaluateExactTutorialImage(previewPage, verifyProbeImageDescriptor, {
+                scanForAnnotationStroke: true,
+              })
+            ).hasAnnotationStrokePixel === true
+          );
         } catch {
           return false;
         }
@@ -2049,14 +2281,11 @@ test(
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
-    const readyResult = await waitForTutorialShotsApiReady(
-      baseUrl,
-      {
-        expectedSourcePath: fixtureCourseEnvPath,
-        expectedShotId: "startup",
-        onTimeoutMessage: "Tutorial shot editor API did not become ready from env file startup.",
-      },
-    );
+    const readyResult = await waitForTutorialShotsApiReady(baseUrl, {
+      expectedSourcePath: fixtureCourseEnvPath,
+      expectedShotId: "startup",
+      onTimeoutMessage: "Tutorial shot editor API did not become ready from env file startup.",
+    });
 
     const { status, data } = readyResult;
 
