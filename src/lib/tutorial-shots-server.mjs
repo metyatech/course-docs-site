@@ -1,3 +1,4 @@
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
@@ -12,12 +13,14 @@ import {
   getTutorialShotCanvasLayout,
   getTutorialShotGeneratedImageFormat,
   getTutorialShotImageContentType,
+  getTutorialShotPageRelativeOutputImagePath,
   getTutorialShotSourceImageExtensionForFileName,
   getTutorialShotSourceImageExtensionForMimeType,
   getTutorialShotWarnings,
   isExpectedTutorialShotRawImagePath,
   isTutorialShotManifestPath,
   isTutorialShotOutputImagePath,
+  isTutorialShotRawImagePath,
   isTutorialShotReadableImagePath,
   normalizeDecodedPosixPath,
   normalizePosixPath,
@@ -25,7 +28,7 @@ import {
   replaceTutorialShotPathExtension,
   renderTutorialShotOverlaySvg,
   isTutorialShotSourceImageMimeType,
-  rewriteTutorialShotImageRefsForOutputPolicy,
+  TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS,
 } from "./tutorial-shots-shared.mjs";
 
 const PAGE_PATH_PATTERN = /^content\/.+\/index\.mdx?$/iu;
@@ -42,6 +45,9 @@ const SHARP_RAW_UPLOAD_FORMAT_EXTENSIONS = new Map([
   ["svg", new Set([".svg"])],
   ["bmp", new Set([".bmp", ".dib"])],
 ]);
+const TUTORIAL_SHOT_RAW_IMAGE_EXTENSIONS = [
+  ...new Set(TUTORIAL_SHOT_SOURCE_IMAGE_FORMATS.flatMap((format) => format.extensions)),
+];
 
 const isLocalPathLike = (value) =>
   value.startsWith(".") ||
@@ -175,25 +181,84 @@ const resolveSourcePath = ({ sourceRoot, contentRelativePath, validator }) => {
   });
 };
 
-const ensureParentDir = async (filePath) => {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
+const isTutorialShotArtifactPath = (contentPath) =>
+  isTutorialShotOutputImagePath(contentPath) ||
+  isTutorialShotManifestPath(contentPath) ||
+  isTutorialShotRawImagePath(contentPath);
+
+export const getTutorialShotArtifactPaths = (ref) => {
+  const requestedOutputImagePath = ref.referencedImagePath ?? ref.outputImagePath;
+  const derived = deriveTutorialShotPaths({
+    pagePath: ref.pagePath,
+    outputImagePath: requestedOutputImagePath,
+    rawImageExtension: getTutorialShotFileExtension(ref.rawImagePath ?? requestedOutputImagePath),
+  });
+  const rawImagePath = isExpectedTutorialShotRawImagePath({
+    pagePath: ref.pagePath,
+    outputImagePath: derived.outputImagePath,
+    rawImagePath: ref.rawImagePath,
+  })
+    ? normalizeDecodedPosixPath(ref.rawImagePath)
+    : derived.rawImagePath;
+
+  return {
+    outputImagePath: derived.outputImagePath,
+    manifestPath: derived.manifestPath,
+    rawImagePath,
+  };
 };
 
-const rewritePageSourceForDevRefresh = async ({
-  pageAbsPath,
-  pagePath,
-  sourceText,
-  outputImagePath,
+export const getTutorialShotArtifactIdentity = ({
+  sourceRoot,
+  contentRelativePath,
+  platform = process.platform,
 }) => {
-  // Rewriting the page with identical contents makes the synced MDX page update
-  // after the generated image file, so the open dev preview reloads the latest image.
-  const rewrite = rewriteTutorialShotImageRefsForOutputPolicy({
-    pagePath,
-    sourceText,
-    outputImagePath,
+  const absolutePath = resolveSourcePath({
+    sourceRoot,
+    contentRelativePath,
+    validator: isTutorialShotArtifactPath,
   });
-  await fs.writeFile(pageAbsPath, rewrite.sourceText, "utf8");
-  return rewrite.sourceText;
+  return platform === "win32" ? absolutePath.toLowerCase() : absolutePath;
+};
+
+const getFileSystemPathIdentity = ({ sourceRoot, absolutePath, platform = process.platform }) => {
+  const insideRootPath = ensureInsideRoot({ rootDir: sourceRoot, resolvedPath: absolutePath });
+  return platform === "win32" ? insideRootPath.toLowerCase() : insideRootPath;
+};
+
+const tutorialShotArtifactPathsShareArtifacts = ({
+  sourceRoot,
+  leftPaths,
+  rightPaths,
+  platform = process.platform,
+}) => {
+  const leftIdentities = new Set(
+    Object.values(leftPaths).map((contentRelativePath) =>
+      getTutorialShotArtifactIdentity({ sourceRoot, contentRelativePath, platform }),
+    ),
+  );
+  return Object.values(rightPaths).some((contentRelativePath) =>
+    leftIdentities.has(
+      getTutorialShotArtifactIdentity({ sourceRoot, contentRelativePath, platform }),
+    ),
+  );
+};
+
+export const tutorialShotRefsShareArtifacts = ({
+  sourceRoot,
+  left,
+  right,
+  platform = process.platform,
+}) =>
+  tutorialShotArtifactPathsShareArtifacts({
+    sourceRoot,
+    leftPaths: getTutorialShotArtifactPaths(left),
+    rightPaths: getTutorialShotArtifactPaths(right),
+    platform,
+  });
+
+const ensureParentDir = async (filePath, fileOps = fs) => {
+  await fileOps.mkdir(path.dirname(filePath), { recursive: true });
 };
 
 const hydrateManifest = (manifestInput) => {
@@ -323,27 +388,24 @@ const getRawUploadExtensionForMetadata = ({
   return [...acceptedExtensions][0];
 };
 
-const writeGeneratedTutorialShotImage = async ({ image, outputAbsPath, outputFormat }) => {
+const renderGeneratedTutorialShotImage = async ({ image, outputImagePath, outputFormat }) => {
   if (!outputFormat) {
-    throw new Error(`出力画像の形式が対応していません: ${outputAbsPath}`);
+    throw new Error(`出力画像の形式が対応していません: ${outputImagePath}`);
   }
 
   if (outputFormat.sharpFormat === "webp-lossless") {
-    await image.webp({ lossless: true }).toFile(outputAbsPath);
-    return;
+    return image.webp({ lossless: true }).toBuffer();
   }
 
   if (outputFormat.sharpFormat === "png") {
-    await image.png().toFile(outputAbsPath);
-    return;
+    return image.png().toBuffer();
   }
 
   if (outputFormat.sharpFormat === "jpeg") {
-    await image.jpeg().toFile(outputAbsPath);
-    return;
+    return image.jpeg().toBuffer();
   }
 
-  throw new Error(`出力画像の形式が対応していません: ${outputAbsPath}`);
+  throw new Error(`出力画像の形式が対応していません: ${outputImagePath}`);
 };
 
 const normalizeCrop = ({ crop, width, height }) => {
@@ -391,12 +453,11 @@ const getRepeatedOverlayComposites = ({ overlaySvg, pages, pageHeight }) =>
     top: index * pageHeight,
   }));
 
-const writeAnimatedWebpTutorialShotImage = async ({
+const renderAnimatedWebpTutorialShotImage = async ({
   rawBuffer,
   crop,
   outputLayout,
   overlaySvg,
-  outputAbsPath,
   animatedOutputPlan,
 }) => {
   const webpOptions = { lossless: true };
@@ -407,7 +468,7 @@ const writeAnimatedWebpTutorialShotImage = async ({
     webpOptions.loop = animatedOutputPlan.loop;
   }
 
-  await sharp(rawBuffer, { animated: true, limitInputPixels: SHARP_INPUT_PIXEL_LIMIT })
+  return sharp(rawBuffer, { animated: true, limitInputPixels: SHARP_INPUT_PIXEL_LIMIT })
     .extract({
       left: crop.x,
       top: crop.y,
@@ -434,7 +495,7 @@ const writeAnimatedWebpTutorialShotImage = async ({
       }),
     )
     .webp(webpOptions)
-    .toFile(outputAbsPath);
+    .toBuffer();
 };
 
 /**
@@ -509,122 +570,485 @@ export const getTutorialShotAuthoringContext = async ({
   };
 };
 
-export const scanTutorialShots = async ({ sourceRoot }) => {
+const hashTutorialShotText = (value) => createHash("sha256").update(value, "utf8").digest("hex");
+
+const createTutorialShotReferenceKey = ({ pagePath, pageRevision, tagName, tagStart, tagEnd }) =>
+  hashTutorialShotText(
+    JSON.stringify([pagePath, pageRevision, tagName, Number(tagStart), Number(tagEnd)]),
+  );
+
+const extractTutorialShotSourceRefs = ({ pagePath, sourceText }) => {
+  const pageRevision = hashTutorialShotText(sourceText);
+  return [
+    ...extractActionImageRefsFromMdx({ pagePath, sourceText }).map((ref) => ({
+      ...ref,
+      shotSource: "action",
+    })),
+    ...extractVerifyImageRefsFromMdx({ pagePath, sourceText }).map((ref) => ({
+      ...ref,
+      shotSource: "verify",
+    })),
+  ].map((ref) => ({
+    ...ref,
+    pageRevision,
+    referenceKey: createTutorialShotReferenceKey({ ...ref, pageRevision }),
+  }));
+};
+
+const scanTutorialShotSourceState = async ({ sourceRoot }) => {
   const contentRoot = path.join(sourceRoot, "content");
   const allFiles = await enumerateFiles(contentRoot);
   const pageFiles = allFiles.filter((filePath) => {
     const relativePath = normalizePosixPath(path.relative(sourceRoot, filePath));
     return PAGE_PATH_PATTERN.test(relativePath);
   });
-  const shots = [];
+  const pages = new Map();
+  const refs = [];
 
   for (const filePath of pageFiles) {
     const relativePath = normalizePosixPath(path.relative(sourceRoot, filePath));
     const sourceText = await fs.readFile(filePath, "utf8");
-    const refs = [
-      ...extractActionImageRefsFromMdx({ pagePath: relativePath, sourceText }).map((ref) => ({
-        ...ref,
-        shotSource: "action",
-      })),
-      ...extractVerifyImageRefsFromMdx({ pagePath: relativePath, sourceText }).map((ref) => ({
-        ...ref,
-        shotSource: "verify",
-      })),
-    ];
-
-    for (const ref of refs) {
-      const manifestPath = resolveSourcePath({
-        sourceRoot,
-        contentRelativePath: ref.manifestPath,
-        validator: isTutorialShotManifestPath,
-      });
-      const outputImagePath = resolveSourcePath({
-        sourceRoot,
-        contentRelativePath: ref.outputImagePath,
-        validator: isTutorialShotOutputImagePath,
-      });
-      const referencedImagePath = resolveSourcePath({
-        sourceRoot,
-        contentRelativePath: ref.referencedImagePath,
-        validator: isTutorialShotReadableImagePath,
-      });
-
-      const rawManifest = await readJsonIfExists(manifestPath);
-      const manifest = hydrateManifest(
-        rawManifest
-          ? {
-              ...rawManifest,
-              pagePath: ref.pagePath,
-              outputImagePath: ref.outputImagePath,
-            }
-          : createDefaultTutorialShotManifest({
-              pagePath: ref.pagePath,
-              outputImagePath: ref.outputImagePath,
-            }),
-      );
-      const rawImagePath = resolveSourcePath({
-        sourceRoot,
-        contentRelativePath: manifest.rawImagePath,
-        validator: (contentPath) =>
-          isExpectedTutorialShotRawImagePath({
-            pagePath: manifest.pagePath,
-            outputImagePath: manifest.outputImagePath,
-            rawImagePath: contentPath,
-          }),
-      });
-
-      const warnings = getTutorialShotWarnings(manifest, { shotSource: ref.shotSource });
-      const hasManifest = rawManifest !== null;
-      const hasRawImage = await fs
-        .stat(rawImagePath)
-        .then(() => true)
-        .catch(() => false);
-      const hasOutputImage = await fs
-        .stat(outputImagePath)
-        .then(() => true)
-        .catch(() => false);
-      const hasReferencedImage =
-        ref.referencedImagePath === ref.outputImagePath
-          ? hasOutputImage
-          : await fs
-              .stat(referencedImagePath)
-              .then(() => true)
-              .catch(() => false);
-      const bootstrapImagePath = hasOutputImage
-        ? ref.outputImagePath
-        : hasReferencedImage
-          ? ref.referencedImagePath
-          : null;
-
-      shots.push({
-        ...ref,
-        rawImagePath: manifest.rawImagePath,
-        manifest,
-        warnings,
-        hasManifest,
-        hasRawImage,
-        hasOutputImage: hasOutputImage || hasReferencedImage,
-        bootstrapImagePath,
-      });
-    }
+    const pageRevision = hashTutorialShotText(sourceText);
+    pages.set(relativePath, { absolutePath: filePath, pageRevision, sourceText });
+    refs.push(...extractTutorialShotSourceRefs({ pagePath: relativePath, sourceText }));
   }
 
-  return shots.sort((left, right) => {
+  refs.sort((left, right) => {
     if (left.pagePath !== right.pagePath) {
       return left.pagePath.localeCompare(right.pagePath);
     }
-    return left.line - right.line;
+    return left.tagStart - right.tagStart;
   });
+
+  const artifactPathsByReferenceKey = new Map();
+  for (const ref of refs) {
+    const defaultArtifactPaths = getTutorialShotArtifactPaths(ref);
+    const manifestAbsolutePath = resolveSourcePath({
+      sourceRoot,
+      contentRelativePath: defaultArtifactPaths.manifestPath,
+      validator: isTutorialShotManifestPath,
+    });
+    const rawManifest = await readJsonIfExists(manifestAbsolutePath);
+    const manifest = hydrateManifest(
+      rawManifest
+        ? {
+            ...rawManifest,
+            pagePath: ref.pagePath,
+            outputImagePath: defaultArtifactPaths.outputImagePath,
+          }
+        : createDefaultTutorialShotManifest({
+            pagePath: ref.pagePath,
+            outputImagePath: defaultArtifactPaths.outputImagePath,
+          }),
+    );
+    artifactPathsByReferenceKey.set(
+      ref.referenceKey,
+      getTutorialShotArtifactPaths({ ...ref, rawImagePath: manifest.rawImagePath }),
+    );
+  }
+
+  return {
+    allFiles,
+    artifactPathsByReferenceKey,
+    pages,
+    refs,
+  };
+};
+
+export const scanTutorialShots = async ({ sourceRoot }) => {
+  const sourceState = await scanTutorialShotSourceState({ sourceRoot });
+  const shots = [];
+
+  for (const ref of sourceState.refs) {
+    const manifestPath = resolveSourcePath({
+      sourceRoot,
+      contentRelativePath: ref.manifestPath,
+      validator: isTutorialShotManifestPath,
+    });
+    const outputImagePath = resolveSourcePath({
+      sourceRoot,
+      contentRelativePath: ref.outputImagePath,
+      validator: isTutorialShotOutputImagePath,
+    });
+    const referencedImagePath = resolveSourcePath({
+      sourceRoot,
+      contentRelativePath: ref.referencedImagePath,
+      validator: isTutorialShotReadableImagePath,
+    });
+
+    const rawManifest = await readJsonIfExists(manifestPath);
+    const manifest = hydrateManifest(
+      rawManifest
+        ? {
+            ...rawManifest,
+            pagePath: ref.pagePath,
+            outputImagePath: ref.outputImagePath,
+          }
+        : createDefaultTutorialShotManifest({
+            pagePath: ref.pagePath,
+            outputImagePath: ref.outputImagePath,
+          }),
+    );
+    const rawImagePath = resolveSourcePath({
+      sourceRoot,
+      contentRelativePath: manifest.rawImagePath,
+      validator: (contentPath) =>
+        isExpectedTutorialShotRawImagePath({
+          pagePath: manifest.pagePath,
+          outputImagePath: manifest.outputImagePath,
+          rawImagePath: contentPath,
+        }),
+    });
+
+    const warnings = getTutorialShotWarnings(manifest, { shotSource: ref.shotSource });
+    const hasManifest = rawManifest !== null;
+    const hasRawImage = await fs
+      .stat(rawImagePath)
+      .then(() => true)
+      .catch(() => false);
+    const hasOutputImage = await fs
+      .stat(outputImagePath)
+      .then(() => true)
+      .catch(() => false);
+    const hasReferencedImage =
+      ref.referencedImagePath === ref.outputImagePath
+        ? hasOutputImage
+        : await fs
+            .stat(referencedImagePath)
+            .then(() => true)
+            .catch(() => false);
+    const bootstrapImagePath = hasOutputImage
+      ? ref.outputImagePath
+      : hasReferencedImage
+        ? ref.referencedImagePath
+        : null;
+
+    shots.push({
+      ...ref,
+      rawImagePath: manifest.rawImagePath,
+      manifest,
+      warnings,
+      hasManifest,
+      hasRawImage,
+      hasOutputImage: hasOutputImage || hasReferencedImage,
+      bootstrapImagePath,
+    });
+  }
+
+  return shots;
+};
+
+const SOURCE_REFERENCE_CONFLICT_MESSAGE =
+  "教材が更新されています。一覧を再読み込みしてから、もう一度保存してください。";
+
+export class TutorialShotConflictError extends Error {
+  constructor(message = SOURCE_REFERENCE_CONFLICT_MESSAGE) {
+    super(message);
+    this.name = "TutorialShotConflictError";
+    this.statusCode = 409;
+  }
+}
+
+const throwTutorialShotConflict = () => {
+  throw new TutorialShotConflictError();
+};
+
+const validateTutorialShotSourceRef = ({ sourceState, sourceRef }) => {
+  if (!sourceRef || typeof sourceRef !== "object") {
+    throwTutorialShotConflict();
+  }
+
+  const pagePath = normalizePosixPath(sourceRef.pagePath ?? "");
+  if (pagePath !== sourceRef.pagePath || !PAGE_PATH_PATTERN.test(pagePath)) {
+    throwTutorialShotConflict();
+  }
+  if (sourceRef.tagName !== "Action" && sourceRef.tagName !== "Verify") {
+    throwTutorialShotConflict();
+  }
+  for (const field of ["tagStart", "tagEnd", "imgValueStart", "imgValueEnd"]) {
+    if (!Number.isSafeInteger(sourceRef[field])) {
+      throwTutorialShotConflict();
+    }
+  }
+  if (
+    typeof sourceRef.expectedImg !== "string" ||
+    typeof sourceRef.pageRevision !== "string" ||
+    typeof sourceRef.referenceKey !== "string"
+  ) {
+    throwTutorialShotConflict();
+  }
+
+  const page = sourceState.pages.get(pagePath);
+  if (!page || page.pageRevision !== sourceRef.pageRevision) {
+    throwTutorialShotConflict();
+  }
+  if (
+    sourceRef.tagStart < 0 ||
+    sourceRef.tagEnd <= sourceRef.tagStart ||
+    sourceRef.tagEnd > page.sourceText.length ||
+    sourceRef.imgValueStart < sourceRef.tagStart ||
+    sourceRef.imgValueEnd < sourceRef.imgValueStart ||
+    sourceRef.imgValueEnd > sourceRef.tagEnd ||
+    page.sourceText.slice(sourceRef.imgValueStart, sourceRef.imgValueEnd) !== sourceRef.expectedImg
+  ) {
+    throwTutorialShotConflict();
+  }
+
+  const expectedReferenceKey = createTutorialShotReferenceKey(sourceRef);
+  if (expectedReferenceKey !== sourceRef.referenceKey) {
+    throwTutorialShotConflict();
+  }
+
+  const currentRef = sourceState.refs.find(
+    (ref) =>
+      ref.pagePath === pagePath &&
+      ref.tagName === sourceRef.tagName &&
+      ref.tagStart === sourceRef.tagStart &&
+      ref.tagEnd === sourceRef.tagEnd &&
+      ref.imgValueStart === sourceRef.imgValueStart &&
+      ref.imgValueEnd === sourceRef.imgValueEnd &&
+      ref.expectedImg === sourceRef.expectedImg &&
+      ref.pageRevision === sourceRef.pageRevision &&
+      ref.referenceKey === sourceRef.referenceKey,
+  );
+  if (!currentRef) {
+    throwTutorialShotConflict();
+  }
+
+  return { currentRef, page };
+};
+
+const assertTutorialShotSourceStateUnchanged = async ({ sourceRoot, sourceState }) => {
+  const currentState = await scanTutorialShotSourceState({ sourceRoot });
+  if (currentState.pages.size !== sourceState.pages.size) {
+    throwTutorialShotConflict();
+  }
+
+  for (const [pagePath, page] of sourceState.pages) {
+    if (currentState.pages.get(pagePath)?.pageRevision !== page.pageRevision) {
+      throwTutorialShotConflict();
+    }
+  }
+};
+
+const resolveExistingFile = async (filePath, fileOps = fs) => {
+  try {
+    const stats = await fileOps.stat(filePath);
+    return stats.isFile();
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+};
+
+const allocateBranchedTutorialShotPaths = ({ sourceRoot, sourceState, manifest }) => {
+  const outputExtension = path.posix.extname(manifest.outputImagePath);
+  const outputStem = manifest.outputImagePath.slice(0, -outputExtension.length);
+  const rawExtension = getTutorialShotFileExtension(manifest.rawImagePath);
+  const existingArtifactIdentities = new Set(
+    sourceState.allFiles.map((absolutePath) =>
+      getFileSystemPathIdentity({ sourceRoot, absolutePath }),
+    ),
+  );
+  for (const artifactPaths of sourceState.artifactPathsByReferenceKey.values()) {
+    for (const contentRelativePath of Object.values(artifactPaths)) {
+      existingArtifactIdentities.add(
+        getTutorialShotArtifactIdentity({ sourceRoot, contentRelativePath }),
+      );
+    }
+  }
+
+  for (let attempt = 0; attempt < 128; attempt += 1) {
+    const suffix = randomBytes(3).toString("hex");
+    const outputImagePath = `${outputStem}--${suffix}${outputExtension}`;
+    const derived = deriveTutorialShotPaths({
+      pagePath: manifest.pagePath,
+      outputImagePath,
+      rawImageExtension: rawExtension,
+    });
+    const rawStem = derived.rawImagePath.slice(
+      0,
+      derived.rawImagePath.length - getTutorialShotFileExtension(derived.rawImagePath).length,
+    );
+    const candidatePaths = [
+      derived.outputImagePath,
+      derived.manifestPath,
+      ...TUTORIAL_SHOT_RAW_IMAGE_EXTENSIONS.map((extension) => `${rawStem}${extension}`),
+    ];
+    const collides = candidatePaths.some((contentRelativePath) =>
+      existingArtifactIdentities.has(
+        getTutorialShotArtifactIdentity({ sourceRoot, contentRelativePath }),
+      ),
+    );
+    if (!collides) {
+      return derived;
+    }
+  }
+
+  throw new Error("重複しないチュートリアル画像パスを作成できませんでした。");
+};
+
+const replaceTutorialShotSourceRef = ({ sourceText, sourceRef, nextImg }) => {
+  if (sourceText.slice(sourceRef.imgValueStart, sourceRef.imgValueEnd) !== sourceRef.expectedImg) {
+    throwTutorialShotConflict();
+  }
+  return `${sourceText.slice(0, sourceRef.imgValueStart)}${nextImg}${sourceText.slice(
+    sourceRef.imgValueEnd,
+  )}`;
+};
+
+const createTutorialShotFileOperationError = ({ action, filePath, error }) =>
+  new Error(`${action}: ${filePath}: ${error instanceof Error ? error.message : String(error)}`, {
+    cause: error,
+  });
+
+export const commitTutorialShotFiles = async (entries, { fileOps = fs } = {}) => {
+  const transactionId = randomUUID();
+  const staged = entries.map((entry, index) => ({
+    ...entry,
+    backupPath: `${entry.targetPath}.${transactionId}.${index}.bak`,
+    backupCreated: false,
+    hadTarget: false,
+    installed: false,
+    restored: false,
+    temporaryPath: `${entry.targetPath}.${transactionId}.${index}.tmp`,
+    temporaryWritten: false,
+  }));
+
+  try {
+    for (const entry of staged) {
+      await ensureParentDir(entry.targetPath, fileOps);
+      entry.temporaryWritten = true;
+      await fileOps.writeFile(entry.temporaryPath, entry.data);
+    }
+    for (const entry of staged) {
+      entry.hadTarget = await resolveExistingFile(entry.targetPath, fileOps);
+      if (entry.hadTarget) {
+        await fileOps.rename(entry.targetPath, entry.backupPath);
+        entry.backupCreated = true;
+      }
+      await fileOps.rename(entry.temporaryPath, entry.targetPath);
+      entry.temporaryWritten = false;
+      entry.installed = true;
+    }
+  } catch (operationError) {
+    const rollbackErrors = [];
+    for (const entry of [...staged].reverse()) {
+      if (entry.installed) {
+        try {
+          await fileOps.rm(entry.targetPath, { force: true });
+          entry.installed = false;
+        } catch (rollbackError) {
+          rollbackErrors.push(
+            createTutorialShotFileOperationError({
+              action: "設置済みファイルをロールバックできませんでした",
+              filePath: entry.targetPath,
+              error: rollbackError,
+            }),
+          );
+        }
+      }
+      if (entry.backupCreated) {
+        try {
+          await fileOps.rename(entry.backupPath, entry.targetPath);
+          entry.backupCreated = false;
+          entry.restored = true;
+        } catch (rollbackError) {
+          rollbackErrors.push(
+            createTutorialShotFileOperationError({
+              action: "バックアップを復元できませんでした。手動復旧用バックアップを保持します",
+              filePath: entry.backupPath,
+              error: rollbackError,
+            }),
+          );
+        }
+      }
+    }
+
+    const cleanupErrors = [];
+    for (const entry of staged) {
+      if (entry.temporaryWritten) {
+        try {
+          await fileOps.rm(entry.temporaryPath, { force: true });
+          entry.temporaryWritten = false;
+        } catch (cleanupError) {
+          cleanupErrors.push(
+            createTutorialShotFileOperationError({
+              action: "ロールバック後の一時ファイルを削除できませんでした",
+              filePath: entry.temporaryPath,
+              error: cleanupError,
+            }),
+          );
+        }
+      }
+      if (entry.restored) {
+        try {
+          await fileOps.rm(entry.backupPath, { force: true });
+        } catch (cleanupError) {
+          cleanupErrors.push(
+            createTutorialShotFileOperationError({
+              action: "復元済みバックアップを削除できませんでした",
+              filePath: entry.backupPath,
+              error: cleanupError,
+            }),
+          );
+        }
+      }
+    }
+
+    if (rollbackErrors.length > 0 || cleanupErrors.length > 0) {
+      throw new AggregateError(
+        [operationError, ...rollbackErrors, ...cleanupErrors],
+        "チュートリアル画像の保存に失敗し、元のファイル状態を完全には復元できませんでした。",
+      );
+    }
+    throw operationError;
+  }
+
+  const cleanupWarnings = [];
+  for (const entry of staged) {
+    const cleanupPaths = [];
+    if (entry.temporaryWritten) {
+      cleanupPaths.push({ kind: "一時ファイル", path: entry.temporaryPath });
+    }
+    if (entry.backupCreated) {
+      cleanupPaths.push({ kind: "バックアップ", path: entry.backupPath });
+    }
+    for (const cleanup of cleanupPaths) {
+      try {
+        await fileOps.rm(cleanup.path, { force: true });
+        if (cleanup.path === entry.temporaryPath) {
+          entry.temporaryWritten = false;
+        } else {
+          entry.backupCreated = false;
+        }
+      } catch (cleanupError) {
+        cleanupWarnings.push(
+          `保存は完了しましたが、${cleanup.kind}を削除できませんでした: ${cleanup.path}: ${
+            cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          }`,
+        );
+      }
+    }
+  }
+
+  return { cleanupWarnings };
 };
 
 export const saveTutorialShot = async ({
   sourceRoot,
+  sourceRef,
   manifestInput,
   rawImageDataUrl = null,
   rawImageFileName = null,
   bootstrapFromOutput = false,
   bootstrapImagePath = null,
+  fileOps = fs,
 }) => {
+  const sourceState = await scanTutorialShotSourceState({ sourceRoot });
+  const { currentRef, page } = validateTutorialShotSourceRef({ sourceState, sourceRef });
   let manifest = prepareManifestForSave(manifestInput);
   const annotationErrors = getTutorialShotAnnotationErrors(
     manifest.annotations,
@@ -637,13 +1061,156 @@ export const saveTutorialShot = async ({
   if (!PAGE_PATH_PATTERN.test(manifest.pagePath)) {
     throw new Error(`不正なチュートリアル画像ページパスです: ${manifest.pagePath}`);
   }
+  const referencedPaths = deriveTutorialShotPaths({
+    pagePath: currentRef.pagePath,
+    outputImagePath: currentRef.referencedImagePath,
+    rawImageExtension: getTutorialShotFileExtension(currentRef.referencedImagePath),
+  });
+  if (
+    manifest.pagePath !== currentRef.pagePath ||
+    manifest.outputImagePath !== referencedPaths.outputImagePath
+  ) {
+    throwTutorialShotConflict();
+  }
+
+  const originalManifest = manifest;
+  const currentArtifactPaths = getTutorialShotArtifactPaths(manifest);
+  const shouldBranch = sourceState.refs.some((ref) =>
+    ref.referenceKey === currentRef.referenceKey
+      ? false
+      : tutorialShotArtifactPathsShareArtifacts({
+          sourceRoot,
+          leftPaths: currentArtifactPaths,
+          rightPaths:
+            sourceState.artifactPathsByReferenceKey.get(ref.referenceKey) ??
+            getTutorialShotArtifactPaths(ref),
+        }),
+  );
+  if (shouldBranch) {
+    const branchedPaths = allocateBranchedTutorialShotPaths({
+      sourceRoot,
+      sourceState,
+      manifest,
+    });
+    manifest = {
+      ...manifest,
+      id: branchedPaths.id,
+      outputImagePath: branchedPaths.outputImagePath,
+      rawImagePath: branchedPaths.rawImagePath,
+    };
+  }
+
+  const originalRawAbsPath = resolveSourcePath({
+    sourceRoot,
+    contentRelativePath: originalManifest.rawImagePath,
+    validator: (contentPath) =>
+      isExpectedTutorialShotRawImagePath({
+        pagePath: originalManifest.pagePath,
+        outputImagePath: originalManifest.outputImagePath,
+        rawImagePath: contentPath,
+      }),
+  });
+  const originalRawExists = await resolveExistingFile(originalRawAbsPath);
+  let rawBuffer = null;
+  let shouldWriteRawImage = false;
+
+  if (rawImageDataUrl) {
+    const { buffer, mimeType } = parseDataUrl(rawImageDataUrl);
+    const metadata = await validateUploadedRawImageBuffer({ buffer });
+    const rawExtension = getRawUploadExtensionForMetadata({
+      metadataFormat: metadata.format,
+      mimeType,
+      rawImageFileName,
+      manifestRawImagePath: manifest.rawImagePath,
+    });
+    manifest = {
+      ...manifest,
+      rawImagePath: deriveTutorialShotRawImagePath({
+        pagePath: manifest.pagePath,
+        outputImagePath: manifest.outputImagePath,
+        fallbackExtension: rawExtension,
+      }),
+    };
+    rawBuffer = buffer;
+    shouldWriteRawImage = true;
+  } else if (originalRawExists) {
+    rawBuffer = await fs.readFile(originalRawAbsPath);
+    if (shouldBranch) {
+      manifest = {
+        ...manifest,
+        rawImagePath: deriveTutorialShotRawImagePath({
+          pagePath: manifest.pagePath,
+          outputImagePath: manifest.outputImagePath,
+          fallbackExtension: getTutorialShotFileExtension(originalManifest.rawImagePath),
+        }),
+      };
+      shouldWriteRawImage = true;
+    }
+  } else if (shouldBranch || bootstrapFromOutput) {
+    const requestedBootstrapPath =
+      typeof bootstrapImagePath === "string" && bootstrapImagePath.trim()
+        ? normalizeDecodedPosixPath(bootstrapImagePath)
+        : null;
+    const bootstrapCandidates = shouldBranch
+      ? [currentRef.referencedImagePath, originalManifest.outputImagePath, requestedBootstrapPath]
+      : [requestedBootstrapPath, originalManifest.outputImagePath];
+    const legacyExtension = getTutorialShotFileExtension(originalManifest.rawImagePath);
+    if (!requestedBootstrapPath && legacyExtension) {
+      bootstrapCandidates.push(
+        replaceTutorialShotPathExtension(originalManifest.outputImagePath, legacyExtension),
+      );
+    }
+
+    let resolvedBootstrap = null;
+    for (const candidate of [...new Set(bootstrapCandidates.filter(Boolean))]) {
+      const candidateAbsPath = resolveSourcePath({
+        sourceRoot,
+        contentRelativePath: candidate,
+        validator: isTutorialShotReadableImagePath,
+      });
+      if (!shouldBranch) {
+        const candidatePaths = deriveTutorialShotPaths({
+          pagePath: originalManifest.pagePath,
+          outputImagePath: candidate,
+        });
+        if (candidatePaths.id !== originalManifest.id) {
+          throw new Error("現在の出力画像と保存対象のショットが一致しません。");
+        }
+      }
+      if (await resolveExistingFile(candidateAbsPath)) {
+        resolvedBootstrap = { absolutePath: candidateAbsPath, contentPath: candidate };
+        break;
+      }
+    }
+    if (!resolvedBootstrap) {
+      throw new Error(
+        "現在の出力画像が無いため、そこから元画像を初期作成できません。先に元画像をアップロードしてください。",
+      );
+    }
+    manifest = {
+      ...manifest,
+      rawImagePath: deriveTutorialShotRawImagePath({
+        pagePath: manifest.pagePath,
+        outputImagePath: manifest.outputImagePath,
+        fallbackExtension: getTutorialShotFileExtension(resolvedBootstrap.contentPath),
+      }),
+    };
+    rawBuffer = await fs.readFile(resolvedBootstrap.absolutePath);
+    shouldWriteRawImage = true;
+  }
+
+  if (!rawBuffer) {
+    throw new Error(
+      "元画像がまだ無いため、この Action 画像は保存できません。先に元画像をアップロードしてください。",
+    );
+  }
 
   const outputAbsPath = resolveSourcePath({
     sourceRoot,
     contentRelativePath: manifest.outputImagePath,
     validator: isTutorialShotOutputImagePath,
   });
-  let rawAbsPath = resolveSourcePath({
+  const rawAbsPath = resolveSourcePath({
     sourceRoot,
     contentRelativePath: manifest.rawImagePath,
     validator: (contentPath) =>
@@ -667,124 +1234,6 @@ export const saveTutorialShot = async ({
     contentRelativePath: manifest.pagePath,
     validator: PAGE_PATH_PATTERN,
   });
-
-  if (rawImageDataUrl) {
-    const { buffer, mimeType } = parseDataUrl(rawImageDataUrl);
-    const metadata = await validateUploadedRawImageBuffer({ buffer });
-    const rawExtension = getRawUploadExtensionForMetadata({
-      metadataFormat: metadata.format,
-      mimeType,
-      rawImageFileName,
-      manifestRawImagePath: manifest.rawImagePath,
-    });
-    manifest = {
-      ...manifest,
-      rawImagePath: deriveTutorialShotRawImagePath({
-        pagePath: manifest.pagePath,
-        outputImagePath: manifest.outputImagePath,
-        fallbackExtension: rawExtension,
-      }),
-    };
-    rawAbsPath = resolveSourcePath({
-      sourceRoot,
-      contentRelativePath: manifest.rawImagePath,
-      validator: (contentPath) =>
-        isExpectedTutorialShotRawImagePath({
-          pagePath: manifest.pagePath,
-          outputImagePath: manifest.outputImagePath,
-          rawImagePath: contentPath,
-        }),
-    });
-    await ensureParentDir(rawAbsPath);
-    await fs.writeFile(rawAbsPath, buffer);
-  } else if (bootstrapFromOutput) {
-    let bootstrapContentPath = normalizeDecodedPosixPath(
-      typeof bootstrapImagePath === "string" && bootstrapImagePath.trim()
-        ? bootstrapImagePath
-        : manifest.outputImagePath,
-    );
-    let bootstrapDerivedPaths = deriveTutorialShotPaths({
-      pagePath: manifest.pagePath,
-      outputImagePath: bootstrapContentPath,
-    });
-    if (bootstrapDerivedPaths.id !== manifest.id) {
-      throw new Error("現在の出力画像と保存対象のショットが一致しません。");
-    }
-    let bootstrapAbsPath = resolveSourcePath({
-      sourceRoot,
-      contentRelativePath: bootstrapContentPath,
-      validator: isTutorialShotReadableImagePath,
-    });
-    let bootstrapImageExists = await fs
-      .stat(bootstrapAbsPath)
-      .then(() => true)
-      .catch(() => false);
-    if (
-      !bootstrapImageExists &&
-      !(typeof bootstrapImagePath === "string" && bootstrapImagePath.trim())
-    ) {
-      const legacyExtension = getTutorialShotFileExtension(manifest.rawImagePath);
-      const legacyContentPath = legacyExtension
-        ? replaceTutorialShotPathExtension(manifest.outputImagePath, legacyExtension)
-        : manifest.outputImagePath;
-      if (legacyContentPath !== manifest.outputImagePath) {
-        bootstrapContentPath = legacyContentPath;
-        bootstrapDerivedPaths = deriveTutorialShotPaths({
-          pagePath: manifest.pagePath,
-          outputImagePath: bootstrapContentPath,
-        });
-        if (bootstrapDerivedPaths.id !== manifest.id) {
-          throw new Error("現在の出力画像と保存対象のショットが一致しません。");
-        }
-        bootstrapAbsPath = resolveSourcePath({
-          sourceRoot,
-          contentRelativePath: bootstrapContentPath,
-          validator: isTutorialShotReadableImagePath,
-        });
-        bootstrapImageExists = await fs
-          .stat(bootstrapAbsPath)
-          .then(() => true)
-          .catch(() => false);
-      }
-    }
-    manifest = {
-      ...manifest,
-      rawImagePath: deriveTutorialShotRawImagePath({
-        pagePath: manifest.pagePath,
-        outputImagePath: manifest.outputImagePath,
-        fallbackExtension: getTutorialShotFileExtension(bootstrapContentPath),
-      }),
-    };
-    rawAbsPath = resolveSourcePath({
-      sourceRoot,
-      contentRelativePath: manifest.rawImagePath,
-      validator: (contentPath) =>
-        isExpectedTutorialShotRawImagePath({
-          pagePath: manifest.pagePath,
-          outputImagePath: manifest.outputImagePath,
-          rawImagePath: contentPath,
-        }),
-    });
-    if (!bootstrapImageExists) {
-      throw new Error(
-        "現在の出力画像が無いため、そこから元画像を初期作成できません。先に元画像をアップロードしてください。",
-      );
-    }
-    await ensureParentDir(rawAbsPath);
-    await fs.copyFile(bootstrapAbsPath, rawAbsPath);
-  }
-
-  const rawExists = await fs
-    .stat(rawAbsPath)
-    .then(() => true)
-    .catch(() => false);
-  if (!rawExists) {
-    throw new Error(
-      "元画像がまだ無いため、この Action 画像は保存できません。先に元画像をアップロードしてください。",
-    );
-  }
-
-  const rawBuffer = await fs.readFile(rawAbsPath);
   const outputFormat = getTutorialShotGeneratedImageFormat(manifest.outputImagePath);
   const rawImageContext = await getRawImageProcessingContext({ rawBuffer });
   const { image: rawImage, metadata } = rawImageContext;
@@ -817,14 +1266,13 @@ export const saveTutorialShot = async ({
     offsetY: outputLayout.imageY,
   });
 
-  await ensureParentDir(outputAbsPath);
+  let outputBuffer;
   if (animatedOutputPlan) {
-    await writeAnimatedWebpTutorialShotImage({
+    outputBuffer = await renderAnimatedWebpTutorialShotImage({
       rawBuffer,
       crop,
       outputLayout,
       overlaySvg,
-      outputAbsPath,
       animatedOutputPlan,
     });
   } else {
@@ -858,9 +1306,9 @@ export const saveTutorialShot = async ({
       },
       { input: Buffer.from(overlaySvg, "utf8") },
     ]);
-    await writeGeneratedTutorialShotImage({
+    outputBuffer = await renderGeneratedTutorialShotImage({
       image: generatedImage,
-      outputAbsPath,
+      outputImagePath: manifest.outputImagePath,
       outputFormat,
     });
   }
@@ -870,20 +1318,58 @@ export const saveTutorialShot = async ({
     crop,
   };
 
-  await ensureParentDir(manifestAbsPath);
-  await fs.writeFile(manifestAbsPath, `${JSON.stringify(savedManifest, null, 2)}\n`, "utf8");
-
-  const pageSourceText = await fs.readFile(pageAbsPath, "utf8");
-  await rewritePageSourceForDevRefresh({
-    pageAbsPath,
+  const pageRelativeOutputImagePath = getTutorialShotPageRelativeOutputImagePath({
     pagePath: manifest.pagePath,
-    sourceText: pageSourceText,
     outputImagePath: manifest.outputImagePath,
   });
+  const nextPageSourceText = replaceTutorialShotSourceRef({
+    sourceText: page.sourceText,
+    sourceRef,
+    nextImg: pageRelativeOutputImagePath,
+  });
+  const nextSourceRef = extractTutorialShotSourceRefs({
+    pagePath: manifest.pagePath,
+    sourceText: nextPageSourceText,
+  }).find(
+    (ref) =>
+      ref.tagName === sourceRef.tagName &&
+      ref.tagStart === sourceRef.tagStart &&
+      ref.expectedImg === pageRelativeOutputImagePath,
+  );
+  if (!nextSourceRef) {
+    throw new Error("保存後のチュートリアル画像参照を特定できませんでした。");
+  }
+
+  await assertTutorialShotSourceStateUnchanged({ sourceRoot, sourceState });
+  const fileEntries = [
+    {
+      targetPath: outputAbsPath,
+      data: outputBuffer,
+    },
+    {
+      targetPath: manifestAbsPath,
+      data: `${JSON.stringify(savedManifest, null, 2)}\n`,
+    },
+    {
+      targetPath: pageAbsPath,
+      data: nextPageSourceText,
+    },
+  ];
+  if (shouldWriteRawImage) {
+    fileEntries.unshift({
+      targetPath: rawAbsPath,
+      data: rawBuffer,
+    });
+  }
+  const { cleanupWarnings } = await commitTutorialShotFiles(fileEntries, { fileOps });
 
   return {
     manifest: savedManifest,
-    warnings: getTutorialShotWarnings(savedManifest),
+    sourceRef: nextSourceRef,
+    warnings: [
+      ...getTutorialShotWarnings(savedManifest, { shotSource: currentRef.shotSource }),
+      ...cleanupWarnings,
+    ],
   };
 };
 

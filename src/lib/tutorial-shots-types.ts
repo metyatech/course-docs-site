@@ -21,9 +21,7 @@ export type TutorialShotArrowAnnotation = {
 
 export type TutorialShotAnnotationMode = "focal" | "multi-focal" | "callout";
 
-export type TutorialShotAnnotation =
-  | TutorialShotBoxAnnotation
-  | TutorialShotArrowAnnotation;
+export type TutorialShotAnnotation = TutorialShotBoxAnnotation | TutorialShotArrowAnnotation;
 
 export type TutorialShotCrop = {
   x: number;
@@ -48,10 +46,21 @@ export type TutorialShotManifest = {
 /** Which MDX component this shot image is referenced from. */
 export type TutorialShotSource = "action" | "verify";
 
-export type TutorialShotItem = {
+export type TutorialShotSourceRef = {
+  pagePath: string;
+  tagName: "Action" | "Verify";
+  tagStart: number;
+  tagEnd: number;
+  imgValueStart: number;
+  imgValueEnd: number;
+  expectedImg: string;
+  pageRevision: string;
+  referenceKey: string;
+};
+
+export type TutorialShotItem = TutorialShotSourceRef & {
   id: string;
   line: number;
-  pagePath: string;
   sourceImagePath: string;
   referencedImagePath: string;
   outputImagePath: string;

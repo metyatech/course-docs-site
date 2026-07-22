@@ -28,6 +28,7 @@ import type {
   TutorialShotManifest,
   TutorialShotItem,
   TutorialShotResponse,
+  TutorialShotSourceRef,
 } from "../../../lib/tutorial-shots-types";
 import styles from "./tutorial-shot-editor.module.css";
 
@@ -79,6 +80,18 @@ const getReadableImageName = (file: File, fallbackFileName: string) => {
 
 const getUnsupportedSourceImageMessage = (file: File) =>
   `${getReadableImageName(file, "選択したファイル")} は読み込めません。読み込める画像は ${TUTORIAL_SHOT_SOURCE_IMAGE_FORMAT_LABEL} です。`;
+
+const getTutorialShotSourceRef = (shot: TutorialShotItem): TutorialShotSourceRef => ({
+  pagePath: shot.pagePath,
+  tagName: shot.tagName,
+  tagStart: shot.tagStart,
+  tagEnd: shot.tagEnd,
+  imgValueStart: shot.imgValueStart,
+  imgValueEnd: shot.imgValueEnd,
+  expectedImg: shot.expectedImg,
+  pageRevision: shot.pageRevision,
+  referenceKey: shot.referenceKey,
+});
 
 const hasFileTransfer = (dataTransfer: DataTransfer | null) =>
   Boolean(dataTransfer?.files.length) ||
@@ -344,7 +357,7 @@ export default function TutorialShotEditor() {
 
   const shots = useMemo(() => (response && response.enabled ? response.shots : []), [response]);
   const selectedShot = useMemo(
-    () => shots.find((shot) => shot.outputImagePath === selectedKey) ?? null,
+    () => shots.find((shot) => shot.referenceKey === selectedKey) ?? null,
     [selectedKey, shots],
   );
   const warnings = useMemo(
@@ -422,9 +435,9 @@ export default function TutorialShotEditor() {
       setResponse(data);
       if (data.enabled && data.shots.length > 0) {
         setSelectedKey((current) =>
-          data.shots.some((shot) => shot.outputImagePath === current)
+          data.shots.some((shot) => shot.referenceKey === current)
             ? current
-            : data.shots[0].outputImagePath,
+            : data.shots[0].referenceKey,
         );
         return;
       }
@@ -471,7 +484,7 @@ export default function TutorialShotEditor() {
 
     const storedCropState = getStoredTutorialShotCropState({
       currentCropStates: cropStatesByShotRef.current,
-      shotKey: selectedShot.outputImagePath,
+      shotKey: selectedShot.referenceKey,
     }) as TutorialShotEditorStoredCropState | null;
     // When loading a Verify shot, automatically fix any legacy role="action" boxes
     // to role="verify". This handles .shot.json files that were created before the
@@ -510,12 +523,12 @@ export default function TutorialShotEditor() {
     setSourceImageElement(null);
     setCrop(storedCropState?.crop ?? undefined);
     setCompletedCrop(storedCropState?.completedCrop ?? null);
-    setCropOwnerKey(selectedShot.outputImagePath);
+    setCropOwnerKey(selectedShot.referenceKey);
     setCroppedPreviewSrc(null);
   }, [selectedShot, sourceImageRevision, sourceOverride]);
 
   useEffect(() => {
-    const activeShotKey = selectedShot?.outputImagePath ?? null;
+    const activeShotKey = selectedShot?.referenceKey ?? null;
     if (!activeShotKey || cropOwnerKey !== activeShotKey || (!crop && !completedCrop)) {
       return;
     }
@@ -662,7 +675,7 @@ export default function TutorialShotEditor() {
   };
 
   const save = async () => {
-    if (!draftManifest) {
+    if (!draftManifest || !selectedShot) {
       return;
     }
     if (hasAnnotationSurface && annotationErrors.length > 0) {
@@ -672,57 +685,79 @@ export default function TutorialShotEditor() {
 
     setIsSaving(true);
     setStatusText("保存しています…");
+    try {
+      const manifestToSave = normalizeTutorialShotManifest({
+        ...draftManifest,
+        crop: completedCrop
+          ? {
+              x: completedCrop.x,
+              y: completedCrop.y,
+              width: completedCrop.width,
+              height: completedCrop.height,
+            }
+          : null,
+      }) as TutorialShotManifest;
 
-    const manifestToSave = normalizeTutorialShotManifest({
-      ...draftManifest,
-      crop: completedCrop
-        ? {
-            x: completedCrop.x,
-            y: completedCrop.y,
-            width: completedCrop.width,
-            height: completedCrop.height,
-          }
-        : null,
-    }) as TutorialShotManifest;
+      const saveResponse = await fetch("/api/dev/tutorial-shots/save", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          manifest: manifestToSave,
+          sourceRef: getTutorialShotSourceRef(selectedShot),
+          rawImageDataUrl: pendingRawDataUrl,
+          rawImageFileName: pendingRawFileName,
+          bootstrapFromOutput: bootstrapFromOutput && !pendingRawDataUrl,
+          bootstrapImagePath:
+            bootstrapFromOutput && !pendingRawDataUrl ? selectedShot.bootstrapImagePath : null,
+          source: sourceOverride,
+        }),
+      });
 
-    const saveResponse = await fetch("/api/dev/tutorial-shots/save", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        manifest: manifestToSave,
-        rawImageDataUrl: pendingRawDataUrl,
-        rawImageFileName: pendingRawFileName,
-        bootstrapFromOutput: bootstrapFromOutput && !pendingRawDataUrl,
-        bootstrapImagePath:
-          bootstrapFromOutput && !pendingRawDataUrl ? selectedShot?.bootstrapImagePath : null,
-        source: sourceOverride,
-      }),
-    });
+      const saveData = await saveResponse.json();
+      if (!saveResponse.ok) {
+        setStatusText(saveData.error ?? "保存できませんでした。");
+        return;
+      }
 
-    const saveData = await saveResponse.json();
-    if (!saveResponse.ok) {
-      setStatusText(saveData.error ?? "保存できませんでした。");
+      // The saved MDX may now have a different revision and source range.
+      // Drop the stale key before rescanning so it can never be submitted twice.
+      setSelectedKey("");
+      const listResponse = await fetch(buildTutorialShotsListUrl(sourceOverride ?? ""), {
+        cache: "no-store",
+      });
+      const listData = (await listResponse.json()) as TutorialShotResponse;
+      if (!listResponse.ok) {
+        throw new Error(
+          listData.enabled === false ? listData.reason : "保存後の画像一覧を読み込めませんでした。",
+        );
+      }
+      setResponse(listData);
+      const savedReferenceKey =
+        typeof saveData.sourceRef?.referenceKey === "string" ? saveData.sourceRef.referenceKey : "";
+      setSelectedKey(
+        listData.enabled && listData.shots.some((shot) => shot.referenceKey === savedReferenceKey)
+          ? savedReferenceKey
+          : listData.enabled
+            ? (listData.shots[0]?.referenceKey ?? "")
+            : "",
+      );
+      cropStatesByShotRef.current = {};
+      setCropStatesByShot({});
+      setStatusText(
+        saveData.warnings?.length
+          ? `保存しました（確認したいこと ${saveData.warnings.length} 件）`
+          : "保存しました",
+      );
+      setPendingRawDataUrl(null);
+      setPendingRawFileName(null);
+      setSourceImageRevision((value) => value + 1);
+    } catch (error) {
+      setStatusText(error instanceof Error ? error.message : "保存できませんでした。");
+    } finally {
       setIsSaving(false);
-      return;
     }
-
-    setStatusText(
-      saveData.warnings?.length
-        ? `保存しました（確認したいこと ${saveData.warnings.length} 件）`
-        : "保存しました",
-    );
-    setPendingRawDataUrl(null);
-    setPendingRawFileName(null);
-    setSourceImageRevision((value) => value + 1);
-    setIsSaving(false);
-
-    const listResponse = await fetch(buildTutorialShotsListUrl(sourceOverride ?? ""), {
-      cache: "no-store",
-    });
-    const listData = (await listResponse.json()) as TutorialShotResponse;
-    setResponse(listData);
   };
 
   const applySourceOverride = (nextSource: string) => {
@@ -903,7 +938,7 @@ export default function TutorialShotEditor() {
     };
     setCrop(fullCrop);
     setCompletedCrop(fullCrop);
-    setCropOwnerKey(selectedShot?.outputImagePath ?? null);
+    setCropOwnerKey(selectedShot?.referenceKey ?? null);
   };
 
   if (!response) {
@@ -1056,26 +1091,29 @@ export default function TutorialShotEditor() {
           </div>
           <ul className={styles.shotList}>
             {shots.map((shot) => {
-              const isActive = shot.outputImagePath === selectedKey;
+              const isActive = shot.referenceKey === selectedKey;
               const flags = getShotFlags(shot);
               return (
-                <li key={shot.outputImagePath}>
+                <li key={shot.referenceKey}>
                   <button
                     aria-current={isActive ? "true" : undefined}
                     className={`${styles.shotRow} ${isActive ? styles.shotRowActive : ""}`}
                     onClick={() => {
                       setStatusText("");
-                      setSelectedKey(shot.outputImagePath);
+                      setSelectedKey(shot.referenceKey);
                     }}
                     type="button"
                   >
                     <div className={styles.shotRowTitle}>{shot.id}</div>
+                    <div className={styles.shotRowMeta}>
+                      {shot.tagName} ・ {shot.line} 行目
+                    </div>
                     <div className={styles.shotRowMeta}>{shot.pagePath}</div>
                     <div className={styles.shotRowFlags}>
                       {flags.map((flag) => (
                         <span
                           className={`${styles.flag} ${flag.className}`}
-                          key={`${shot.outputImagePath}:${flag.label}`}
+                          key={`${shot.referenceKey}:${flag.label}`}
                           title={flag.title}
                         >
                           {flag.label}
@@ -1249,7 +1287,7 @@ export default function TutorialShotEditor() {
                                   cw > 0 ? sourceImageElement.naturalWidth / cw : 1;
                               }
                               setCrop(toNaturalCrop(nextCrop, cropDisplayScaleRef.current));
-                              setCropOwnerKey(selectedShot.outputImagePath);
+                              setCropOwnerKey(selectedShot.referenceKey);
                             }}
                             onComplete={(nextCrop) => {
                               if (sourceImageElement) {
@@ -1260,7 +1298,7 @@ export default function TutorialShotEditor() {
                               setCompletedCrop(
                                 toNaturalCrop(nextCrop, cropDisplayScaleRef.current),
                               );
-                              setCropOwnerKey(selectedShot.outputImagePath);
+                              setCropOwnerKey(selectedShot.referenceKey);
                             }}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1273,13 +1311,13 @@ export default function TutorialShotEditor() {
                                 cropDisplayScaleRef.current = cw > 0 ? image.naturalWidth / cw : 1;
                                 const nextCropState = getTutorialShotCropStateForImage({
                                   currentCropStates: cropStatesByShotRef.current,
-                                  shotKey: selectedShot.outputImagePath,
+                                  shotKey: selectedShot.referenceKey,
                                   manifestCrop: draftManifest.crop,
                                   imageWidth: image.naturalWidth,
                                   imageHeight: image.naturalHeight,
                                 }) as TutorialShotEditorStoredCropState;
                                 setSourceImageElement(image);
-                                setCropOwnerKey(selectedShot.outputImagePath);
+                                setCropOwnerKey(selectedShot.referenceKey);
                                 setCrop(
                                   nextCropState.crop ?? createInitialCrop(image, draftManifest),
                                 );
