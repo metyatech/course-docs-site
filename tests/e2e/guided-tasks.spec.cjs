@@ -4,6 +4,180 @@ const isJavaScriptCourse = (process.env.COURSE_CONTENT_SOURCE ?? "").includes(
   "javascript-course-docs",
 );
 
+const MIN_BACKGROUND_CONTRAST = 1.1;
+const MIN_BORDER_CONTRAST = 3;
+
+const parseCssColor = (value) => {
+  const match = value.match(/rgba?\(([^)]+)\)/);
+  if (!match) {
+    throw new Error(`Unsupported computed color: ${value}`);
+  }
+
+  const channels = match[1]
+    .trim()
+    .split(/[\s,/]+/)
+    .filter(Boolean)
+    .map(Number);
+  if (channels.length < 3 || channels.some(Number.isNaN)) {
+    throw new Error(`Invalid computed color: ${value}`);
+  }
+
+  return channels.slice(0, 3);
+};
+
+const relativeLuminance = (color) => {
+  const [red, green, blue] = parseCssColor(color).map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+};
+
+const contrastRatio = (foreground, background) => {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  return (
+    (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+    (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+  );
+};
+
+test("guided task boundaries meet contrast requirements in every state", async ({ page }) => {
+  if (!isJavaScriptCourse) {
+    test.skip(true, "guided task assertions apply to the JavaScript course");
+  }
+
+  const response = await page.goto("/docs/basics/conditionals-if-elseif");
+  if (!response) throw new Error("Response is null");
+  expect(response.ok()).toBeTruthy();
+
+  const quickCheck = page.locator(".rensyuBlock.rensyuQuickCheck").first();
+  const exercise = page.locator(".rensyuBlock:not(.rensyuQuickCheck)").first();
+  const surfaces = [
+    ["QuickCheck Hint", quickCheck.locator("details.rensyuHint")],
+    ["QuickCheck Answer", quickCheck.locator("details.rensyuKaitou")],
+    ["Exercise Hint", exercise.locator("details.rensyuHint")],
+    ["Exercise Answer", exercise.locator("details.rensyuKaitou")],
+  ];
+
+  for (const [label, details] of surfaces) {
+    await expect(details, `${label}: guided task surface exists`).toHaveCount(1);
+  }
+
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((currentTheme) => {
+      document.documentElement.classList.toggle("dark", currentTheme === "dark");
+    }, theme);
+
+    for (const [state, open] of [
+      ["closed", false],
+      ["open", true],
+    ]) {
+      for (const [label, details] of surfaces) {
+        await details.evaluate((element, shouldOpen) => {
+          element.open = shouldOpen;
+        }, open);
+
+        const colors = await details.evaluate((element) => {
+          const parseColor = (value) => {
+            const match = value.match(/rgba?\(([^)]+)\)/);
+            if (!match) return null;
+            const values = match[1]
+              .trim()
+              .split(/[\s,/]+/)
+              .filter(Boolean)
+              .map(Number);
+            if (values.length < 3 || values.some(Number.isNaN)) return null;
+            return {
+              red: values[0],
+              green: values[1],
+              blue: values[2],
+              alpha: values.length > 3 ? values[3] : 1,
+            };
+          };
+
+          const blend = (foreground, background) => {
+            const alpha = foreground.alpha + background.alpha * (1 - foreground.alpha);
+            return {
+              red:
+                (foreground.red * foreground.alpha +
+                  background.red * background.alpha * (1 - foreground.alpha)) /
+                alpha,
+              green:
+                (foreground.green * foreground.alpha +
+                  background.green * background.alpha * (1 - foreground.alpha)) /
+                alpha,
+              blue:
+                (foreground.blue * foreground.alpha +
+                  background.blue * background.alpha * (1 - foreground.alpha)) /
+                alpha,
+              alpha,
+            };
+          };
+
+          const toRgb = (color) =>
+            `rgb(${Math.round(color.red)}, ${Math.round(color.green)}, ${Math.round(color.blue)})`;
+
+          const effectiveBackground = (start) => {
+            const layers = [];
+            for (let current = start; current; current = current.parentElement) {
+              const color = parseColor(getComputedStyle(current).backgroundColor);
+              if (color && color.alpha > 0) {
+                layers.push(color);
+                if (color.alpha >= 1) break;
+              }
+            }
+
+            let result = { red: 255, green: 255, blue: 255, alpha: 1 };
+            for (let index = layers.length - 1; index >= 0; index -= 1) {
+              result = blend(layers[index], result);
+            }
+            return result;
+          };
+
+          const styles = getComputedStyle(element);
+          const parentBackground = effectiveBackground(element.parentElement);
+          const elementBackground = effectiveBackground(element);
+          const border = parseColor(styles.borderTopColor);
+          if (!border) {
+            throw new Error(`Unable to parse border color: ${styles.borderTopColor}`);
+          }
+
+          return {
+            backgroundColor: styles.backgroundColor,
+            parentBackgroundColor: toRgb(parentBackground),
+            effectiveBackgroundColor: toRgb(elementBackground),
+            borderColor: styles.borderTopColor,
+            effectiveBorderColor: toRgb(blend(border, parentBackground)),
+          };
+        });
+
+        const backgroundContrast = contrastRatio(
+          colors.effectiveBackgroundColor,
+          colors.parentBackgroundColor,
+        );
+        const borderContrast = contrastRatio(
+          colors.effectiveBorderColor,
+          colors.parentBackgroundColor,
+        );
+        const diagnostic = [
+          `${label} ${theme} ${state}`,
+          `backgroundColor=${colors.backgroundColor}`,
+          `parentBackgroundColor=${colors.parentBackgroundColor}`,
+          `borderColor=${colors.borderColor}`,
+          `backgroundContrast=${backgroundContrast.toFixed(2)}`,
+          `borderContrast=${borderContrast.toFixed(2)}`,
+        ].join(" ");
+
+        expect(
+          backgroundContrast >= MIN_BACKGROUND_CONTRAST || borderContrast >= MIN_BORDER_CONTRAST,
+          diagnostic,
+        ).toBeTruthy();
+      }
+    }
+  }
+});
+
 test("conditionals page renders the Answer-only guided task flow", async ({ page }) => {
   if (!isJavaScriptCourse) {
     test.skip(true, "guided task assertions apply to the JavaScript course");
