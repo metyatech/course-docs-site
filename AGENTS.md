@@ -97,6 +97,19 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-autho
 - Prompts, answers, and explanations MUST stand alone without referring to
   "this material", "the attached document", "lesson N", or other external
   source context unless that source context is included in the prompt itself.
+- Educational questions MUST NOT assess content or context specific to a
+  particular teaching material, example, exercise, project, story, or classroom
+  activity. Use source materials only to establish the taught scope and
+  evidence. Rewrite assessment targets as self-contained, transferable
+  concepts, features, roles, procedures, judgments, debugging cues, or
+  misconceptions that remain valid outside the original teaching artifact.
+- Unless an identifier or value is itself an intended learning target,
+  questions MUST NOT make recall of incidental source-specific names or values
+  part of the answer. This includes work titles, scenarios, characters,
+  Blueprint names, class names, function names, variable names, level names,
+  file names, message strings, instructor-assigned labels, example-specific
+  constants, placements, and outputs. Replace them with generic role-based
+  wording while preserving the taught technical distinction.
 - Questions, prompts, options, answers, scoring criteria, and explanations MUST NOT introduce, require, or casually reference untaught concepts, features, parameters, APIs, syntax, techniques, tools, or extension-only content unless the user explicitly requests extension-level assessment.
 - Scoring criteria (also called rubric criteria) are the individual bullet items of a question's `## Scoring` section, each describing one thing the answer must demonstrate.
 - The number of scoring criteria and their ordering determine the assessment manifest `points` array: the `points` length MUST equal the criterion count, and each `points` entry maps to the criterion at the same index.
