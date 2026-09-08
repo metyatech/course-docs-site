@@ -8,6 +8,7 @@ type SiteConfigShape = typeof siteConfig & {
   githubRepo?: string;
   description?: string;
   faviconHref?: string;
+  ogImageUrl?: string;
 };
 
 const resolvedSiteConfig = siteConfig as SiteConfigShape;
@@ -27,6 +28,9 @@ export const getSiteDescription = () =>
 
 export const getSiteFaviconHref = () =>
   readTrimmedString(resolvedSiteConfig.faviconHref) || "/favicon.ico";
+
+export const getSiteOgImageUrl = () =>
+  readTrimmedString(resolvedSiteConfig.ogImageUrl);
 
 const getGitHubRepoUrl = () => {
   const githubRepo = readTrimmedString(resolvedSiteConfig.githubRepo);

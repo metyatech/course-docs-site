@@ -43,4 +43,5 @@ await run(process.execPath, [
   'tests/submissions-admin-session-client.test.mjs',
   'tests/submissions-ui-regression.test.mjs',
   'tests/tutorial-action-render.test.mjs',
+  'tests/root-layout-og-image.test.mjs',
 ]);
