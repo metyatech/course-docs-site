@@ -38,7 +38,7 @@
     "pretest": "npm run platform:build",
     "test": "npm run test:fast",
     "test:admin-security": "node --import tsx --test --test-concurrency=1 tests/admin-session.test.mjs tests/admin-comment-delete.test.mjs tests/admin-comment-delete-route.test.mjs tests/admin-client-security-contract.test.mjs tests/admin-mode-distinct-secrets.test.mjs tests/admin-comment-delete-route-config.test.mjs tests/admin-mode-route-protection.test.mjs",
-    "test:fast": "npm run verify:sites && npm run test:e2e-config && npm run test:admin-security && node scripts/run-node-tests-sequential.mjs tests/course-sites-manifest.test.mjs tests/git-auth-context.test.mjs tests/git-fixture-env.test.mjs tests/git-origin-normalize.test.mjs tests/git-remote-ref.test.mjs tests/platform-workspace-contract.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-failure-redaction.test.mjs tests/sync-course-content-link-mode.test.mjs tests/sync-course-content-origin-url-normalize.test.mjs tests/sync-course-content-pre-network-repair.test.mjs tests/sync-course-content-private-remote-auth.test.mjs tests/sync-course-content-public-remote.test.mjs tests/sync-course-content-remote-cache.test.mjs tests/tutorial-shots.test.mjs tests/verify-content.test.mjs",
+    "test:fast": "npm run verify:sites && npm run test:e2e-config && npm run test:admin-security && node scripts/run-node-tests-sequential.mjs tests/course-sites-manifest.test.mjs tests/git-auth-context.test.mjs tests/git-fixture-env.test.mjs tests/git-origin-normalize.test.mjs tests/git-remote-ref.test.mjs tests/platform-workspace-contract.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-deployment-assets.test.mjs tests/sync-course-content-failure-redaction.test.mjs tests/sync-course-content-link-mode.test.mjs tests/sync-course-content-origin-url-normalize.test.mjs tests/sync-course-content-pre-network-repair.test.mjs tests/sync-course-content-private-remote-auth.test.mjs tests/sync-course-content-public-remote.test.mjs tests/sync-course-content-remote-cache.test.mjs tests/tutorial-shots.test.mjs tests/verify-content.test.mjs",
     "test:shared": "npm run test:e2e-config && node --test --test-concurrency=1 tests/admin-mode-legacy-token.test.mjs && node scripts/run-node-tests-sequential.mjs tests/git-auth-context.test.mjs tests/git-fixture-env.test.mjs tests/git-origin-normalize.test.mjs tests/git-remote-ref.test.mjs tests/import-asset-resolution.test.mjs tests/sync-course-content-clears-next.test.mjs tests/sync-course-content-link-mode.test.mjs tests/sync-course-content-pre-network-repair.test.mjs tests/sync-course-content-remote-cache.test.mjs tests/tutorial-shots.test.mjs && node scripts/run-tutorial-shot-editor-flow-tests.mjs",
     "preverify:repeat-clean": "npm run platform:build",
     "verify:repeat-clean": "node scripts/run-repeat-clean-test.mjs",
@@ -68,7 +68,7 @@
     "@supabase/supabase-js": "^2.49.1",
     "dotenv": "^17.2.3",
     "konva": "^10.2.3",
-    "next": "^15.5.18",
+    "next": "^15.5.24",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
     "react": "^19.2.3",
@@ -87,7 +87,7 @@
     "ajv-formats": "^3.0.1",
     "cross-env": "^10.1.0",
     "eslint": "^9.39.4",
-    "eslint-config-next": "^15.5.18",
+    "eslint-config-next": "^15.5.24",
     "eslint-config-prettier": "^10.0.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
@@ -116,7 +116,7 @@
     ]
   },
   "engines": {
-    "node": ">=20.0"
+    "node": "24.x"
   },
   "overrides": {
     "entities": "^6.0.1",

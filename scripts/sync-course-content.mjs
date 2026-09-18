@@ -284,6 +284,28 @@ const ensureRealDirectory = (dirPath) => {
 
 const normalizeRelativePath = (relativePath) => relativePath.split(path.sep).join("/");
 
+const deploymentExcludedContentDirectories = new Set([
+  "docs/css-basics/css-styling-basics/assets/css-styling-basics-complete",
+  "docs/html-basics/images-links/assets/images-links-complete",
+  "docs/html-basics/practice-exercises/markup-exercises-advanced/assets/markup-exercises-advanced-complete",
+  "docs/html-basics/text-markup/assets/text-markup-complete",
+]);
+
+const deploymentExcludedContentFiles = [
+  /^docs\/student-guide\/shots\/[^/]+\.raw\.png$/,
+  /^docs\/student-guide\/shots\/[^/]+\.shot\.json$/,
+];
+
+const isDeploymentExcludedContentPath = (relativePath) =>
+  deploymentExcludedContentFiles.some((pattern) => pattern.test(relativePath)) ||
+  [...deploymentExcludedContentDirectories].some(
+    (directoryPath) =>
+      relativePath === directoryPath || relativePath.startsWith(`${directoryPath}/`),
+  );
+
+const shouldSkipContentEntry = ({ name, relativePath }) =>
+  name === "_pagefind" || isDeploymentExcludedContentPath(relativePath);
+
 const copyFile = (from, to) => {
   try {
     const st = fs.lstatSync(to);
@@ -527,7 +549,7 @@ const contentTo = path.join(projectRoot, "content");
 syncDirectory({
   from: contentFrom,
   to: contentTo,
-  shouldSkip: ({ name }) => name === "_pagefind",
+  shouldSkip: shouldSkipContentEntry,
 });
 
 const siteConfigFrom = path.join(sourceRoot, "site.config.ts");

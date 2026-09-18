@@ -23,8 +23,8 @@ const parsePatchFileName = (fileName) => {
 test("dependency versions and patch installation stay pinned", async () => {
   const pkg = JSON.parse(await readFile(packageJsonPath, "utf8"));
 
-  assert.equal(pkg.dependencies.next, "^15.5.18");
-  assert.equal(pkg.devDependencies["eslint-config-next"], "^15.5.18");
+  assert.equal(pkg.dependencies.next, "^15.5.24");
+  assert.equal(pkg.devDependencies["eslint-config-next"], "^15.5.24");
   assert.equal(pkg.overrides.mermaid, "11.15.0");
   assert.equal(pkg.overrides.dompurify, "3.4.3");
   assert.equal(pkg.overrides["@xmldom/xmldom"], "0.9.10");
