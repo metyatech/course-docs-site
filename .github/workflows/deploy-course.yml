@@ -1,0 +1,136 @@
+name: Deploy course site
+
+on:
+  workflow_call:
+    inputs:
+      next_public_works_base_url:
+        description: Optional Student Works base URL used by the Programming course site.
+        required: false
+        type: string
+        default: ""
+    secrets:
+      VERCEL_TOKEN:
+        required: true
+      VERCEL_ORG_ID:
+        required: true
+      VERCEL_PROJECT_ID:
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: course-site-deploy-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_CLI_VERSION: 50.9.6
+      COURSE_CONTENT_SOURCE: ../course-content
+    steps:
+      - name: Validate required secrets
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "Missing one or more required Vercel secrets."
+            exit 1
+          fi
+
+      - name: Checkout course content
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: course-content
+          persist-credentials: false
+
+      - name: Checkout shared runtime
+        uses: actions/checkout@v6
+        with:
+          repository: metyatech/course-docs-site
+          ref: main
+          path: site
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Configure optional build environment
+        if: inputs.next_public_works_base_url != ''
+        env:
+          NEXT_PUBLIC_WORKS_BASE_URL_INPUT: ${{ inputs.next_public_works_base_url }}
+        run: |
+          node --input-type=module <<'EOF'
+          import { appendFileSync } from 'node:fs';
+
+          const value = process.env.NEXT_PUBLIC_WORKS_BASE_URL_INPUT;
+          if (value.includes('\n') || value.includes('\r')) {
+            throw new Error('NEXT_PUBLIC_WORKS_BASE_URL must be a single-line URL.');
+          }
+
+          const url = new URL(value);
+          if (url.protocol !== 'https:') {
+            throw new Error('NEXT_PUBLIC_WORKS_BASE_URL must use HTTPS.');
+          }
+
+          appendFileSync(process.env.GITHUB_ENV, `NEXT_PUBLIC_WORKS_BASE_URL=${value}\n`);
+          EOF
+
+      - name: Vercel auth and project preflight
+        run: |
+          npx vercel@${{ env.VERCEL_CLI_VERSION }} whoami --token="$VERCEL_TOKEN"
+          node --input-type=module <<'EOF'
+          const projectId = process.env.VERCEL_PROJECT_ID;
+          const teamId = process.env.VERCEL_ORG_ID;
+          const token = process.env.VERCEL_TOKEN;
+
+          async function check(url, label) {
+            const response = await fetch(url, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (!response.ok) {
+              throw new Error(`${label} failed with HTTP ${response.status}.`);
+            }
+
+            return response.json();
+          }
+
+          const user = await check('https://api.vercel.com/www/user', 'Vercel user lookup');
+          const project = await check(
+            `https://api.vercel.com/v9/projects/${projectId}?teamId=${teamId}`,
+            'Vercel project lookup',
+          );
+
+          if (project.id !== projectId) {
+            throw new Error('Vercel resolved a project different from VERCEL_PROJECT_ID.');
+          }
+
+          console.log(`Authenticated as ${user.user.username}; verified Vercel project ${project.name}.`);
+          EOF
+
+      - name: Install shared runtime
+        working-directory: site
+        run: npm ci
+
+      - name: Pull Vercel production settings
+        working-directory: site
+        run: npx vercel@${{ env.VERCEL_CLI_VERSION }} pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build for Vercel production
+        working-directory: site
+        run: npx vercel@${{ env.VERCEL_CLI_VERSION }} build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy to Vercel production (retry once)
+        working-directory: site
+        run: |
+          npx vercel@${{ env.VERCEL_CLI_VERSION }} deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN" || \
+          npx vercel@${{ env.VERCEL_CLI_VERSION }} deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN"
