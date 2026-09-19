@@ -136,6 +136,28 @@
         "repo": "teacher-profile-docs",
         "workflow": "deploy-vercel.yml"
       }
+    },
+    {
+      "id": "game-development-course-docs",
+      "requiresContentReadToken": false,
+      "contentRepository": "metyatech/game-development-course-docs",
+      "defaultContentRef": "master",
+      "productionUrl": "https://game-development-course-docs.vercel.app",
+      "features": {
+        "submissions": false,
+        "adminCommentModeration": false,
+        "pagefind": true,
+        "codePreview": false,
+        "exercises": true
+      },
+      "e2eProfile": "docs-only",
+      "representativeE2E": false,
+      "redeployOnSiteChange": true,
+      "dispatchTarget": {
+        "owner": "metyatech",
+        "repo": "game-development-course-docs",
+        "workflow": "deploy-vercel.yml"
+      }
     }
   ]
 }

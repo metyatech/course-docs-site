@@ -10,7 +10,7 @@
     "version": { "const": 1 },
     "sites": {
       "type": "array",
-      "minItems": 6,
+      "minItems": 7,
       "items": { "$ref": "#/$defs/site" }
     }
   },

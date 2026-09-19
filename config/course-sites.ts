@@ -2,7 +2,7 @@
  * Type-safe accessor for the single course-sites manifest.
  *
  * The manifest is the single source of truth for every course docs site
- * (6 sites today). It is consumed by:
+ * (all supported course docs sites). It is consumed by:
  *   - the build matrix in `ci.yml` (one site per E2E profile)
  *   - the redeploy dispatch in `redeploy-content-sites.yml`
  *   - the local dev tooling (`npm run sync:content`)
