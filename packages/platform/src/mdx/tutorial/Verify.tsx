@@ -3,15 +3,7 @@ import { ImageZoom } from 'nextra/components';
 
 export type VerifyProps = {
   /**
-   * Optional screenshot showing the expected result state.
-   *
-   * Provide this when the expected outcome is primarily visual (e.g. a UI
-   * icon changing state, a panel layout, a graph shape). Per the Multimedia
-   * and Feedback principles, an observable visual state requires an image to
-   * allow the learner to compare the actual screen against the expected state.
-   *
-   * Place this Verify at the natural Procedure end (i.e. at a state-
-   * transition or sub-goal boundary), not after every individual Action.
+   * Optional image for a visual comparison when it helps confirm the result.
    */
   img?: string;
   /** Alt text for the result image. Defaults to empty string. */
@@ -21,9 +13,10 @@ export type VerifyProps = {
 };
 
 /**
- * Confirmation that a Procedure succeeded.
- * Renders as a "→ result" line, optionally preceded by a result-state
- * screenshot.
+ * Closure for a goal when observable state or behavior is its evidence.
+ * Place at a natural goal or sub-goal boundary, not after every Action.
+ * An image is optional and useful only when visual comparison helps.
+ * Renders as a "→ result" line, optionally preceded by an image.
  */
 export default function Verify({ img, alt, children }: VerifyProps) {
   return (

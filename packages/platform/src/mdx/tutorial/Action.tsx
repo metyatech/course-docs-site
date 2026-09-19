@@ -2,25 +2,24 @@ import type { ReactNode } from 'react';
 import { ImageZoom } from 'nextra/components';
 
 export type ActionProps = {
-  /** Path to the screenshot showing where to interact. */
+  /** Optional visual representation of the operation. */
   img?: string;
   /** Alt text for the image. */
   alt?: string;
-  /** What the learner should do (text instruction). */
+  /** Instruction, code, CodePreview, or another representation needed for the task. */
   children: ReactNode;
 };
 
 /**
- * A single atomic operation: image (where) → instruction (what to do) →
- * optional inline result.
+ * One atomic learner operation. An image is optional: visual representation
+ * is one of several ways to present an operation, and children can provide
+ * the instruction, code, CodePreview, or other representation the task needs.
  *
- * Renders as a `<div>` so it can sit anywhere inside a Section, including
- * directly next to other Sections, Concepts, References, or Recoveries.
+ * When an image is provided, it renders above the text as it does today.
  * Visual numbering is provided by a CSS counter scoped to the nearest
  * Section, so action numbers reset cleanly per sub-section.
  *
- * Image is always above the text (spatial proximity principle). For
- * numbered callouts on screenshots, use the tutorial-shots editor in
+ * For numbered callouts on screenshots, use the tutorial-shots editor in
  * course-docs-site (`/dev/tutorial-shots`): it keeps a separate raw
  * image and an annotation JSON and bakes the callouts into the
  * published image at build time, which keeps MDX free of pixel

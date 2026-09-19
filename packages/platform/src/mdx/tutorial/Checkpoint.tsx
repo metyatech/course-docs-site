@@ -5,9 +5,8 @@ export type CheckpointProps = {
 };
 
 /**
- * End-of-Step checklist confirming everything works.
+ * Optional checklist for a meaningful milestone with multiple conditions.
  * Renders as a highlighted box with checkmark items.
- * Exactly one per Step, placed at the end.
  */
 export default function Checkpoint({ children }: CheckpointProps) {
   return (

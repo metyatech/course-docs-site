@@ -4,48 +4,38 @@ import type { Node } from 'unist';
 
 /**
  * Remark plugin that lints `<Section>` / `<Action>` / `<Verify>` /
- * `<Reference>` / `<Checkpoint>` usage for the conventions defined in the
- * `tutorial-authoring` skill. Machine-checkable conventions live here
- * (rather than in the skill text) per the `rule-system` mechanisation
- * rule.
+ * `<QuickCheck>` / `<Checkpoint>` / `<Exercise>` / `<Reference>` usage for
+ * conventions defined in the `tutorial-authoring` skill. Machine-checkable
+ * conventions live here (rather than in the skill text) per the `rule-system`
+ * mechanisation rule.
  *
  * Severity policy:
  *  - error: structural break that makes the MDX incoherent or loses
  *           required authoring metadata. Blocks the build.
- *  - warn : principle violation with solid empirical support OR a
- *           render/technical bug that would affect rendering.
- *  - note : best-practice advisory derived from a principle whose
- *           specific numeric threshold or lexical pattern does NOT
- *           have direct empirical support. Printed as console.info,
- *           never escalated to error even under TUTORIAL_LINT_STRICT.
+ *  - warn : actionable authoring convention or technical issue.
+ *  - note : advisory review prompt or heuristic pattern. Printed as
+ *           console.info, never escalated to error even under
+ *           TUTORIAL_LINT_STRICT.
  *           Notes surface in collect-all output but do not by
  *           themselves fail the build.
  *
  * Rules implemented:
- *
- *  Structural / technical:
- *  - tutorial/section-goal-required     (error) — missing metadata
- *  - tutorial/action-single-image       (error) — structural break
- *  - tutorial/checkpoint-placement      (warn)  — structure rule
- *  - tutorial/section-no-hrule          (warn)  — structure convention
- *  - tutorial/verify-no-duplicate-arrow (warn)  — render bug
- *  - tutorial/verify-shot-action-role   (warn)  — Verify shot has role="action" annotation
- *  - tutorial/action-positional-prefix  (warn)  — Redundancy (strong)
- *  - tutorial/section-lacks-feedback    (warn)  — Feedback (strong)
- *
- *  Principle-driven advisories (note):
- *  - tutorial/section-goal-tense        (note)  — heuristic endings
- *  - tutorial/reference-image-only      (note)  — design convention
- *  - tutorial/action-bold-overuse       (note)  — Signaling; numeric
- *                                                  threshold is a
- *                                                  professional guess
- *  - tutorial/third-person-reader       (note)  — pattern list heuristic
- *  - tutorial/page-opens-with-doc-description (note) — opener-only scope
- *  - tutorial/verify-internal-mechanics (note)  — pattern list heuristic
- *  - tutorial/concept-length            (note)  — numeric threshold
- *  - tutorial/concept-placement         (note)  — judgement
- *  - tutorial/decorative-emoji          (note)  — allowlist heuristic
- *  - tutorial/verify-visual-workaround-as-action (note) — pattern list heuristic
+ *  - tutorial/section-goal-required       error — top-level Section metadata
+ *  - tutorial/action-single-image         note  — multiple images merit review
+ *  - tutorial/section-no-hrule            warn  — structure convention
+ *  - tutorial/verify-no-duplicate-arrow   warn  — render bug
+ *  - tutorial/verify-shot-action-role     warn  — Verify shot role mismatch
+ *  - tutorial/section-lacks-closure       warn  — Action without aligned closure
+ *  - tutorial/section-goal-tense          note  — heuristic endings
+ *  - tutorial/reference-image-only        note  — image-role advisory
+ *  - tutorial/action-bold-overuse         note  — signaling advisory
+ *  - tutorial/third-person-reader         note  — local prose convention
+ *  - tutorial/page-opens-with-doc-description note — opener convention
+ *  - tutorial/verify-internal-mechanics   note  — pattern list heuristic
+ *  - tutorial/concept-length              note  — review advisory
+ *  - tutorial/concept-placement           note  — first-use judgement
+ *  - tutorial/decorative-emoji            note  — allowlist heuristic
+ *  - tutorial/verify-visual-workaround-as-action note — pattern heuristic
  *
  * Severity handling:
  *  - Errors call `file.fail()` which throws and fails the MDX compile.
@@ -136,26 +126,6 @@ type VFileLike = {
 // form 〜できるようになります uses 〜できる and is not matched.
 const GOAL_PAST_TENSE = /(た状態|している|されている|できます)/;
 
-// Positional prefixes that the image is expected to convey.
-const POSITIONAL_PREFIXES = [
-  '左側から',
-  '左側の',
-  '右側から',
-  '右側の',
-  '画面下部の',
-  '画面上部の',
-  '画面中央の',
-  '上部ツールバーの',
-  '下部ツールバーの',
-  '左上の',
-  '右上の',
-  '左下の',
-  '右下の',
-  '中央の',
-];
-
-const POSITIONAL_PREFIX_PATTERN = new RegExp(`(${POSITIONAL_PREFIXES.join('|')})`);
-
 // Signaling dilution: too many bold spans in one Action.
 // The specific numeric threshold has no direct empirical backing —
 // Mayer's Signaling principle says "signal the important" but not a
@@ -165,19 +135,17 @@ const POSITIONAL_PREFIX_PATTERN = new RegExp(`(${POSITIONAL_PREFIXES.join('|')})
 // the practitioner can flag it. Emitted as a note, not an error.
 const ACTION_BOLD_MAX = 5;
 
-// Personalization: third-person descriptions of the reader.
-// These terms frame the reader as an external subject, which contradicts
-// Mayer's Personalization principle.
+// Local learner-facing prose quality convention: flag author-facing
+// audience descriptions that do not help the reader perform the task.
 const THIRD_PERSON_READER_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /受講者/, label: '受講者' },
   { pattern: /学習者(は|が|の)/, label: '学習者は/が/の' },
   { pattern: /初学者向け/, label: '初学者向け' },
   { pattern: /初心者向け/, label: '初心者向け' },
-  { pattern: /ユーザー(は|が)[^。]*(する|します|行う|行います)/, label: 'ユーザーは/が 〜する' },
 ];
 
-// Personalization: page-opening patterns that describe the document
-// instead of addressing the reader directly.
+// Page-opening patterns for the local convention that prefers
+// learner-facing task prose.
 const DOC_DESCRIPTION_OPENER_PATTERNS: RegExp[] = [
   /^この(教材|資料|ページ|授業|ドキュメント|マニュアル|記事|解説|ガイド)は/,
   /^本(教材|資料|ページ|授業|ドキュメント|マニュアル|記事|解説|ガイド)は/,
@@ -222,13 +190,9 @@ const VERIFY_WORKAROUND_AS_ACTION_PATTERNS: Array<{ pattern: RegExp; label: stri
   },
 ];
 
-// Pre-training: Concept length limits.
-// Mayer prescribes "name + key features" but no specific sentence
-// count. 5 was arbitrarily tight; 10 is the "obviously too long"
-// point where Concept stops functioning as quick pre-training and
-// turns into a full explanation that belongs elsewhere. Emitted as
-// a note.
-const CONCEPT_SENTENCE_MAX = 10;
+// Six or more sentences prompt review for multiple concepts or detail
+// that belongs in Reference material; this is advisory, not a hard limit.
+const CONCEPT_SENTENCE_MAX = 5;
 
 // Coherence: decorative emoji outside of known cueing positions.
 // We match common pictographic ranges (pictographs, misc symbols,
@@ -348,72 +312,26 @@ const countTables = (node: Node): number => {
   return count;
 };
 
-// Detect whether a subtree contains at least one `<Verify>`, `<Recovery>`,
-// or `<Checkpoint>` element — i.e. a Feedback / Generative-activity surface.
-const containsFeedbackSurface = (node: Node): boolean => {
-  let found = false;
-  const walk = (n: Node) => {
-    if (found) return;
-    if (
-      (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
-      ((n as MdxJsxElement).name === 'Verify' ||
-        (n as MdxJsxElement).name === 'Recovery' ||
-        (n as MdxJsxElement).name === 'Checkpoint')
-    ) {
-      found = true;
-      return;
-    }
-    if (hasChildren(n)) {
-      for (const child of n.children) walk(child);
-    }
-  };
-  walk(node);
-  return found;
-};
+const ACTION_COMPONENT_NAMES = new Set(['Action']);
+const CLOSURE_COMPONENT_NAMES = new Set(['Verify', 'QuickCheck', 'Checkpoint', 'Exercise']);
 
-// Detect whether a subtree contains at least one `<Action>` — used to
-// decide whether a Section "does operational work" (if not, Feedback
-// enforcement is relaxed).
-const containsAction = (node: Node): boolean => {
-  let found = false;
-  const walk = (n: Node) => {
-    if (found) return;
+// Search the current Section and its wrappers without attributing nested
+// Section content to its parent.
+const containsSectionLocalComponent = (
+  section: MdxJsxElement,
+  names: ReadonlySet<string>,
+): boolean => {
+  const walk = (node: Node): boolean => {
+    if (isJsxElement(node, 'Section')) return false;
     if (
-      (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
-      (n as MdxJsxElement).name === 'Action'
+      (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') &&
+      names.has((node as MdxJsxElement).name ?? '')
     ) {
-      found = true;
-      return;
+      return true;
     }
-    if (hasChildren(n)) {
-      for (const child of n.children) walk(child);
-    }
+    return hasChildren(node) && node.children.some(walk);
   };
-  walk(node);
-  return found;
-};
-
-// Detect whether a subtree contains nested <Section> elements. When a
-// Section delegates its Feedback surfaces to child Sections, the parent
-// need not carry its own Verify/Checkpoint.
-const containsNestedSection = (node: Node): boolean => {
-  let found = false;
-  const walk = (n: Node, isRoot: boolean) => {
-    if (found) return;
-    if (
-      !isRoot &&
-      (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
-      (n as MdxJsxElement).name === 'Section'
-    ) {
-      found = true;
-      return;
-    }
-    if (hasChildren(n)) {
-      for (const child of n.children) walk(child, false);
-    }
-  };
-  walk(node, true);
-  return found;
+  return section.children.some(walk);
 };
 
 // Check whether a <Reference> contains only image-bearing content.
@@ -553,17 +471,6 @@ const flushCollection = (file: VFileLike) => {
   file.fail(summary, collection[0].node, `${RULE_ORIGIN}:collect-all`);
 };
 
-type CheckpointInfo = {
-  node: MdxJsxElement;
-  indexInParent: number;
-  parentChildrenCount: number;
-};
-
-type StepContext = {
-  section: MdxJsxElement;
-  checkpoints: CheckpointInfo[];
-};
-
 export default function remarkTutorialLint() {
   return function transform(tree: Node, file: VFileLike) {
     if (isCollectMode()) startCollection(file);
@@ -577,7 +484,7 @@ export default function remarkTutorialLint() {
       validateNextStepsPlacement(file, tree);
     }
 
-    const walk = (node: Node, stepContext: StepContext | null, sectionDepth: number) => {
+    const walk = (node: Node, sectionDepth: number) => {
       if (!hasChildren(node)) return;
 
       // Track horizontal rule placement inside any <Section>.
@@ -586,7 +493,7 @@ export default function remarkTutorialLint() {
           if (child.type === 'thematicBreak') {
             emitWarning(
               file,
-              '<Section> should not contain a horizontal rule (`---`); use it only between top-level Steps',
+              '<Section> should not contain a horizontal rule (`---`); use it only between top-level Sections',
               child,
               'section-no-hrule',
             );
@@ -599,14 +506,15 @@ export default function remarkTutorialLint() {
 
         if (isJsxElement(child, 'Section')) {
           const goal = getStringAttribute(child, 'goal');
-          if (goal === undefined || goal.trim().length === 0) {
+          const hasGoal = goal !== undefined && goal.trim().length > 0;
+          if (sectionDepth === 0 && !hasGoal) {
             emitError(
               file,
-              '<Section> is missing a `goal` prop (every Section must declare its milestone)',
+              'Top-level <Section> is missing a non-empty `goal` prop',
               child,
               'section-goal-required',
             );
-          } else if (GOAL_PAST_TENSE.test(goal)) {
+          } else if (hasGoal && GOAL_PAST_TENSE.test(goal)) {
             emitNote(
               file,
               `<Section goal="..."> uses past/completed form ("${goal}"); consider future-declarative form (e.g. "〜します" / "〜できるようになります"). Specific ending patterns are heuristic, so this is advisory only`,
@@ -615,21 +523,8 @@ export default function remarkTutorialLint() {
             );
           }
 
-          // A top-level Section (directly below the document root) represents
-          // a Step for placement purposes. Nested Sections inherit the outer
-          // Step context so Checkpoints inside subsections are still rolled
-          // up to that Step.
-          const childAsStep: StepContext =
-            sectionDepth === 0
-              ? { section: child, checkpoints: [] }
-              : (stepContext ?? { section: child, checkpoints: [] });
-
-          walk(child, childAsStep, sectionDepth + 1);
-
-          if (sectionDepth === 0) {
-            validateCheckpointPlacement(file, childAsStep);
-            validateSectionFeedback(file, child);
-          }
+          walk(child, sectionDepth + 1);
+          validateSectionClosure(file, child);
           continue;
         }
 
@@ -649,19 +544,11 @@ export default function remarkTutorialLint() {
           validateConcept(file, child, node.children, i);
         }
 
-        if (isJsxElement(child, 'Checkpoint') && stepContext) {
-          stepContext.checkpoints.push({
-            node: child,
-            indexInParent: i,
-            parentChildrenCount: node.children.length,
-          });
-        }
-
-        walk(child, stepContext, sectionDepth);
+        walk(child, sectionDepth);
       }
     };
 
-    walk(tree, null, 0);
+    walk(tree, 0);
 
     // Collect-all mode: throw one aggregated error listing every finding.
     flushCollection(file);
@@ -673,25 +560,12 @@ function validateAction(file: VFileLike, node: MdxJsxElement) {
   const imageCount = countImages(node) + (imgAttr ? 1 : 0);
 
   if (imageCount > 1) {
-    emitError(
+    emitNote(
       file,
-      '<Action> contains more than one image; split into separate Actions (one image per Action)',
+      '<Action> contains multiple images; review whether one annotated composite image or multiple Actions would reduce integration effort',
       node,
       'action-single-image',
     );
-  }
-
-  if (imgAttr) {
-    const body = collectText(node);
-    const match = POSITIONAL_PREFIX_PATTERN.exec(body);
-    if (match) {
-      emitWarning(
-        file,
-        `<Action img="..."> body contains positional prefix "${match[1]}"; the image is expected to convey position — remove the prefix or add a callout to the image`,
-        node,
-        'action-positional-prefix',
-      );
-    }
   }
 
   // Signaling dilution: too many bold spans destroy emphasis effectiveness.
@@ -807,7 +681,7 @@ function validateReference(file: VFileLike, node: MdxJsxElement) {
   if (isReferenceImageOnly(node)) {
     emitNote(
       file,
-      '<Reference> contains only an image; success-verifying screenshots typically belong in an always-visible <Action>. This is a design convention, so treat as advisory',
+      '<Reference> contains only an image; consider its role: an operation visual may belong in <Action>, an observable result in <Verify>, and lookup material in <Reference> with a text equivalent or context',
       node,
       'reference-image-only',
     );
@@ -820,7 +694,7 @@ function validateConcept(
   siblings: Node[],
   indexInParent: number,
 ) {
-  // Pre-training: Concept length limits (5 sentences or 1 short table).
+  // Review Concepts that may combine several ideas or reference detail.
   const body = collectText(node);
   const sentenceCount = countJapaneseSentences(body);
   const tableCount = countTables(node);
@@ -828,7 +702,7 @@ function validateConcept(
   if (sentenceCount > CONCEPT_SENTENCE_MAX) {
     emitNote(
       file,
-      `<Concept> has ${sentenceCount} sentences (advisory max: ${CONCEPT_SENTENCE_MAX}); consider splitting into multiple Concepts. Specific sentence count is a professional guess, not an empirical threshold`,
+      `<Concept> has ${sentenceCount} sentences; review whether multiple concepts are combined or details belong in <Reference>. Six sentences is an advisory, not a hard limit`,
       node,
       'concept-length',
     );
@@ -842,16 +716,13 @@ function validateConcept(
     );
   }
 
-  // Pre-training × Minimalism: Concept MUST be followed by a Procedure /
-  // Action / nested Section that actually uses the term. If the Concept
-  // trails at the end of its parent with no usage site, it is either
-  // front-loaded or orphaned.
+  // Keep Concepts near an Action or closure that uses the term.
   let foundUsageSite = false;
   for (let j = indexInParent + 1; j < siblings.length; j += 1) {
     const sibling = siblings[j];
     if (
       (sibling.type === 'mdxJsxFlowElement' || sibling.type === 'mdxJsxTextElement') &&
-      ['Action', 'Procedure', 'Section', 'Verify', 'Exercise'].includes(
+      ['Action', 'Procedure', 'Section', 'Verify', 'QuickCheck', 'Exercise'].includes(
         (sibling as MdxJsxElement).name ?? '',
       )
     ) {
@@ -867,7 +738,7 @@ function validateConcept(
   if (!foundUsageSite) {
     emitNote(
       file,
-      '<Concept> has no following Action/Procedure/Section/Exercise that uses the term in its parent; Pre-training suggests placing Concepts immediately before first-use. This is a structural judgement — the exception is a legitimate trailing summary',
+      '<Concept> has no following Action/Section/Verify/QuickCheck/Exercise that uses the term in its parent; place it near a first-use or retrieval opportunity when useful. This is a judgement, and a trailing summary may be intentional',
       node,
       'concept-placement',
     );
@@ -880,7 +751,7 @@ function containsUsageSite(node: Node): boolean {
     if (found) return;
     if (
       (n.type === 'mdxJsxFlowElement' || n.type === 'mdxJsxTextElement') &&
-      ['Action', 'Procedure', 'Section', 'Verify', 'Exercise'].includes(
+      ['Action', 'Procedure', 'Section', 'Verify', 'QuickCheck', 'Exercise'].includes(
         (n as MdxJsxElement).name ?? '',
       )
     ) {
@@ -895,25 +766,19 @@ function containsUsageSite(node: Node): boolean {
   return found;
 }
 
-function validateSectionFeedback(file: VFileLike, section: MdxJsxElement) {
-  // Feedback / Generative activity: a Section that does operational work
-  // (contains at least one Action) MUST expose at least one feedback
-  // surface (Verify / Recovery / Checkpoint). Grouping-only Sections that
-  // delegate to nested Sections are exempt.
-  if (!containsAction(section)) return;
-  if (containsFeedbackSurface(section)) return;
-  if (containsNestedSection(section)) return;
+function validateSectionClosure(file: VFileLike, section: MdxJsxElement) {
+  if (!containsSectionLocalComponent(section, ACTION_COMPONENT_NAMES)) return;
+  if (containsSectionLocalComponent(section, CLOSURE_COMPONENT_NAMES)) return;
   emitWarning(
     file,
-    '<Section> contains Actions but no <Verify>, <Recovery>, or <Checkpoint>; add a feedback surface so the learner can confirm the outcome (Feedback / Generative activity)',
+    '<Section> contains an <Action> but no aligned closure; consider <Verify> / <QuickCheck> / <Checkpoint> / <Exercise> when one can test the learning goal',
     section,
-    'section-lacks-feedback',
+    'section-lacks-closure',
   );
 }
 
-// Personalization: flag a page that opens by describing itself instead of
-// addressing the reader. We inspect the first non-empty paragraph outside
-// of any JSX wrapper.
+// Prefer learner-facing task prose in the page opener as a local convention.
+// We inspect the first non-empty paragraph outside of any JSX wrapper.
 function validatePageOpener(file: VFileLike, tree: Node) {
   if (!hasChildren(tree)) return;
   for (const child of tree.children) {
@@ -926,7 +791,7 @@ function validatePageOpener(file: VFileLike, tree: Node) {
         if (pattern.test(text)) {
           emitNote(
             file,
-            `Page opens with a document-describing sentence ("${text.slice(0, 30)}..."); consider second-person direct address — opening with an action or inviting goal is typically stronger. Opener-only scope and the pattern list are heuristic`,
+            `Page opens with a document-describing sentence ("${text.slice(0, 30)}..."); prefer learner-facing task prose as a local convention, such as opening with an action or goal. Opener-only scope and the pattern list are heuristic`,
             child,
             'page-opens-with-doc-description',
           );
@@ -940,9 +805,8 @@ function validatePageOpener(file: VFileLike, tree: Node) {
   }
 }
 
-// Personalization: flag third-person descriptions of the reader anywhere
-// in the tutorial body. We walk all paragraphs, emitting at most one
-// warning per unique pattern per file to avoid spam.
+// Apply the local learner-facing prose quality convention to paragraphs,
+// emitting at most one note per unique pattern per file.
 function validateThirdPersonReader(file: VFileLike, tree: Node) {
   const seenPatterns = new Set<string>();
   const walk = (node: Node) => {
@@ -955,7 +819,7 @@ function validateThirdPersonReader(file: VFileLike, tree: Node) {
           seenPatterns.add(label);
           emitNote(
             file,
-            `Text describes the reader in third person ("${label}"); Personalization benefits from second-person direct address ("〜しましょう" / "確認してください"). Pattern list is heuristic — legitimate use exists when quoting or defining a role`,
+            `Text uses author-facing audience wording ("${label}"); revise it into learner-facing task prose when the wording does not help perform the task. This is a local prose quality convention; the pattern list is heuristic`,
             node,
             'third-person-reader',
           );
@@ -1001,57 +865,6 @@ function validateDecorativeEmoji(file: VFileLike, tree: Node) {
     }
   };
   walk(tree, false);
-}
-
-function validateCheckpointPlacement(file: VFileLike, step: StepContext) {
-  if (step.checkpoints.length === 0) {
-    return;
-  }
-  if (step.checkpoints.length > 1) {
-    emitWarning(
-      file,
-      'Step contains multiple <Checkpoint> elements; exactly one <Checkpoint> per Step is the intended structure',
-      step.checkpoints[1].node,
-      'checkpoint-placement',
-    );
-  }
-
-  // The Checkpoint must be the last meaningful child of the Step Section.
-  const checkpoint = step.checkpoints[0];
-  const stepChildren = step.section.children;
-
-  // Find the index of this checkpoint within the Step children (it may be a
-  // direct child, or the Checkpoint may have been found during nested walk).
-  const directIndex = stepChildren.indexOf(checkpoint.node);
-  if (directIndex < 0) {
-    // Checkpoint is not a direct child of the Step Section — that means the
-    // Step placed it inside a subsection, which is itself a placement error.
-    emitWarning(
-      file,
-      '<Checkpoint> should be a direct child of its top-level <Section> (Step), not nested inside a sub-Section',
-      checkpoint.node,
-      'checkpoint-placement',
-    );
-    return;
-  }
-
-  // Scan children after the Checkpoint: anything non-trivial means it is not last.
-  for (let i = directIndex + 1; i < stepChildren.length; i += 1) {
-    const following = stepChildren[i];
-    if (following.type === 'text' && /^\s*$/.test((following as TextNode).value)) continue;
-    // Allow closing whitespace/paragraphs only.
-    if (following.type === 'paragraph' && hasChildren(following)) {
-      const text = collectText(following).trim();
-      if (text.length === 0) continue;
-    }
-    emitWarning(
-      file,
-      '<Checkpoint> should be the last element of its Step; move any content that follows it before the Checkpoint or into a separate Step',
-      checkpoint.node,
-      'checkpoint-placement',
-    );
-    return;
-  }
 }
 
 /**
