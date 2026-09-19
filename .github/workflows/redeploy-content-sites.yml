@@ -51,12 +51,11 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Verify site manifest
-        run: npm run verify:sites
-
       - name: Generate redeploy matrix
         id: set-matrix
-        run: echo "matrix=$(node scripts/print-course-sites-matrix.mjs --kind redeploy)" >> $GITHUB_OUTPUT
+        env:
+          COURSE_CONTENT_READ_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: echo "matrix=$(node scripts/discover-course-repositories.mjs --kind redeploy)" >> $GITHUB_OUTPUT
 
       - name: Record site SHA
         id: set-sha
@@ -79,7 +78,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
-    name: Dispatch ${{ matrix.repo }}
+    name: Dispatch ${{ matrix.fullName }}
     steps:
       - name: Validate dispatch token
         env:
@@ -94,21 +93,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.COURSE_CONTENT_REDEPLOY_TOKEN }}
         run: |
-          echo "Dispatching ${{ matrix.workflow }} for ${{ matrix.repo }} @ ${{ matrix.ref }}"
-          gh workflow run "${{ matrix.workflow }}" --repo "metyatech/${{ matrix.repo }}" --ref "${{ matrix.ref }}"
+          echo "Dispatching ${{ matrix.workflow }} for ${{ matrix.fullName }} @ ${{ matrix.ref }}"
+          gh workflow run "${{ matrix.workflow }}" --repo "${{ matrix.fullName }}" --ref "${{ matrix.ref }}"
 
       - name: Record dispatch summary
         if: always()
         env:
           SITE_ID: ${{ matrix.siteId }}
-          REPO: ${{ matrix.repo }}
+          REPO: ${{ matrix.fullName }}
           REF: ${{ matrix.ref }}
           WORKFLOW: ${{ matrix.workflow }}
           SITE_SHA: ${{ needs.prepare-matrix.outputs.site_sha }}
         run: |
           echo "## Dispatch ${{ matrix.siteId }}" >> $GITHUB_STEP_SUMMARY
           echo "- siteId: ${{ matrix.siteId }}" >> $GITHUB_STEP_SUMMARY
-          echo "- repo: metyatech/${{ matrix.repo }}" >> $GITHUB_STEP_SUMMARY
+          echo "- repo: ${{ matrix.fullName }}" >> $GITHUB_STEP_SUMMARY
           echo "- ref: ${{ matrix.ref }}" >> $GITHUB_STEP_SUMMARY
           echo "- workflow: ${{ matrix.workflow }}" >> $GITHUB_STEP_SUMMARY
           echo "- site_sha: ${{ needs.prepare-matrix.outputs.site_sha }}" >> $GITHUB_STEP_SUMMARY

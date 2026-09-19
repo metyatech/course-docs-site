@@ -556,7 +556,7 @@ test("real session integration: a valid cookie is accepted by the real validator
   // signAdminSession uses the current real time by default and the
   // 8-hour fixed TTL, so the cookie is valid right now. We inject the real
   // low-level signature validator with an explicit secret so this test does
-  // not depend on ADMIN_MODE_TOKEN, the synced manifest site, or
+  // not depend on ADMIN_MODE_TOKEN, the active site config, or
   // isAdminModeConfigured() — only on the cryptographic session check.
   const cookie = await signAdminSession(SIGNING_SECRET);
   const handler = createAdminCommentDeleteRoute({

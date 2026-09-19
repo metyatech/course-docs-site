@@ -190,7 +190,7 @@ test("fast local scripts do not invoke the full E2E matrix", async () => {
   assert.equal(pkg.scripts["verify:e2e:matrix"], "npm run test:e2e:matrix");
   assert.equal(
     pkg.scripts["verify:ci"],
-    "npm run verify:sites && npm run build && npm run test:production-routes && npm run verify:course:ci",
+    "npm run build && npm run test:production-routes && npm run verify:course:ci",
   );
 });
 
@@ -212,31 +212,37 @@ test("verification docs document fast, single-course CI, and explicit matrix tie
   );
 });
 
-test("CI matrix drives build and e2e jobs per course source from the manifest", async () => {
+test("CI matrix comes from dynamic topic discovery and drives all course builds", async () => {
   const workflowText = await readFile(ciWorkflowPath, "utf8");
   const prepareJobText = extractPrepareMatrixJob(workflowText);
+  const buildJobText = extractJobBody(workflowText, "build-course");
   const e2eJobText = extractE2eCourseJob(workflowText);
 
-  // prepare-matrix must read the manifest and publish both build and e2e matrices.
+  // One discovery call validates every topic repository and publishes both matrices.
   assert.match(
     prepareJobText,
-    /echo "build=\$\(node scripts\/print-course-sites-matrix\.mjs --kind build\)" >> \$GITHUB_OUTPUT/,
+    /COURSE_CONTENT_READ_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}/,
   );
   assert.match(
     prepareJobText,
-    /echo "e2e=\$\(node scripts\/print-course-sites-matrix\.mjs --kind e2e\)" >> \$GITHUB_OUTPUT/,
+    /echo "matrices=\$\(node scripts\/discover-course-repositories\.mjs --kind ci\)" >> \$GITHUB_OUTPUT/,
   );
   assert.match(
     prepareJobText,
-    /outputs:[\s\S]*?build: \$\{\{ steps\.set-build-matrix\.outputs\.build \}\}/,
-  );
-  assert.match(
-    prepareJobText,
-    /outputs:[\s\S]*?e2e: \$\{\{ steps\.set-e2e-matrix\.outputs\.e2e \}\}/,
+    /outputs:[\s\S]*?matrices: \$\{\{ steps\.set-matrices\.outputs\.matrices \}\}/,
   );
 
+  assert.match(
+    buildJobText,
+    /matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.matrices\)\.build \}\}/,
+  );
+  assert.match(buildJobText, /COURSE_CONTENT_SOURCE: \$\{\{ matrix\.courseSource \}\}/);
+
   // e2e-course must consume the generated course-and-shard matrix.
-  assert.match(e2eJobText, /matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\) \}\}/);
+  assert.match(
+    e2eJobText,
+    /matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.matrices\)\.e2e \}\}/,
+  );
   assert.match(e2eJobText, /needs: \[prepare-matrix, platform\]/);
   assert.match(e2eJobText, /COURSE_CONTENT_SOURCE: \$\{\{ matrix\.courseSource \}\}/);
   // The job exposes a public step and a `(private content)` step that both
@@ -339,6 +345,14 @@ test("redeploy-content-sites.yml prepare-matrix checkout sets persist-credential
     prepareMatrixBody,
     "redeploy-content-sites.yml:prepare-matrix",
   );
+
+  const discoveryStep = extractStepByName(prepareMatrixBody, "Generate redeploy matrix");
+  assert.match(
+    discoveryStep,
+    /COURSE_CONTENT_READ_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}/,
+  );
+  assert.match(discoveryStep, /scripts\/discover-course-repositories\.mjs --kind redeploy/);
+  assert.doesNotMatch(discoveryStep, /print-course-sites-matrix|course-sites\.json/);
 });
 
 test("ci.yml build-course and e2e-course keep COURSE_CONTENT_READ_TOKEN step-scoped (no job-level GH_TOKEN; public steps have no GH_TOKEN; private steps carry it gated on matrix; npm ci never sees it; preflight is unchanged)", async (t) => {

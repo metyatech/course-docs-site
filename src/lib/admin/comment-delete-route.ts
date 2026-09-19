@@ -1,7 +1,11 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getAdminModeCookieName, isAdminModeConfigured, isAdminSessionValid } from "../admin-mode";
-import { getCurrentCourseSite } from "../current-course-site";
+import {
+  getAdminModeCookieName,
+  hasAdminCommentModeration,
+  isAdminModeConfigured,
+  isAdminSessionValid,
+} from "../admin-mode";
 import { isSameOriginMutation } from "./same-origin";
 import { deleteComment } from "./comment-delete";
 
@@ -40,8 +44,8 @@ const defaultGetCookieValue: GetCookieValue = async () => {
   return store.get(getAdminModeCookieName())?.value;
 };
 
-const defaultIsAdminCommentModerationEnabled: IsAdminCommentModerationEnabled = () =>
-  getCurrentCourseSite()?.features.adminCommentModeration === true;
+const defaultIsAdminCommentModerationEnabled: IsAdminCommentModerationEnabled =
+  hasAdminCommentModeration;
 
 export type AdminCommentDeleteAuthorizationOptions = {
   isAdminModeConfigured?: () => boolean;

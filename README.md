@@ -21,7 +21,7 @@ npm run test:e2e:matrix
 
 ## Content sync
 
-This repo does **not** store course content in Git. The `content/` directory is synced from a public content repo
+This repo does **not** store course content in Git. The `content/` directory is synced from a course content repo
 at build/dev time.
 
 `site.config.ts` is also synced (generated) and is intentionally gitignored.
@@ -31,6 +31,55 @@ Required env vars (files or environment):
 - `COURSE_CONTENT_SOURCE`
   - GitHub format: `github:owner/repo#ref` (example: `"github:metyatech/javascript-course-docs#master"` in `.env` files)
   - Local path format: `../path-to-content-repo`
+
+### Add a course repository
+
+Create the content repository under `metyatech`, then:
+
+1. Add the GitHub topic `course-docs` to opt it into shared builds and shared-runtime redeploys.
+2. Add `content/` and a root `site.config.ts`.
+3. Add the small deployment caller at `.github/workflows/deploy-vercel.yml`. It must call the shared
+   [deployment workflow](./.github/workflows/deploy-course.yml) and pass the three named Vercel secrets.
+4. Create the matching Vercel project and configure `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
+   `VERCEL_PROJECT_ID` as repository secrets.
+5. For a private content repository, grant the shared `COURSE_CONTENT_READ_TOKEN` read access to its
+   Contents and Metadata. The shared repository uses this token only for discovery and private content reads.
+
+The next shared CI run discovers and builds every active repository with the topic. A content push starts that
+repository's deployment caller only; a successful shared `main` CI run dispatches every discovered caller. No
+central course list or required-site IDs need updating.
+
+The caller's default-branch check uses GitHub's repository metadata, so it works with either `main` or `master`:
+
+```yaml
+name: Deploy site to Vercel
+
+on:
+  push:
+    paths:
+      - "content/**"
+      - "public/**"
+      - "site.config.ts"
+      - ".github/workflows/deploy-vercel.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref_name == github.event.repository.default_branch
+    uses: metyatech/course-docs-site/.github/workflows/deploy-course.yml@main
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+```
+
+The Programming caller also passes the optional `next_public_works_base_url` input to retain its Student Works
+link. Other course callers use the common snippet without site-specific inputs.
 
 Optional env vars:
 
@@ -69,10 +118,8 @@ Generate one with:
 openssl rand -base64 32
 ```
 
-Only `programming-course-docs` currently needs these admin secrets because it defines the admin comment-moderation
-capability. The other five supported sites
-(`course-common-docs`, `javascript-course-docs`, `web-foundations-docs`, `teacher-profile-docs`) have no admin
-features, so they do not need `ADMIN_MODE_TOKEN` or `ADMIN_SESSION_SECRET`.
+Only a course whose `site.config.ts` sets `adminCommentModeration: true` needs these admin secrets. Currently,
+that is `programming-course-docs`; other sites default to no admin capabilities.
 
 The issued session cookie is `HttpOnly`, `SameSite=Lax`, scoped to `/`, and expires after 8 hours. The cookie
 value is `<base64url(payload)>.<base64url(hmacSha256(payload, key))>`; only the HMAC key needs to stay secret.
@@ -84,25 +131,21 @@ See `.env.example` for the full list.
 
 ### Private course content authentication (Site CI)
 
-Site CI checks out the course content for every site in `config/course-sites.json` over the GitHub API.
-Most sites are public, but a small number (currently `metyatech/teacher-profile-docs`) are private.
-To allow Site CI to read private content repositories, register a GitHub Actions repository secret:
+Shared CI discovers active `course-docs` repositories through the GitHub REST API. Public repositories are listed
+without credentials. The private repository listing and private content checkouts use the shared repository's
+GitHub Actions secret:
 
 - Secret name: `COURSE_CONTENT_READ_TOKEN`
 - Token type: **fine-grained Personal Access Token**
-- Repository access: **Only select repositories** → `metyatech/teacher-profile-docs`
+- Repository access: select each private course repository, currently `metyatech/teacher-profile-docs`
 - Repository permissions:
   - `Contents`: **Read-only**
   - `Metadata`: **Read-only**
 - Token value: NEVER store it in `.env`, `.env.local`, `.env.example`, or any tracked source file. The token
   only ever lives in GitHub Actions repository secrets.
-- When the secret is registered, Site CI exposes it to the relevant jobs as `GH_TOKEN`. A per-matrix
-  preflight step validates that the secret is present for any site whose manifest entry sets
-  `requiresContentReadToken: true`; if the secret is missing, the build fails fast with a clear error.
-- When the secret is NOT registered, the `teacher-profile-docs` build fails at the "Validate private
-  content read token" preflight step, so the overall Site CI run reports failure. Do not merge the PR
-  while CI is failing. Register `COURSE_CONTENT_READ_TOKEN`, re-run CI, and confirm all 11 jobs succeed
-  (11/11) before merging.
+- Discovery fails if the secret is missing or the private repository API request fails; it never treats that as
+  an empty private repository list. The token is passed only to repository discovery and to private content
+  build/E2E steps. Public site jobs do not receive it.
 
 #### How is the secret handled?
 
@@ -349,9 +392,9 @@ COURSE_CONTENT_SOURCE="github:metyatech/programming-course-docs#master" npm run 
 
 ## E2E test matrix
 
-The full course Playwright matrix is an explicit heavy local command, not the
-default test or pre-commit path. Run it only when you intentionally want E2E
-coverage across every supported course content source:
+The representative Playwright matrix is an explicit heavy local command, not the
+default test or pre-commit path. Run it when you want E2E coverage for the shared
+docs and submissions experiences:
 
 ```sh
 npm run test:e2e:matrix
@@ -363,7 +406,6 @@ Behavior:
 
 - Runs E2E once with `programming-course-docs`
 - Runs E2E once with `javascript-course-docs`
-- Runs E2E once with `open-campus-unreal-90min`
 - Uses the same E2E suite in every run
 - Injects course-specific behavior by generating `tests/e2e/.suite-config.json` per course
 - Cleans `tests/e2e/.suite-config.json` and leftover worktree dev/test processes before and after each course
@@ -372,7 +414,6 @@ Behavior:
 - Uses one source variable per course:
   - `E2E_PROGRAMMING_CONTENT_SOURCE`
   - `E2E_JAVASCRIPT_CONTENT_SOURCE`
-  - `E2E_OPEN_CAMPUS_CONTENT_SOURCE`
 - Source format:
   - Remote GitHub: `github:owner/repo#ref`
   - Local path: `../path-to-content-repo`
@@ -388,7 +429,6 @@ Local example (`.env.e2e.example`):
 ```dotenv
 E2E_PROGRAMMING_CONTENT_SOURCE=../programming-course-docs
 E2E_JAVASCRIPT_CONTENT_SOURCE=../javascript-course-docs
-E2E_OPEN_CAMPUS_CONTENT_SOURCE=../open-campus-unreal-90min
 ```
 
 Remote example:
@@ -396,7 +436,6 @@ Remote example:
 ```dotenv
 E2E_PROGRAMMING_CONTENT_SOURCE="github:metyatech/programming-course-docs#master"
 E2E_JAVASCRIPT_CONTENT_SOURCE="github:metyatech/javascript-course-docs#master"
-E2E_OPEN_CAMPUS_CONTENT_SOURCE="github:metyatech/open-campus-unreal-90min#main"
 ```
 
 ## Verification
@@ -495,7 +534,8 @@ dir, and cleans deterministic matrix state before and after each course. Set
 ## Notes
 
 - This repo is intentionally framework-only. All course-specific text/content lives in the content repos.
-- The Vercel deployment workflows live in the content repos and call the Vercel CLI against this repo.
+- Content repos hold a tiny deployment caller; the Vercel deployment implementation is shared in
+  `.github/workflows/deploy-course.yml`.
 - After a successful `CI` run on `main`, GitHub Actions in this repo automatically triggers `deploy-vercel.yml`
   in the content repos so production sites pick up the latest shared runtime.
 - Cross-repo workflow dispatch uses the `COURSE_CONTENT_REDEPLOY_TOKEN` Actions secret in this repository.

@@ -4,7 +4,7 @@ import {
   isAdminSessionSecretValid,
   isAdminSessionValid as isAdminSessionValidImpl,
 } from "./admin/session";
-import { getCurrentCourseSite } from "./current-course-site";
+import { getSiteAdminCommentModeration } from "./site-config";
 
 /** Returns the human-entered admin login code (`ADMIN_MODE_TOKEN`). */
 export const getAdminModeToken = (): string => (process.env.ADMIN_MODE_TOKEN ?? "").trim();
@@ -26,8 +26,7 @@ export const areAdminSecretsDistinct = (): boolean => {
 };
 
 /** True when the active course site enables comment moderation. */
-export const hasAdminCommentModeration = (): boolean =>
-  getCurrentCourseSite()?.features.adminCommentModeration === true;
+export const hasAdminCommentModeration = (): boolean => getSiteAdminCommentModeration();
 
 /** True when the active course site has an admin capability. */
 export const hasAnyAdminCapability = (): boolean => hasAdminCommentModeration();

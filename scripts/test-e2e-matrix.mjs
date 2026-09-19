@@ -14,10 +14,9 @@ import {
   waitForProcessExit,
 } from "../tests/test-harness-env.mjs";
 
-import { readCourseSitesManifest } from "./course-sites-manifest.mjs";
-
 const require = createRequire(import.meta.url);
 const { resolveCourseSuiteConfig } = require("../tests/e2e/course-defaults.cjs");
+const { representativeSites } = require("../tests/e2e/representative-sites.cjs");
 
 export const projectRoot = process.cwd();
 export const suiteConfigPath = path.join(projectRoot, "tests", "e2e", ".suite-config.json");
@@ -26,13 +25,10 @@ const COURSE_TIMEOUT_ENV = "E2E_MATRIX_COURSE_TIMEOUT_MS";
 const CLEANUP_TIMEOUT_SECONDS = 30;
 const PORT_CLEANUP_TIMEOUT_MS = 30_000;
 
-const manifest = readCourseSitesManifest();
-const representativeSites = manifest.sites.filter((site) => site.representativeE2E === true);
-
 export const courses = representativeSites.map((site) => ({
-  name: site.id,
+  name: site.siteId,
   sourceEnv: site.e2eSourceEnv,
-  defaultSource: `github:${site.contentRepository}#${site.defaultContentRef}`,
+  defaultSource: site.defaultSource,
   preferredPort: site.e2ePort,
 }));
 

@@ -18,8 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      build: ${{ steps.set-build-matrix.outputs.build }}
-      e2e: ${{ steps.set-e2e-matrix.outputs.e2e }}
+      matrices: ${{ steps.set-matrices.outputs.matrices }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -42,16 +41,11 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Verify site manifest
-        run: npm run verify:sites
-
-      - name: Generate build matrix
-        id: set-build-matrix
-        run: echo "build=$(node scripts/print-course-sites-matrix.mjs --kind build)" >> $GITHUB_OUTPUT
-
-      - name: Generate E2E matrix
-        id: set-e2e-matrix
-        run: echo "e2e=$(node scripts/print-course-sites-matrix.mjs --kind e2e)" >> $GITHUB_OUTPUT
+      - name: Discover course repositories and generate matrices
+        id: set-matrices
+        env:
+          COURSE_CONTENT_READ_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: echo "matrices=$(node scripts/discover-course-repositories.mjs --kind ci)" >> $GITHUB_OUTPUT
 
   shared:
     needs: platform
@@ -119,7 +113,7 @@ jobs:
     timeout-minutes: 10
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-matrix.outputs.build) }}
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrices).build }}
     env:
       COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
       COURSE_DOCS_NEXT_DIST_DIR: .next-build-${{ matrix.siteId }}
@@ -198,7 +192,7 @@ jobs:
       # The generated matrix already expands each representative course into
       # two Playwright shards, preserving the full suite under the ten-minute
       # pull-request job cap.
-      matrix: ${{ fromJson(needs.prepare-matrix.outputs.e2e) }}
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrices).e2e }}
     env:
       COURSE_CONTENT_SOURCE: ${{ matrix.courseSource }}
       COURSE_DOCS_NEXT_DIST_DIR: .next-e2e-${{ matrix.siteId }}

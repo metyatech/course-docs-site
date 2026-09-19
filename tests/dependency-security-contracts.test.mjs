@@ -28,31 +28,16 @@ test("dependency versions and patch installation stay pinned", async () => {
   assert.equal(pkg.overrides.mermaid, "11.15.0");
   assert.equal(pkg.overrides.dompurify, "3.4.3");
   assert.equal(pkg.overrides["@xmldom/xmldom"], "0.9.10");
-  assert.equal(
-    pkg.scripts.postinstall,
-    "patch-package --error-on-fail && npm run platform:build",
-  );
+  assert.equal(pkg.scripts.postinstall, "patch-package --error-on-fail && npm run platform:build");
 });
 
 test("verify:ci script contains every required CI gate", async () => {
   const pkg = JSON.parse(await readFile(packageJsonPath, "utf8"));
   const verifyCi = pkg.scripts["verify:ci"];
 
-  assert.equal(
-    typeof verifyCi,
-    "string",
-    "verify:ci must be a string script definition",
-  );
-  assert.match(
-    verifyCi,
-    /npm run verify:sites/,
-    "verify:ci must run verify:sites (manifest validation)",
-  );
-  assert.match(
-    verifyCi,
-    /npm run build\b/,
-    "verify:ci must run build",
-  );
+  assert.equal(typeof verifyCi, "string", "verify:ci must be a string script definition");
+  assert.doesNotMatch(verifyCi, /verify:sites|course-sites\.json/u);
+  assert.match(verifyCi, /npm run build\b/, "verify:ci must run build");
   assert.match(
     verifyCi,
     /npm run verify:course:ci/,

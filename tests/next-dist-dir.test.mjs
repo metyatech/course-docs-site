@@ -230,17 +230,17 @@ test("playwright CI web server uses the test Next dist dir by default", async ()
     playwrightConfig.webServer?.env?.COURSE_DOCS_NEXT_DIST_DIR,
     `${TEST_NEXT_DIST_DIR}/playwright-webserver-ci`,
   );
-    assert.equal(
-      playwrightConfig.workers,
-      4,
-      "CI must run four isolated Playwright workers so the full course suite fits the workflow time cap.",
-    );
-    assert.equal(
-      playwrightConfig.fullyParallel,
-      true,
-      "CI must distribute isolated tests within a spec file across its workers so the full course suite fits the workflow time cap.",
-    );
-  });
+  assert.equal(
+    playwrightConfig.workers,
+    4,
+    "CI must run four isolated Playwright workers so the full course suite fits the workflow time cap.",
+  );
+  assert.equal(
+    playwrightConfig.fullyParallel,
+    true,
+    "CI must distribute isolated tests within a spec file across its workers so the full course suite fits the workflow time cap.",
+  );
+});
 
 test("CI e2e-course job depends on prepare-matrix and runs test:course:ci under the e2e Next dist dir", async () => {
   const workflowText = await readFile(ciWorkflowPath, "utf8");
@@ -276,7 +276,7 @@ test("CI e2e-course job depends on prepare-matrix and runs test:course:ci under 
 
   assert.match(
     jobText,
-    /^      matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.e2e\) \}\}$/m,
+    /^      matrix: \$\{\{ fromJson\(needs\.prepare-matrix\.outputs\.matrices\)\.e2e \}\}$/m,
     "e2e-course must consume the generated course-and-shard matrix directly.",
   );
 
@@ -308,12 +308,12 @@ test("package.json exposes verify:precommit (fast local gate) and verify:ci (CI-
 
   assert.equal(
     pkg.scripts["verify:course:ci"],
-    "npm run verify:sites && npm run test:course:ci && npm run build:verified",
-    "verify:course:ci MUST chain verify:sites, the Playwright CI test, and the verified build so local repro matches CI.",
+    "npm run test:course:ci && npm run build:verified",
+    "verify:course:ci MUST run the Playwright CI test and verified build so local repro matches CI.",
   );
   assert.equal(
     pkg.scripts["verify:ci"],
-    "npm run verify:sites && npm run build && npm run test:production-routes && npm run verify:course:ci",
+    "npm run build && npm run test:production-routes && npm run verify:course:ci",
     "verify:ci MUST chain `build`, then `verify:course:ci` so local repro matches CI.",
   );
   assert.equal(
@@ -359,7 +359,7 @@ test("findFirstFreePort skips an occupied preferred port", async () => {
 
   await new Promise((resolve, reject) => {
     blocker.once("error", reject);
-    blocker.listen(basePort, '127.0.0.1', resolve);
+    blocker.listen(basePort, "127.0.0.1", resolve);
   });
 
   try {

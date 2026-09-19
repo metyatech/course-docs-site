@@ -56,7 +56,7 @@ test("isAdminAuthorizedForCommentDelete: missing ADMIN_MODE_TOKEN returns false"
   );
 });
 
-test("isAdminAuthorizedForCommentDelete: no admin capability returns false", async () => {
+test("isAdminAuthorizedForCommentDelete: site config without capability returns false", async () => {
   await withEnv(
     (env) => {
       env.ADMIN_MODE_TOKEN = VALID_TOKEN;
@@ -64,15 +64,9 @@ test("isAdminAuthorizedForCommentDelete: no admin capability returns false", asy
     },
     async () => {
       const cookie = await signAdminSession(VALID_SECRET);
-      // The active course site in this unit-test env declares admin
-      // capability (programming-course-docs enables adminCommentModeration),
-      // so we use the `isAdminModeConfigured` injection to simulate the
-      // "site has no admin capability" branch. The helper must fail closed
-      // even with a valid cookie.
-      const result = await isAdminAuthorizedForCommentDelete(cookie, {
-        isAdminModeConfigured: () => false,
-      });
-      assert.equal(result, false);
+      // The checked-in default site config has no admin capability. A valid
+      // cookie and valid secrets must still fail closed for that site.
+      assert.equal(await isAdminAuthorizedForCommentDelete(cookie), false);
     },
   );
 });
