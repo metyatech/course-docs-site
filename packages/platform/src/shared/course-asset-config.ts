@@ -124,12 +124,6 @@ export const IMPORTABLE_STATIC_ASSET_EXTENSIONS = IMPORTABLE_STATIC_ASSET_EXTENS
   (extension) => `.${extension}`,
 );
 
-const DIRECT_ROUTE_ASSET_EXTENSION_NAMES = [...STATIC_ASSET_LIKE_EXTENSIONS];
-
-export const DIRECT_ROUTE_ASSET_EXTENSIONS = DIRECT_ROUTE_ASSET_EXTENSION_NAMES.map(
-  (extension) => `.${extension}`,
-);
-
 const DOWNLOAD_ROUTE_ASSET_EXTENSION_NAMES = [
   '7z',
   'bz2',
@@ -207,8 +201,95 @@ export const STATIC_ASSET_LIKE_EXTENSION_SET = new Set<string>(STATIC_ASSET_LIKE
 export const IMPORTABLE_STATIC_ASSET_EXTENSION_SET = new Set<string>(
   IMPORTABLE_STATIC_ASSET_EXTENSIONS,
 );
-export const DIRECT_ROUTE_ASSET_EXTENSION_SET = new Set<string>(DIRECT_ROUTE_ASSET_EXTENSIONS);
 export const DOWNLOAD_ROUTE_ASSET_EXTENSION_SET = new Set<string>(DOWNLOAD_ROUTE_ASSET_EXTENSIONS);
+
+export const DEPLOYMENT_EXCLUDED_CONTENT_DIRECTORIES = [
+  'docs/css-basics/css-styling-basics/assets/css-styling-basics-complete',
+  'docs/html-basics/images-links/assets/images-links-complete',
+  'docs/html-basics/practice-exercises/markup-exercises-advanced/assets/markup-exercises-advanced-complete',
+  'docs/html-basics/text-markup/assets/text-markup-complete',
+] as const;
+
+const DEPLOYMENT_EXCLUDED_CONTENT_FILE_PATTERNS = [
+  /^docs\/student-guide\/shots\/[^/]+\.raw\.png$/i,
+  /^docs\/student-guide\/shots\/[^/]+\.shot\.json$/i,
+];
+
+export const isDeploymentExcludedCourseContentPath = (relativePath: string) => {
+  const normalizedPath = relativePath.replaceAll('\\', '/').replace(/^\/+/, '');
+  return (
+    DEPLOYMENT_EXCLUDED_CONTENT_FILE_PATTERNS.some((pattern) => pattern.test(normalizedPath)) ||
+    DEPLOYMENT_EXCLUDED_CONTENT_DIRECTORIES.some(
+      (directoryPath) =>
+        normalizedPath === directoryPath || normalizedPath.startsWith(`${directoryPath}/`),
+    )
+  );
+};
+
+const NON_PUBLISHABLE_SOURCE_EXTENSIONS = new Set(['.md', '.mdx']);
+const SENSITIVE_FILE_EXTENSIONS = new Set(['.key', '.p12', '.pem', '.pfx']);
+
+/**
+ * Determines whether a relative path under `content/` can be published as a
+ * direct static asset. Unknown extensions are publishable by default; source,
+ * hidden, sensitive, and authoring-only paths are excluded.
+ */
+export const isPublishableCourseAssetPath = (relativePath: string) => {
+  let decodedPath: string;
+  try {
+    decodedPath = decodeURIComponent(relativePath.replaceAll('\\', '/'));
+  } catch {
+    return false;
+  }
+
+  const segments = decodedPath.replace(/^\/+/, '').split('/');
+  if (
+    segments.length === 0 ||
+    segments.some(
+      (segment) => !segment || segment === '.' || segment === '..' || segment.startsWith('.'),
+    )
+  ) {
+    return false;
+  }
+
+  const filename = segments.at(-1) ?? '';
+  const extension = filename.includes('.') ? `.${filename.split('.').at(-1)!.toLowerCase()}` : '';
+  if (
+    /^_meta\.(?:ts|js|mjs|cjs)$/i.test(filename) ||
+    NON_PUBLISHABLE_SOURCE_EXTENSIONS.has(extension) ||
+    SENSITIVE_FILE_EXTENSIONS.has(extension) ||
+    /\.raw\.png$/i.test(filename) ||
+    /\.shot\.json$/i.test(filename) ||
+    isDeploymentExcludedCourseContentPath(decodedPath)
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+/** Returns the static-asset rewrite destination for a course URL, if eligible. */
+export const getCourseAssetRewritePath = (pathname: string) => {
+  if (
+    !pathname.startsWith('/docs/') &&
+    !pathname.startsWith('/layout-preview/') &&
+    !pathname.startsWith('/submissions/')
+  ) {
+    return undefined;
+  }
+
+  const lastSlash = pathname.lastIndexOf('/');
+  const lastDot = pathname.lastIndexOf('.');
+  if (lastDot <= lastSlash || lastDot === pathname.length - 1) {
+    return undefined;
+  }
+
+  if (!isPublishableCourseAssetPath(pathname.replace(/^\/+/, ''))) {
+    return undefined;
+  }
+
+  return `/_course-assets${pathname}`;
+};
 
 export const createAssetExtensionRegex = (extensions: readonly string[]) =>
   new RegExp(

@@ -12,7 +12,10 @@ import { normalizeOriginUrl } from "./git-origin-normalize.mjs";
 import { parseLsRemoteObjectId } from "./git-remote-ref.mjs";
 import { resolveNextDistDirPath } from "./next-dist-dir.mjs";
 import { redactArgsForError, redactGitError } from "./sanitize-git-error.mjs";
-import { DIRECT_ROUTE_ASSET_EXTENSION_SET } from "../packages/platform/dist/shared/course-asset-config.js";
+import {
+  isDeploymentExcludedCourseContentPath,
+  isPublishableCourseAssetPath,
+} from "../packages/platform/dist/shared/course-asset-config.js";
 
 export { redactArgsForError, redactGitError };
 export { normalizeOriginUrl };
@@ -285,27 +288,8 @@ const ensureRealDirectory = (dirPath) => {
 
 const normalizeRelativePath = (relativePath) => relativePath.split(path.sep).join("/");
 
-const deploymentExcludedContentDirectories = new Set([
-  "docs/css-basics/css-styling-basics/assets/css-styling-basics-complete",
-  "docs/html-basics/images-links/assets/images-links-complete",
-  "docs/html-basics/practice-exercises/markup-exercises-advanced/assets/markup-exercises-advanced-complete",
-  "docs/html-basics/text-markup/assets/text-markup-complete",
-]);
-
-const deploymentExcludedContentFiles = [
-  /^docs\/student-guide\/shots\/[^/]+\.raw\.png$/,
-  /^docs\/student-guide\/shots\/[^/]+\.shot\.json$/,
-];
-
-const isDeploymentExcludedContentPath = (relativePath) =>
-  deploymentExcludedContentFiles.some((pattern) => pattern.test(relativePath)) ||
-  [...deploymentExcludedContentDirectories].some(
-    (directoryPath) =>
-      relativePath === directoryPath || relativePath.startsWith(`${directoryPath}/`),
-  );
-
 const shouldSkipContentEntry = ({ name, relativePath }) =>
-  name === "_pagefind" || isDeploymentExcludedContentPath(relativePath);
+  name === "_pagefind" || isDeploymentExcludedCourseContentPath(relativePath);
 
 const isStaticAssetSourceEntry = ({ sourcePath, relativePath }) => {
   let stat;
@@ -322,7 +306,7 @@ const isStaticAssetSourceEntry = ({ sourcePath, relativePath }) => {
     return false;
   }
 
-  return !DIRECT_ROUTE_ASSET_EXTENSION_SET.has(path.extname(relativePath).toLowerCase());
+  return !isPublishableCourseAssetPath(relativePath);
 };
 
 const copyFile = (from, to) => {
@@ -593,6 +577,6 @@ syncDirectory({
   from: staticAssetsFrom,
   to: staticAssetsTo,
   shouldSkip: ({ sourcePath, relativePath }) =>
-    isDeploymentExcludedContentPath(relativePath) ||
+    isDeploymentExcludedCourseContentPath(relativePath) ||
     isStaticAssetSourceEntry({ sourcePath, relativePath }),
 });

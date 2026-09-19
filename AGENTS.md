@@ -158,6 +158,16 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
 - Exercise statements MUST include the expected result, success criteria, and enough context for learners to start without guessing.
 - Extension exercises MUST be optional and must not be required for the base lesson completion.
 
+## Tutorial representation and learning-goal closure
+
+- For each learner action, choose the most efficient primary representation for the task: visual for spatial UI/layout information, code or CodePreview for code authoring, text for short non-spatial operations, and diagrams/visuals for structural relationships. Images MUST NOT be added merely because a step is operational.
+- Do not duplicate the same complete procedure across the primary representation and secondary prose. Short labels, identifiers, numbers, or positional cues MAY appear in both when they materially reduce mapping or search cost.
+- A substantive learning goal MUST have an aligned closure that can actually test that goal. Use `<Verify>` for observable behavior/state, `<QuickCheck>` for retrieval/understanding, `<Checkpoint>` for a meaningful multi-condition milestone, or `<Exercise>` for transfer/application. Do not add every closure component mechanically.
+- `<Recovery>` is error diagnosis/recovery support and MUST NOT be treated as learning-goal closure.
+- A `<Concept>` MUST focus on one new concept and only the information needed for imminent first use. Roughly 2–5 sentences or one short table is preferred; 6+ sentences SHOULD trigger review for multiple concepts or reference material, not automatic rejection.
+- Learner-facing prose MUST NOT contain author-facing audience meta descriptions such as `受講者は〜`, `学習者は〜`, or `初学者向け` when they do not help perform the task. Rewrite them as direct task prose. Do not ban `ユーザー` when it refers to a real product/domain end user rather than the tutorial reader.
+- For screenshot annotations, normal text and images of text MUST meet WCAG 2.2 SC 1.4.3 contrast of at least 4.5:1; large text may use 3:1. Meaningful non-text callout shapes and UI-state indicators MUST meet the applicable 3:1 non-text contrast requirement. Prefer real text over images of text when practical.
+
 ## Beginner lesson material ordering
 
 - Materials MUST be written assuming learners will read every word carefully, in natural reading order: top to bottom and left to right.

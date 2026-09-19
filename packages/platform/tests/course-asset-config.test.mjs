@@ -28,7 +28,7 @@ test('importable asset extensions include pdf and common video files', async () 
 });
 
 test('shared content types cover pdf and video assets', async () => {
-  const { getCourseAssetContentType, DIRECT_ROUTE_ASSET_EXTENSION_SET } = await import(
+  const { getCourseAssetContentType, isPublishableCourseAssetPath } = await import(
     configModulePath
   );
 
@@ -37,10 +37,70 @@ test('shared content types cover pdf and video assets', async () => {
   assert.equal(getCourseAssetContentType('.mov'), 'video/quicktime');
   assert.equal(getCourseAssetContentType('.webm'), 'video/webm');
 
-  assert.equal(DIRECT_ROUTE_ASSET_EXTENSION_SET.has('.pdf'), true);
-  assert.equal(DIRECT_ROUTE_ASSET_EXTENSION_SET.has('.mp4'), true);
-  assert.equal(DIRECT_ROUTE_ASSET_EXTENSION_SET.has('.mov'), true);
-  assert.equal(DIRECT_ROUTE_ASSET_EXTENSION_SET.has('.webm'), true);
+  assert.equal(isPublishableCourseAssetPath('docs/handout.pdf'), true);
+  assert.equal(isPublishableCourseAssetPath('docs/movie.mp4'), true);
+});
+
+test('course asset publication defaults to static except source and private files', async () => {
+  const { isPublishableCourseAssetPath } = await import(configModulePath);
+
+  for (const relativePath of [
+    'docs/model.foo',
+    'docs/model.glb',
+    'docs/project.uasset',
+    'docs/code.js',
+  ]) {
+    assert.equal(isPublishableCourseAssetPath(relativePath), true, relativePath);
+  }
+
+  for (const relativePath of [
+    'docs/index.mdx',
+    'README.md',
+    '_meta.ts',
+    'docs/_meta.js',
+    'docs/_meta.mjs',
+    'docs/_meta.cjs',
+    '.env',
+    '.env.local',
+    'docs/.private/image.png',
+    'private.pem',
+    'secret.key',
+    'bundle.p12',
+    'certificate.pfx',
+    'docs/student-guide/shots/example.raw.png',
+    'docs/student-guide/shots/example.shot.json',
+    'docs/models/../secret.png',
+    'docs/%2Eenv.local',
+    'docs/css-basics/css-styling-basics/assets/css-styling-basics-complete/model.glb',
+    'docs/html-basics/images-links/assets/images-links-complete/model.glb',
+    'docs/html-basics/practice-exercises/markup-exercises-advanced/assets/markup-exercises-advanced-complete/model.glb',
+    'docs/html-basics/text-markup/assets/text-markup-complete/model.glb',
+  ]) {
+    assert.equal(isPublishableCourseAssetPath(relativePath), false, relativePath);
+  }
+});
+
+test('course asset rewrite paths accept any file extension without capturing pages', async () => {
+  const { getCourseAssetRewritePath } = await import(configModulePath);
+
+  assert.equal(
+    getCourseAssetRewritePath('/docs/test/model.glb'),
+    '/_course-assets/docs/test/model.glb',
+  );
+  assert.equal(
+    getCourseAssetRewritePath('/docs/test/project.uasset'),
+    '/_course-assets/docs/test/project.uasset',
+  );
+  assert.equal(
+    getCourseAssetRewritePath('/docs/test/file.foo'),
+    '/_course-assets/docs/test/file.foo',
+  );
+  assert.equal(getCourseAssetRewritePath('/docs/test/page'), undefined);
+  assert.equal(getCourseAssetRewritePath('/docs/test/page.'), undefined);
+  assert.equal(getCourseAssetRewritePath('/docs/test/page.mdx'), undefined);
+  assert.equal(getCourseAssetRewritePath('/docs/test/_meta.ts'), undefined);
+  assert.equal(getCourseAssetRewritePath('/docs/test/.env'), undefined);
+  assert.equal(getCourseAssetRewritePath('/outside/file.foo'), undefined);
 });
 
 test('webpack asset rule matches pdf and video assets', async () => {

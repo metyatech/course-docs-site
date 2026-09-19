@@ -81,6 +81,15 @@ test(
     await writeFile(sourceRoot, "content/docs/student-guide/shots/example.shot.json", "shot");
     await writeFile(sourceRoot, "content/docs/student-guide/img/example.png", "final image");
     await writeFile(sourceRoot, "content/docs/intro/assets/demo-complete.mp4", "video");
+    await writeFile(sourceRoot, "content/docs/models/model.glb", "glb");
+    await writeFile(sourceRoot, "content/docs/models/project.uasset", "uasset");
+    await writeFile(sourceRoot, "content/docs/models/file.foo", "unknown");
+    await writeFile(sourceRoot, "content/docs/README.md", "source");
+    await writeFile(sourceRoot, "content/docs/_meta.ts", "export default {};");
+    await writeFile(sourceRoot, "content/.env", "secret");
+    await writeFile(sourceRoot, "content/.env.local", "secret");
+    await writeFile(sourceRoot, "content/docs/private.pem", "secret");
+    await writeFile(sourceRoot, "content/docs/secret.key", "secret");
 
     const sourceBefore = await snapshotFiles(sourceRoot);
     await writeFile(siteRoot, "content/docs/student-guide/shots/old.raw.png", "stale raw");
@@ -116,25 +125,61 @@ test(
       true,
     );
     assert.equal(
-      await fileExists(path.join(siteRoot, "public/_course-assets/docs/student-guide/img/example.png")),
+      await fileExists(
+        path.join(siteRoot, "public/_course-assets/docs/student-guide/img/example.png"),
+      ),
       true,
     );
     assert.equal(
-      await fileExists(path.join(siteRoot, "public/_course-assets/docs/intro/assets/demo-complete.mp4")),
+      await fileExists(
+        path.join(siteRoot, "public/_course-assets/docs/intro/assets/demo-complete.mp4"),
+      ),
       true,
     );
+    for (const relativePath of [
+      "docs/models/model.glb",
+      "docs/models/project.uasset",
+      "docs/models/file.foo",
+    ]) {
+      assert.equal(
+        await fileExists(path.join(siteRoot, "public/_course-assets", relativePath)),
+        true,
+        `default-static asset should be present: ${relativePath}`,
+      );
+    }
     assert.equal(
-      await fileExists(path.join(siteRoot, "public/_course-assets/docs/student-guide/shots/example.raw.png")),
+      await fileExists(
+        path.join(siteRoot, "public/_course-assets/docs/student-guide/shots/example.raw.png"),
+      ),
       false,
     );
     assert.equal(
-      await fileExists(path.join(siteRoot, "public/_course-assets/docs/student-guide/shots/example.shot.json")),
+      await fileExists(
+        path.join(siteRoot, "public/_course-assets/docs/student-guide/shots/example.shot.json"),
+      ),
       false,
     );
     assert.equal(
-      await fileExists(path.join(siteRoot, "public/_course-assets/docs/student-guide/img/stale.png")),
+      await fileExists(
+        path.join(siteRoot, "public/_course-assets/docs/student-guide/img/stale.png"),
+      ),
       false,
     );
+    for (const relativePath of [
+      "docs/intro/index.mdx",
+      "docs/README.md",
+      "docs/_meta.ts",
+      ".env",
+      ".env.local",
+      "docs/private.pem",
+      "docs/secret.key",
+    ]) {
+      assert.equal(
+        await fileExists(path.join(siteRoot, "public/_course-assets", relativePath)),
+        false,
+        `non-public source should be absent: ${relativePath}`,
+      );
+    }
   },
 );
 
@@ -188,9 +233,7 @@ test(
         `ZIP should be present in generated static assets: ${relativeDirectory}.zip`,
       );
       assert.equal(
-        await fileExists(
-          path.join(siteRoot, "public", "_course-assets", relativeDirectory),
-        ),
+        await fileExists(path.join(siteRoot, "public", "_course-assets", relativeDirectory)),
         false,
         `editing source should be absent from generated static assets: ${relativeDirectory}`,
       );
