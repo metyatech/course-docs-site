@@ -5,7 +5,7 @@
  * (6 sites today). It is consumed by:
  *   - the build matrix in `ci.yml` (one site per E2E profile)
  *   - the redeploy dispatch in `redeploy-content-sites.yml`
- *   - the local dev tooling (`npm run sync:content`, smoke test)
+ *   - the local dev tooling (`npm run sync:content`)
  *   - the manifest validator in `scripts/verify-course-sites-manifest.mjs`
  *
  * Adding a new site means adding ONE entry to `config/course-sites.json`
@@ -34,7 +34,6 @@ export type CourseSite = {
   representativeE2E: boolean;
   e2ePort?: number;
   e2eSourceEnv?: string;
-  smokeTestPaths: string[];
   redeployOnSiteChange: boolean;
   dispatchTarget: { owner: string; repo: string; workflow: string };
 };
