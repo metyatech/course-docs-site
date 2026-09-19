@@ -66,6 +66,7 @@ const BASE_PAGE_EXTENSIONS = ["ts", "tsx", "js", "jsx", "md", "mdx"];
 
 /** @type {import('next').NextConfig} */
 const createNextConfig = (phase) => ({
+  outputFileTracingRoot: projectRoot,
   distDir: resolveNextDistDir({ projectRoot, env: process.env }),
   reactStrictMode: true,
   trailingSlash: true,

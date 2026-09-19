@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   prepare-matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     outputs:
       matrices: ${{ steps.set-matrices.outputs.matrices }}
@@ -38,6 +38,10 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
+      - name: Install npm 11.19.1
+        run: npm install --global npm@11.19.1
+        working-directory: ${{ runner.temp }}
+
       - name: Install
         run: npm ci
 
@@ -49,7 +53,7 @@ jobs:
 
   shared:
     needs: platform
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     env:
       COURSE_CONTENT_SOURCE: github:metyatech/javascript-course-docs#master
@@ -69,6 +73,10 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
+      - name: Install npm 11.19.1
+        run: npm install --global npm@11.19.1
+        working-directory: ${{ runner.temp }}
+
       - name: Install
         run: npm ci
 
@@ -84,7 +92,7 @@ jobs:
 
   site-verify:
     needs: platform
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     env:
       COURSE_CONTENT_SOURCE: github:metyatech/javascript-course-docs#master
@@ -101,6 +109,10 @@ jobs:
           cache: "npm"
           cache-dependency-path: package-lock.json
 
+      - name: Install npm 11.19.1
+        run: npm install --global npm@11.19.1
+        working-directory: ${{ runner.temp }}
+
       - name: Install
         run: npm ci
 
@@ -109,7 +121,7 @@ jobs:
 
   build-course:
     needs: [prepare-matrix, platform]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -139,6 +151,10 @@ jobs:
           node-version: 24
           cache: "npm"
           cache-dependency-path: package-lock.json
+
+      - name: Install npm 11.19.1
+        run: npm install --global npm@11.19.1
+        working-directory: ${{ runner.temp }}
 
       - name: Install
         run: npm ci
@@ -185,7 +201,7 @@ jobs:
 
   e2e-course:
     needs: [prepare-matrix, platform]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -213,6 +229,10 @@ jobs:
           node-version: 24
           cache: "npm"
           cache-dependency-path: package-lock.json
+
+      - name: Install npm 11.19.1
+        run: npm install --global npm@11.19.1
+        working-directory: ${{ runner.temp }}
 
       - name: Install
         run: npm ci
@@ -272,7 +292,7 @@ jobs:
         run: npm run test:course:ci -- --shard=${{ matrix.shard }}
 
   platform:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -286,6 +306,10 @@ jobs:
           node-version: 24
           cache: "npm"
           cache-dependency-path: package-lock.json
+
+      - name: Install npm 11.19.1
+        run: npm install --global npm@11.19.1
+        working-directory: ${{ runner.temp }}
 
       - name: Install
         run: npm ci

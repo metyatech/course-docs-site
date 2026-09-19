@@ -139,6 +139,9 @@ test("custom dist dirs use an ignored generated tsconfig with the exact Next typ
   const env = { COURSE_DOCS_NEXT_DIST_DIR: customDistDir };
   const rootTsconfigContents = `${JSON.stringify(
     {
+      compilerOptions: {
+        plugins: [{ name: "next" }],
+      },
       include: [
         "**/*.mjs",
         "**/*.ts",
@@ -168,6 +171,7 @@ test("custom dist dirs use an ignored generated tsconfig with the exact Next typ
     );
 
     assert.equal(generatedTsconfig.extends, "./tsconfig.json");
+    assert.deepEqual(generatedTsconfig.compilerOptions.plugins, [{ name: "next" }]);
     assert.deepEqual(generatedTsconfig.exclude, ["node_modules", "coverage"]);
     assert.deepEqual(generatedTsconfig.include, [
       "**/*.mjs",
@@ -203,6 +207,12 @@ test("default dist dir keeps the tracked root tsconfig", () => {
   assert.equal(ensureNextTsconfig({ projectRoot, env: {} }), "tsconfig.json");
 });
 
+test("tracked root tsconfig explicitly enables the Next.js TypeScript plugin", async () => {
+  const rootTsconfig = JSON.parse(await readFile(path.join(projectRoot, "tsconfig.json"), "utf8"));
+
+  assert.ok(rootTsconfig.compilerOptions.plugins.some((plugin) => plugin.name === "next"));
+});
+
 test("generated Next tsconfig files are ignored", async () => {
   const gitignore = await readFile(gitignorePath, "utf8");
   assert.match(gitignore, /^tsconfig\.next\.generated\*\.json$/m);
@@ -211,6 +221,26 @@ test("generated Next tsconfig files are ignored", async () => {
     /^\/\.next-e2e-\*$/m,
     "course-matrix E2E build output must remain an untracked generated artifact.",
   );
+  assert.match(
+    gitignore,
+    /^\/\.next-build-\*\/$/m,
+    "per-site Next build output must remain an untracked generated artifact.",
+  );
+});
+
+test("Course Docs workflows use Ubuntu 26.04 and the pinned npm version", async () => {
+  const workflowPaths = [
+    path.join(projectRoot, ".github", "workflows", "ci.yml"),
+    path.join(projectRoot, ".github", "workflows", "deploy-course.yml"),
+    path.join(projectRoot, ".github", "workflows", "redeploy-content-sites.yml"),
+  ];
+
+  for (const workflowPath of workflowPaths) {
+    const workflow = await readFile(workflowPath, "utf8");
+    assert.match(workflow, /runs-on: ubuntu-26\.04/);
+    assert.doesNotMatch(workflow, /runs-on: ubuntu-latest/);
+    assert.match(workflow, /Install npm 11\.19\.1/);
+  }
 });
 
 test("playwright web server uses an isolated Next dist dir by default", async () => {

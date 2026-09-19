@@ -39,6 +39,5 @@ npm run platform:pack:check
 
 - [docs/admonition-authoring.md](./docs/admonition-authoring.md)
 - [Root LICENSE](../../LICENSE)
-- [Root SECURITY](../../SECURITY.md)
 - [Root CONTRIBUTING](../../CONTRIBUTING.md)
 - [CHANGELOG.md](./CHANGELOG.md)

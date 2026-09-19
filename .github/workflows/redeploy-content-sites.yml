@@ -25,7 +25,7 @@ jobs:
         github.event.workflow_run.event == 'push' &&
         github.event.workflow_run.head_branch == 'main'
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -47,6 +47,10 @@ jobs:
           node-version: 24
           cache: "npm"
           cache-dependency-path: package-lock.json
+
+      - name: Install npm 11.19.1
+        run: npm install --global npm@11.19.1
+        working-directory: ${{ runner.temp }}
 
       - name: Install
         run: npm ci
@@ -73,7 +77,7 @@ jobs:
 
   dispatch:
     needs: prepare-matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     strategy:
       fail-fast: false

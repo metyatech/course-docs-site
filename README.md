@@ -10,7 +10,13 @@ archive済みであり、active implementationはこのmonorepoにあります�
 
 ## Local development
 
+The site uses Node.js 24 and npm 11.19.1. Set the npm version outside the repository so npm can check the pinned
+tool version, then install dependencies:
+
 ```powershell
+Push-Location $env:TEMP
+npm install --global npm@11.19.1
+Pop-Location
 npm ci
 npm run dev
 npm run platform:verify
@@ -18,6 +24,10 @@ npm run verify:precommit
 npm run build:verified
 npm run test:e2e:matrix
 ```
+
+The root `.npmrc` rejects dependency install scripts unless the exact package version is approved in
+`package.json` under `allowScripts`. Before approving a new script, inspect its contents and dependency path, then use
+`npm install-scripts approve --allow-scripts-pin <package>` and review the version-pinned manifest change.
 
 ## Content sync
 
@@ -526,7 +536,6 @@ dir, and cleans deterministic matrix state before and after each course. Set
 - [Content Quality Boundary](./docs/content-quality-boundary.md)
 - [Tutorial Shot Editor](./docs/tutorial-shot-editor.md)
 - [LICENSE](./LICENSE)
-- [SECURITY.md](./SECURITY.md)
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
 - [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
 - [CHANGELOG.md](./CHANGELOG.md)

@@ -23,12 +23,33 @@ const parsePatchFileName = (fileName) => {
 test("dependency versions and patch installation stay pinned", async () => {
   const pkg = JSON.parse(await readFile(packageJsonPath, "utf8"));
 
-  assert.equal(pkg.dependencies.next, "^15.5.24");
-  assert.equal(pkg.devDependencies["eslint-config-next"], "^15.5.24");
-  assert.equal(pkg.overrides.mermaid, "11.15.0");
-  assert.equal(pkg.overrides.dompurify, "3.4.3");
-  assert.equal(pkg.overrides["@xmldom/xmldom"], "0.9.10");
+  assert.equal(pkg.dependencies.next, "^15.5.25");
+  assert.equal(pkg.devDependencies["eslint-config-next"], "^15.5.25");
+  assert.equal(pkg.dependencies.sharp, "^0.35.4");
+  assert.equal(pkg.overrides.mermaid, "11.17.2");
+  assert.equal(pkg.overrides.dompurify, "3.4.15");
+  assert.equal(pkg.overrides["@xmldom/xmldom"], "0.9.12");
+  assert.equal(pkg.overrides["brace-expansion"], "2.1.4");
+  assert.equal(pkg.overrides.postcss, "8.5.28");
+  assert.equal(pkg.overrides["speech-rule-engine"], "5.0.0-rc.4");
   assert.equal(pkg.scripts.postinstall, "patch-package --error-on-fail && npm run platform:build");
+});
+
+test("npm version and install-script approvals are strict and version-pinned", async () => {
+  const pkg = JSON.parse(await readFile(packageJsonPath, "utf8"));
+  const npmrc = await readFile(path.join(projectRoot, ".npmrc"), "utf8");
+
+  assert.equal(pkg.engines.npm, "11.19.1");
+  assert.deepEqual(pkg.devEngines.packageManager, {
+    name: "npm",
+    version: "11.19.1",
+    onFail: "error",
+  });
+  assert.deepEqual(pkg.allowScripts, {
+    "esbuild@0.28.1": true,
+    "unrs-resolver@1.11.1": true,
+  });
+  assert.match(npmrc, /^strict-allow-scripts=true$/m);
 });
 
 test("verify:ci script contains every required CI gate", async () => {

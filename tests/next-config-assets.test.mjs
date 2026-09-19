@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_BUILD } from "next/constants.js";
 import test from "node:test";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
-const nextConfigUrl = pathToFileURL(path.resolve("next.config.js"));
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const nextConfigUrl = pathToFileURL(path.join(projectRoot, "next.config.js"));
 
 const importNextConfig = async (envOverrides = {}, phase = PHASE_PRODUCTION_BUILD) => {
   const previous = {
@@ -57,6 +58,12 @@ test("next config disables static image wrappers for course asset imports", asyn
   const nextConfig = await importNextConfig();
   assert.equal(nextConfig.images?.disableStaticImages, true);
   assert.equal(nextConfig.images?.unoptimized, true);
+});
+
+test("output tracing uses the repository root instead of a parent lockfile root", async () => {
+  const nextConfig = await importNextConfig();
+
+  assert.equal(path.resolve(nextConfig.outputFileTracingRoot), projectRoot);
 });
 
 test("next build keeps lint and typecheck enabled by default", async () => {

@@ -5,6 +5,7 @@
 # Next output
 /.next
 /.next-test
+/.next-build-*/
 /.next-e2e-*
 /out
 /packages/platform/dist

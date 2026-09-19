@@ -39,10 +39,13 @@ const createGeneratedTsconfig = ({ projectRoot, distDir }) => {
   const exclude = Array.isArray(rootTsconfig.exclude)
     ? rootTsconfig.exclude.map((exclude) => toPortablePath(exclude))
     : GENERATED_TSCONFIG_EXCLUDE;
+  const rootPlugins = rootTsconfig.compilerOptions?.plugins;
+  const compilerOptions = Array.isArray(rootPlugins) ? { plugins: rootPlugins } : undefined;
 
   return `${JSON.stringify(
     {
       extends: `./${ROOT_TSCONFIG_NAME}`,
+      ...(compilerOptions ? { compilerOptions } : {}),
       include,
       exclude,
     },
