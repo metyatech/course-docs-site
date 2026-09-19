@@ -10,14 +10,17 @@ import type { Node } from 'unist';
  * mechanisation rule.
  *
  * Severity policy:
- *  - error: structural break that makes the MDX incoherent or loses
- *           required authoring metadata. Blocks the build.
- *  - warn : actionable authoring convention or technical issue.
- *  - note : advisory review prompt or heuristic pattern. Printed as
- *           console.info, never escalated to error even under
- *           TUTORIAL_LINT_STRICT.
- *           Notes surface in collect-all output but do not by
- *           themselves fail the build.
+ *  Severity reflects artefact impact and confidence that the condition can
+ *  be detected mechanically. Research provenance/strength informs the rule's
+ *  rationale but does not by itself determine build severity.
+ *  - error: machine-certain structural/contract break that makes the MDX
+ *           incoherent or loses required authoring metadata. Blocks the build.
+ *  - warn : machine-detectable, materially actionable authoring convention or
+ *           technical issue with sufficiently low false-positive risk.
+ *  - note : advisory review prompt or context-dependent/heuristic pattern.
+ *           Printed as console.info, never escalated to error even under
+ *           TUTORIAL_LINT_STRICT. Notes surface in collect-all output but do
+ *           not by themselves fail the build.
  *
  * Rules implemented:
  *  - tutorial/section-goal-required       error — top-level Section metadata
@@ -43,8 +46,8 @@ import type { Node } from 'unist';
  *    surface in both `npm run dev` and `npm run build` output regardless
  *    of the loader's vfile-message handling.
  *  - Notes call `console.info(...)` only. They are never escalated to
- *    error, even under strict mode, because their thresholds/patterns
- *    are heuristic rather than empirical.
+ *    error, even under strict mode, because their automated trigger is
+ *    heuristic/context-dependent or their impact is intentionally advisory.
  *  - Strict mode: setting `TUTORIAL_LINT_STRICT=1` (or `1`/`true`) at
  *    build time promotes every WARNING into a build-failing error. CI
  *    pipelines should enable this to prevent warning drift. Notes are
@@ -433,9 +436,9 @@ const emitError = (file: VFileLike, reason: string, place: Node, ruleId: string)
   file.fail(`${reason} (${ruleId})`, place, origin);
 };
 
-// Note: best-practice advisory whose specific threshold or pattern has
-// no direct empirical support. Printed via console.info only, never
-// escalated to an error or a vfile message; strict mode ignores it.
+// Note: advisory review signal whose automated trigger is heuristic,
+// context-dependent, or intentionally low-impact. Printed via console.info
+// only, never escalated to an error or a vfile message; strict mode ignores it.
 const emitNote = (file: VFileLike, reason: string, place: Node, ruleId: string) => {
   const collection = getCollection(file);
   if (collection) {
@@ -869,8 +872,9 @@ function validateDecorativeEmoji(file: VFileLike, tree: Node) {
 
 /**
  * Warn if <Prerequisites> appears after a <Section> (it should be at the page top).
- * Severity: warn — placement before first Section has solid pedagogical rationale
- * (ISO 26514 §10 preliminary information; ミニマリズム P1 action-orientation).
+ * Severity: warn — placement is unambiguous in the AST and late prerequisites
+ * materially undermine a learner's ability to verify requirements before starting.
+ * Rationale includes ISO 26514 §10 preliminary information and Minimalism P1.
  */
 function validatePrerequisitesPlacement(file: VFileLike, tree: Node) {
   if (!hasChildren(tree)) return;
