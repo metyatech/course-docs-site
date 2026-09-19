@@ -16,6 +16,7 @@ export const REQUIRED_SITE_IDS = [
   "web-foundations-docs",
   "open-campus-unreal-90min",
   "teacher-profile-docs",
+  "game-development-course-docs",
 ];
 
 export const E2E_PROFILES = ["docs-only", "submissions"];
@@ -146,9 +147,7 @@ export const validateCrossConstraints = (manifest) => {
   for (const site of sites) {
     const expected = site.id === "teacher-profile-docs";
     if (site.requiresContentReadToken !== expected) {
-      errors.push(
-        `site ${site.id} must set requiresContentReadToken=${expected}`,
-      );
+      errors.push(`site ${site.id} must set requiresContentReadToken=${expected}`);
     }
   }
 

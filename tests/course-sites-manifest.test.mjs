@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  REQUIRED_SITE_IDS,
   readManifestFile,
   validateManifest,
   loadCourseSitesManifest,
@@ -38,20 +39,22 @@ test("the shipped manifest passes schema and cross constraints", () => {
 
 test("manifest rejects the removed smoke-test path configuration", () => {
   const manifest = baseManifest();
-  assert.ok(
-    manifest.sites.every((site) => !Object.hasOwn(site, "smokeTestPaths")),
-  );
+  assert.ok(manifest.sites.every((site) => !Object.hasOwn(site, "smokeTestPaths")));
 
   manifest.sites[0].smokeTestPaths = ["/", "/docs/intro"];
   assert.ok(validateManifest(manifest).some((error) => /schema:/.test(error)));
 });
 
-test("build matrix contains all six sites with course sources", () => {
+test("build matrix contains all seven sites with course sources", () => {
   const matrix = buildMatrix(readManifestFile());
-  assert.equal(matrix.length, 6);
+  assert.equal(matrix.length, 7);
   const byId = Object.fromEntries(matrix.map((m) => [m.siteId, m.courseSource]));
   assert.equal(byId["javascript-course-docs"], "github:metyatech/javascript-course-docs#master");
   assert.equal(byId["course-common-docs"], "github:metyatech/course-common-docs#main");
+  assert.equal(
+    byId["game-development-course-docs"],
+    "github:metyatech/game-development-course-docs#master",
+  );
   for (const entry of matrix) {
     assert.ok(/^github:metyatech\/[a-z0-9-]+#\S+$/.test(entry.courseSource));
   }
@@ -61,10 +64,7 @@ test("E2E matrix contains exactly the two representative sites", () => {
   const matrix = representativeE2EMatrix(readManifestFile());
   assert.equal(matrix.length, 2);
   const ids = matrix.map((m) => m.siteId).sort();
-  assert.deepEqual(ids, [
-    "javascript-course-docs",
-    "programming-course-docs",
-  ]);
+  assert.deepEqual(ids, ["javascript-course-docs", "programming-course-docs"]);
   const byId = Object.fromEntries(matrix.map((m) => [m.siteId, m]));
   assert.equal(byId["programming-course-docs"].e2ePort, 3101);
   assert.equal(byId["javascript-course-docs"].e2ePort, 3102);
@@ -73,9 +73,9 @@ test("E2E matrix contains exactly the two representative sites", () => {
   assert.equal(siteById(readManifestFile(), "open-campus-unreal-90min").representativeE2E, false);
 });
 
-test("redeploy matrix contains all six sites with repo/ref/workflow", () => {
+test("redeploy matrix contains all seven sites with repo/ref/workflow", () => {
   const matrix = redeployMatrix(readManifestFile());
-  assert.equal(matrix.length, 6);
+  assert.equal(matrix.length, 7);
   for (const entry of matrix) {
     assert.ok(entry.siteId);
     assert.ok(entry.repo);
@@ -85,6 +85,50 @@ test("redeploy matrix contains all six sites with repo/ref/workflow", () => {
   const prog = matrix.find((m) => m.siteId === "programming-course-docs");
   assert.equal(prog.ref, "master");
   assert.equal(prog.repo, "programming-course-docs");
+});
+
+test("game-development-course-docs is required and built and redeployed from master", () => {
+  const manifest = readManifestFile();
+  const gameSites = manifest.sites.filter((site) => site.id === "game-development-course-docs");
+  assert.ok(REQUIRED_SITE_IDS.includes("game-development-course-docs"));
+  assert.equal(gameSites.length, 1);
+
+  const gameSite = gameSites[0];
+  assert.equal(gameSite.requiresContentReadToken, false);
+  assert.equal(gameSite.defaultContentRef, "master");
+  assert.deepEqual(gameSite.features, {
+    submissions: false,
+    adminCommentModeration: false,
+    pagefind: true,
+    codePreview: false,
+    exercises: true,
+  });
+  assert.equal(gameSite.e2eProfile, "docs-only");
+  assert.equal(gameSite.representativeE2E, false);
+
+  const buildEntry = buildMatrix(manifest).find(
+    (entry) => entry.siteId === "game-development-course-docs",
+  );
+  assert.ok(buildEntry, "game-development-course-docs must be in the build matrix");
+  assert.equal(buildEntry.courseSource, "github:metyatech/game-development-course-docs#master");
+
+  const redeployEntry = redeployMatrix(manifest).find(
+    (entry) => entry.siteId === "game-development-course-docs",
+  );
+  assert.deepEqual(redeployEntry, {
+    siteId: "game-development-course-docs",
+    repo: "game-development-course-docs",
+    ref: "master",
+    workflow: "deploy-vercel.yml",
+  });
+});
+
+test("validator names game-development-course-docs when its manifest entry is missing", () => {
+  const manifest = baseManifest();
+  manifest.sites = manifest.sites.filter((site) => site.id !== "game-development-course-docs");
+  assert.ok(
+    validateManifest(manifest).includes("required site missing: game-development-course-docs"),
+  );
 });
 
 test("duplicate site id is rejected", () => {
@@ -174,14 +218,14 @@ test("non-https production url is rejected", () => {
   assert.ok(errors.some((e) => /schema:/.test(e)));
 });
 
-test("matrix CLI: build output is an object with include.length === 6", () => {
+test("matrix CLI: build output is an object with include.length === 7", () => {
   const stdout = runMatrixCli("build");
   const parsed = JSON.parse(stdout);
   assert.equal(typeof parsed, "object");
   assert.ok(parsed !== null, "CLI output must be a JSON object");
   assert.ok(!Array.isArray(parsed), "top-level must not be an array");
   assert.ok(Array.isArray(parsed.include), "parsed.include must be an array");
-  assert.equal(parsed.include.length, 6);
+  assert.equal(parsed.include.length, 7);
 });
 
 test("matrix CLI: e2e output is an object with include.length === 4", () => {
@@ -194,14 +238,14 @@ test("matrix CLI: e2e output is an object with include.length === 4", () => {
   assert.equal(parsed.include.length, 4);
 });
 
-test("matrix CLI: redeploy output is an object with include.length === 6", () => {
+test("matrix CLI: redeploy output is an object with include.length === 7", () => {
   const stdout = runMatrixCli("redeploy");
   const parsed = JSON.parse(stdout);
   assert.equal(typeof parsed, "object");
   assert.ok(parsed !== null, "CLI output must be a JSON object");
   assert.ok(!Array.isArray(parsed), "top-level must not be an array");
   assert.ok(Array.isArray(parsed.include), "parsed.include must be an array");
-  assert.equal(parsed.include.length, 6);
+  assert.equal(parsed.include.length, 7);
 });
 
 test("matrix CLI: stdout is parseable JSON with no stray log lines", () => {
@@ -235,7 +279,7 @@ test("build matrix: teacher-profile-docs entry has requiresContentReadToken === 
 test("build matrix: every non-teacher-profile entry has requiresContentReadToken === false", () => {
   const matrix = buildMatrix(readManifestFile());
   const others = matrix.filter((m) => m.siteId !== "teacher-profile-docs");
-  assert.equal(others.length, 5);
+  assert.equal(others.length, 6);
   for (const entry of others) {
     assert.equal(entry.requiresContentReadToken, false);
   }
@@ -272,7 +316,7 @@ test("cross constraints: a public site requiresContentReadToken=true is rejected
 test("matrix CLI: build output includes requiresContentReadToken for every entry", () => {
   const stdout = runMatrixCli("build");
   const parsed = JSON.parse(stdout);
-  assert.equal(parsed.include.length, 6);
+  assert.equal(parsed.include.length, 7);
   for (const entry of parsed.include) {
     assert.equal(
       typeof entry.requiresContentReadToken,
