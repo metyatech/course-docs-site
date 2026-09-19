@@ -85,6 +85,7 @@ test(
     const sourceBefore = await snapshotFiles(sourceRoot);
     await writeFile(siteRoot, "content/docs/student-guide/shots/old.raw.png", "stale raw");
     await writeFile(siteRoot, "content/docs/student-guide/shots/old.shot.json", "stale shot");
+    await writeFile(siteRoot, "public/_course-assets/docs/student-guide/img/stale.png", "stale");
 
     t.after(() => safeRm(tempRoot));
 
@@ -113,6 +114,26 @@ test(
     assert.equal(
       await fileExists(path.join(siteRoot, "content/docs/intro/assets/demo-complete.mp4")),
       true,
+    );
+    assert.equal(
+      await fileExists(path.join(siteRoot, "public/_course-assets/docs/student-guide/img/example.png")),
+      true,
+    );
+    assert.equal(
+      await fileExists(path.join(siteRoot, "public/_course-assets/docs/intro/assets/demo-complete.mp4")),
+      true,
+    );
+    assert.equal(
+      await fileExists(path.join(siteRoot, "public/_course-assets/docs/student-guide/shots/example.raw.png")),
+      false,
+    );
+    assert.equal(
+      await fileExists(path.join(siteRoot, "public/_course-assets/docs/student-guide/shots/example.shot.json")),
+      false,
+    );
+    assert.equal(
+      await fileExists(path.join(siteRoot, "public/_course-assets/docs/student-guide/img/stale.png")),
+      false,
     );
   },
 );
@@ -158,6 +179,20 @@ test(
         await fileExists(path.join(siteRoot, "content", `${relativeDirectory}.zip`)),
         true,
         `ZIP should be present: ${relativeDirectory}.zip`,
+      );
+      assert.equal(
+        await fileExists(
+          path.join(siteRoot, "public", "_course-assets", `${relativeDirectory}.zip`),
+        ),
+        true,
+        `ZIP should be present in generated static assets: ${relativeDirectory}.zip`,
+      );
+      assert.equal(
+        await fileExists(
+          path.join(siteRoot, "public", "_course-assets", relativeDirectory),
+        ),
+        false,
+        `editing source should be absent from generated static assets: ${relativeDirectory}`,
       );
     }
   },

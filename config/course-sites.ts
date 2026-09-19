@@ -15,14 +15,13 @@ import manifestJson from "./course-sites.json";
 
 export type CourseSiteFeatures = {
   submissions: boolean;
-  protectedDocs: boolean;
   adminCommentModeration: boolean;
   pagefind: boolean;
   codePreview: boolean;
   exercises: boolean;
 };
 
-export type E2EProfile = "docs-only" | "submissions" | "protected-admin";
+export type E2EProfile = "docs-only" | "submissions";
 
 export type CourseSite = {
   id: string;

@@ -1,149 +1,38 @@
-import type { Meta, PageMapItem } from "nextra";
-import { siteConfig } from "../../site.config";
 import {
   getAdminSessionCookieName,
   getAdminSessionSecret as getSessionSecret,
   isAdminSessionSecretValid,
   isAdminSessionValid as isAdminSessionValidImpl,
 } from "./admin/session";
-
 import { getCurrentCourseSite } from "./current-course-site";
 
-const DEFAULT_PUBLIC_FALLBACK_PATH = "/";
-const RESERVED_META_KEYS = new Set(["*", "index"]);
-
-type AdminModeLink = {
-  href: string;
-  label: string;
-};
-
-type AdminModeConfig = {
-  protectedLinks?: AdminModeLink[];
-  cookieName?: string;
-  publicFallbackPath?: string;
-};
-
-type SiteConfigWithAdminMode = typeof siteConfig & {
-  adminMode?: AdminModeConfig;
-};
-
-type StaticParams = {
-  mdxPath?: string[];
-  [key: string]: string | string[] | undefined;
-};
-
-const normalizeRoute = (route: string) => {
-  const trimmed = route.trim();
-  if (!trimmed) {
-    return "/";
-  }
-
-  const withLeadingSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-  if (withLeadingSlash.length > 1 && withLeadingSlash.endsWith("/")) {
-    return withLeadingSlash.slice(0, -1);
-  }
-  return withLeadingSlash;
-};
-
-const isAdminModeLink = (value: unknown): value is AdminModeLink => {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const maybeLink = value as Partial<AdminModeLink>;
-  return typeof maybeLink.href === "string" && typeof maybeLink.label === "string";
-};
-
-const getAdminModeConfig = () => (siteConfig as SiteConfigWithAdminMode).adminMode;
-
-const protectedLinks = (() => {
-  const rawLinks = Array.isArray(getAdminModeConfig()?.protectedLinks)
-    ? getAdminModeConfig()?.protectedLinks
-    : [];
-
-  const deduped = new Map<string, AdminModeLink>();
-  for (const rawLink of rawLinks ?? []) {
-    if (!isAdminModeLink(rawLink)) {
-      continue;
-    }
-
-    const href = normalizeRoute(rawLink.href);
-    deduped.set(href, {
-      href,
-      label: rawLink.label.trim() || href,
-    });
-  }
-
-  return [...deduped.values()];
-})();
-
-const protectedRoutes = protectedLinks.map((link) => link.href);
-
-export const getAdminModeCookieName = () => {
-  const configured = getAdminModeConfig()?.cookieName?.trim();
-  return configured || getAdminSessionCookieName();
-};
-
-export const getAdminModePublicFallbackPath = () => {
-  const configured = getAdminModeConfig()?.publicFallbackPath?.trim();
-  return configured ? normalizeRoute(configured) : DEFAULT_PUBLIC_FALLBACK_PATH;
-};
-
-/**
- * Returns the human-entered admin login code (`ADMIN_MODE_TOKEN`).
- * The login endpoint compares user input with this value using a
- * constant-time digest comparison. It is never compared against
- * `ADMIN_SESSION_SECRET` and is never used as the admin-session HMAC
- * signing key; `ADMIN_SESSION_SECRET` is reserved for signing cookies.
- */
+/** Returns the human-entered admin login code (`ADMIN_MODE_TOKEN`). */
 export const getAdminModeToken = (): string => (process.env.ADMIN_MODE_TOKEN ?? "").trim();
 
-/**
- * Returns the admin-session HMAC secret (`ADMIN_SESSION_SECRET`). The same
- * secret is used both to mint the signed session cookie and to verify it.
- */
+/** Returns the signed admin-session cookie name. */
+export const getAdminModeCookieName = () => getAdminSessionCookieName();
+
+/** Returns the admin-session HMAC secret (`ADMIN_SESSION_SECRET`). */
 export const getAdminSessionSecret = (): string => getSessionSecret();
 
 /**
- * Configuration-integrity check that the admin-mode shared token and the
- * admin-session HMAC secret are configured as two distinct values. Using the
- * same value for both would let anyone who learns the user-entered code
- * forge valid session cookies, so admin mode refuses to enable when they
- * match. This is a synchronous string comparison of two configured values
- * and is intentionally NOT a timing-safe primitive.
+ * The login token and HMAC secret must be distinct so knowledge of the
+ * human-entered code cannot forge an admin session cookie.
  */
 export const areAdminSecretsDistinct = (): boolean => {
   const token = getAdminModeToken();
   const secret = getAdminSessionSecret();
-
   return token !== "" && secret !== "" && token !== secret;
 };
 
-export const getProtectedAdminLinks = () => protectedLinks;
-
-/** True when the active course site defines at least one protected route. */
-export const hasProtectedAdminRoutes = (): boolean => protectedRoutes.length > 0;
-
-/**
- * True when the active course site enables the admin comment-moderation
- * surface (deleting work-submission comments). Read from the site manifest's
- * `features.adminCommentModeration` flag, not from the legacy `adminMode`
- * course config.
- */
+/** True when the active course site enables comment moderation. */
 export const hasAdminCommentModeration = (): boolean =>
   getCurrentCourseSite()?.features.adminCommentModeration === true;
 
-/** True when the active course site has any admin-mode capability. */
-export const hasAnyAdminCapability = (): boolean =>
-  hasProtectedAdminRoutes() || hasAdminCommentModeration();
+/** True when the active course site has an admin capability. */
+export const hasAnyAdminCapability = (): boolean => hasAdminCommentModeration();
 
-/**
- * True when the runtime is actually able to enable admin mode: at least one
- * admin capability is declared for the current site, the `ADMIN_MODE_TOKEN`
- * (user-supplied code) is configured, and the `ADMIN_SESSION_SECRET` (HMAC
- * key) is at least 32 bytes of UTF-8 randomness. Anything shorter
- * disables the configured gate so callers fail closed.
- */
+/** True when the signed admin session can serve comment moderation. */
 export const isAdminModeConfigured = (): boolean =>
   hasAnyAdminCapability() &&
   getAdminModeToken() !== "" &&
@@ -152,75 +41,3 @@ export const isAdminModeConfigured = (): boolean =>
 
 export const isAdminSessionValid = (cookieValue: string | null | undefined) =>
   isAdminSessionValidImpl(cookieValue ?? undefined, getAdminSessionSecret());
-
-export const isProtectedRoute = (pathname: string) => {
-  const normalizedPath = normalizeRoute(pathname);
-  return protectedRoutes.some(
-    (protectedRoute) =>
-      normalizedPath === protectedRoute || normalizedPath.startsWith(`${protectedRoute}/`),
-  );
-};
-
-export const isProtectedMdxPath = (mdxPath: string[] | undefined) => {
-  if (!mdxPath || mdxPath.length === 0) {
-    return false;
-  }
-  return isProtectedRoute(`/${mdxPath.join("/")}`);
-};
-
-export const filterProtectedStaticParams = <T extends StaticParams>(params: T[]) =>
-  params.filter((param) => {
-    const mdxPath = Array.isArray(param.mdxPath) ? param.mdxPath : undefined;
-    return !isProtectedMdxPath(mdxPath);
-  });
-
-const isPageMapMeta = (
-  item: PageMapItem,
-): item is PageMapItem & { data: Record<string, unknown> } =>
-  "data" in item && Boolean(item.data) && typeof item.data === "object";
-
-const isPageMapFolder = (
-  item: PageMapItem,
-): item is PageMapItem & { route: string; children: PageMapItem[] } =>
-  "route" in item &&
-  typeof item.route === "string" &&
-  "children" in item &&
-  Array.isArray(item.children);
-
-const isPageMapRouteEntry = (item: PageMapItem): item is PageMapItem & { route: string } =>
-  "route" in item && typeof item.route === "string";
-
-export const filterProtectedPageMap = (items: PageMapItem[], parentRoute = ""): PageMapItem[] =>
-  items.reduce<PageMapItem[]>((filteredItems, item) => {
-    if (isPageMapMeta(item)) {
-      const filteredData = Object.fromEntries(
-        Object.entries(item.data).filter(([key]) => {
-          if (RESERVED_META_KEYS.has(key)) {
-            return true;
-          }
-          return !isProtectedRoute(`${parentRoute}/${key}`);
-        }),
-      ) as Record<string, Meta>;
-      filteredItems.push({ ...item, data: filteredData });
-      return filteredItems;
-    }
-
-    if (isPageMapFolder(item)) {
-      if (isProtectedRoute(item.route)) {
-        return filteredItems;
-      }
-
-      filteredItems.push({
-        ...item,
-        children: filterProtectedPageMap(item.children, item.route),
-      });
-      return filteredItems;
-    }
-
-    if (isPageMapRouteEntry(item) && isProtectedRoute(item.route)) {
-      return filteredItems;
-    }
-
-    filteredItems.push(item);
-    return filteredItems;
-  }, []);

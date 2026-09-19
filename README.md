@@ -47,14 +47,14 @@ The Supabase variables are only needed when the selected course enables the `/su
 
 ### Admin mode
 
-If the synced `site.config.ts` defines `adminMode.protectedLinks` (or the active site enables admin comment
-moderation), two server-only environment variables are required to actually unlock admin features:
+If the active site enables admin comment moderation, two server-only environment variables are required to unlock
+the moderation controls:
 
 - `ADMIN_MODE_TOKEN`: the human-entered code shown in the admin-mode UI on the footer. The server compares it
   against this value at login time using a constant-time digest comparison. The token is **never** reused as
   the cookie signing secret.
 - `ADMIN_SESSION_SECRET`: the HMAC-SHA256 signing key for the signed admin session cookie. The cookie is set
-  after a successful `ADMIN_MODE_TOKEN` check and is verified on every protected request.
+  after a successful `ADMIN_MODE_TOKEN` check and is verified on every moderation request.
 
 Both values must be set in production. The two values **must not be the same** — using the same value for both
 would let anyone who learns the user-entered code forge valid session cookies. When the two values are equal,
@@ -69,8 +69,8 @@ Generate one with:
 openssl rand -base64 32
 ```
 
-Only `programming-course-docs` and `open-campus-unreal-90min` actually need these admin secrets — they are the
-two sites that define admin capabilities (comment moderation / protected docs). The other four supported sites
+Only `programming-course-docs` currently needs these admin secrets because it defines the admin comment-moderation
+capability. The other five supported sites
 (`course-common-docs`, `javascript-course-docs`, `web-foundations-docs`, `teacher-profile-docs`) have no admin
 features, so they do not need `ADMIN_MODE_TOKEN` or `ADMIN_SESSION_SECRET`.
 
@@ -306,8 +306,8 @@ COURSE_CONTENT_SOURCE=../programming-course-docs
 
 Template: `.env.course.local.example`
 
-If your selected course defines `siteConfig.adminMode.protectedLinks`, also set `ADMIN_SESSION_SECRET` in
-`.env.local` before `npm run dev`.
+If your selected course enables admin comment moderation, also set `ADMIN_SESSION_SECRET` in `.env.local` before
+`npm run dev`.
 
 PowerShell example:
 

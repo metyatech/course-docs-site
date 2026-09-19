@@ -7,8 +7,6 @@ import styles from "./admin-mode-footer-toggle.module.css";
 const STATUS_PATH = "/api/admin/mode/";
 const ADMIN_SESSION_CHANGED_EVENT = "course-docs-admin-session-changed";
 
-type ProtectedLink = { href: string; label: string };
-
 type AdminModeUnavailableReason =
   | "no-admin-capability"
   | "missing-admin-mode-token"
@@ -21,9 +19,7 @@ type AdminModeStatus = {
   available: boolean;
   configured: boolean;
   enabled: boolean;
-  capabilities: { protectedDocs: boolean; commentModeration: boolean };
-  protectedLinks: ProtectedLink[];
-  publicFallbackPath: string;
+  capabilities: { commentModeration: boolean };
   tokenConfigured: boolean;
   sessionSecretConfigured: boolean;
   sessionSecretValid: boolean;
@@ -36,9 +32,7 @@ const defaultStatus: AdminModeStatus = {
   available: false,
   configured: false,
   enabled: false,
-  capabilities: { protectedDocs: false, commentModeration: false },
-  protectedLinks: [],
-  publicFallbackPath: "/docs/intro",
+  capabilities: { commentModeration: false },
   tokenConfigured: false,
   sessionSecretConfigured: false,
   sessionSecretValid: false,
@@ -54,9 +48,6 @@ const readJson = async <T,>(response: Response, fallback: T): Promise<T> => {
     return fallback;
   }
 };
-
-const matchesProtectedPath = (pathname: string, protectedLinks: ProtectedLink[]) =>
-  protectedLinks.some((link) => pathname === link.href || pathname.startsWith(`${link.href}/`));
 
 const notifyAdminSessionChanged = () => {
   if (typeof window === "undefined") return;
@@ -136,10 +127,6 @@ export default function AdminModeFooterToggle() {
       setToken("");
       setOpen(false);
       notifyAdminSessionChanged();
-      if (matchesProtectedPath(window.location.pathname, nextStatus.protectedLinks)) {
-        window.location.assign(nextStatus.publicFallbackPath);
-        return;
-      }
       router.refresh();
     } finally {
       setPending(false);
@@ -199,17 +186,6 @@ export default function AdminModeFooterToggle() {
               </button>
             )}
           </div>
-          {status.enabled && status.protectedLinks.length > 0 ? (
-            <ul className={styles.links}>
-              {status.protectedLinks.map((link) => (
-                <li key={link.href} className={styles.linkItem}>
-                  <a className={styles.link} href={link.href}>
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </div>
       ) : null}
     </div>

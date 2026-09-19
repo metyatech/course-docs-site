@@ -18,12 +18,11 @@ export const REQUIRED_SITE_IDS = [
   "teacher-profile-docs",
 ];
 
-export const E2E_PROFILES = ["docs-only", "submissions", "protected-admin"];
+export const E2E_PROFILES = ["docs-only", "submissions"];
 
 export const REPRESENTATIVE_BY_PROFILE = {
   "docs-only": "javascript-course-docs",
   submissions: "programming-course-docs",
-  "protected-admin": "open-campus-unreal-90min",
 };
 
 const FORBIDDEN_PLACEHOLDER_VALUES = ["VERCEL_PROJECT_ID", "VERCEL_ORG_ID"];
@@ -138,16 +137,8 @@ export const validateCrossConstraints = (manifest) => {
     if (site.e2eProfile === "submissions" && site.features?.submissions !== true) {
       errors.push(`site ${site.id} has submissions profile but features.submissions is not true`);
     }
-    if (site.e2eProfile === "protected-admin" && site.features?.protectedDocs !== true) {
-      errors.push(
-        `site ${site.id} has protected-admin profile but features.protectedDocs is not true`,
-      );
-    }
     if (site.features?.adminCommentModeration === true && site.features?.submissions !== true) {
       errors.push(`site ${site.id} enables adminCommentModeration but submissions is not true`);
-    }
-    if (site.features?.protectedDocs === true && site.e2eProfile !== "protected-admin") {
-      errors.push(`site ${site.id} has protectedDocs but is not on the protected-admin profile`);
     }
   }
 

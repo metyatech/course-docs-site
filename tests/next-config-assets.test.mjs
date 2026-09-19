@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
+import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_BUILD } from "next/constants.js";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 
 const nextConfigUrl = pathToFileURL(path.resolve("next.config.js"));
 
-const importNextConfig = async (envOverrides = {}) => {
+const importNextConfig = async (envOverrides = {}, phase = PHASE_PRODUCTION_BUILD) => {
   const previous = {
     COURSE_DOCS_SKIP_BUILD_LINT: process.env.COURSE_DOCS_SKIP_BUILD_LINT,
     COURSE_DOCS_SKIP_BUILD_TYPECHECK: process.env.COURSE_DOCS_SKIP_BUILD_TYPECHECK,
@@ -24,7 +25,7 @@ const importNextConfig = async (envOverrides = {}) => {
 
   try {
     const importedConfig = await import(importUrl.href);
-    return importedConfig.default;
+    return importedConfig.default(phase);
   } finally {
     for (const [key, value] of Object.entries(previous)) {
       if (typeof value === "string") {
@@ -68,6 +69,15 @@ test("next dev allows 127.0.0.1 as an additional local origin", async () => {
   const nextConfig = await importNextConfig();
   assert.ok(Array.isArray(nextConfig.allowedDevOrigins));
   assert.ok(nextConfig.allowedDevOrigins.includes("127.0.0.1"));
+});
+
+test("development phase discovers tutorial-shots routes while production does not", async () => {
+  const productionConfig = await importNextConfig({}, PHASE_PRODUCTION_BUILD);
+  const developmentConfig = await importNextConfig({}, PHASE_DEVELOPMENT_SERVER);
+  assert.ok(!productionConfig.pageExtensions.includes("dev.ts"));
+  assert.ok(!productionConfig.pageExtensions.includes("dev.tsx"));
+  assert.ok(developmentConfig.pageExtensions.includes("dev.ts"));
+  assert.ok(developmentConfig.pageExtensions.includes("dev.tsx"));
 });
 
 test("verified builds can skip duplicate lint and typecheck passes", async () => {

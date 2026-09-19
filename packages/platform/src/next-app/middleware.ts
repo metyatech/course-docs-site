@@ -30,7 +30,7 @@ export function middleware(request: NextRequest) {
   }
 
   const url = request.nextUrl.clone();
-  url.pathname = `/asset${pathname}`;
+  url.pathname = `/_course-assets${pathname}`;
   return NextResponse.rewrite(url);
 }
 
