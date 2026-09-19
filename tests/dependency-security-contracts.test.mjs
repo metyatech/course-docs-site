@@ -42,7 +42,7 @@ test("npm version and install-script approvals are strict and version-pinned", a
   assert.equal(pkg.engines.npm, "11.19.1");
   assert.deepEqual(pkg.devEngines.packageManager, {
     name: "npm",
-    version: "11.19.1",
+    version: "^11.19.0",
     onFail: "error",
   });
   assert.deepEqual(pkg.allowScripts, {

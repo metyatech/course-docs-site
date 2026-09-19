@@ -240,6 +240,7 @@ test("Course Docs workflows use Ubuntu 26.04 and the pinned npm version", async 
     assert.match(workflow, /runs-on: ubuntu-26\.04/);
     assert.doesNotMatch(workflow, /runs-on: ubuntu-latest/);
     assert.match(workflow, /Install npm 11\.19\.1/);
+    assert.match(workflow, /npm install --global npm@11\.19\.1/);
   }
 });
 
