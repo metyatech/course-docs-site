@@ -16,7 +16,6 @@
       },
       "e2eProfile": "docs-only",
       "representativeE2E": false,
-      "smokeTestPaths": ["/", "/docs/intro"],
       "redeployOnSiteChange": true,
       "dispatchTarget": {
         "owner": "metyatech",
@@ -41,7 +40,6 @@
       "representativeE2E": true,
       "e2ePort": 3102,
       "e2eSourceEnv": "E2E_JAVASCRIPT_CONTENT_SOURCE",
-      "smokeTestPaths": ["/", "/docs/intro"],
       "redeployOnSiteChange": true,
       "dispatchTarget": {
         "owner": "metyatech",
@@ -66,7 +64,6 @@
       "representativeE2E": true,
       "e2ePort": 3101,
       "e2eSourceEnv": "E2E_PROGRAMMING_CONTENT_SOURCE",
-      "smokeTestPaths": ["/", "/docs/intro", "/submissions"],
       "redeployOnSiteChange": true,
       "dispatchTarget": {
         "owner": "metyatech",
@@ -89,7 +86,6 @@
       },
       "e2eProfile": "docs-only",
       "representativeE2E": false,
-      "smokeTestPaths": ["/", "/docs/intro"],
       "redeployOnSiteChange": true,
       "dispatchTarget": {
         "owner": "metyatech",
@@ -112,7 +108,6 @@
       },
       "e2eProfile": "docs-only",
       "representativeE2E": false,
-      "smokeTestPaths": ["/", "/docs/intro"],
       "redeployOnSiteChange": true,
       "dispatchTarget": {
         "owner": "metyatech",
@@ -135,7 +130,6 @@
       },
       "e2eProfile": "docs-only",
       "representativeE2E": false,
-      "smokeTestPaths": ["/", "/docs/intro"],
       "redeployOnSiteChange": true,
       "dispatchTarget": {
         "owner": "metyatech",

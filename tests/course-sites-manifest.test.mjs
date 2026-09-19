@@ -36,6 +36,16 @@ test("the shipped manifest passes schema and cross constraints", () => {
   assert.doesNotThrow(() => loadCourseSitesManifest());
 });
 
+test("manifest rejects the removed smoke-test path configuration", () => {
+  const manifest = baseManifest();
+  assert.ok(
+    manifest.sites.every((site) => !Object.hasOwn(site, "smokeTestPaths")),
+  );
+
+  manifest.sites[0].smokeTestPaths = ["/", "/docs/intro"];
+  assert.ok(validateManifest(manifest).some((error) => /schema:/.test(error)));
+});
+
 test("build matrix contains all six sites with course sources", () => {
   const matrix = buildMatrix(readManifestFile());
   assert.equal(matrix.length, 6);

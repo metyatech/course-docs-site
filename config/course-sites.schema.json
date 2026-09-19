@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/metyatech/course-docs-site/config/course-sites.schema.json",
   "title": "Course Docs Sites Manifest",
-  "description": "Single source of truth for all metyatech course documentation sites. Consumed by build matrix, E2E, redeploy dispatch, smoke test, and local dev tooling.",
+  "description": "Single source of truth for all metyatech course documentation sites. Consumed by build matrix, E2E, redeploy dispatch, and local dev tooling.",
   "type": "object",
   "required": ["version", "sites"],
   "additionalProperties": false,
@@ -26,7 +26,6 @@
         "features",
         "e2eProfile",
         "representativeE2E",
-        "smokeTestPaths",
         "redeployOnSiteChange",
         "dispatchTarget"
       ],
@@ -62,11 +61,6 @@
         "representativeE2E": { "type": "boolean" },
         "e2ePort": { "type": "integer", "minimum": 1024, "maximum": 65535 },
         "e2eSourceEnv": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
-        "smokeTestPaths": {
-          "type": "array",
-          "minItems": 2,
-          "items": { "type": "string", "pattern": "^/" }
-        },
         "redeployOnSiteChange": { "type": "boolean" },
         "dispatchTarget": {
           "type": "object",
