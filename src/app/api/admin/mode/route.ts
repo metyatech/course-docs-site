@@ -2,10 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
   getAdminModeCookieName,
-  getAdminModePublicFallbackPath,
-  getProtectedAdminLinks,
   hasAdminCommentModeration,
-  hasProtectedAdminRoutes,
   hasAnyAdminCapability,
   isAdminModeConfigured,
   isAdminSessionValid,
@@ -36,11 +33,8 @@ type AdminModeStatus = {
   configured: boolean;
   enabled: boolean;
   capabilities: {
-    protectedDocs: boolean;
     commentModeration: boolean;
   };
-  protectedLinks: Array<{ href: string; label: string }>;
-  publicFallbackPath: string;
   tokenConfigured: boolean;
   sessionSecretConfigured: boolean;
   sessionSecretValid: boolean;
@@ -73,13 +67,11 @@ const jsonResponse = (status: AdminModeStatus, init: ResponseInit = {}) => {
 };
 
 const buildStatus = (enabled: boolean): AdminModeStatus => {
-  const protectedLinks = getProtectedAdminLinks();
-  const protectedDocs = hasProtectedAdminRoutes();
   const commentModeration = hasAdminCommentModeration();
   const tokenConfigured = getAdminModeToken() !== "";
   const sessionSecretConfigured = getAdminSessionSecret() !== "";
   const sessionSecretValid = isAdminSessionSecretValid(getAdminSessionSecret());
-  const capability = protectedDocs || commentModeration;
+  const capability = commentModeration;
 
   const secretsDistinct =
     tokenConfigured &&
@@ -103,9 +95,7 @@ const buildStatus = (enabled: boolean): AdminModeStatus => {
     available: capability,
     configured,
     enabled: configured && enabled,
-    capabilities: { protectedDocs, commentModeration },
-    protectedLinks,
-    publicFallbackPath: getAdminModePublicFallbackPath(),
+    capabilities: { commentModeration },
     tokenConfigured,
     sessionSecretConfigured,
     sessionSecretValid,

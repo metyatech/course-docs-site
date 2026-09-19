@@ -80,17 +80,3 @@
   line-height: 1.5;
   padding: 0.65rem 0.75rem;
 }
-
-.links {
-  margin: 0.75rem 0 0;
-  padding-left: 1.1rem;
-}
-
-.linkItem + .linkItem {
-  margin-top: 0.35rem;
-}
-
-.link {
-  text-decoration: underline;
-  text-underline-offset: 0.18em;
-}

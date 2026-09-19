@@ -1,4 +1,4 @@
-const DOWNLOADABLE_PREFIXES = ['/_next/static/media/', '/asset/'];
+const DOWNLOADABLE_PREFIXES = ['/_next/static/media/'];
 
 const buildContentDisposition = (filename: string) => {
   const asciiFallback = filename.replace(/[^\x20-\x7E]+/g, '_').replace(/["\\]/g, '_');

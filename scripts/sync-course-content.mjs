@@ -12,6 +12,7 @@ import { normalizeOriginUrl } from "./git-origin-normalize.mjs";
 import { parseLsRemoteObjectId } from "./git-remote-ref.mjs";
 import { resolveNextDistDirPath } from "./next-dist-dir.mjs";
 import { redactArgsForError, redactGitError } from "./sanitize-git-error.mjs";
+import { DIRECT_ROUTE_ASSET_EXTENSION_SET } from "../packages/platform/dist/shared/course-asset-config.js";
 
 export { redactArgsForError, redactGitError };
 export { normalizeOriginUrl };
@@ -306,6 +307,24 @@ const isDeploymentExcludedContentPath = (relativePath) =>
 const shouldSkipContentEntry = ({ name, relativePath }) =>
   name === "_pagefind" || isDeploymentExcludedContentPath(relativePath);
 
+const isStaticAssetSourceEntry = ({ sourcePath, relativePath }) => {
+  let stat;
+  try {
+    stat = fs.lstatSync(sourcePath);
+    if (stat.isSymbolicLink()) {
+      stat = fs.statSync(sourcePath);
+    }
+  } catch {
+    return true;
+  }
+
+  if (stat.isDirectory()) {
+    return false;
+  }
+
+  return !DIRECT_ROUTE_ASSET_EXTENSION_SET.has(path.extname(relativePath).toLowerCase());
+};
+
 const copyFile = (from, to) => {
   try {
     const st = fs.lstatSync(to);
@@ -562,4 +581,18 @@ syncDirectory({
   from: publicFrom,
   to: publicTo,
   shouldSkip: ({ relativePath }) => relativePath === "student-works",
+});
+
+// Direct course assets keep their author-facing /docs/... URLs, but are
+// mirrored into public static assets so they never need a Node filesystem
+// route or output-file-tracing include. The same deployment exclusions used
+// for synced content are applied to this generated tree.
+const staticAssetsFrom = contentFrom;
+const staticAssetsTo = path.join(publicTo, "_course-assets");
+syncDirectory({
+  from: staticAssetsFrom,
+  to: staticAssetsTo,
+  shouldSkip: ({ sourcePath, relativePath }) =>
+    isDeploymentExcludedContentPath(relativePath) ||
+    isStaticAssetSourceEntry({ sourcePath, relativePath }),
 });

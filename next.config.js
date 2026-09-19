@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 import nextra from "nextra";
 import {
   applyCourseAssetWebpackRules,
@@ -10,6 +11,7 @@ import {
   resolveNextDistDir,
   resolveNextDistDirPath,
 } from "./scripts/next-dist-dir.mjs";
+import { resolveDefaultContentPath } from "./scripts/default-content-path.mjs";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 const skipBuildLint = process.env.COURSE_DOCS_SKIP_BUILD_LINT === "1";
@@ -60,8 +62,10 @@ const applyArbitraryAssetDirectoryFallbackRule = (config, { isServer }) => {
   return config;
 };
 
+const BASE_PAGE_EXTENSIONS = ["ts", "tsx", "js", "jsx", "md", "mdx"];
+
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+const createNextConfig = (phase) => ({
   distDir: resolveNextDistDir({ projectRoot, env: process.env }),
   reactStrictMode: true,
   trailingSlash: true,
@@ -74,11 +78,14 @@ const nextConfig = {
     ignoreBuildErrors: skipBuildTypecheck,
     tsconfigPath: ensureNextTsconfig({ projectRoot, env: process.env }),
   },
-  outputFileTracingIncludes: {
-    // Ensure /asset route can read synced course files in serverless runtimes.
-    "/asset/[...assetPath]": ["content/**/*"],
-    "/asset/[...assetPath]/route": ["content/**/*"],
-    "/asset": ["content/**/*"],
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: resolveDefaultContentPath(),
+        permanent: false,
+      },
+    ];
   },
   env: {
     NEXT_PUBLIC_WORKS_BASE_URL: process.env.NEXT_PUBLIC_WORKS_BASE_URL ?? "",
@@ -87,7 +94,10 @@ const nextConfig = {
     unoptimized: true,
     disableStaticImages: true,
   },
-  pageExtensions: ["ts", "tsx", "js", "jsx", "md", "mdx"],
+  pageExtensions:
+    phase === PHASE_DEVELOPMENT_SERVER
+      ? [...BASE_PAGE_EXTENSIONS, "dev.ts", "dev.tsx"]
+      : BASE_PAGE_EXTENSIONS,
   webpack: (config, { isServer }) => {
     config.resolve = config.resolve ?? {};
     config.resolve.symlinks = false;
@@ -105,6 +115,8 @@ const nextConfig = {
     applyCourseAssetWebpackRules(config, { isServer, projectRoot });
     return applyArbitraryAssetDirectoryFallbackRule(config, { isServer });
   },
-};
+});
 
-export default withNextra(nextConfig);
+const nextConfig = (phase) => withNextra(createNextConfig(phase));
+
+export default nextConfig;

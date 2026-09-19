@@ -47,20 +47,20 @@ test("build matrix contains all six sites with course sources", () => {
   }
 });
 
-test("E2E matrix contains exactly the three representative sites", () => {
+test("E2E matrix contains exactly the two representative sites", () => {
   const matrix = representativeE2EMatrix(readManifestFile());
-  assert.equal(matrix.length, 3);
+  assert.equal(matrix.length, 2);
   const ids = matrix.map((m) => m.siteId).sort();
   assert.deepEqual(ids, [
     "javascript-course-docs",
-    "open-campus-unreal-90min",
     "programming-course-docs",
   ]);
   const byId = Object.fromEntries(matrix.map((m) => [m.siteId, m]));
   assert.equal(byId["programming-course-docs"].e2ePort, 3101);
   assert.equal(byId["javascript-course-docs"].e2ePort, 3102);
-  assert.equal(byId["open-campus-unreal-90min"].e2ePort, 3103);
-  assert.equal(byId["open-campus-unreal-90min"].e2eProfile, "protected-admin");
+  assert.equal(byId["open-campus-unreal-90min"], undefined);
+  assert.equal(siteById(readManifestFile(), "open-campus-unreal-90min").e2eProfile, "docs-only");
+  assert.equal(siteById(readManifestFile(), "open-campus-unreal-90min").representativeE2E, false);
 });
 
 test("redeploy matrix contains all six sites with repo/ref/workflow", () => {
@@ -136,13 +136,6 @@ test("submissions profile without submissions feature is rejected", () => {
   assert.ok(errors.some((e) => /submissions profile but features.submissions/.test(e)));
 });
 
-test("protectedDocs without protected-admin profile is rejected", () => {
-  const m = baseManifest();
-  siteById(m, "course-common-docs").features.protectedDocs = true;
-  const errors = validateManifest(m);
-  assert.ok(errors.some((e) => /protectedDocs but is not on the protected-admin profile/.test(e)));
-});
-
 test("adminCommentModeration without submissions is rejected", () => {
   const m = baseManifest();
   siteById(m, "course-common-docs").features.adminCommentModeration = true;
@@ -181,14 +174,14 @@ test("matrix CLI: build output is an object with include.length === 6", () => {
   assert.equal(parsed.include.length, 6);
 });
 
-test("matrix CLI: e2e output is an object with include.length === 6", () => {
+test("matrix CLI: e2e output is an object with include.length === 4", () => {
   const stdout = runMatrixCli("e2e");
   const parsed = JSON.parse(stdout);
   assert.equal(typeof parsed, "object");
   assert.ok(parsed !== null, "CLI output must be a JSON object");
   assert.ok(!Array.isArray(parsed), "top-level must not be an array");
   assert.ok(Array.isArray(parsed.include), "parsed.include must be an array");
-  assert.equal(parsed.include.length, 6);
+  assert.equal(parsed.include.length, 4);
 });
 
 test("matrix CLI: redeploy output is an object with include.length === 6", () => {
@@ -240,7 +233,7 @@ test("build matrix: every non-teacher-profile entry has requiresContentReadToken
 
 test("E2E matrix: every entry has requiresContentReadToken === false (current reps are public)", () => {
   const matrix = representativeE2EMatrix(readManifestFile());
-  assert.equal(matrix.length, 3);
+  assert.equal(matrix.length, 2);
   for (const entry of matrix) {
     assert.equal(entry.requiresContentReadToken, false);
   }
@@ -284,7 +277,7 @@ test("matrix CLI: build output includes requiresContentReadToken for every entry
 test("matrix CLI: e2e output expands every representative course into two shards", () => {
   const stdout = runMatrixCli("e2e");
   const parsed = JSON.parse(stdout);
-  assert.equal(parsed.include.length, 6);
+  assert.equal(parsed.include.length, 4);
   const shardsBySite = new Map();
   for (const entry of parsed.include) {
     assert.equal(
@@ -299,7 +292,6 @@ test("matrix CLI: e2e output expands every representative course into two shards
   }
   assert.deepEqual([...shardsBySite.keys()].sort(), [
     "javascript-course-docs",
-    "open-campus-unreal-90min",
     "programming-course-docs",
   ]);
   for (const shards of shardsBySite.values()) {

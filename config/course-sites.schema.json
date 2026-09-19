@@ -41,7 +41,6 @@
           "type": "object",
           "required": [
             "submissions",
-            "protectedDocs",
             "adminCommentModeration",
             "pagefind",
             "codePreview",
@@ -50,7 +49,6 @@
           "additionalProperties": false,
           "properties": {
             "submissions": { "type": "boolean" },
-            "protectedDocs": { "type": "boolean" },
             "adminCommentModeration": { "type": "boolean" },
             "pagefind": { "type": "boolean" },
             "codePreview": { "type": "boolean" },
@@ -59,7 +57,7 @@
         },
         "e2eProfile": {
           "type": "string",
-          "enum": ["docs-only", "submissions", "protected-admin"]
+          "enum": ["docs-only", "submissions"]
         },
         "representativeE2E": { "type": "boolean" },
         "e2ePort": { "type": "integer", "minimum": 1024, "maximum": 65535 },

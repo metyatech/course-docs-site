@@ -190,7 +190,7 @@ test("fast local scripts do not invoke the full E2E matrix", async () => {
   assert.equal(pkg.scripts["verify:e2e:matrix"], "npm run test:e2e:matrix");
   assert.equal(
     pkg.scripts["verify:ci"],
-    "npm run verify:sites && npm run build && npm run verify:course:ci",
+    "npm run verify:sites && npm run build && npm run test:production-routes && npm run verify:course:ci",
   );
 });
 

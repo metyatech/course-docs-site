@@ -9,7 +9,6 @@
       "productionUrl": "https://course-common-docs.vercel.app",
       "features": {
         "submissions": false,
-        "protectedDocs": false,
         "adminCommentModeration": false,
         "pagefind": true,
         "codePreview": true,
@@ -33,7 +32,6 @@
       "productionUrl": "https://javascript-course-docs.vercel.app",
       "features": {
         "submissions": false,
-        "protectedDocs": false,
         "adminCommentModeration": false,
         "pagefind": true,
         "codePreview": true,
@@ -59,7 +57,6 @@
       "productionUrl": "https://programming-course-docs.vercel.app",
       "features": {
         "submissions": true,
-        "protectedDocs": false,
         "adminCommentModeration": true,
         "pagefind": true,
         "codePreview": true,
@@ -85,7 +82,6 @@
       "productionUrl": "https://web-foundations-docs.vercel.app",
       "features": {
         "submissions": false,
-        "protectedDocs": false,
         "adminCommentModeration": false,
         "pagefind": true,
         "codePreview": true,
@@ -109,16 +105,13 @@
       "productionUrl": "https://open-campus-unreal-90min.vercel.app",
       "features": {
         "submissions": false,
-        "protectedDocs": true,
         "adminCommentModeration": false,
         "pagefind": true,
         "codePreview": true,
         "exercises": true
       },
-      "e2eProfile": "protected-admin",
-      "representativeE2E": true,
-      "e2ePort": 3103,
-      "e2eSourceEnv": "E2E_OPEN_CAMPUS_CONTENT_SOURCE",
+      "e2eProfile": "docs-only",
+      "representativeE2E": false,
       "smokeTestPaths": ["/", "/docs/intro"],
       "redeployOnSiteChange": true,
       "dispatchTarget": {
@@ -135,7 +128,6 @@
       "productionUrl": "https://teacher-profile-docs.vercel.app",
       "features": {
         "submissions": false,
-        "protectedDocs": false,
         "adminCommentModeration": false,
         "pagefind": true,
         "codePreview": true,

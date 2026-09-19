@@ -2,6 +2,9 @@
 
 Local authoring tool for step-by-step tutorial screenshots.
 
+The editor page and its API routes are discovered only by the Next.js development server. They are not included in
+production builds; use `npm run dev` for this authoring workflow.
+
 The editor keeps learner-facing tutorial image references in page-local `img/`
 folders while moving the editable source of truth to:
 

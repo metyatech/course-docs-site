@@ -158,6 +158,10 @@ test(
     const intro = await fetchText(`${baseUrl}/docs/intro/`);
     assert.equal(intro.status, 200);
 
+    const root = await fetch(`${baseUrl}/`, { redirect: "manual" });
+    assert.equal(root.status, 307);
+    assert.match(root.headers.get("location") ?? "", /\/docs\/intro\/?$/);
+
     const imageTagMatch = intro.text.match(/<img[^>]*alt="fixture image"[^>]*>/i);
     assert.ok(imageTagMatch, "Could not find markdown image in /docs/intro/ HTML.");
     const srcMatch = imageTagMatch[0].match(/\ssrc="([^"]+)"/i);
@@ -174,5 +178,6 @@ test(
       signal: AbortSignal.timeout(20_000),
     });
     assert.equal(imageResponse.status, 200);
+    assert.equal(imageResponse.headers.get("content-type"), "image/png");
   },
 );
