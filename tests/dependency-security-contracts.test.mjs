@@ -9,6 +9,21 @@ const packageJsonPath = path.join(projectRoot, "package.json");
 const packageLockPath = path.join(projectRoot, "package-lock.json");
 const patchesDir = path.join(projectRoot, "patches");
 
+const compareVersions = (left, right) => {
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+
+  return 0;
+};
+
+const parseVersion = (value) => {
+  const match = /^(?:\^|~)?(\d+)\.(\d+)\.(\d+)$/.exec(value);
+  assert.ok(match, `Expected a simple Playwright version, received ${value}.`);
+  return match.slice(1).map(Number);
+};
+
 const parsePatchFileName = (fileName) => {
   const stem = fileName.replace(/\.patch$/, "");
   const parts = stem.split("+");
@@ -50,6 +65,27 @@ test("npm version and install-script approvals are strict and version-pinned", a
     "unrs-resolver@1.11.1": true,
   });
   assert.match(npmrc, /^strict-allow-scripts=true$/m);
+});
+
+test("Playwright versions support Chromium installation on Ubuntu 26.04", async () => {
+  const pkg = JSON.parse(await readFile(packageJsonPath, "utf8"));
+  const lockfile = JSON.parse(await readFile(packageLockPath, "utf8"));
+  const minimumVersion = [1, 60, 0];
+  const manifestVersion = parseVersion(pkg.devDependencies["@playwright/test"]);
+
+  assert.ok(
+    compareVersions(manifestVersion, minimumVersion) >= 0,
+    "Playwright 1.60.0 or newer is required for Ubuntu 26.04 browser installation.",
+  );
+
+  for (const packageName of ["@playwright/test", "playwright", "playwright-core"]) {
+    const lockedVersion = lockfile.packages[`node_modules/${packageName}`]?.version;
+    assert.ok(lockedVersion, `Expected a package-lock entry for ${packageName}.`);
+    assert.ok(
+      compareVersions(parseVersion(lockedVersion), minimumVersion) >= 0,
+      `${packageName}@${lockedVersion} does not support Ubuntu 26.04 browser installation.`,
+    );
+  }
 });
 
 test("verify:ci script contains every required CI gate", async () => {
