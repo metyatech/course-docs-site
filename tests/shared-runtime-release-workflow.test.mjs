@@ -39,6 +39,11 @@ test("automatic shared-main Production fanout is absent and release is manual", 
 
 test("release verifies main CI and history, dispatches exact SHA, then smoke-tests before pointer update", async () => {
   const workflow = await readProjectFile(".github/workflows/release-shared-runtime.yml");
+  assert.match(
+    workflow,
+    /Checkout shared history[\s\S]*?Setup Node[\s\S]*?actions\/setup-node@v6/u,
+  );
+  assert.match(workflow, /Install npm 11\.19\.1[\s\S]*?run: npm install --global npm@11\.19\.1/u);
   assert.match(workflow, /target_sha:[\s\S]*?required:\s*false/u);
   assert.match(workflow, /TARGET_SHA_INPUT:-\$WORKFLOW_SHA/u);
   assert.match(workflow, /git merge-base --is-ancestor "\$TARGET_SHA" origin\/main/u);

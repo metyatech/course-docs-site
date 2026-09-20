@@ -34,6 +34,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
       - name: Install npm 11.19.1
         run: npm install --global npm@11.19.1
         working-directory: ${{ runner.temp }}
