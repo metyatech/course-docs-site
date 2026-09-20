@@ -232,7 +232,7 @@ test("Course Docs workflows use Ubuntu 26.04 and the pinned npm version", async 
   const workflowPaths = [
     path.join(projectRoot, ".github", "workflows", "ci.yml"),
     path.join(projectRoot, ".github", "workflows", "deploy-course.yml"),
-    path.join(projectRoot, ".github", "workflows", "redeploy-content-sites.yml"),
+    path.join(projectRoot, ".github", "workflows", "release-shared-runtime.yml"),
   ];
 
   for (const workflowPath of workflowPaths) {

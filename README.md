@@ -46,23 +46,35 @@ Required env vars (files or environment):
 
 Create the content repository under `metyatech`, then:
 
-1. Add the GitHub topic `course-docs` to opt it into shared builds and shared-runtime redeploys.
+1. Add the GitHub topic `course-docs` to opt it into shared builds and shared-runtime releases.
 2. Add `content/` and a root `site.config.ts`.
 3. Add the small deployment caller at `.github/workflows/deploy-vercel.yml`. It must call the shared
-   [deployment workflow](./.github/workflows/deploy-course.yml) and pass the three named Vercel secrets.
+   [deployment workflow](./.github/workflows/deploy-course.yml) at `@production-runtime`, pass the
+   optional `shared_runtime_ref` dispatch input (default `production-runtime`), and pass the three named Vercel secrets.
 4. Create the matching Vercel project and configure `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
    `VERCEL_PROJECT_ID` as repository secrets.
 5. For a private content repository, grant the shared `COURSE_CONTENT_READ_TOKEN` read access to its
-   Contents and Metadata. The shared repository uses this token only for discovery and private content reads.
+   Contents and Metadata. The manual shared runtime release also uses this token for authenticated repository listing
+   and caller checks.
 
-The next shared CI run discovers and builds every active repository with the topic. A content push starts that
-repository's deployment caller only; a successful shared `main` CI run dispatches every discovered caller. No
-central course list or required-site IDs need updating.
+The next shared CI run discovers and builds every active repository with the topic. No central course list or
+required-site IDs need updating.
+
+Deployment behavior is:
+
+- A push to `course-docs-site/main` runs CI across all discovered sites and does not deploy Production.
+- A content repository push deploys only that site, using the `production-runtime` pointer.
+- To release a completed shared runtime, manually run **Release shared runtime** from `main`, optionally entering
+  a full `target_sha`. The release checks that commit's successful CI, deploys that exact SHA to every discovered
+  site, runs Production smoke checks, and advances `production-runtime` only after all checks pass.
+- If any deployment or smoke check fails, `production-runtime` stays on its previous SHA, so later content pushes
+  continue to use the runtime currently in Production.
 
 The caller's default-branch check uses GitHub's repository metadata, so it works with either `main` or `master`:
 
 ```yaml
 name: Deploy site to Vercel
+run-name: Deploy [shared-runtime-release:${{ inputs.release_id || 'content' }}] with ${{ inputs.shared_runtime_ref || 'production-runtime' }}
 
 on:
   push:
@@ -72,6 +84,17 @@ on:
       - "site.config.ts"
       - ".github/workflows/deploy-vercel.yml"
   workflow_dispatch:
+    inputs:
+      shared_runtime_ref:
+        description: Shared runtime commit SHA for a coordinated release.
+        required: false
+        type: string
+        default: production-runtime
+      release_id:
+        description: Correlation ID used by a coordinated shared runtime release.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -81,7 +104,9 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.ref_name == github.event.repository.default_branch
-    uses: metyatech/course-docs-site/.github/workflows/deploy-course.yml@main
+    uses: metyatech/course-docs-site/.github/workflows/deploy-course.yml@production-runtime
+    with:
+      shared_runtime_ref: ${{ github.event_name == 'workflow_dispatch' && inputs.shared_runtime_ref || 'production-runtime' }}
     secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -142,8 +167,9 @@ See `.env.example` for the full list.
 ### Private course content authentication (Site CI)
 
 Shared CI discovers active `course-docs` repositories through the GitHub REST API. Public repositories are listed
-without credentials. The private repository listing and private content checkouts use the shared repository's
-GitHub Actions secret:
+without credentials during CI. The private repository listing and private content checkouts use the shared
+repository's GitHub Actions secret. Manual releases also use it to authenticate repository listing and caller/root
+contract checks across public and private repositories, avoiding unauthenticated API rate limits:
 
 - Secret name: `COURSE_CONTENT_READ_TOKEN`
 - Token type: **fine-grained Personal Access Token**

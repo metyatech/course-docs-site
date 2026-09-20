@@ -1,0 +1,219 @@
+name: Release shared runtime
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Full course-docs-site commit SHA to release. Defaults to this main workflow run's commit.
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: course-docs-site-production-runtime-release
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+      target_sha: ${{ steps.release.outputs.target_sha }}
+      previous_sha: ${{ steps.release.outputs.previous_sha }}
+      release_id: ${{ steps.release.outputs.release_id }}
+      site_count: ${{ steps.discover.outputs.site_count }}
+    steps:
+      - name: Checkout shared history
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install npm 11.19.1
+        run: npm install --global npm@11.19.1
+        working-directory: ${{ runner.temp }}
+
+      - name: Install
+        run: npm ci
+
+      - name: Validate release target and production pointer
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA_INPUT: ${{ inputs.target_sha }}
+          WORKFLOW_SHA: ${{ github.sha }}
+          WORKFLOW_REF: ${{ github.ref }}
+          RELEASE_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+
+          if [ "$WORKFLOW_REF" != "refs/heads/main" ]; then
+            echo "Release workflow must be started from main."
+            exit 1
+          fi
+
+          TARGET_SHA="${TARGET_SHA_INPUT:-$WORKFLOW_SHA}"
+          TARGET_SHA="$(printf '%s' "$TARGET_SHA" | tr '[:upper:]' '[:lower:]')"
+          if [[ ! "$TARGET_SHA" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then
+            echo "target_sha must be a full 40- or 64-character commit SHA."
+            exit 1
+          fi
+
+          if ! git cat-file -e "${TARGET_SHA}^{commit}"; then
+            echo "Release target is not present in course-docs-site history."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$TARGET_SHA" origin/main; then
+            echo "Release target is not an ancestor of course-docs-site/main."
+            exit 1
+          fi
+
+          CI_SUCCESS="$(gh api "repos/metyatech/course-docs-site/actions/workflows/ci.yml/runs?head_sha=${TARGET_SHA}&event=push&per_page=100" --jq '.workflow_runs | any(.[]; .status == "completed" and .conclusion == "success" and .event == "push")')"
+          if [ "$CI_SUCCESS" != "true" ]; then
+            echo "No successful CI run was found for target ${TARGET_SHA}."
+            exit 1
+          fi
+
+          POINTER_JSON="$(gh api repos/metyatech/course-docs-site/git/ref/heads/production-runtime)"
+          PREVIOUS_SHA="$(printf '%s' "$POINTER_JSON" | node --input-type=module -e 'let input=""; for await (const chunk of process.stdin) input += chunk; const ref=JSON.parse(input); if (ref.ref !== "refs/heads/production-runtime" || !/^(?:[\da-f]{40}|[\da-f]{64})$/i.test(ref.object?.sha ?? "")) process.exit(1); process.stdout.write(ref.object.sha.toLowerCase());')"
+          if [ "$PREVIOUS_SHA" = "$TARGET_SHA" ]; then
+            echo "production-runtime already points to the requested SHA."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$PREVIOUS_SHA" "$TARGET_SHA"; then
+            echo "Release would move production-runtime backward or off history."
+            exit 1
+          fi
+
+          echo "target_sha=${TARGET_SHA}" >> "$GITHUB_OUTPUT"
+          echo "previous_sha=${PREVIOUS_SHA}" >> "$GITHUB_OUTPUT"
+          echo "release_id=${RELEASE_ID}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Shared runtime release preflight"
+            echo "- Target shared runtime SHA: ${TARGET_SHA}"
+            echo "- Current production-runtime SHA: ${PREVIOUS_SHA}"
+            echo "- Successful main CI: verified"
+            echo "- Fast-forward: verified"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Discover and validate all production callers
+        id: discover
+        env:
+          COURSE_CONTENT_READ_TOKEN: ${{ secrets.COURSE_CONTENT_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          MATRIX="$(node scripts/discover-course-repositories.mjs --kind release)"
+          printf 'matrix=%s\n' "$MATRIX" >> "$GITHUB_OUTPUT"
+          SITE_COUNT="$(printf '%s' "$MATRIX" | node --input-type=module -e 'let input=""; for await (const chunk of process.stdin) input += chunk; const value=JSON.parse(input); if (!Array.isArray(value.include) || value.include.length === 0) process.exit(1); process.stdout.write(String(value.include.length));')"
+          echo "site_count=${SITE_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "Discovered and validated ${SITE_COUNT} course deployment callers, including private repositories."
+          echo "- Discovered production sites: ${SITE_COUNT}" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: preflight
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.preflight.outputs.matrix) }}
+    name: Deploy ${{ matrix.siteId }}
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Dispatch and wait for exact-SHA deployment
+        env:
+          GH_TOKEN: ${{ secrets.COURSE_CONTENT_REDEPLOY_TOKEN }}
+          COURSE_REPOSITORY: ${{ matrix.fullName }}
+          COURSE_WORKFLOW: ${{ matrix.workflow }}
+          COURSE_REF: ${{ matrix.ref }}
+          TARGET_SHA: ${{ needs.preflight.outputs.target_sha }}
+          RELEASE_ID: ${{ needs.preflight.outputs.release_id }}
+        run: node scripts/dispatch-course-deployment.mjs
+
+  smoke:
+    needs: [preflight, deploy]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install npm 11.19.1
+        run: npm install --global npm@11.19.1
+        working-directory: ${{ runner.temp }}
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke-test all Production sites
+        env:
+          COURSE_RELEASE_MATRIX: ${{ needs.preflight.outputs.matrix }}
+        run: node scripts/smoke-production-sites.mjs
+
+  advance-production-runtime:
+    needs: [preflight, deploy, smoke]
+    if: ${{ needs.preflight.result == 'success' && needs.deploy.result == 'success' && needs.smoke.result == 'success' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout shared history
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.target_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Advance production-runtime by fast-forward only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_SHA: ${{ needs.preflight.outputs.previous_sha }}
+          TARGET_SHA: ${{ needs.preflight.outputs.target_sha }}
+          SITE_COUNT: ${{ needs.preflight.outputs.site_count }}
+        run: |
+          set -euo pipefail
+
+          CURRENT_SHA="$(gh api repos/metyatech/course-docs-site/git/ref/heads/production-runtime --jq '.object.sha' | tr '[:upper:]' '[:lower:]')"
+          if [ "$CURRENT_SHA" != "$PREVIOUS_SHA" ]; then
+            echo "production-runtime changed during release; refusing to update it."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$CURRENT_SHA" "$TARGET_SHA"; then
+            echo "Target is not a fast-forward from the current production-runtime pointer."
+            exit 1
+          fi
+
+          UPDATED_SHA="$(gh api --method PATCH repos/metyatech/course-docs-site/git/refs/heads/production-runtime -f sha="$TARGET_SHA" -F force=false --jq '.object.sha' | tr '[:upper:]' '[:lower:]')"
+          if [ "$UPDATED_SHA" != "$TARGET_SHA" ]; then
+            echo "GitHub did not advance production-runtime to the requested SHA."
+            exit 1
+          fi
+
+          {
+            echo "## production-runtime advanced"
+            echo "- Previous SHA: ${CURRENT_SHA}"
+            echo "- New SHA: ${UPDATED_SHA}"
+            echo "- Deployments: all ${SITE_COUNT} discovered sites succeeded"
+            echo "- Production smoke: passed"
+          } >> "$GITHUB_STEP_SUMMARY"

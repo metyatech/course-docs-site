@@ -89,6 +89,8 @@ jobs:
             echo "- Shared runtime requested ref: ${SHARED_RUNTIME_REF}"
             echo "- Shared runtime SHA: ${SHARED_RUNTIME_SHA}"
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployment content SHA: ${CONTENT_SHA}"
+          echo "Deployment shared runtime SHA: ${SHARED_RUNTIME_SHA}"
 
       - name: Setup Node
         uses: actions/setup-node@v6

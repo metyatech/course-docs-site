@@ -332,26 +332,29 @@ test("ci.yml checkouts in shared, build-course, e2e-course, and prepare-matrix s
   }
 });
 
-test("redeploy-content-sites.yml prepare-matrix checkout sets persist-credentials: false", async () => {
-  const redeployWorkflowPath = path.join(
+test("release-shared-runtime.yml preflight checkout sets persist-credentials: false", async () => {
+  const releaseWorkflowPath = path.join(
     projectRoot,
     ".github",
     "workflows",
-    "redeploy-content-sites.yml",
+    "release-shared-runtime.yml",
   );
-  const workflowText = await readFile(redeployWorkflowPath, "utf8");
-  const prepareMatrixBody = extractJobBody(workflowText, "prepare-matrix");
+  const workflowText = await readFile(releaseWorkflowPath, "utf8");
+  const prepareMatrixBody = extractJobBody(workflowText, "preflight");
   assertCheckoutHasPersistCredentialsFalse(
     prepareMatrixBody,
-    "redeploy-content-sites.yml:prepare-matrix",
+    "release-shared-runtime.yml:preflight",
   );
 
-  const discoveryStep = extractStepByName(prepareMatrixBody, "Generate redeploy matrix");
+  const discoveryStep = extractStepByName(
+    prepareMatrixBody,
+    "Discover and validate all production callers",
+  );
   assert.match(
     discoveryStep,
     /COURSE_CONTENT_READ_TOKEN: \$\{\{ secrets\.COURSE_CONTENT_READ_TOKEN \}\}/,
   );
-  assert.match(discoveryStep, /scripts\/discover-course-repositories\.mjs --kind redeploy/);
+  assert.match(discoveryStep, /scripts\/discover-course-repositories\.mjs --kind release/);
   assert.doesNotMatch(discoveryStep, /print-course-sites-matrix|course-sites\.json/);
 });
 

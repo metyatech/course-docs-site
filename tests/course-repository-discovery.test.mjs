@@ -7,6 +7,7 @@ import {
   discoverCourseRepositories,
   fetchAllRepositoryPages,
   selectCourseRepositories,
+  validateProductionDeployCaller,
   validateCourseRepositoryContracts,
 } from "../scripts/discover-course-repositories.mjs";
 
@@ -30,6 +31,50 @@ const repository = (
 
 const jsonResponse = (body, { status = 200, headers = {} } = {}) =>
   new Response(JSON.stringify(body), { status, headers });
+
+const productionDeployCaller = (repositoryName = "metyatech/example-course") => {
+  const programmingWorksInput =
+    repositoryName === "metyatech/programming-course-docs"
+      ? "      next_public_works_base_url: https://metyatech.github.io/programming-course-student-works\n"
+      : "";
+
+  return `name: Deploy site to Vercel
+run-name: Deploy [shared-runtime-release:\${{ inputs.release_id || 'content' }}] with \${{ inputs.shared_runtime_ref || 'production-runtime' }}
+
+on:
+  push:
+    paths:
+      - 'content/**'
+      - 'public/**'
+      - 'site.config.ts'
+      - '.github/workflows/deploy-vercel.yml'
+  workflow_dispatch:
+    inputs:
+      shared_runtime_ref:
+        description: Shared runtime commit SHA for a coordinated release.
+        required: false
+        type: string
+        default: production-runtime
+      release_id:
+        description: Correlation ID used by a coordinated shared runtime release.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: metyatech/course-docs-site/.github/workflows/deploy-course.yml@production-runtime
+    with:
+      shared_runtime_ref: \${{ github.event_name == 'workflow_dispatch' && inputs.shared_runtime_ref || 'production-runtime' }}
+${programmingWorksInput}    secrets:
+      VERCEL_TOKEN: \${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: \${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: \${{ secrets.VERCEL_PROJECT_ID }}
+`;
+};
 
 test("an eighth public topic repository enters the build and redeploy matrices automatically", () => {
   const discovered = selectCourseRepositories({
@@ -73,6 +118,26 @@ test("public discovery is anonymous while private discovery receives the token",
   assert.equal(authorizationByPath.get("/users/metyatech/repos"), undefined);
   assert.equal(authorizationByPath.get("/user/repos"), "Bearer fixture-token");
   assert.equal(discovered[0].private, true);
+});
+
+test("release discovery authenticates public and private listing requests", async () => {
+  const authorizationByPath = new Map();
+  const fetchImpl = async (url, options) => {
+    const pathname = new URL(url).pathname;
+    authorizationByPath.set(pathname, options.headers.Authorization);
+    return jsonResponse(
+      pathname === "/user/repos" ? [repository("private-course", { private: true })] : [],
+    );
+  };
+
+  await discoverCourseRepositories({
+    token: "private-read-token",
+    publicToken: "release-read-token",
+    fetchImpl,
+  });
+
+  assert.equal(authorizationByPath.get("/users/metyatech/repos"), "Bearer release-read-token");
+  assert.equal(authorizationByPath.get("/user/repos"), "Bearer private-read-token");
 });
 
 test("main and master default branches are derived from repository metadata", () => {
@@ -196,5 +261,133 @@ test("a topic repository without its tiny deployment caller fails contract valid
   await assert.rejects(
     validateCourseRepositoryContracts([selected], { fetchImpl }),
     /course-docs repository metyatech\/missing-caller-course is missing the deployment caller/u,
+  );
+});
+
+test("release deployment callers pin and forward the production runtime while keeping content triggers", () => {
+  assert.doesNotThrow(() =>
+    validateProductionDeployCaller(productionDeployCaller(), "metyatech/example-course"),
+  );
+  assert.doesNotThrow(() =>
+    validateProductionDeployCaller(
+      productionDeployCaller("metyatech/programming-course-docs"),
+      "metyatech/programming-course-docs",
+    ),
+  );
+
+  for (const [workflowText, message] of [
+    [
+      productionDeployCaller().replace("@production-runtime", "@main"),
+      /pinned to production-runtime/u,
+    ],
+    [
+      productionDeployCaller().replace("default: production-runtime", "default: main"),
+      /defaulting to production-runtime/u,
+    ],
+    [
+      productionDeployCaller().replaceAll(
+        "inputs.shared_runtime_ref || 'production-runtime'",
+        "inputs.shared_runtime_ref || 'main'",
+      ),
+      /production-runtime fallback/u,
+    ],
+    [
+      productionDeployCaller().replace("'public/**'", "'assets/**'"),
+      /missing the public\/\*\* push path/u,
+    ],
+  ]) {
+    assert.throws(
+      () => validateProductionDeployCaller(workflowText, "metyatech/example-course"),
+      message,
+    );
+  }
+
+  assert.throws(
+    () =>
+      validateProductionDeployCaller(
+        productionDeployCaller("metyatech/programming-course-docs").replace(
+          "https://metyatech.github.io/programming-course-student-works",
+          "https://example.com",
+        ),
+        "metyatech/programming-course-docs",
+      ),
+    /Student Works URL input/u,
+  );
+});
+
+test("strict release caller validation authenticates private Teacher Profile workflow contents", async () => {
+  const authorizationByPath = new Map();
+  const workflowText = productionDeployCaller("metyatech/teacher-profile-docs");
+  const fetchImpl = async (url, options) => {
+    const pathname = new URL(url).pathname;
+    authorizationByPath.set(pathname, options.headers.Authorization);
+
+    if (pathname.endsWith("/contents")) {
+      return jsonResponse([
+        { name: "site.config.ts", type: "file" },
+        { name: "content", type: "dir" },
+      ]);
+    }
+
+    if (pathname.endsWith("/contents/.github/workflows/deploy-vercel.yml")) {
+      return jsonResponse({
+        type: "file",
+        encoding: "base64",
+        content: Buffer.from(workflowText, "utf8").toString("base64"),
+      });
+    }
+
+    return new Response(null, { status: 404 });
+  };
+
+  await validateCourseRepositoryContracts([repository("teacher-profile-docs", { private: true })], {
+    token: "private-read-token",
+    fetchImpl,
+    requireProductionRuntime: true,
+  });
+
+  assert.equal(
+    authorizationByPath.get(
+      "/repos/metyatech/teacher-profile-docs/contents/.github/workflows/deploy-vercel.yml",
+    ),
+    "Bearer private-read-token",
+  );
+});
+
+test("strict release validation authenticates public contract checks to avoid anonymous API limits", async () => {
+  const authorizationByPath = new Map();
+  const workflowText = productionDeployCaller();
+  const fetchImpl = async (url, options) => {
+    const pathname = new URL(url).pathname;
+    authorizationByPath.set(pathname, options.headers.Authorization);
+
+    if (pathname.endsWith("/contents")) {
+      return jsonResponse([
+        { name: "site.config.ts", type: "file" },
+        { name: "content", type: "dir" },
+      ]);
+    }
+
+    if (pathname.endsWith("/contents/.github/workflows/deploy-vercel.yml")) {
+      return jsonResponse({
+        type: "file",
+        encoding: "base64",
+        content: Buffer.from(workflowText, "utf8").toString("base64"),
+      });
+    }
+
+    return new Response(null, { status: 404 });
+  };
+
+  await validateCourseRepositoryContracts([repository("public-course-docs")], {
+    token: "release-read-token",
+    fetchImpl,
+    requireProductionRuntime: true,
+    authenticatePublicChecks: true,
+  });
+
+  assert.deepEqual(
+    [...authorizationByPath.values()],
+    ["Bearer release-read-token", "Bearer release-read-token"],
   );
 });
