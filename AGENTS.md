@@ -151,7 +151,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
 - QuickCheck tasks MUST use `<QuickCheck>`, `<Hint>`, and `<Answer>` when the page expects learners to check understanding and then compare with an answer.
 - Every `<Exercise>` and `<QuickCheck>` task MUST be structured as problem content, followed by one or more `<Hint>` blocks, followed by exactly one `<Answer>` block.
 - A `<Hint>` MUST NOT reveal the answer first and MUST use only material already covered earlier in the same lesson or in a guaranteed earlier lesson.
-- An `<Answer>` MUST include an explanation that corrects likely misconceptions, not only the final answer.
+- An `<Answer>` MUST provide enough explanation to make the feedback instructive, not only the final answer. Explain why the answer is correct and address a likely misconception when one genuinely exists; do not invent a misconception merely to satisfy the template.
 - Course docs MUST NOT use `<Solution>` or `authoringMode`.
 - Course docs MUST NOT impose a fixed page-wide order for QuickCheck, Exercise, and extension exercise blocks; place each task where it best supports the learner's progression.
 - Exercise headings MUST use `### 演習N` for standard exercises and `### 演習-発展N` for extension exercises.
@@ -160,9 +160,11 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
 
 ## Tutorial representation and learning-goal closure
 
-- For each learner action, choose the most efficient primary representation for the task: visual for spatial UI/layout information, code or CodePreview for code authoring, text for short non-spatial operations, and diagrams/visuals for structural relationships. Images MUST NOT be added merely because a step is operational.
+- Before choosing representation or assistance, identify whether the lesson/section is intended mainly for immediate task performance, later retention, transfer, or a deliberate combination. Do not optimise only first-attempt speed when retention or transfer is an explicit goal.
+- For each learner action, choose the most efficient primary representation for both the task and intended instructional horizon: visual for spatial UI/layout information, code or CodePreview for code authoring, text for short non-spatial operations, and diagrams/visuals for structural relationships. Images MUST NOT be added merely because a step is operational.
 - Treat one `<Action>` as one coherent learner action episode toward an immediate sub-goal. It MAY contain a short locally unified sequence (for example, click → open menu → hover → choose) when splitting per click would increase rather than reduce integration cost.
 - Do not duplicate the same complete procedure across the primary representation and secondary prose merely for repetition. Short labels, identifiers, numbers, positional cues, exact values, or other mapping information MAY appear in both when they materially reduce search/integration cost.
+- The `<Action>` as a whole MUST be executable without guessing. For a visual-primary Action, visible prose MAY contain only complementary information rather than restating the full visual path, provided a complete accessible text-equivalent route exists for essential visual instructions.
 - Accessibility-equivalent instructions MUST NOT be removed as “redundancy”. Preserve a complete text-equivalent route for essential visual information while avoiding two unnecessarily competing primary paths when the platform can expose the equivalent accessibly or on demand.
 - A substantive learning goal MUST have an aligned closure that can actually test that goal. Use `<Verify>` for observable behavior/state, `<QuickCheck>` for retrieval/understanding, `<Checkpoint>` for a meaningful multi-condition milestone, or `<Exercise>` for transfer/application. Do not add every closure component mechanically.
 - Treat immediate closure as evidence of current performance, not proof of durable mastery. Important knowledge SHOULD be revisited later through retrieval/distributed practice when curriculum scope allows; do not claim permanent mastery from one immediate success.
@@ -175,7 +177,8 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
 
 ## Beginner lesson material ordering
 
-- Materials MUST be written assuming learners will read every word carefully, in natural reading order: top to bottom and left to right.
+- Materials MUST pass a literal cold-read in natural rendered order: if a learner reads linearly from the first word onward, every dependency must be understandable at first use. This is a verification method, not an assumption that real learners will read every word or never re-enter the page midstream.
+- Design for scanning/re-entry as well as linear correctness: major headings/goals SHOULD orient a returning reader, and sequential dependencies MUST be explicit rather than inferred.
 - At any point in the material, do not introduce a term or feature that has not been explained earlier in that same material (or in a strictly earlier lesson within the same course, when curriculum ordering guarantees it was already taught). Introduce new terms or features at the point where learners first need them.
 - "Term or feature" is not limited to HTML/CSS/JS syntax or APIs. It also includes: quoted literal values used in prose or tables (e.g. a string like `active` used as a rule's classification key), variable/identifier names, and any word or metaphor used in a `<Section>`/`<Concept>`/heading title or in body prose, a table cell, or a bullet, before its meaning has been established.
 - A `<Concept>` or `<Section>` title MUST NOT rely on a word, abbreviation, or metaphor that is only explained in that block's own body or in a later block. Titles MUST either be self-explanatory to a reader who has not yet read the body, or be phrased so the metaphor/label appears only after the body has explained the underlying idea (e.g. as a closing summary label, not as the heading itself).

@@ -39,6 +39,8 @@ import type { Node } from 'unist';
  *  - tutorial/concept-placement           note  — first-use judgement
  *  - tutorial/decorative-emoji            note  — allowlist heuristic
  *  - tutorial/verify-visual-workaround-as-action note — pattern heuristic
+ *  - tutorial/prerequisites-placement      warn  — page-level placement
+ *  - tutorial/nextsteps-placement          note  — page-level placement
  *
  * Severity handling:
  *  - Errors call `file.fail()` which throws and fails the MDX compile.
