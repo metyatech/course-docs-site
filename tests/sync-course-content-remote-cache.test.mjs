@@ -234,7 +234,11 @@ test(
       env: { ...baseEnv, FAKE_GIT_SHA: SHA_2 },
     });
     assert.equal(cExit, 0, "case C: SHA-update sync must succeed");
-    assert.equal(await countLog("clone "), 2, "case C: clone count must increase by one (re-clone)");
+    assert.equal(
+      await countLog("clone "),
+      2,
+      "case C: clone count must increase by one (re-clone)",
+    );
     assert.equal(await countLog("ls-remote "), 3, "case C: a third ls-remote ran");
     assert.match(
       await fs.readFile(introPath, "utf8"),
@@ -267,7 +271,11 @@ test(
       },
     });
     assert.equal(dExit, 0, "case D: ref-switch sync must succeed");
-    assert.equal(await countLog("clone "), 3, "case D: clone count must increase by one (re-clone)");
+    assert.equal(
+      await countLog("clone "),
+      3,
+      "case D: clone count must increase by one (re-clone)",
+    );
     assert.equal(await countLog("ls-remote "), 4, "case D: a fourth ls-remote ran");
     assert.match(
       await fs.readFile(introPath, "utf8"),

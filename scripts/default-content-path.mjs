@@ -51,7 +51,9 @@ const resolveFirstContentPath = (dirPath, routePrefix) => {
 };
 
 /** Resolve the first visible content route during Next configuration/build. */
-export const resolveDefaultContentPath = ({ contentRoot = path.join(process.cwd(), "content") } = {}) => {
+export const resolveDefaultContentPath = ({
+  contentRoot = path.join(process.cwd(), "content"),
+} = {}) => {
   const route = resolveFirstContentPath(contentRoot, "");
   if (!route) {
     throw new Error("Could not determine a default content route from content/_meta.ts.");

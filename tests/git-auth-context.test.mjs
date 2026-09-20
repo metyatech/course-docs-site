@@ -47,7 +47,10 @@ const buildSeededGitconfig = (badbasic) =>
 const createBareRepo = (parentDir) => {
   const bareDir = path.join(parentDir, "bare.git");
   fs.mkdirSync(bareDir, { recursive: true });
-  const result = spawnSync("git", ["init", "--bare", bareDir], { encoding: "utf8", env: fixtureGitEnv });
+  const result = spawnSync("git", ["init", "--bare", bareDir], {
+    encoding: "utf8",
+    env: fixtureGitEnv,
+  });
   if (result.status !== 0) {
     throw new Error(
       `git init --bare ${bareDir} failed: ${result.stderr || result.stdout || "no stderr"}`,

@@ -116,6 +116,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Verify (precommit)
         run: npm run verify:precommit
 

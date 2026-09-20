@@ -1,6 +1,9 @@
+npx lint-staged
+
 _IDX=$(git rev-parse --git-path index)
 _SNAP=${_IDX}.snap
 cp "$_IDX" "$_SNAP"
+trap 'if [ -f "$_SNAP" ]; then cp "$_SNAP" "$_IDX"; rm -f "$_SNAP"; fi' EXIT
 
 npm run verify:precommit
 compose-agentsmd --compose
@@ -13,7 +16,6 @@ snap=idx+'.snap'
 
 if os.path.exists(snap):
     shutil.copy(snap,idx)
-    os.unlink(snap)
 
 d=bytearray(open(idx,'rb').read())
 n=struct.unpack('>I',d[8:12])[0]
@@ -44,4 +46,6 @@ for path in sp2:
 hd=b'DIRC'+struct.pack('>II',2,len(sp2))
 bd=hd+ed
 open(idx,'wb').write(bd+hashlib.sha1(bd).digest())
+if os.path.exists(snap):
+    os.unlink(snap)
 " 2>/dev/null

@@ -354,9 +354,25 @@ test("package.json exposes verify:precommit (fast local gate) and verify:ci (CI-
   );
 });
 
-test("pre-commit hook uses the fast verify:precommit gate, not the full CI command", async () => {
+test("pre-commit hook formats staged files before snapshot and then runs existing gates", async () => {
   const hook = await readFile(preCommitHookPath, "utf8");
+  const lintStagedPosition = hook.indexOf("npx lint-staged");
+  const snapshotPosition = hook.indexOf("_IDX=$(git rev-parse --git-path index)");
+  const restoreTrapPosition = hook.indexOf("trap '");
+  const verifyPosition = hook.indexOf("npm run verify:precommit");
+  const composePosition = hook.indexOf("compose-agentsmd --compose");
 
+  assert.match(hook, /^npx lint-staged$/m, "pre-commit hook MUST invoke lint-staged.");
+  assert.ok(
+    lintStagedPosition >= 0 && lintStagedPosition < snapshotPosition,
+    "lint-staged MUST finish before the Git index snapshot is taken.",
+  );
+  assert.ok(
+    snapshotPosition < restoreTrapPosition &&
+      restoreTrapPosition < verifyPosition &&
+      verifyPosition < composePosition,
+    "The existing snapshot, verify, and compose ordering MUST be preserved.",
+  );
   assert.match(
     hook,
     /^npm run verify:precommit$/m,

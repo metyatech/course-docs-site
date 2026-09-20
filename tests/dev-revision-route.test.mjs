@@ -72,58 +72,54 @@ Development route fixture.
   await fs.writeFile(path.join(sourceRoot, "public", "img", "favicon.ico"), "", "utf8");
 };
 
-test(
-  "development discovers revision JSON and SSE routes",
-  { timeout: 120_000 },
-  async (t) => {
-    const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-dev-revision-route-"));
-    const port = await getFreePort();
-    const baseUrl = `http://127.0.0.1:${port}`;
-    await writeFixtureCourse(sourceRoot);
+test("development discovers revision JSON and SSE routes", { timeout: 120_000 }, async (t) => {
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-dev-revision-route-"));
+  const port = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  await writeFixtureCourse(sourceRoot);
 
-    const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
-      cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: "dev-revision-route",
-        env: process.env,
-        overrides: { COURSE_CONTENT_SOURCE: sourceRoot },
-      }),
-      stdio: "inherit",
-      windowsHide: true,
-    });
+  const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
+    cwd: projectRoot,
+    env: createRunDevTestEnv({
+      label: "dev-revision-route",
+      env: process.env,
+      overrides: { COURSE_CONTENT_SOURCE: sourceRoot },
+    }),
+    stdio: "inherit",
+    windowsHide: true,
+  });
 
-    t.after(async () => {
-      await killProcessTreeAndWaitForPort(dev, port);
-      await fs.rm(sourceRoot, { recursive: true, force: true });
-    });
+  t.after(async () => {
+    await killProcessTreeAndWaitForPort(dev, port);
+    await fs.rm(sourceRoot, { recursive: true, force: true });
+  });
 
-    const ready = await waitForDevServerReady({
-      child: dev,
-      url: `${baseUrl}/api/dev/revision`,
-      acceptStatuses: new Set([200, 308]),
-    });
-    await ready.body?.cancel();
+  const ready = await waitForDevServerReady({
+    child: dev,
+    url: `${baseUrl}/api/dev/revision`,
+    acceptStatuses: new Set([200, 308]),
+  });
+  await ready.body?.cancel();
 
-    const revisionResponse = await fetch(`${baseUrl}/api/dev/revision`, {
-      signal: AbortSignal.timeout(20_000),
-    });
-    assert.equal(revisionResponse.status, 200);
-    assert.match(revisionResponse.headers.get("content-type") ?? "", /application\/json/u);
-    const revisionBody = await revisionResponse.json();
-    assert.equal(typeof revisionBody.revision, "string");
-    assert.notEqual(revisionBody.revision, "");
+  const revisionResponse = await fetch(`${baseUrl}/api/dev/revision`, {
+    signal: AbortSignal.timeout(20_000),
+  });
+  assert.equal(revisionResponse.status, 200);
+  assert.match(revisionResponse.headers.get("content-type") ?? "", /application\/json/u);
+  const revisionBody = await revisionResponse.json();
+  assert.equal(typeof revisionBody.revision, "string");
+  assert.notEqual(revisionBody.revision, "");
 
-    const streamResponse = await fetch(`${baseUrl}/api/dev/revision/stream`, {
-      signal: AbortSignal.timeout(20_000),
-    });
-    assert.equal(streamResponse.status, 200);
-    assert.match(streamResponse.headers.get("content-type") ?? "", /text\/event-stream/u);
-    assert.ok(streamResponse.body, "SSE route must return a readable body");
-    const reader = streamResponse.body.getReader();
-    const firstChunk = await reader.read();
-    await reader.cancel();
-    const streamText = new TextDecoder().decode(firstChunk.value);
-    assert.match(streamText, /retry: 1000\n/u);
-    assert.match(streamText, /data: \{"revision":"[^"\\]+"\}/u);
-  },
-);
+  const streamResponse = await fetch(`${baseUrl}/api/dev/revision/stream`, {
+    signal: AbortSignal.timeout(20_000),
+  });
+  assert.equal(streamResponse.status, 200);
+  assert.match(streamResponse.headers.get("content-type") ?? "", /text\/event-stream/u);
+  assert.ok(streamResponse.body, "SSE route must return a readable body");
+  const reader = streamResponse.body.getReader();
+  const firstChunk = await reader.read();
+  await reader.cancel();
+  const streamText = new TextDecoder().decode(firstChunk.value);
+  assert.match(streamText, /retry: 1000\n/u);
+  assert.match(streamText, /data: \{"revision":"[^"\\]+"\}/u);
+});

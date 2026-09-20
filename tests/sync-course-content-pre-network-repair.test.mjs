@@ -285,7 +285,9 @@ test(
       "config must not contain the fixture token",
     );
     const canonicalCount = (
-      finalConfig.match(new RegExp(`url = ${canonicalUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gu")) ?? []
+      finalConfig.match(
+        new RegExp(`url = ${canonicalUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gu"),
+      ) ?? []
     ).length;
     assert.equal(canonicalCount, 1, "config must contain exactly one canonical origin url line");
 

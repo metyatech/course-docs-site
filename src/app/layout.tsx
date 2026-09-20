@@ -1,10 +1,6 @@
 import { createRootLayout } from "@metyatech/course-docs-platform/next-app/create-root-layout";
 import DevAutoReload from "../components/dev-auto-reload";
-import {
-  getSiteDescription,
-  getSiteFaviconHref,
-  getSiteOgImageUrl,
-} from "../lib/site-config";
+import { getSiteDescription, getSiteFaviconHref, getSiteOgImageUrl } from "../lib/site-config";
 import "./accessibility-overrides.css";
 import "./navigation-accessibility-overrides.css";
 

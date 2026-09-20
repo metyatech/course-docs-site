@@ -34,8 +34,8 @@ test("platform is a root npm workspace with matching package metadata", () => {
 
 test("root ESLint excludes the workspace package and synced course content", () => {
   const eslintConfig = fs.readFileSync(path.join(root, "eslint.config.mjs"), "utf8");
-  assert.match(eslintConfig, /'packages\/platform\/\*\*\/\*'/);
-  assert.match(eslintConfig, /'content\/\*\*\/\*'/);
+  assert.match(eslintConfig, /["']packages\/platform\/\*\*\/\*['"]/);
+  assert.match(eslintConfig, /["']content\/\*\*\/\*['"]/);
 });
 
 test("root lockfile links the platform workspace without the old Git dependency", () => {
@@ -65,11 +65,18 @@ test("obsolete standalone-platform files and SHA cache implementation are absent
     "packages/platform/AGENTS.md",
     `scripts/${["check", "platform", "cache"].join("-")}.mjs`,
   ]) {
-    assert.equal(fs.existsSync(path.join(root, relativePath)), false, `${relativePath} must be absent`);
+    assert.equal(
+      fs.existsSync(path.join(root, relativePath)),
+      false,
+      `${relativePath} must be absent`,
+    );
   }
 
   const rootPackage = readJson("package.json");
-  assert.doesNotMatch(rootPackage.scripts.postinstall, new RegExp(["check", "platform", "cache"].join("-")));
+  assert.doesNotMatch(
+    rootPackage.scripts.postinstall,
+    new RegExp(["check", "platform", "cache"].join("-")),
+  );
 });
 
 test("all platform exports resolve after the workspace package is built", async () => {
@@ -87,5 +94,8 @@ test("all platform exports resolve after the workspace package is built", async 
   const mdxConsumer = fs.readFileSync(path.join(root, "src/mdx-components.tsx"), "utf8");
   const serverConsumer = fs.readFileSync(path.join(root, "src/app/layout.tsx"), "utf8");
   assert.match(mdxConsumer, /from "@metyatech\/course-docs-platform\/mdx"/);
-  assert.match(serverConsumer, /from "@metyatech\/course-docs-platform\/next-app\/create-root-layout"/);
+  assert.match(
+    serverConsumer,
+    /from "@metyatech\/course-docs-platform\/next-app\/create-root-layout"/,
+  );
 });

@@ -28,7 +28,8 @@ const BARE_TOKEN_URL = `https://${FIXTURE_TOKEN}@github.com/metyatech/teacher-pr
 // added in git 2.28; fall back to `init` + symbolic-ref when needed.
 const initRepo = (cloneDir) => {
   let result = spawnSync("git", ["init", "--initial-branch=main", cloneDir], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
   if (result.status !== 0) {
     result = spawnSync("git", ["init", cloneDir], { encoding: "utf8", env: fixtureGitEnv });
@@ -51,19 +52,23 @@ const initRepo = (cloneDir) => {
   // Make `git` commits deterministic in this throwaway repo so any
   // failure path that reads config or refs does not depend on caller env.
   spawnSync("git", ["-C", cloneDir, "config", "user.email", "fixture@example.invalid"], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
   spawnSync("git", ["-C", cloneDir, "config", "user.name", "Fixture"], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
   spawnSync("git", ["-C", cloneDir, "config", "commit.gpgsign", "false"], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
 };
 
 const setRemoteOriginUrl = (cloneDir, url) => {
   const result = spawnSync("git", ["-C", cloneDir, "config", "remote.origin.url", url], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
   if (result.status !== 0) {
     throw new Error(
@@ -74,7 +79,8 @@ const setRemoteOriginUrl = (cloneDir, url) => {
 
 const getRemoteOriginUrl = (cloneDir) => {
   const result = spawnSync("git", ["-C", cloneDir, "remote", "get-url", "origin"], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
   if (result.status !== 0) {
     throw new Error(

@@ -38,7 +38,8 @@ const BACKUP_CANONICAL_URL = "https://github.com/metyatech/backup-repo.git";
 
 const initRepo = (cloneDir) => {
   let result = spawnSync("git", ["init", "--initial-branch=main", cloneDir], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
   if (result.status !== 0) {
     result = spawnSync("git", ["init", cloneDir], { encoding: "utf8", env: fixtureGitEnv });
@@ -59,19 +60,23 @@ const initRepo = (cloneDir) => {
     }
   }
   spawnSync("git", ["-C", cloneDir, "config", "user.email", "fixture@example.invalid"], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
   spawnSync("git", ["-C", cloneDir, "config", "user.name", "Fixture"], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
   spawnSync("git", ["-C", cloneDir, "config", "commit.gpgsign", "false"], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
 };
 
 const getAllOriginUrls = (cloneDir) => {
   const result = spawnSync("git", ["-C", cloneDir, "config", "--get-all", "remote.origin.url"], {
-    encoding: "utf8", env: fixtureGitEnv,
+    encoding: "utf8",
+    env: fixtureGitEnv,
   });
   if (result.status !== 0) {
     return [];

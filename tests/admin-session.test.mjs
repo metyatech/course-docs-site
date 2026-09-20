@@ -353,10 +353,7 @@ test("verifyAdminSession: 31-byte secret returns invalid-secret", async () => {
   // for invalid-secret (NOT bad-signature) because the length check runs
   // before any HMAC import.
   const shortSecret = "a".repeat(31);
-  const cookie = await signWithPayload(
-    { v: 1, iat: baseNow, exp: baseNow + 60 },
-    shortSecret,
-  );
+  const cookie = await signWithPayload({ v: 1, iat: baseNow, exp: baseNow + 60 }, shortSecret);
   const result = await verifyAdminSession(cookie, shortSecret, { now: baseNow + 30 });
   assert.equal(result.ok, false);
   if (!result.ok) {
@@ -366,14 +363,8 @@ test("verifyAdminSession: 31-byte secret returns invalid-secret", async () => {
 
 test("isAdminSessionValid: 31-byte secret returns false", async () => {
   const shortSecret = "a".repeat(31);
-  const cookie = await signWithPayload(
-    { v: 1, iat: baseNow, exp: baseNow + 60 },
-    shortSecret,
-  );
-  assert.equal(
-    await isAdminSessionValid(cookie, shortSecret, { now: baseNow + 30 }),
-    false,
-  );
+  const cookie = await signWithPayload({ v: 1, iat: baseNow, exp: baseNow + 60 }, shortSecret);
+  assert.equal(await isAdminSessionValid(cookie, shortSecret, { now: baseNow + 30 }), false);
 });
 
 test("32-byte secret: sign and verify still work normally", async () => {

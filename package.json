@@ -32,7 +32,8 @@
     "pagefind": "node scripts/run-pagefind.mjs",
     "postbuild": "node scripts/run-pagefind.mjs",
     "lint": "npm run typecheck && eslint .",
-    "format": "prettier --check .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "pretypecheck": "npm run platform:build",
     "typecheck": "npm run sync:content && npm run verify:content && next typegen && tsc --noEmit",
     "pretest": "npm run platform:build",
@@ -108,12 +109,12 @@
     "@pagefind/windows-x64": "1.5.0"
   },
   "lint-staged": {
-    "src/**/*.{ts,tsx,mjs}": [
-      "prettier --check",
+    "**/*.{js,mjs,cjs,ts,tsx}": [
+      "prettier --write",
       "eslint"
     ],
-    "*.{json,md}": [
-      "prettier --check"
+    "**/*.{jsx,json,jsonc,md,mdx,yaml,yml,css,scss,html}": [
+      "prettier --write"
     ]
   },
   "engines": {

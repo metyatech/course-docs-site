@@ -18,13 +18,21 @@ Thank you for your interest in contributing to this project!
    Playwright coverage across every supported course: `npm run test:e2e:matrix`.
 7. Submit a pull request.
 
+## Formatting
+
+`npm run format` writes Prettier formatting across the repository. CI uses
+`npm run format:check` to check the repository without changing files. The
+pre-commit hook runs `lint-staged` first: it formats staged files and runs
+ESLint on staged JavaScript and TypeScript files before the existing
+`verify:precommit` and `compose-agentsmd` steps.
+
 ## Verification commands
 
 | Command                    | Tier                           | When to run                                                               | What it does                                                                                                                                                                                                                                                                                                                                                                         |
 | -------------------------- | ------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `npm run verify:content`   | Synced-content quality gate    | Every time you edit synced MDX / assets locally or before pushing content | Site-owned verifier that inspects root `content/` for Exercise heading rules and four-space code-block / asset indentation. `_meta.ts` is excluded from the asset rule and is left to the source repo's formatter; see [docs/content-quality-boundary.md](./docs/content-quality-boundary.md). Wired into `typecheck` / `build` / `build:verified` immediately after `sync:content`. |
 | `npm run verify:precommit` | Fast pre-commit                | Every commit (auto via Husky)                                             | Local fast gate: `lint` + `test`; `npm test` runs `test:fast`, not dev-server route/editor flows or the full matrix.                                                                                                                                                                                                                                                                 |
-| `npm run verify:ci`        | CI-equivalent single course    | Reproducing a CI matrix failure locally                                   | Same command CI runs per course: `build`, then `verify:course:ci` for the current `COURSE_CONTENT_SOURCE`.                                                                                                                                                                                                                                                                             |
+| `npm run verify:ci`        | CI-equivalent single course    | Reproducing a CI matrix failure locally                                   | Same command CI runs per course: `build`, then `verify:course:ci` for the current `COURSE_CONTENT_SOURCE`.                                                                                                                                                                                                                                                                           |
 | `npm run test:e2e:matrix`  | Explicit full local E2E matrix | Intentional all-course local E2E runs                                     | Heavy Playwright matrix across all supported course content sources with per-course cleanup and timeout.                                                                                                                                                                                                                                                                             |
 
 `verify:precommit` deliberately does not iterate the full remote course matrix.

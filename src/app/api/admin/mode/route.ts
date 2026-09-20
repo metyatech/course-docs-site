@@ -73,10 +73,7 @@ const buildStatus = (enabled: boolean): AdminModeStatus => {
   const sessionSecretValid = isAdminSessionSecretValid(getAdminSessionSecret());
   const capability = commentModeration;
 
-  const secretsDistinct =
-    tokenConfigured &&
-    sessionSecretValid &&
-    areAdminSecretsDistinct();
+  const secretsDistinct = tokenConfigured && sessionSecretValid && areAdminSecretsDistinct();
 
   const unavailableReason: UnavailableReason = !capability
     ? "no-admin-capability"

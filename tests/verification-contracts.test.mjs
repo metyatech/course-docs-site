@@ -194,6 +194,38 @@ test("fast local scripts do not invoke the full E2E matrix", async () => {
   );
 });
 
+test("format scripts and staged-file tasks have separate responsibilities", async () => {
+  const pkg = await readPackageJson();
+
+  assert.equal(pkg.scripts.format, "prettier --write .");
+  assert.equal(pkg.scripts["format:check"], "prettier --check .");
+  assert.equal(
+    pkg.scripts["verify:precommit"],
+    "npm run platform:verify && npm run lint && npm test",
+  );
+  assert.deepEqual(pkg["lint-staged"], {
+    "**/*.{js,mjs,cjs,ts,tsx}": ["prettier --write", "eslint"],
+    "**/*.{jsx,json,jsonc,md,mdx,yaml,yml,css,scss,html}": ["prettier --write"],
+  });
+});
+
+test("CI checks repository formatting exactly once in site-verify", async () => {
+  const workflowText = await readFile(ciWorkflowPath, "utf8");
+  const siteVerifyJobText = extractJobBody(workflowText, "site-verify");
+  const formatCheckCalls = workflowText.match(/run: npm run format:check/g) ?? [];
+  const formatCheckPosition = siteVerifyJobText.indexOf("run: npm run format:check");
+  const verifyPosition = siteVerifyJobText.indexOf("run: npm run verify:precommit");
+  const pkg = await readPackageJson();
+
+  assert.equal(formatCheckCalls.length, 1, "CI MUST check repository formatting exactly once.");
+  assert.ok(
+    formatCheckPosition >= 0 && formatCheckPosition < verifyPosition,
+    "The format check MUST run in site-verify before the precommit verification step.",
+  );
+  assert.doesNotMatch(workflowText, /prettier --write/);
+  assert.doesNotMatch(pkg.scripts["verify:precommit"], /format:check/);
+});
+
 test("verification docs document fast, single-course CI, and explicit matrix tiers", async () => {
   const readme = await readFile(readmePath, "utf8");
   const contributing = await readFile(contributingPath, "utf8");
