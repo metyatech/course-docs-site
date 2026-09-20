@@ -15,8 +15,16 @@ test("reusable deployment workflow is callable and uses explicit Vercel secrets"
 
 test("reusable deployment checks the caller project before building and deploying", () => {
   assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
-  assert.match(workflow, /repository: metyatech\/course-docs-site[\s\S]*?ref: main/);
+  assert.match(
+    workflow,
+    /repository: metyatech\/course-docs-site[\s\S]*?ref: \$\{\{ inputs\.shared_runtime_ref \}\}/,
+  );
   assert.match(workflow, /persist-credentials: false/);
+  assert.match(
+    workflow,
+    /shared_runtime_ref:[\s\S]*?required: false[\s\S]*?type: string[\s\S]*?default: production-runtime/,
+  );
+  assert.match(workflow, /git check-ref-format --branch "\$SHARED_RUNTIME_REF"/);
   assert.match(workflow, /VERCEL_PROJECT_ID/);
   assert.match(workflow, /project\.id !== projectId/);
   assert.match(
@@ -28,6 +36,13 @@ test("reusable deployment checks the caller project before building and deployin
   assert.match(workflow, /retry once/);
   assert.match(workflow, /timeout-minutes: 10/);
   assert.match(workflow, /node-version: 24/);
+});
+
+test("deployment summary records both source repositories' immutable SHAs", () => {
+  assert.match(workflow, /CONTENT_SHA: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /SHARED_RUNTIME_SHA=\$\(git -C site rev-parse HEAD\)/);
+  assert.match(workflow, /Content SHA: \$\{CONTENT_SHA\}/);
+  assert.match(workflow, /Shared runtime SHA: \$\{SHARED_RUNTIME_SHA\}/);
 });
 
 test("Student Works URL is an optional shared workflow input", () => {

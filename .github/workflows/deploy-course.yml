@@ -3,6 +3,11 @@ name: Deploy course site
 on:
   workflow_call:
     inputs:
+      shared_runtime_ref:
+        description: Shared runtime commit SHA or branch to use for this deployment.
+        required: false
+        type: string
+        default: production-runtime
       next_public_works_base_url:
         description: Optional Student Works base URL used by the Programming course site.
         required: false
@@ -41,6 +46,19 @@ jobs:
             exit 1
           fi
 
+      - name: Validate shared runtime ref
+        env:
+          SHARED_RUNTIME_REF: ${{ inputs.shared_runtime_ref }}
+        run: |
+          if [[ "$SHARED_RUNTIME_REF" =~ ^([0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})$ ]]; then
+            exit 0
+          fi
+
+          if ! git check-ref-format --branch "$SHARED_RUNTIME_REF" >/dev/null; then
+            echo "Shared runtime ref must be a valid Git branch name or full commit SHA."
+            exit 1
+          fi
+
       - name: Checkout course content
         uses: actions/checkout@v6
         with:
@@ -50,11 +68,27 @@ jobs:
 
       - name: Checkout shared runtime
         uses: actions/checkout@v6
+        id: shared-runtime
         with:
           repository: metyatech/course-docs-site
-          ref: main
+          ref: ${{ inputs.shared_runtime_ref }}
           path: site
           persist-credentials: false
+
+      - name: Record deployment provenance
+        env:
+          CONTENT_REPOSITORY: ${{ github.repository }}
+          CONTENT_SHA: ${{ github.sha }}
+          SHARED_RUNTIME_REF: ${{ inputs.shared_runtime_ref }}
+        run: |
+          SHARED_RUNTIME_SHA=$(git -C site rev-parse HEAD)
+          {
+            echo "## Deployment provenance"
+            echo "- Content repository: ${CONTENT_REPOSITORY}"
+            echo "- Content SHA: ${CONTENT_SHA}"
+            echo "- Shared runtime requested ref: ${SHARED_RUNTIME_REF}"
+            echo "- Shared runtime SHA: ${SHARED_RUNTIME_SHA}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup Node
         uses: actions/setup-node@v6
