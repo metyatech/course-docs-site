@@ -1903,7 +1903,7 @@ test("dev auto reload does not reload the tutorial shot editor itself", async ()
   const autoReloadSourcePath = path.join(projectRoot, "src", "components", "dev-auto-reload.tsx");
   const source = await fs.readFile(autoReloadSourcePath, "utf8");
 
-  assert.match(source, /window\.location\.pathname\.startsWith\('\/dev\/'\)/);
+  assert.match(source, /window\.location\.pathname\.startsWith\(["']\/dev\/["']\)/);
   assert.match(source, /return undefined;/);
 });
 
