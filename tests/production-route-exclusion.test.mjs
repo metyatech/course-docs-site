@@ -42,6 +42,51 @@ test("production manifests do not discover tutorial-shots routes", async () => {
   assert.doesNotMatch(manifestText, /api[/\\]dev[/\\]tutorial-shots/);
 });
 
+test("production manifests and function traces do not discover dev revision routes", async () => {
+  const manifestPaths = [
+    "routes-manifest.json",
+    "server/app-paths-manifest.json",
+    "server/middleware-manifest.json",
+  ];
+  const manifestText = (await Promise.all(manifestPaths.map(readJson)))
+    .flatMap(allStrings)
+    .join("\n");
+
+  for (const routePath of ["api/dev/revision", "api/dev/revision/stream"]) {
+    assert.doesNotMatch(
+      manifestText,
+      new RegExp(routePath.replaceAll("/", "[/\\\\]")),
+      `${routePath} must not be present in production manifests`,
+    );
+  }
+
+  const serverRoot = path.join(projectRoot, distDir, "server");
+  const traceFiles = (await listFiles(serverRoot)).filter((filePath) =>
+    filePath.endsWith(".nft.json"),
+  );
+  const traceText = traceFiles
+    .map((traceFile) => path.relative(projectRoot, traceFile))
+    .join("\n")
+    .concat(
+      "\n",
+      (
+        await Promise.all(
+          traceFiles.map(async (traceFile) =>
+            allStrings(JSON.parse(await fs.readFile(traceFile, "utf8"))).join("\n"),
+          ),
+        )
+      ).join("\n"),
+    );
+
+  for (const routePath of ["api/dev/revision", "api/dev/revision/stream"]) {
+    assert.doesNotMatch(
+      traceText,
+      new RegExp(routePath.replaceAll("/", "[/\\\\]")),
+      `${routePath} must not be present in production function traces`,
+    );
+  }
+});
+
 test("production function traces do not include synchronized course source files", async () => {
   const serverRoot = path.join(projectRoot, distDir, "server");
   const contentRoot = path.join(projectRoot, "content");
