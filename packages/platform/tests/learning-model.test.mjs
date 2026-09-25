@@ -224,7 +224,7 @@ test('course analyzer respects Nextra metadata order and labels deterministic fa
     );
     await writeFile(
       path.join(root, 'content', '_meta.ts'),
-      'export default { second: "Second", first: "First" };\n',
+      'const meta = { second: {}, first: {}, "*": {}, hidden: { display: "hidden" } };\nexport default meta;\n',
       'utf8',
     );
     const mdx = (id) =>
@@ -242,6 +242,111 @@ test('course analyzer respects Nextra metadata order and labels deterministic fa
       source: 'Nextra _meta.ts; stable path fallback for unlisted pages',
       certain: false,
     });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('Nextra metadata ordering is parsed statically without executing content code', async () => {
+  const { parseNextraMetaOrder } = await import('../../../scripts/learning-analysis.mjs');
+  assert.deepEqual(
+    parseNextraMetaOrder(
+      `const meta = { intro: {}, flexbox: {}, exercises: {} }; export default meta;`,
+    ),
+    {
+      supported: true,
+      entries: [
+        { key: 'intro', hidden: false },
+        { key: 'flexbox', hidden: false },
+        { key: 'exercises', hidden: false },
+      ],
+    },
+  );
+  assert.deepEqual(parseNextraMetaOrder(`export default { intro: {}, flexbox: {} };`), {
+    supported: true,
+    entries: [
+      { key: 'intro', hidden: false },
+      { key: 'flexbox', hidden: false },
+    ],
+  });
+  assert.deepEqual(
+    parseNextraMetaOrder(`export default { intro: "Introduction", flexbox: "Layout" };`),
+    {
+      supported: true,
+      entries: [
+        { key: 'intro', hidden: false },
+        { key: 'flexbox', hidden: false },
+      ],
+    },
+  );
+  assert.deepEqual(
+    parseNextraMetaOrder(`export default { "*": {}, hidden: { display: "hidden" }, visible: {} };`),
+    {
+      supported: true,
+      entries: [
+        { key: '*', hidden: false },
+        { key: 'hidden', hidden: true },
+        { key: 'visible', hidden: false },
+      ],
+    },
+  );
+
+  const marker = '__courseDocsMetaCodeMustNotExecute';
+  delete globalThis[marker];
+  const staticWithSideEffect = parseNextraMetaOrder(
+    `globalThis.${marker} = true; export default { lesson: {} };`,
+  );
+  assert.equal(staticWithSideEffect.supported, true);
+  assert.equal(globalThis[marker], undefined);
+  const unsupported = parseNextraMetaOrder(
+    `function buildMeta() { throw new Error('metadata code executed'); } export default buildMeta();`,
+  );
+  assert.deepEqual(unsupported, { supported: false, entries: [] });
+  assert.equal(globalThis[marker], undefined);
+});
+
+test('unsupported dynamic Nextra metadata uses a stable path fallback and reports uncertain order', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'learning-analysis-dynamic-meta-'));
+  try {
+    await mkdir(path.join(root, 'content'), { recursive: true });
+    await writeFile(
+      path.join(root, 'learning-units.yaml'),
+      'version: 1\nunits:\n  - id: unit-a\n    objective: Can do the task.\n',
+      'utf8',
+    );
+    await writeFile(
+      path.join(root, 'content', '_meta.ts'),
+      "function buildMeta() { throw new Error('metadata code executed'); }\nexport default buildMeta();\n",
+      'utf8',
+    );
+    await writeFile(
+      path.join(root, 'content', 'lesson.mdx'),
+      [
+        '<Section title="Goal" goal="Goal" eventId="event-a" targets="unit-a" phase="initial" pattern="instruction-first">',
+        '',
+        '<Instruction>',
+        'Learn.',
+        '</Instruction>',
+        '',
+        '<ProblemSolving>',
+        'Try.',
+        '</ProblemSolving>',
+        '',
+        '</Section>',
+      ].join('\n'),
+      'utf8',
+    );
+    const { analyzeCourseLearning } = await import('../../../scripts/learning-analysis.mjs');
+    const result = await analyzeCourseLearning({ root });
+    assert.deepEqual(
+      result.events.map(({ id }) => id),
+      ['event-a'],
+    );
+    assert.equal(result.pageOrder.certain, false);
+    assert.equal(
+      result.issues.some(({ severity }) => severity === 'error'),
+      false,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

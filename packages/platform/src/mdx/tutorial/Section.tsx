@@ -1,6 +1,7 @@
 import { Children, type ReactNode } from 'react';
+import type { LearningEventMetadata } from './learning-model.js';
 
-export type SectionProps = {
+export type SectionProps = LearningEventMetadata & {
   /**
    * Visible heading text. The actual `<h2>` / `<h3>` / ... element is injected
    * by the `remark-section-headings` plugin at compile time, so it appears in

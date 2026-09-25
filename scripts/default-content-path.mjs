@@ -1,41 +1,32 @@
 import fs from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import { parseNextraMetaOrder } from "./nextra-meta-order.mjs";
 
 const RESERVED_META_KEYS = new Set(["*", "index"]);
 
-const readMetaRecord = (dirPath) => {
+const readMetaOrder = (dirPath) => {
   const metaPath = path.join(dirPath, "_meta.ts");
-  if (!fs.existsSync(metaPath)) return {};
-
-  const source = fs.readFileSync(metaPath, "utf8");
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2020,
-    },
-  }).outputText;
-  const compiledModule = { exports: {} };
-  const evaluator = new Function("module", "exports", compiled);
-  evaluator(compiledModule, compiledModule.exports);
-
-  const exported = compiledModule.exports.default ?? compiledModule.exports;
-  return exported && typeof exported === "object" ? exported : {};
-};
-
-const isVisibleMetaEntry = (value) => {
-  if (!value || typeof value !== "object" || !("display" in value)) return true;
-  return value.display !== "hidden";
+  if (!fs.existsSync(metaPath)) return { supported: false, entries: [] };
+  return parseNextraMetaOrder(fs.readFileSync(metaPath, "utf8"));
 };
 
 const hasIndexPage = (dirPath) =>
   fs.existsSync(path.join(dirPath, "index.mdx")) || fs.existsSync(path.join(dirPath, "index.md"));
 
 const resolveFirstContentPath = (dirPath, routePrefix) => {
-  const meta = readMetaRecord(dirPath);
+  const meta = readMetaOrder(dirPath);
+  const candidates = meta.supported
+    ? meta.entries
+        .filter(({ key, hidden }) => !RESERVED_META_KEYS.has(key) && !hidden)
+        .map(({ key }) => key)
+    : fs
+        .readdirSync(dirPath, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
-  for (const [key, value] of Object.entries(meta)) {
-    if (RESERVED_META_KEYS.has(key) || !isVisibleMetaEntry(value)) continue;
+  for (const key of candidates) {
+    if (key.includes("/") || key.includes("\\") || key === "." || key === "..") continue;
 
     const childDir = path.join(dirPath, key);
     if (!fs.existsSync(childDir) || !fs.statSync(childDir).isDirectory()) continue;

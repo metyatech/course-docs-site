@@ -118,6 +118,55 @@ test('initial instruction-first and problem-solving-first structures are validat
   );
 });
 
+test('stage markers are initial-event top-level structures only and cannot nest', async () => {
+  await assert.rejects(
+    () => run({ type: 'root', children: [element('Instruction')] }),
+    /must be inside a learning event/u,
+  );
+  for (const phase of ['practice', 'retrieval', 'transfer']) {
+    await assert.rejects(
+      () =>
+        run({
+          type: 'root',
+          children: [
+            section(
+              { eventId: `later-${phase}`, targets: 'unit-a', phase },
+              element('Instruction'),
+            ),
+          ],
+        }),
+      /only be used inside an initial learning event/u,
+    );
+  }
+  for (const [outer, inner] of [
+    ['Instruction', 'Instruction'],
+    ['ProblemSolving', 'ProblemSolving'],
+    ['Instruction', 'ProblemSolving'],
+    ['ProblemSolving', 'Instruction'],
+  ]) {
+    await assert.rejects(
+      () =>
+        run({
+          type: 'root',
+          children: [
+            section(initial(), element(outer, {}, [element(inner)]), element('ProblemSolving')),
+          ],
+        }),
+      /top-level instructional stage directly inside its initial event Section/u,
+    );
+  }
+  await assert.rejects(
+    () =>
+      run({
+        type: 'root',
+        children: [
+          section(initial(), section({}, element('Instruction')), element('ProblemSolving')),
+        ],
+      }),
+    /top-level instructional stage directly inside its initial event Section/u,
+  );
+});
+
 test('Productive Failure requires problem-solving-first plus both ordered stage markers', async () => {
   await assert.rejects(
     () =>
