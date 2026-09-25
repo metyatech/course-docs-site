@@ -274,6 +274,13 @@ export const validateCourseRepositoryContracts = async (
       throw new Error(`course-docs repository ${repository.full_name} is missing content/.`);
     }
 
+    const learningUnitsEntry = rootContents.find((entry) => entry?.name === "learning-units.yaml");
+    if (learningUnitsEntry && learningUnitsEntry.type !== "file") {
+      throw new Error(
+        `course-docs repository ${repository.full_name} learning-units.yaml must be a file.`,
+      );
+    }
+
     const callerContents = await fetchJson(repositoryContentsUrl(repository, DEPLOY_WORKFLOW), {
       fetchImpl,
       token: requestToken,

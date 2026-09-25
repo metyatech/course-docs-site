@@ -18,6 +18,9 @@ Primary consumers:
 - Shared Next/Nextra integration helpers, including MDX remark plugins and webpack asset rules
 - Shared MDX and runtime features, such as exercise rendering, code preview wiring, submissions UI, and admin routes
 - Shared MDX syntax checks and tutorial component linting for Course Docs Site authoring
+- Learning Event metadata on the existing Section outline, explicit Instruction/ProblemSolving stage markers, and the metadata-only Evidence wrapper
+
+The course-level model and report are documented in [the learning system guide](../../docs/learning-system.md).
 
 ## Requirements
 

@@ -32,6 +32,7 @@
     ".": "./dist/index.js",
     "./next": "./dist/next/index.js",
     "./mdx": "./dist/mdx/index.js",
+    "./mdx/learning-model": "./dist/mdx/tutorial/learning-model.js",
     "./nextra": "./dist/nextra/index.js",
     "./next-app": "./dist/next-app/index.js",
     "./next-app/create-docs-layout": "./dist/next-app/create-docs-layout.js",

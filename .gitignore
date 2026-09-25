@@ -18,6 +18,7 @@
 /public/*
 /public/_pagefind
 /site.config.ts
+/learning-units.yaml
 
 # Misc
 .DS_Store

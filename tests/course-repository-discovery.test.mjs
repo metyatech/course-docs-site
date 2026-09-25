@@ -264,6 +264,38 @@ test("a topic repository without its tiny deployment caller fails contract valid
   );
 });
 
+test("discovery accepts the optional root learning model file and rejects a directory in its place", async () => {
+  const selected = repository("learning-model-course");
+  const fetchWithModel = async (url) => {
+    if (new URL(url).pathname.endsWith("/contents")) {
+      return jsonResponse([
+        { name: "site.config.ts", type: "file" },
+        { name: "content", type: "dir" },
+        { name: "learning-units.yaml", type: "file" },
+      ]);
+    }
+    return jsonResponse({ type: "file" });
+  };
+  await assert.doesNotReject(() =>
+    validateCourseRepositoryContracts([selected], { fetchImpl: fetchWithModel }),
+  );
+
+  const fetchWithWrongType = async (url) => {
+    if (new URL(url).pathname.endsWith("/contents")) {
+      return jsonResponse([
+        { name: "site.config.ts", type: "file" },
+        { name: "content", type: "dir" },
+        { name: "learning-units.yaml", type: "dir" },
+      ]);
+    }
+    return jsonResponse({ type: "file" });
+  };
+  await assert.rejects(
+    validateCourseRepositoryContracts([selected], { fetchImpl: fetchWithWrongType }),
+    /learning-units\.yaml must be a file/u,
+  );
+});
+
 test("release deployment callers pin and forward the production runtime while keeping content triggers", () => {
   assert.doesNotThrow(() =>
     validateProductionDeployCaller(productionDeployCaller(), "metyatech/example-course"),

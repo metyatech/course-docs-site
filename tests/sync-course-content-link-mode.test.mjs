@@ -60,6 +60,15 @@ const safeRm = async (targetPath) => {
   await fs.rm(targetPath, { recursive: true, force: true });
 };
 
+const fileExists = async (targetPath) => {
+  try {
+    await fs.stat(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 test("local content sources are mirrored into real directories", { timeout: 60_000 }, async (t) => {
   const fakeSiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-site-"));
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-real-dir-"));
@@ -85,6 +94,41 @@ test("local content sources are mirrored into real directories", { timeout: 60_0
     /initial content/u,
   );
 });
+
+test(
+  "sync copies the optional learning model and removes a stale model for legacy sources",
+  { timeout: 60_000 },
+  async (t) => {
+    const fakeSiteRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-learning-site-"));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-sync-learning-src-"));
+    const modernCourse = path.join(tempRoot, "modern");
+    const legacyCourse = path.join(tempRoot, "legacy");
+    await writeCourseRepo({ rootDir: modernCourse, courseName: "Modern", introBody: "modern" });
+    await writeCourseRepo({ rootDir: legacyCourse, courseName: "Legacy", introBody: "legacy" });
+    await fs.writeFile(
+      path.join(modernCourse, "learning-units.yaml"),
+      "version: 1\nunits: []\n",
+      "utf8",
+    );
+    t.after(async () => {
+      await safeRm(fakeSiteRoot);
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    });
+    assert.equal(
+      await runSync({ cwd: fakeSiteRoot, env: { COURSE_CONTENT_SOURCE: modernCourse } }),
+      0,
+    );
+    assert.match(
+      await fs.readFile(path.join(fakeSiteRoot, "learning-units.yaml"), "utf8"),
+      /version: 1/u,
+    );
+    assert.equal(
+      await runSync({ cwd: fakeSiteRoot, env: { COURSE_CONTENT_SOURCE: legacyCourse } }),
+      0,
+    );
+    assert.equal(await fileExists(path.join(fakeSiteRoot, "learning-units.yaml")), false);
+  },
+);
 
 test(
   "sync replaces pre-existing external links with mirrored directories and prunes stale files",
