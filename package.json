@@ -54,6 +54,9 @@
     "lint:contrast": "node scripts/run-playwright.mjs test -c tests/e2e/playwright.config.mjs tests/e2e/contrast.spec.cjs",
     "verify": "npm run verify:precommit",
     "verify:content": "node scripts/verify-content.mjs",
+    "preverify:content": "npm run platform:build",
+    "learning:report": "node scripts/learning-report.mjs",
+    "prelearning:report": "npm run platform:build",
     "verify:precommit": "npm run platform:verify && npm run lint && npm test",
     "verify:course": "npm run lint && npm run test:course && npm run build:verified",
     "verify:course:ci": "npm run test:course:ci && npm run build:verified",
@@ -97,7 +100,10 @@
     "prettier": "^3.4.2",
     "tsx": "^4.20.0",
     "typescript": "^5.9.3",
-    "yaml": "2.8.3"
+    "yaml": "2.8.3",
+    "remark-mdx": "^3.1.1",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5"
   },
   "optionalDependencies": {
     "@pagefind/darwin-arm64": "1.5.0",

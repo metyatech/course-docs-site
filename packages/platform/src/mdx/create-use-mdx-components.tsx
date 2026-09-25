@@ -15,6 +15,9 @@ import {
   Checkpoint,
   Prerequisites,
   NextSteps,
+  Evidence,
+  Instruction,
+  ProblemSolving,
 } from './tutorial/index.js';
 
 type WrapperProps = {
@@ -45,6 +48,9 @@ const baseComponents: MDXComponents = {
   Checkpoint,
   Prerequisites,
   NextSteps,
+  Evidence,
+  Instruction,
+  ProblemSolving,
 };
 
 export function createUseMDXComponents(extra: MDXComponents = {}) {

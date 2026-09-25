@@ -95,6 +95,11 @@ export default meta;
   fs.writeFileSync(path.join(targetDir, "content", "_meta.ts"), rootMeta, "utf8");
   fs.writeFileSync(path.join(targetDir, "content", "docs", "_meta.ts"), docsMeta, "utf8");
   fs.writeFileSync(
+    path.join(targetDir, "learning-units.yaml"),
+    "version: 1\\nunits:\\n  - id: remote-unit\\n    objective: Can use the remote course model.\\n",
+    "utf8",
+  );
+  fs.writeFileSync(
     path.join(targetDir, "content", "docs", "intro", "index.mdx"),
     \`---
 title: Fake Public Course
@@ -317,5 +322,9 @@ test(
     const introPath = path.join(fakeSiteRoot, "content", "docs", "intro", "index.mdx");
     const intro = await fs.readFile(introPath, "utf8");
     assert.match(intro, /3333330000000000000000000000000000000000/);
+    assert.match(
+      await fs.readFile(path.join(fakeSiteRoot, "learning-units.yaml"), "utf8"),
+      /remote-unit/u,
+    );
   },
 );

@@ -559,6 +559,13 @@ const siteConfigFrom = path.join(sourceRoot, "site.config.ts");
 const siteConfigTo = path.join(projectRoot, "site.config.ts");
 copyFile(siteConfigFrom, siteConfigTo);
 
+// The course-level learning unit model is optional for legacy content
+// repositories. Remove a previous course's copy when the new source has none.
+const learningUnitsFrom = path.join(sourceRoot, "learning-units.yaml");
+const learningUnitsTo = path.join(projectRoot, "learning-units.yaml");
+if (fs.existsSync(learningUnitsFrom)) copyFile(learningUnitsFrom, learningUnitsTo);
+else rmIfExists(learningUnitsTo);
+
 const publicFrom = path.join(sourceRoot, "public");
 const publicTo = path.join(projectRoot, "public");
 syncDirectory({

@@ -21,6 +21,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { analyzeCourseLearning } from "./learning-analysis.mjs";
 
 const contentDir = path.join(process.cwd(), "content");
 const validatedFenceLanguages = new Set([
@@ -336,6 +337,7 @@ const main = async () => {
 
   const exerciseResult = await verifyExerciseHeadings(mdxFiles);
   const indentationErrors = await verifyIndentationRules(mdxFiles, assetFiles);
+  const learningResult = await analyzeCourseLearning({ root: process.cwd() });
 
   let exitCode = 0;
   if (exerciseResult.errors.length > 0) {
@@ -348,9 +350,15 @@ const main = async () => {
     process.stdout.write("Code block indentation verification failed:\n");
     for (const error of indentationErrors) process.stdout.write(`- ${error}\n`);
   }
+  const learningErrors = learningResult.issues.filter((issue) => issue.severity === "error");
+  if (learningErrors.length > 0) {
+    exitCode = 1;
+    process.stdout.write("Learning system verification failed:\n");
+    for (const issue of learningErrors) process.stdout.write(`- ${issue.message}\n`);
+  }
   if (exitCode === 0) {
     process.stdout.write(
-      `verify-content: ok (${exerciseResult.exerciseCount} <Exercise> blocks, ${mdxFiles.length} mdx files, ${assetFiles.length} asset files).\n`,
+      `verify-content: ok (${exerciseResult.exerciseCount} <Exercise> blocks, ${mdxFiles.length} mdx files, ${assetFiles.length} asset files${learningResult.configured ? `, ${learningResult.progression.length} learning units, ${learningResult.events.length} learning events` : ""}).\n`,
     );
   }
   process.exit(exitCode);

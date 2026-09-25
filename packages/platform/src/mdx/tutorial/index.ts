@@ -7,6 +7,9 @@ export { default as Recovery } from './Recovery.js';
 export { default as Checkpoint } from './Checkpoint.js';
 export { default as Prerequisites } from './Prerequisites.js';
 export { default as NextSteps } from './NextSteps.js';
+export { default as Evidence } from './Evidence.js';
+export { default as Instruction } from './Instruction.js';
+export { default as ProblemSolving } from './ProblemSolving.js';
 
 export type { SectionProps } from './Section.js';
 export type { ActionProps } from './Action.js';
@@ -17,3 +20,4 @@ export type { RecoveryProps } from './Recovery.js';
 export type { CheckpointProps } from './Checkpoint.js';
 export type { PrerequisitesProps } from './Prerequisites.js';
 export type { NextStepsProps } from './NextSteps.js';
+export type { EvidenceProps } from './Evidence.js';

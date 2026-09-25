@@ -34,6 +34,9 @@ The root `.npmrc` rejects dependency install scripts unless the exact package ve
 This repo does **not** store course content in Git. The `content/` directory is synced from a course content repo
 at build/dev time.
 
+Course-level objectives, Learning Event metadata, explicit assessment evidence, and the derived progression report are
+documented in [docs/learning-system.md](./docs/learning-system.md).
+
 `site.config.ts` is also synced (generated) and is intentionally gitignored.
 
 Required env vars (files or environment):
