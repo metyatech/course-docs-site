@@ -1,7 +1,7 @@
 import { analyzeCourseLearning } from "./learning-analysis.mjs";
 
 const result = await analyzeCourseLearning();
-if (!result.configured) {
+if (!result.configured && result.issues.length === 0) {
   process.stdout.write(
     "learning-report: no learning-units.yaml found; legacy course content is unchanged.\n",
   );

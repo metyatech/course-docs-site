@@ -1,6 +1,6 @@
 # Course learning model
 
-Course Docs can derive a course progression report from learning objectives stored once at course level and explicit learning occurrences in MDX. Pages remain display and distribution units; they are not objectives. Existing content repositories without `learning-units.yaml` continue to build with the existing behavior.
+Course Docs can derive a course progression report from learning objectives stored once at course level and explicit learning occurrences in MDX. Pages remain display and distribution units; they are not objectives. Existing content repositories without `learning-units.yaml` continue to build with the existing behavior as long as they do not use Learning System metadata or components.
 
 ## Define learning units
 
@@ -36,32 +36,47 @@ A Learning Event records how a learner encounters one or more units on one occas
   phase="initial"
   pattern="instruction-first"
 >
-  <Instruction>
-    <Concept title="配置位置">配置位置は、オブジェクトを置く場所です。</Concept>
-    <Action>ビューポートでオブジェクトを配置し、位置を調整します。</Action>
-  </Instruction>
+
+<Instruction>
+  <Concept title="配置位置">配置位置は、オブジェクトを置く場所です。</Concept>
+  <Action>ビューポートでオブジェクトを配置し、位置を調整します。</Action>
+</Instruction>
+
   <ProblemSolving>
     <QuickCheck>
       配置したオブジェクトが意図した場所にあるか、何を見て確かめますか。
-      <Hint>ビューポートでオブジェクトと周囲の位置関係を見ます。</Hint>
+
+      <Hint>
+        ビューポートでオブジェクトと周囲の位置関係を見ます。
+      </Hint>
+
       <Answer>
         周囲との位置関係を確認します。名前や一覧だけでは、画面上の場所までは確かめられません。
       </Answer>
     </QuickCheck>
+
   </ProblemSolving>
-  <Evidence targets="place-object" demonstrates="application">
-    <Verify>オブジェクトが意図した位置にあることを確認します。</Verify>
-  </Evidence>
+
+<Evidence targets="place-object" demonstrates="application">
+
+<Verify>
+
+オブジェクトが意図した位置にあることを確認します。
+
+</Verify>
+
+</Evidence>
+
 </Section>
 ```
 
 Exactly one page contains a complete Event. Do not reuse one Event ID on multiple pages or split its stages across pages. A page is a display unit; the Event is the instructional occurrence contained within it. Event-bearing Sections cannot nest inside other Event-bearing Sections. A grouping `<Section>` without Event metadata may contain an Event-bearing Section, and an Event-bearing Section may contain ordinary non-event sub-Sections.
 
-Event order is derived from Nextra `_meta.ts` navigation order when it lists pages. Unlisted pages use a stable path order and the report marks the overall order as uncertain. That fallback provides repeatable output; it is not a claim about teaching order. Do not maintain a separate Learning Plan or teacher-lesson graph.
+Event order is derived from Nextra `_meta.ts` navigation order when its static object lists pages. If the metadata uses an unsupported dynamic expression, unlisted pages use a stable path fallback and the report marks the overall order as uncertain. The fallback provides repeatable output; it is not a claim about teaching order. The analyzer reads `_meta.ts` as TypeScript syntax and never executes it. Do not maintain a separate Learning Plan or teacher-lesson graph.
 
 ## Mark the initial learning pattern
 
-Every `initial` Event requires an explicit `pattern` and explicit stage markers. The markers are platform components that preserve their children and let validation inspect structure without guessing from prose or task names.
+Every `initial` Event requires an explicit `pattern` and explicit stage markers. `<Instruction>` and `<ProblemSolving>` are top-level instructional stages directly inside the Event Section. They are allowed only in `initial` Events and cannot contain one another. Later `practice`, `retrieval`, and `transfer` Events use learner-facing components directly without these markers. The markers preserve their children and let validation inspect structure without guessing from prose or task names.
 
 For **instruction-first**, put an `<Instruction>` stage before a `<ProblemSolving>` stage:
 
@@ -74,13 +89,27 @@ For **instruction-first**, put an `<Instruction>` stage before a `<ProblemSolvin
   phase="initial"
   pattern="instruction-first"
 >
-  <Instruction>
-    <Action>設定の場所と変更方法を確認します。</Action>
-  </Instruction>
+
+<Instruction>
+  <Action>設定の場所と変更方法を確認します。</Action>
+</Instruction>
+
   <ProblemSolving>
     ### 演習1
-    <Exercise>目的に合う設定へ変更します。</Exercise>
+    <Exercise>
+      目的に合う設定へ変更してください。完了したら、変更結果が目的に合うことを確認します。
+
+      <Hint>
+        変更する設定と、その設定が画面に与える影響を対応させます。
+      </Hint>
+
+      <Answer>
+        目的に合う設定を選び、画面で結果を確認します。設定名だけで判断せず、変更後の状態を確かめます。
+      </Answer>
+    </Exercise>
+
   </ProblemSolving>
+
 </Section>
 ```
 
@@ -95,19 +124,40 @@ For **problem-solving-first**, reverse the stage order. The Event can then teach
   phase="initial"
   pattern="problem-solving-first"
 >
+
   <ProblemSolving>
     ### 演習1
-    <Exercise>見本を参考にせず、オブジェクトの位置を調整してみます。</Exercise>
+    <Exercise>
+      見本を参考にせず、オブジェクトを目的の位置へ移動してください。完了したら、周囲との位置関係を確認します。
+
+      <Hint>
+        オブジェクトの位置を変え、ビューポートで周囲との関係を見ます。
+      </Hint>
+
+      <Answer>
+        オブジェクトを目的の位置へ移動し、ビューポートで周囲との位置関係を確認します。
+      </Answer>
+    </Exercise>
+
   </ProblemSolving>
-  <Instruction>
-    <Concept title="位置の調整">座標を変えると、オブジェクトの位置が変わります。</Concept>
-  </Instruction>
-  <ProblemSolving>
-    <Action>座標を調整して目的の位置に置きます。</Action>
-    <Evidence targets="place-object" demonstrates="application">
-      <Verify>画面上で位置を確認します。</Verify>
-    </Evidence>
-  </ProblemSolving>
+
+<Instruction>
+  <Concept title="位置の調整">座標を変えると、オブジェクトの位置が変わります。</Concept>
+</Instruction>
+
+<ProblemSolving>
+  <Action>座標を調整して目的の位置に置きます。</Action>
+  <Evidence targets="place-object" demonstrates="application">
+
+    <Verify>
+
+      画面上で位置を確認します。
+
+    </Verify>
+
+  </Evidence>
+</ProblemSolving>
+
 </Section>
 ```
 
@@ -125,18 +175,36 @@ After the one initial introduction for a Leaf Unit, use `practice`, `retrieval`,
   targets="place-object"
   phase="retrieval"
 >
+
   <QuickCheck>
     オブジェクトの位置を調整する手順を、画面を見ずに説明してください。
-    <Hint>位置を変える操作と結果を確かめる操作を思い出します。</Hint>
-    <Answer>位置を調整し、ビューポートで意図した場所にあるか確かめます。</Answer>
+
+    <Hint>
+      位置を変える操作と結果を確かめる操作を思い出します。
+    </Hint>
+
+    <Answer>
+      位置を調整し、ビューポートで意図した場所にあるか確かめます。
+    </Answer>
+
   </QuickCheck>
+
   <Evidence targets="place-object" demonstrates="retrieval">
+
     <QuickCheck>
       位置を調整したあと、どこを見て結果を確認しますか。
-      <Hint>配置したものが表示される画面を思い出します。</Hint>
-      <Answer>ビューポートを見ます。実際の位置関係を確認できます。</Answer>
+
+      <Hint>
+        配置したものが表示される画面を思い出します。
+      </Hint>
+
+      <Answer>
+        ビューポートを見ます。実際の位置関係を確認できます。
+      </Answer>
     </QuickCheck>
+
   </Evidence>
+
 </Section>
 ```
 
@@ -152,7 +220,20 @@ Use `demonstrates="application"` for applying a skill, even when the surface is 
 ### 演習1
 
 <Evidence targets="place-object" demonstrates="application">
-  <Exercise>指定された場所にオブジェクトを配置してください。</Exercise>
+
+  <Exercise>
+    指定された場所にオブジェクトを配置してください。配置後、周囲との位置関係を確認します。
+
+    <Hint>
+      オブジェクトを移動し、ビューポートで指定場所との関係を見ます。
+    </Hint>
+
+    <Answer>
+      オブジェクトを指定場所に配置し、ビューポートでその位置を確認します。
+    </Answer>
+
+  </Exercise>
+
 </Evidence>
 ```
 
@@ -160,11 +241,20 @@ Use `demonstrates="retrieval"` when the learner recalls knowledge or a procedure
 
 ```mdx
 <Evidence targets="place-object" demonstrates="retrieval">
+
   <QuickCheck>
     位置を調整する手順を説明してください。
-    <Hint>位置を変える操作と結果の確認を思い出します。</Hint>
-    <Answer>位置を調整し、表示結果を確認します。</Answer>
+
+    <Hint>
+      位置を変える操作と結果の確認を思い出します。
+    </Hint>
+
+    <Answer>
+      位置を調整し、表示結果を確認します。
+    </Answer>
+
   </QuickCheck>
+
 </Evidence>
 ```
 
@@ -174,7 +264,20 @@ Use `demonstrates="transfer"` only when the author explicitly intends the assess
 ### 演習1
 
 <Evidence targets="place-object" demonstrates="transfer">
-  <Exercise>初めて使うシーンで、目的に合う場所へオブジェクトを配置してください。</Exercise>
+
+  <Exercise>
+    初めて使うシーンで、目的に合う場所へオブジェクトを配置してください。配置後、周囲との位置関係を確認します。
+
+    <Hint>
+      シーン内の目印と目的を対応させ、ビューポートで位置を確かめます。
+    </Hint>
+
+    <Answer>
+      目的に合う場所へオブジェクトを配置し、シーン内の目印との位置関係を確認します。
+    </Answer>
+
+  </Exercise>
+
 </Evidence>
 ```
 
@@ -182,7 +285,7 @@ An Exercise does not automatically count as transfer. Component names do not det
 
 ## Validate and inspect the derived report
 
-After content sync, `npm run verify:content` validates a configured learning model and its page metadata. `npm run learning:report` prints the derived progression; `npm run learning:report -- --json` prints the same data as JSON. With no `learning-units.yaml`, verification and site builds retain the existing legacy behavior.
+After content sync, `npm run verify:content` validates a configured learning model and its page metadata. `npm run learning:report` prints the derived progression; `npm run learning:report -- --json` prints the same data as JSON. A legacy repository without `learning-units.yaml` keeps its existing behavior while it has no Learning System metadata or components. Once an Event attribute, `<Evidence>`, `<Instruction>`, or `<ProblemSolving>` is used, `learning-units.yaml` is required.
 
 The report contains:
 

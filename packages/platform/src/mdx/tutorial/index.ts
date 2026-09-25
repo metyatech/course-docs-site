@@ -11,6 +11,13 @@ export { default as Evidence } from './Evidence.js';
 export { default as Instruction } from './Instruction.js';
 export { default as ProblemSolving } from './ProblemSolving.js';
 
+export type {
+  LearningEventMetadata,
+  LearningEventPhase,
+  LearningEventStrategy,
+  LearningPattern,
+} from './learning-model.js';
+
 export type { SectionProps } from './Section.js';
 export type { ActionProps } from './Action.js';
 export type { VerifyProps } from './Verify.js';

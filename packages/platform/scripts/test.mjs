@@ -31,6 +31,7 @@ await run(process.execPath, [
   'tests/course-asset-config.test.mjs',
   'tests/download-link-render.test.mjs',
   'tests/exercise-contrast-styles.test.mjs',
+  'tests/learning-docs-examples.test.mjs',
   'tests/mdx-code-preview-boundary.test.mjs',
   'tests/mdx-guided-task-components.test.mjs',
   'tests/learning-model.test.mjs',

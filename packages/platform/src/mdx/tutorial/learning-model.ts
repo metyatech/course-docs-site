@@ -5,14 +5,25 @@ export const LEARNING_PATTERNS = ['instruction-first', 'problem-solving-first'] 
 export const EVIDENCE_KINDS = ['application', 'retrieval', 'transfer'] as const;
 export const LEARNING_STAGES = ['Instruction', 'ProblemSolving'] as const;
 
+export type LearningEventPhase = (typeof LEARNING_EVENT_PHASES)[number];
+export type LearningPattern = (typeof LEARNING_PATTERNS)[number];
+export type LearningEventStrategy = 'productive-failure';
+export type LearningEventMetadata = {
+  eventId?: string;
+  targets?: string;
+  phase?: LearningEventPhase;
+  pattern?: LearningPattern;
+  strategy?: LearningEventStrategy;
+};
+
 export type LearningUnit = { id: string; objective: string; parent?: string };
 export type LearningUnitModel = { version: 1; units: LearningUnit[] };
 export type LearningEvent = {
   id: string;
   targets: string[];
-  phase: (typeof LEARNING_EVENT_PHASES)[number];
-  pattern?: (typeof LEARNING_PATTERNS)[number];
-  strategy?: 'productive-failure';
+  phase: LearningEventPhase;
+  pattern?: LearningPattern;
+  strategy?: LearningEventStrategy;
   page: string;
   order: number;
 };
@@ -27,6 +38,7 @@ export type LearningContentAnalysis = {
   events: LearningEvent[];
   evidence: LearningEvidence[];
   issues: LearningIssue[];
+  metadataPresent: boolean;
 };
 
 type AstNode = {
@@ -137,9 +149,20 @@ export const collectLearningContent = (tree: AstNode, page: string): LearningCon
   const evidence: LearningEvidence[] = [];
   const issues: LearningIssue[] = [];
   let order = 0;
-  const visit = (node: AstNode, enclosingEvent?: LearningEvent, stageOrder?: string[]) => {
+  let metadataPresent = false;
+  const learningEventFields = new Set(['eventId', 'targets', 'phase', 'pattern', 'strategy']);
+  const visit = (
+    node: AstNode,
+    enclosingEvent?: LearningEvent,
+    eventOwner?: AstNode,
+    stageOrder?: string[],
+    parentStage?: string,
+    parentNode?: AstNode,
+  ) => {
     let currentEvent = enclosingEvent;
     let currentStageOrder = stageOrder;
+    let currentEventOwner = eventOwner;
+    let ownsEvent = false;
     if (isElement(node, 'Section')) {
       if (node.attributes?.some((attribute) => attribute.name === 'objective')) {
         issues.push({
@@ -147,8 +170,10 @@ export const collectLearningContent = (tree: AstNode, page: string): LearningCon
           message: `Learning objectives belong only in learning-units.yaml, not in ${page}.`,
         });
       }
-      const fields = ['eventId', 'targets', 'phase', 'pattern', 'strategy'];
-      const present = fields.filter((name) => astAttribute(node, name) !== undefined);
+      const present = (node.attributes ?? [])
+        .filter((attribute) => learningEventFields.has(String(attribute.name)))
+        .map((attribute) => String(attribute.name));
+      if (present.length > 0) metadataPresent = true;
       if (
         present.length > 0 &&
         !['eventId', 'targets', 'phase'].every((name) => present.includes(name))
@@ -186,16 +211,30 @@ export const collectLearningContent = (tree: AstNode, page: string): LearningCon
         events.push(event);
         currentEvent = event;
         currentStageOrder = [];
+        currentEventOwner = node;
+        ownsEvent = true;
       }
     }
+    if (isElement(node, 'Evidence')) metadataPresent = true;
     if (
       isElement(node) &&
       LEARNING_STAGES.includes(node.name as (typeof LEARNING_STAGES)[number])
     ) {
+      metadataPresent = true;
       if (!currentEvent)
         issues.push({
           severity: 'error',
           message: `<${node.name}> in ${page} must be inside a learning event.`,
+        });
+      else if (currentEvent.phase !== 'initial')
+        issues.push({
+          severity: 'error',
+          message: `<${node.name}> in ${page} can only be used inside an initial learning event.`,
+        });
+      else if (parentStage || parentNode !== currentEventOwner)
+        issues.push({
+          severity: 'error',
+          message: `<${node.name}> in ${page} must be a top-level instructional stage directly inside its initial event Section.`,
         });
       else currentStageOrder?.push(node.name!);
     }
@@ -255,13 +294,18 @@ export const collectLearningContent = (tree: AstNode, page: string): LearningCon
         });
       }
     }
-    for (const child of node.children ?? []) visit(child, currentEvent, currentStageOrder);
-    if (
-      isElement(node, 'Section') &&
-      currentEvent === events.at(-1) &&
-      currentEvent?.page === page &&
-      currentEvent !== enclosingEvent
-    ) {
+    for (const child of node.children ?? [])
+      visit(
+        child,
+        currentEvent,
+        currentEventOwner,
+        currentStageOrder,
+        isElement(node) && LEARNING_STAGES.includes(node.name as (typeof LEARNING_STAGES)[number])
+          ? node.name!
+          : parentStage,
+        node,
+      );
+    if (ownsEvent && currentEvent) {
       const sequence = currentStageOrder ?? [];
       if (
         currentEvent.pattern === 'instruction-first' &&
@@ -311,7 +355,7 @@ export const collectLearningContent = (tree: AstNode, page: string): LearningCon
       });
     ids.add(event.id);
   }
-  return { events, evidence, issues };
+  return { events, evidence, issues, metadataPresent };
 };
 
 export const validateLearningUnitModel = (input: unknown): LearningIssue[] => {

@@ -94,6 +94,84 @@ test("verify-content passes on a clean fixture", async () => {
   }
 });
 
+test("verify-content requires a learning model only when Learning System metadata is used", async () => {
+  const cases = [
+    {
+      name: "legacy MDX",
+      model: undefined,
+      mdx: ["---", "title: Legacy", "---", "", "既存ページです。", ""].join("\n"),
+      succeeds: true,
+    },
+    {
+      name: "event metadata",
+      model: undefined,
+      mdx: [
+        '<Section title="Goal" goal="Goal" eventId="event-a" targets="unit-a" phase="initial" pattern="instruction-first">',
+        "",
+        "<Instruction>",
+        "Learn.",
+        "</Instruction>",
+        "",
+        "<ProblemSolving>",
+        "Try.",
+        "</ProblemSolving>",
+        "",
+        "</Section>",
+      ].join("\n"),
+      succeeds: false,
+    },
+    {
+      name: "Evidence",
+      model: undefined,
+      mdx: '<Evidence targets="unit-a" demonstrates="application"><Verify>Check.</Verify></Evidence>',
+      succeeds: false,
+    },
+    {
+      name: "stage marker",
+      model: undefined,
+      mdx: "<Instruction>Learn.</Instruction>",
+      succeeds: false,
+    },
+    {
+      name: "configured learning model",
+      model: "version: 1\nunits:\n  - id: unit-a\n    objective: Can do the task.\n",
+      mdx: [
+        '<Section title="Goal" goal="Goal" eventId="event-a" targets="unit-a" phase="initial" pattern="instruction-first">',
+        "",
+        "<Instruction>",
+        "Learn.",
+        "</Instruction>",
+        "",
+        "<ProblemSolving>",
+        "Try.",
+        "</ProblemSolving>",
+        "",
+        "</Section>",
+      ].join("\n"),
+      succeeds: true,
+    },
+  ];
+
+  for (const scenario of cases) {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-learning-config-"));
+    try {
+      if (scenario.model !== undefined)
+        await writeFixture(tempDir, "learning-units.yaml", scenario.model);
+      await writeFixture(tempDir, "content/lesson.mdx", scenario.mdx);
+      const result = await runVerifier(tempDir);
+      assert.equal(
+        result.code === 0,
+        scenario.succeeds,
+        `${scenario.name}: unexpected exit ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+      );
+      if (!scenario.succeeds)
+        assert.match(result.stdout, /learning-units\.yaml is required/u, scenario.name);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("verify-content flags <Exercise> without a preceding heading", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
   try {
