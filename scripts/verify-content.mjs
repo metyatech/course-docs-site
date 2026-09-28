@@ -207,7 +207,28 @@ const verifyExerciseHeadings = async (mdxFiles) => {
       // between, but require a Markdown heading `###` through `######`.
       let cursor = i - 1;
       while (cursor >= 0 && lines[cursor].trim() === "") cursor -= 1;
-      if (cursor < 0 || !/^ {0,3}#{3,6}[ \t]+\S/.test(lines[cursor])) {
+      let headingCursor = cursor;
+      if (cursor >= 0) {
+        const previousLine = lines[cursor].trim();
+        let evidenceOpening = null;
+        if (/^<Evidence\b[^>]*>$/.test(previousLine)) {
+          evidenceOpening = cursor;
+        } else if (previousLine === ">") {
+          for (let openingCursor = cursor - 1; openingCursor >= 0; openingCursor -= 1) {
+            const candidate = lines[openingCursor].trim();
+            if (/^<Evidence\b/.test(candidate)) {
+              evidenceOpening = openingCursor;
+              break;
+            }
+            if (candidate !== "" && !/^[\w-]+\s*=/.test(candidate)) break;
+          }
+        }
+        if (evidenceOpening !== null) {
+          headingCursor = evidenceOpening - 1;
+          while (headingCursor >= 0 && lines[headingCursor].trim() === "") headingCursor -= 1;
+        }
+      }
+      if (headingCursor < 0 || !/^ {0,3}#{3,6}[ \t]+\S/.test(lines[headingCursor])) {
         errors.push(
           `${repoPosixPath(filePath)}:${i + 1}: <Exercise> must be immediately preceded by a non-empty Markdown exercise heading (### through ######), allowing only blank lines between them.`,
         );

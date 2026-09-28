@@ -94,6 +94,80 @@ test("verify-content passes on a clean fixture", async () => {
   }
 });
 
+test("verify-content accepts heading-wrapped Evidence and still requires its heading", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-evidence-exercise-heading-"));
+  try {
+    await writeFixture(
+      tempDir,
+      "learning-units.yaml",
+      "version: 1\nunits:\n  - id: unit-a\n    objective: Can do the task.\n",
+    );
+    const fixturePath = await writeFixture(
+      tempDir,
+      "content/docs/foo/index.mdx",
+      [
+        '<Section title="Goal" goal="Goal" eventId="event-a" targets="unit-a" phase="initial" pattern="instruction-first">',
+        "",
+        "<Instruction>",
+        "Learn.",
+        "</Instruction>",
+        "",
+        "<ProblemSolving>",
+        "### 演習1",
+        "",
+        '<Evidence targets="unit-a" demonstrates="application">',
+        "",
+        "<Exercise>",
+        "Complete the task.",
+        "</Exercise>",
+        "",
+        "</Evidence>",
+        "</ProblemSolving>",
+        "</Section>",
+        "",
+      ].join("\n"),
+    );
+
+    let result = await runVerifier(tempDir);
+    assert.equal(
+      result.code,
+      0,
+      `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
+
+    await writeFile(
+      fixturePath,
+      [
+        '<Section title="Goal" goal="Goal" eventId="event-a" targets="unit-a" phase="initial" pattern="instruction-first">',
+        "",
+        "<Instruction>",
+        "Learn.",
+        "</Instruction>",
+        "",
+        "<ProblemSolving>",
+        '<Evidence targets="unit-a" demonstrates="application">',
+        "",
+        "<Exercise>",
+        "Complete the task.",
+        "</Exercise>",
+        "",
+        "</Evidence>",
+        "</ProblemSolving>",
+        "</Section>",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    result = await runVerifier(tempDir);
+    assert.notEqual(result.code, 0);
+    assert.match(result.stdout, /Exercise heading verification failed/u);
+    assert.match(result.stdout, /preceded by a non-empty Markdown exercise heading/u);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("verify-content requires a learning model only when Learning System metadata is used", async () => {
   const cases = [
     {

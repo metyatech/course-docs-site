@@ -34,9 +34,9 @@ const readMetaOrder = async (directory) => {
   const metaPath = path.join(directory, "_meta.ts");
   try {
     const source = await readFile(metaPath, "utf8");
-    return parseNextraMetaOrder(source);
+    return { ...parseNextraMetaOrder(source), present: true };
   } catch (error) {
-    if (error?.code === "ENOENT") return { supported: false, entries: [] };
+    if (error?.code === "ENOENT") return { supported: false, entries: [], present: false };
     throw new Error(`Unable to read Nextra navigation order at ${metaPath}: ${error.message}`);
   }
 };
@@ -45,15 +45,16 @@ const orderedMdxFiles = async (contentRoot) => {
   const allFiles = await collectMdxFiles(contentRoot);
   const remaining = new Set(allFiles);
   const ordered = [];
-  let usedFallback = false;
+  const fallbackDirectories = [];
+  const uncertainDirectories = [];
   const walk = async (directory) => {
     const meta = await readMetaOrder(directory);
-    if (!meta.supported) usedFallback = true;
+    if (meta.present && !meta.supported) uncertainDirectories.push(directory);
     const listed = new Set();
     for (const { key, hidden } of meta.entries) {
       if (key === "*" || key === "index" || hidden) continue;
       if (key.includes("/") || key.includes("\\") || key === "." || key === "..") {
-        usedFallback = true;
+        uncertainDirectories.push(directory);
         continue;
       }
       listed.add(key);
@@ -75,17 +76,23 @@ const orderedMdxFiles = async (contentRoot) => {
     for (const entry of entries
       .filter((item) => item.isDirectory())
       .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
-      if (!listed.has(entry.name)) await walk(path.join(directory, entry.name));
+      if (!listed.has(entry.name)) {
+        const childDirectory = path.join(directory, entry.name);
+        fallbackDirectories.push(childDirectory);
+        await walk(childDirectory);
+      }
     }
   };
   await walk(contentRoot);
-  for (const file of [...remaining].sort()) {
-    usedFallback = true;
+  const fallbackFiles = [...remaining].sort();
+  for (const file of fallbackFiles) {
     ordered.push(file);
   }
   return {
     files: ordered,
-    orderCertain: !usedFallback,
+    fallbackFiles,
+    fallbackDirectories,
+    uncertainDirectories,
     orderSource: "Nextra _meta.ts; stable path fallback for unlisted pages",
   };
 };
@@ -115,6 +122,7 @@ export const analyzeCourseLearning = async ({ root = process.cwd() } = {}) => {
   const files = pageOrder.files;
   const events = [];
   const evidence = [];
+  const eventPages = new Set();
   let metadataPresent = false;
   for (const file of files) {
     const source = await readFile(file, "utf8");
@@ -122,12 +130,26 @@ export const analyzeCourseLearning = async ({ root = process.cwd() } = {}) => {
     const relativePage = path.relative(contentPath, file).split(path.sep).join("/");
     const collected = collectLearningContent(tree, relativePage);
     metadataPresent ||= collected.metadataPresent;
+    if (collected.events.length > 0) eventPages.add(file);
     events.push(
       ...collected.events.map((event) => ({ ...event, order: events.length + event.order })),
     );
     evidence.push(...collected.evidence);
     issues.push(...collected.issues);
   }
+  const isWithinDirectory = (file, directory) => {
+    const relative = path.relative(directory, file);
+    return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== "..");
+  };
+  const fallbackAffectedEventPage =
+    pageOrder.fallbackFiles.some((file) => eventPages.has(file)) ||
+    pageOrder.fallbackDirectories.some((directory) =>
+      [...eventPages].some((file) => isWithinDirectory(file, directory)),
+    );
+  const unsupportedEventPage = pageOrder.uncertainDirectories.some((directory) =>
+    [...eventPages].some((file) => isWithinDirectory(file, directory)),
+  );
+  const orderCertain = !unsupportedEventPage && !(fallbackAffectedEventPage && eventPages.size > 1);
   if (!modelPresent) {
     if (metadataPresent) {
       issues.push({
@@ -137,7 +159,7 @@ export const analyzeCourseLearning = async ({ root = process.cwd() } = {}) => {
       });
       return {
         configured: false,
-        pageOrder: { source: pageOrder.orderSource, certain: pageOrder.orderCertain },
+        pageOrder: { source: pageOrder.orderSource, certain: orderCertain },
         issues,
         progression: [],
         events,
@@ -149,7 +171,7 @@ export const analyzeCourseLearning = async ({ root = process.cwd() } = {}) => {
   const progression = analyzeLearningProgression({ units: model.units, events, evidence });
   return {
     configured: true,
-    pageOrder: { source: pageOrder.orderSource, certain: pageOrder.orderCertain },
+    pageOrder: { source: pageOrder.orderSource, certain: orderCertain },
     issues: [...issues, ...progression.issues],
     progression: progression.progression,
     events: progression.events,

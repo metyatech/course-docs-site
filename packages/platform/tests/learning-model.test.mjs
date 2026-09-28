@@ -247,6 +247,76 @@ test('course analyzer respects Nextra metadata order and labels deterministic fa
   }
 });
 
+test('parent Nextra metadata orders lesson index pages without leaf metadata uncertainty', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'learning-analysis-parent-meta-'));
+  try {
+    await mkdir(path.join(root, 'content'), { recursive: true });
+    await writeFile(
+      path.join(root, 'learning-units.yaml'),
+      'version: 1\nunits:\n  - id: unit-a\n    objective: Can do the task.\n',
+      'utf8',
+    );
+    await writeFile(
+      path.join(root, 'content', '_meta.ts'),
+      'const meta = { "lesson-a": {}, "lesson-b": {} };\nexport default meta;\n',
+      'utf8',
+    );
+    const mdx = (id) =>
+      `<Section title="Goal" goal="Goal" eventId="${id}" targets="unit-a" phase="initial" pattern="instruction-first">\n<Instruction>Learn.</Instruction>\n<ProblemSolving>Try.</ProblemSolving>\n</Section>`;
+    await mkdir(path.join(root, 'content', 'lesson-a'), { recursive: true });
+    await mkdir(path.join(root, 'content', 'lesson-b'), { recursive: true });
+    await writeFile(path.join(root, 'content', 'lesson-a', 'index.mdx'), mdx('event-a'), 'utf8');
+    await writeFile(path.join(root, 'content', 'lesson-b', 'index.mdx'), mdx('event-b'), 'utf8');
+
+    const { analyzeCourseLearning } = await import('../../../scripts/learning-analysis.mjs');
+    const result = await analyzeCourseLearning({ root });
+    assert.deepEqual(
+      result.events.map(({ id }) => id),
+      ['event-a', 'event-b'],
+    );
+    assert.equal(result.pageOrder.certain, true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('unlisted sibling Event pages use stable fallback and report uncertain order', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'learning-analysis-unlisted-sibling-'));
+  try {
+    await mkdir(path.join(root, 'content'), { recursive: true });
+    await writeFile(
+      path.join(root, 'learning-units.yaml'),
+      'version: 1\nunits:\n  - id: unit-a\n    objective: Can do the task.\n',
+      'utf8',
+    );
+    await writeFile(
+      path.join(root, 'content', '_meta.ts'),
+      'const meta = { "lesson-a": {}, "lesson-b": {} };\nexport default meta;\n',
+      'utf8',
+    );
+    const mdx = (id) =>
+      `<Section title="Goal" goal="Goal" eventId="${id}" targets="unit-a" phase="initial" pattern="instruction-first">\n<Instruction>Learn.</Instruction>\n<ProblemSolving>Try.</ProblemSolving>\n</Section>`;
+    for (const lesson of ['lesson-a', 'lesson-b', 'lesson-c']) {
+      await mkdir(path.join(root, 'content', lesson), { recursive: true });
+      await writeFile(
+        path.join(root, 'content', lesson, 'index.mdx'),
+        mdx(`event-${lesson}`),
+        'utf8',
+      );
+    }
+
+    const { analyzeCourseLearning } = await import('../../../scripts/learning-analysis.mjs');
+    const result = await analyzeCourseLearning({ root });
+    assert.deepEqual(
+      result.events.map(({ id }) => id),
+      ['event-lesson-a', 'event-lesson-b', 'event-lesson-c'],
+    );
+    assert.equal(result.pageOrder.certain, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('Nextra metadata ordering is parsed statically without executing content code', async () => {
   const { parseNextraMetaOrder } = await import('../../../scripts/learning-analysis.mjs');
   assert.deepEqual(

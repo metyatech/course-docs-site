@@ -64,9 +64,14 @@ test("isAdminAuthorizedForCommentDelete: site config without capability returns 
     },
     async () => {
       const cookie = await signAdminSession(VALID_SECRET);
-      // The checked-in default site config has no admin capability. A valid
-      // cookie and valid secrets must still fail closed for that site.
-      assert.equal(await isAdminAuthorizedForCommentDelete(cookie), false);
+      // Isolate the missing-capability case from whatever course config the
+      // content sync generated for this checkout.
+      assert.equal(
+        await isAdminAuthorizedForCommentDelete(cookie, {
+          isAdminModeConfigured: () => false,
+        }),
+        false,
+      );
     },
   );
 });
