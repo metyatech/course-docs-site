@@ -1,7 +1,6 @@
 <!-- markdownlint-disable MD025 -->
 # Tool Rules (compose-agentsmd)
 
-- **Session gate**: before starting substantive work for each externally supplied human/operator instruction, run `compose-agentsmd` once from the project root. AGENTS.md contains the rules you operate under; stale rules cause rule violations. Do not rerun this gate within the same instruction after tool results, retries, generated continuations, or resumed execution. If you discover you skipped this step mid-session, stop, run it immediately, re-read the diff, and adjust your behavior before continuing.
 - `compose-agentsmd` intentionally regenerates `AGENTS.md`; any resulting `AGENTS.md` diff is expected and must not be treated as an unexpected external change.
 - If `compose-agentsmd` is not available, run it via `npx compose-agentsmd`. If `npx` is unavailable or cannot fetch the package, install it via npm with an environment-appropriate method such as `npm install -g compose-agentsmd` when global installs are permitted, or a user-local npm prefix when global installs are not permitted.
 - To update shared/global rules, use `compose-agentsmd edit-rules` to locate the writable rules workspace, make changes only in that workspace, then run `compose-agentsmd apply-rules` (do not manually clone or edit the rules source repo outside this workflow).
@@ -141,89 +140,223 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
 
 # Course Docs Authoring
 
-- Course documentation content MUST be written for beginner learners in clear Japanese unless the task explicitly requests another language.
-- Course docs pages MUST use the shared course-docs MDX components when they express page structure, learner actions, verification, concept explanation, reference material, recovery steps, checkpoints, exercises, or answers.
-- Use `<Section>`, `<Action>`, `<Verify>`, `<Concept>`, `<Reference>`, `<Recovery>`, `<Checkpoint>`, `<Exercise>`, `<QuickCheck>`, `<Hint>`, and `<Answer>` from `course-docs-platform` for structured tutorial pages.
+- Course documentation content MUST be written for beginner learners in clear
+  Japanese unless the task explicitly requests another language.
+- Use shared `course-docs-platform` MDX components for page structure, learner
+  actions, explanations, checks, exercises, answers, references, and recovery
+  support.
+- Common components include `<Section>`, `<Action>`, `<Concept>`, `<Reference>`,
+  `<Verify>`, `<QuickCheck>`, `<Checkpoint>`, `<Exercise>`, `<Evidence>`,
+  `<Hint>`, `<Answer>`, and `<Recovery>`. `<Instruction>` and `<ProblemSolving>`
+  are Learning System stage markers, not general-purpose containers.
 - A top-level `<Section>` MUST declare `goal`.
-- Learner-facing HTML examples MUST use normal HTML void elements without XHTML-style trailing slashes, such as `<input>` rather than `<input />`.
-- The void-element rule applies to learner-facing HTML code fences and sample/complete files; it does not apply to MDX/JSX component syntax.
-- Exercises MUST use `<Exercise>`, `<Hint>`, and `<Answer>` when the page expects learners to attempt a task and then compare with an answer.
-- QuickCheck tasks MUST use `<QuickCheck>`, `<Hint>`, and `<Answer>` when the page expects learners to check understanding and then compare with an answer.
-- Every `<Exercise>` and `<QuickCheck>` task MUST be structured as problem content, followed by one or more `<Hint>` blocks, followed by exactly one `<Answer>` block.
-- A `<Hint>` MUST NOT reveal the answer first and MUST use only material already covered earlier in the same lesson or in a guaranteed earlier lesson.
-- An `<Answer>` MUST provide enough explanation to make the feedback instructive, not only the final answer. Explain why the answer is correct and address a likely misconception when one genuinely exists; do not invent a misconception merely to satisfy the template.
+- Learner-facing HTML examples MUST use normal HTML void elements without
+  XHTML-style trailing slashes, such as `<input>` rather than `<input />`. This
+  applies to HTML code fences and sample/complete files, not MDX/JSX components.
 - Course docs MUST NOT use `<Solution>` or `authoringMode`.
-- Course docs MUST NOT impose a fixed page-wide order for QuickCheck, Exercise, and extension exercise blocks; place each task where it best supports the learner's progression.
-- Exercise headings MUST use `### 演習N` for standard exercises and `### 演習-発展N` for extension exercises.
-- Exercise statements MUST include the expected result, success criteria, and enough context for learners to start without guessing.
-- Extension exercises MUST be optional and must not be required for the base lesson completion.
 
-## Tutorial representation and learning-goal closure
+## Learning System contract
 
-- Before choosing representation or assistance, identify whether the lesson/section is intended mainly for immediate task performance, later retention, transfer, or a deliberate combination. Do not optimise only first-attempt speed when retention or transfer is an explicit goal.
-- For each learner action, choose the most efficient primary representation for both the task and intended instructional horizon: visual for spatial UI/layout information, code or CodePreview for code authoring, text for short non-spatial operations, and diagrams/visuals for structural relationships. Images MUST NOT be added merely because a step is operational.
-- Treat one `<Action>` as one coherent learner action episode toward an immediate sub-goal. It MAY contain a short locally unified sequence (for example, click → open menu → hover → choose) when splitting per click would increase rather than reduce integration cost.
-- Do not duplicate the same complete procedure across the primary representation and secondary prose merely for repetition. Short labels, identifiers, numbers, positional cues, exact values, or other mapping information MAY appear in both when they materially reduce search/integration cost.
-- The `<Action>` as a whole MUST be executable without guessing. For a visual-primary Action, visible prose MAY contain only complementary information rather than restating the full visual path, provided a complete accessible text-equivalent route exists for essential visual instructions.
-- Accessibility-equivalent instructions MUST NOT be removed as “redundancy”. Preserve a complete text-equivalent route for essential visual information while avoiding two unnecessarily competing primary paths when the platform can expose the equivalent accessibly or on demand.
-- A substantive learning goal MUST have an aligned closure that can actually test that goal. Use `<Verify>` for observable behavior/state, `<QuickCheck>` for retrieval/understanding, `<Checkpoint>` for a meaningful multi-condition milestone, or `<Exercise>` for transfer/application. Do not add every closure component mechanically.
-- Treat immediate closure as evidence of current performance, not proof of durable mastery. Important knowledge SHOULD be revisited later through retrieval/distributed practice when curriculum scope allows; do not claim permanent mastery from one immediate success.
-- `<Recovery>` is error diagnosis/recovery support and MUST NOT be treated as learning-goal closure.
-- A `<Concept>` MUST focus on one new concept and only the information needed for imminent first use. First use MAY be an Action, Section, Verify, QuickCheck, or Exercise as appropriate. Roughly 2–5 sentences or one short table is preferred; 6+ sentences SHOULD trigger review for multiple concepts or reference material, not automatic rejection.
-- For a new procedure with low or unestablished prior knowledge, show enough worked/guided support before substantial independent construction. Fade, retain, or restore assistance based on established prior knowledge and learner performance; do not use a fixed "second time / third time" phase rule.
-- Learner-facing prose MUST NOT contain author-facing audience meta descriptions such as `受講者は〜`, `学習者は〜`, or `初学者向け` when they do not help perform the task. Rewrite them as direct task prose. Do not ban `ユーザー` when it refers to a real product/domain end user rather than the tutorial reader.
-- All informative tutorial visuals MUST have text alternatives appropriate to their role. For complex annotated screenshots / diagrams, use short `alt` text for purpose/identity and put the detailed equivalent in adjacent learner-visible text or another long-description mechanism instead of cramming the whole procedure into `alt`.
-- For screenshot annotations, normal text and images of text MUST meet WCAG 2.2 SC 1.4.3 contrast of at least 4.5:1; large text may use 3:1. Meaningful non-text callout shapes and UI-state indicators MUST meet the applicable 3:1 non-text contrast requirement. Prefer real text over images of text when practical.
+- A Learning Unit is a canonical objective or capability with a stable ID.
+  Define each Unit exactly once in the course-root `learning-units.yaml`; do not
+  duplicate its `objective` in MDX.
+- Units MAY have parent-child hierarchy. The platform derives Composite status
+  for Units with children and Leaf status for Units without children. A
+  Composite MAY have no direct Event; each Leaf MUST have Learning Event
+  coverage.
+- A Learning Event is one occurrence of how the learner learns targeted Units.
+  Represent it with metadata on an existing `<Section>`. One Event MUST be
+  contained in one MDX page; do not reuse an Event ID across pages or nest
+  Event-bearing Sections.
+- A Page is a display/distribution unit, not a Learning Unit. Derive course
+  progression from the ordered Learning Events; do not maintain a separate
+  Learning Plan or teacher lesson graph.
+- Event metadata uses `eventId`, `targets`, and `phase`; `pattern` is required
+  only for an initial Event. `strategy="productive-failure"` is optional and
+  valid only for an initial, problem-solving-first Event.
+- Valid `phase` values are `initial`, `practice`, `retrieval`, and `transfer`.
+  Initial Events MUST set `pattern` to `instruction-first` or
+  `problem-solving-first`; non-initial Events MUST NOT set `pattern`.
+- Initial Events MUST use `<Instruction>` and `<ProblemSolving>` as explicit
+  stage markers, each as a direct child of the Event Section. Markers MUST NOT
+  appear outside an initial Event, inside non-initial Events, or nest inside one
+  another.
+- Order the stage markers to match `pattern`: Instruction before ProblemSolving
+  for `instruction-first`, and ProblemSolving before Instruction for
+  `problem-solving-first`.
+- Do not treat Productive Failure as another name for problem-solving-first.
+  Follow the platform metadata contract without inventing an agent-side semantic
+  test for whether an Event qualifies.
 
-## Beginner lesson material ordering
+## Tasks, evidence, and closure
 
-- Materials MUST pass a literal cold-read in natural rendered order: if a learner reads linearly from the first word onward, every dependency must be understandable at first use. This is a verification method, not an assumption that real learners will read every word or never re-enter the page midstream.
-- Design for scanning/re-entry as well as linear correctness: major headings/goals SHOULD orient a returning reader, and sequential dependencies MUST be explicit rather than inferred.
-- At any point in the material, do not introduce a term or feature that has not been explained earlier in that same material (or in a strictly earlier lesson within the same course, when curriculum ordering guarantees it was already taught). Introduce new terms or features at the point where learners first need them.
-- "Term or feature" is not limited to HTML/CSS/JS syntax or APIs. It also includes: quoted literal values used in prose or tables (e.g. a string like `active` used as a rule's classification key), variable/identifier names, and any word or metaphor used in a `<Section>`/`<Concept>`/heading title or in body prose, a table cell, or a bullet, before its meaning has been established.
-- A `<Concept>` or `<Section>` title MUST NOT rely on a word, abbreviation, or metaphor that is only explained in that block's own body or in a later block. Titles MUST either be self-explanatory to a reader who has not yet read the body, or be phrased so the metaphor/label appears only after the body has explained the underlying idea (e.g. as a closing summary label, not as the heading itself).
-- When a rule, table, or summary statement needs to reference a specific value, label, or term (e.g. a classification-rule sentence naming a value to count), the term MUST already be defined by that point, or the sentence MUST explicitly flag it as forthcoming rather than using it as if already known.
-- When creating materials, first decide how learners should behave in each section, then write the content so that it naturally leads them to behave that way.
-- Introduce only one new concept or element at a time.
-- Do not include elements, such as terms, features, code, or markup, that learners will not use or engage with just because they might be realistic or useful later.
+- Exercise and QuickCheck tasks MUST present the problem, then one or more
+  `<Hint>` blocks, then exactly one `<Answer>` block. Hints MUST NOT reveal the
+  answer first and MUST use material already covered in this or a guaranteed
+  earlier lesson. Answers MUST explain why they are correct and address a likely
+  misconception only when one genuinely exists.
+- Exercise is a task/container format, not a learning phase. Near-copy and
+  routine application tasks MAY use `<Exercise>`; the component name alone does
+  not make a task transfer.
+- In Learning System content, bind objective evidence with metadata-only
+  `<Evidence>` around an existing learner-facing surface when an explicit
+  evidence mapping is needed. Allowed surfaces are `<Verify>`, `<QuickCheck>`,
+  `<Checkpoint>`, and `<Exercise>`; `demonstrates` is `application`,
+  `retrieval`, or `transfer`.
+- Do not infer evidence kind from a component name. `<Recovery>` is not an
+  Evidence surface. `<Evidence>` supplies a binding; it is not assessment UI.
+- A transfer task MUST require selecting and adapting a learned principle under
+  different conditions. Changing only values, names, or materials in a near-copy
+  is not transfer.
+- Each substantive learning goal MUST have an aligned closure that can test it.
+  Choose closure based on needed evidence: `<Verify>` for observable state,
+  `<QuickCheck>` for retrieval or understanding, `<Checkpoint>` for a
+  multi-condition milestone, or `<Exercise>` for application or transfer tasks.
+  This is a selection guide; component type alone does not determine evidence
+  kind.
+- Immediate success shows current performance, not durable mastery. Later
+  recurrence alone does not establish distributed practice. Do not model spacing
+  or interleaving as a single Event attribute.
+- `<Recovery>` supports error diagnosis and recovery; it is not learning-goal
+  closure. The platform currently reports missing explicit objective evidence as
+  a note; do not describe that note as an enforced build failure.
+- Do not impose a fixed page-wide order for QuickCheck, Exercise, and extension
+  exercises; place tasks where they support the learner's progression.
+- Exercise headings MUST use `### 演習N` for standard exercises and `### 演習-発展N`
+  for extension exercises. Exercise statements MUST give the expected result,
+  success criteria, and enough context to start without guessing. Extension
+  exercises MUST be optional and not required for base lesson completion.
 
-### Verification method for this rule
+## Learner-facing explanations and guidance
 
-- Checking this rule requires a literal top-to-bottom "cold read" simulation, not a structural/component-level scan. To review material against this rule:
-  1. Walk the material from the first word to the last, in rendered reading order, including titles/headings (which render before their own body).
-  2. Maintain a running set of terms, values, and metaphors that have been explicitly explained so far.
-  3. At each sentence, heading, table cell, and code comment, check every technical term, quoted value, and metaphor against that running set before accepting it as understandable at that point.
-  4. Flag the first point where a word could not be resolved by a first-time reader using only what has been read so far. Headings/titles MUST be checked against content read strictly before that heading, never against the body that follows it.
-- A structural check (e.g. "does this page use the required MDX components", "is `goal` present") does NOT satisfy this rule's verification requirement and MUST NOT be treated as a substitute for the cold-read simulation above.
+- Introduce concepts when the learner needs them. A `<Concept>` MUST focus on
+  one concept and include only information needed for imminent first use. First
+  use MAY be an Action, Section, Verify, QuickCheck, or Exercise. Roughly 2–5
+  sentences or one short table is preferred; 6+ sentences SHOULD trigger review
+  for multiple concepts or reference material, not automatic rejection.
+- Write so a learner reading once from the top can understand each idea without
+  backtracking: establish the need or context, name and explain the concept,
+  then use it (`Need / Context → Name + meaning → Use`). Do not rely on an
+  unexplained concept as already known.
+- A new term may first appear in a heading or title; its name alone does not
+  introduce the concept. When first named there, the heading/title and its
+  immediately following explanation MUST work together to make the meaning
+  explicit before the learner is expected to use it. Do not assume the learner
+  already knows the term. Prefer `Need / Context → Name + meaning → Use` while
+  allowing the name to appear before its explanation. Do not require a glossary
+  or predefine every term.
+- Exact literal values, identifiers, and metaphors may appear before their
+  meaning is explained; explain them before relying on the learner to know what
+  they mean. Judge cold-read clarity by whether a learner reading downward from
+  the start can understand the current material without going back, not by
+  whether every string appeared only after a prior definition.
+- Introduce only concepts and elements learners will use or engage with; do not
+  add later-use realism without a learning need.
+- Before choosing representation or assistance, identify whether the intended
+  goal is initial performance, learning (including retention), transfer, or a
+  deliberate combination. Do not optimize only initial performance when
+  learning or transfer is an explicit goal.
+- Choose the most efficient primary representation for the task and goal: visual
+  for spatial UI/layout information, code or CodePreview for code authoring,
+  text for short non-spatial operations, and diagrams/visuals for structural
+  relationships. Do not add images merely because a step is operational.
+- Treat one `<Action>` as one coherent learner action episode toward an
+  immediate sub-goal. It MAY contain a short, locally unified sequence (for
+  example, click → open menu → hover → choose) when splitting each click would
+  increase integration cost.
+- Do not duplicate a complete procedure across primary representation and prose
+  merely for repetition. Short labels, identifiers, numbers, positional cues,
+  and exact values MAY appear in both when they reduce search or integration
+  cost.
+- An `<Action>` MUST be executable without guessing. For a visual-primary
+  Action, prose MAY add complementary details instead of repeating the full
+  visual path, provided essential visual instructions have a complete accessible
+  text-equivalent route.
+- Preserve accessibility-equivalent instructions; avoid competing duplicate
+  paths when the platform can expose an equivalent accessibly or on demand.
+- For a new procedure with low or unestablished prior knowledge, provide enough
+  worked or guided support before substantial independent construction. Fade,
+  retain, or restore assistance based on established prior knowledge and learner
+  performance; do not use a fixed second-time/third-time rule.
+- Learner-facing prose MUST NOT contain author-facing audience descriptions such
+  as `受講者は〜`, `学習者は〜`, or `初学者向け` when they do not help perform the task.
+  Rewrite these as direct task prose. Do not ban `ユーザー` when it refers to a real
+  product/domain end user rather than the tutorial reader.
+- Informative tutorial visuals MUST have text alternatives appropriate to their
+  role. For complex annotated screenshots or diagrams, use short `alt` text for
+  purpose/identity and put the detailed equivalent in adjacent learner-visible
+  text or another long-description mechanism.
+- Screenshot annotation text and images of text MUST meet WCAG 2.2 SC 1.4.3
+  contrast: 4.5:1 for normal text and 3:1 for large text. Meaningful non-text
+  callout shapes and UI-state indicators MUST meet the applicable 3:1 non-text
+  contrast requirement. Prefer real text over images of text when practical.
 
 Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/repository-and-site.md
 
 # Course Docs Repository and Site Architecture
 
-- `metyatech/course-docs-site` is the Course Docs monorepo and the only runnable Next.js/Nextra course site app.
-- The runnable site remains at the repository root.
-- `packages/platform` is the internal workspace package named `@metyatech/course-docs-platform`.
-- The Course Docs monorepo MUST keep a single root `package-lock.json`; workspace packages MUST NOT contain their own lockfiles.
-- `packages/platform` owns shared MDX components, remark/rehype configuration, webpack asset rules, reusable Next app factories/routes, and shared course-site behavior.
-- The root site owns content synchronization, site composition, deployment wiring, development tooling, and end-to-end tests.
-- Shared behavior that applies to multiple courses belongs in `packages/platform`.
-- Root site code MUST remain composition/wiring for platform-owned behavior.
-- Site/platform cross-boundary changes MUST be committed and verified atomically in the same repository.
-- Platform, site, course build, and end-to-end verification MUST run together for changes that cross the site/platform boundary.
+- `metyatech/course-docs-site` is the Course Docs monorepo and the only runnable
+  Next.js/Nextra course site app. The runnable site remains at the repository
+  root.
+- `packages/platform` is the internal workspace package named
+  `@metyatech/course-docs-platform`.
+- The monorepo MUST keep a single root `package-lock.json`; workspace packages
+  MUST NOT contain their own lockfiles.
+- `packages/platform` owns shared MDX components, remark/rehype configuration,
+  webpack asset rules, reusable Next app factories/routes, and shared
+  course-site behavior.
+- The root site owns content synchronization, site composition, deployment
+  wiring, development tooling, and end-to-end tests. Root site code MUST remain
+  composition/wiring for platform-owned behavior.
+- Shared behavior that applies to multiple courses belongs in
+  `packages/platform`.
+- Site/platform cross-boundary changes MUST be committed and verified atomically
+  in the same repository. Platform, site, course build, and end-to-end
+  verification MUST run together for changes crossing this boundary.
 - The archived `metyatech/course-docs-platform` repository is historical only.
-- Active code MUST NOT depend on the archived repository through Git, GitHub SHA dependencies, submodules, or subtree synchronization.
-- Content repositories remain content-only repositories.
-- Course content repositories MUST keep only course content, static assets, and course-specific configuration such as `content/**`, `public/img/**`, and `site.config.ts`.
-- Course content repositories MUST NOT add Next.js/Nextra app runtime files such as `next.config.js`, `src/app`, app package files, or site runtime implementations.
-- `public/img/favicon.ico` is expected by `site.config.ts` when `faviconHref` references it.
-- Framework boilerplate assets MUST NOT be kept unless referenced by content.
-- Secrets MUST NOT be stored in course content repositories.
-- `.env.local` is local-only and belongs in `course-docs-site`, not in content repositories.
-- Course content MUST be previewed through `course-docs-site` by setting `COURSE_CONTENT_SOURCE`.
-- Vercel deployment for course sites MUST use GitHub Actions with the Vercel CLI, not Vercel's GitHub integration.
+  Active code MUST NOT depend on it through Git, GitHub SHA dependencies,
+  submodules, or subtree synchronization.
+
+## Course content repositories
+
+- Course content repositories are content-only. They MAY contain `content/**`,
+  static assets such as `public/img/**`, `site.config.ts`, and course-specific
+  data such as `learning-units.yaml`.
+- `learning-units.yaml` MUST be at the course root when used. It is the
+  canonical course-specific Learning Unit/objective model, not site or runtime
+  implementation. Require it when MDX uses Learning System Event metadata or
+  components such as `<Evidence>`; do not require it for legacy content that has
+  not adopted the Learning System.
+- Course content repositories MUST NOT add Next.js/Nextra app runtime files such
+  as `next.config.js`, `src/app`, app package files, or site runtime
+  implementations.
+- `public/img/favicon.ico` is expected by `site.config.ts` when `faviconHref`
+  references it. Framework boilerplate assets MUST NOT be kept unless referenced
+  by content.
+- Secrets MUST NOT be stored in course content repositories. `.env.local` is
+  local-only and belongs in `course-docs-site`, not in content repositories.
+- Preview course content through `course-docs-site` by setting
+  `COURSE_CONTENT_SOURCE`.
+- Vercel deployment for course sites MUST use GitHub Actions with the Vercel
+  CLI, not Vercel's GitHub integration.
+
+## Course structure and navigation
+
+- A Page is a display/distribution unit, not a pedagogical Learning Unit.
+  Learning Event order is the source for actual course material progression; do
+  not treat a page, Nextra navigation entry, or file path as a Learning Unit or
+  substitute it for Event order.
+- Course Docs MAY use Nextra navigation order where it represents material
+  progression. If navigation order is incomplete, progression may be uncertain;
+  a path-based fallback MUST NOT be described as lesson order.
+- Do not require a separate session plan or teacher lesson graph when Learning
+  Events already express progression.
 - Generic tool-agnostic specs MUST remain in their dedicated repositories.
-- Course Docs Site-specific presentation conventions MUST be documented in `course-docs-platform` or the `course-docs` domain, not in generic specs.
+  Course Docs Site-specific presentation conventions belong in
+  `course-docs-platform` or the `course-docs` domain, not generic specs.
 - Course docs pages MUST define page titles in frontmatter.
-- `_meta.ts` MUST be used for grouping-only folder labels, not for overriding ordinary page titles.
-- Default sidebar collapse behavior MUST be controlled through `theme.config.tsx` sidebar settings.
-- `theme.collapsed` MUST be used only for true exceptions.
+- `_meta.ts` MUST be used for grouping-only folder labels, not for overriding
+  ordinary page titles.
+- Default sidebar collapse behavior MUST be controlled through
+  `theme.config.tsx` sidebar settings. `theme.collapsed` MUST be used only for
+  true exceptions.
