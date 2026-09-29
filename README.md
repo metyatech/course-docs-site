@@ -65,11 +65,13 @@ required-site IDs need updating.
 
 Deployment behavior is:
 
-- A push to `course-docs-site/main` runs CI across all discovered sites and does not deploy Production.
+- A push to `course-docs-site/main` runs CI across all discovered sites and does not directly deploy Production. When that push's CI succeeds, **Release shared runtime** starts automatically and follows the same guarded release flow as a manual release.
 - A content repository push deploys only that site, using the `production-runtime` pointer.
-- To release a completed shared runtime, manually run **Release shared runtime** from `main`, optionally entering
-  a full `target_sha`. The release checks that commit's successful CI, deploys that exact SHA to every discovered
-  site, runs Production smoke checks, and advances `production-runtime` only after all checks pass.
+- To release a shared runtime manually, run **Release shared runtime** from `main`, optionally entering a full
+  `target_sha`. Automatic releases use the completed CI run's exact `head_sha`; both paths check that commit's
+  successful push CI, deploy that exact SHA to every discovered site, run Production smoke checks, and advance
+  `production-runtime` only after all checks pass. Pull request, failed, cancelled, and non-main CI runs do not
+  start an automatic release.
 - If any deployment or smoke check fails, `production-runtime` stays on its previous SHA, so later content pushes
   continue to use the runtime currently in Production.
 

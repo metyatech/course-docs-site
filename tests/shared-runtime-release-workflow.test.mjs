@@ -27,14 +27,30 @@ test("shared deploy workflow checks out the selected runtime and defaults to pro
   assert.match(workflow, /Content SHA: \$\{CONTENT_SHA\}/u);
 });
 
-test("automatic shared-main Production fanout is absent and release is manual", async () => {
+test("release supports manual dispatch and filters automatic CI completion before privileged jobs", async () => {
   const workflowDirectory = path.join(projectRoot, ".github", "workflows");
   const files = await fs.readdir(workflowDirectory);
   assert.ok(!files.includes("redeploy-content-sites.yml"));
   const releaseWorkflow = await readProjectFile(".github/workflows/release-shared-runtime.yml");
-  assert.match(releaseWorkflow, /workflow_dispatch:/u);
-  assert.doesNotMatch(releaseWorkflow, /^\s+workflow_run:/mu);
-  assert.equal(YAML.parse(releaseWorkflow).name, "Release shared runtime");
+  const parsed = YAML.parse(releaseWorkflow);
+  assert.ok(parsed.on.workflow_dispatch);
+  assert.equal(parsed.on.workflow_dispatch.inputs.target_sha.required, false);
+  assert.deepEqual(parsed.on.workflow_run, { workflows: ["CI"], types: ["completed"] });
+  assert.equal(parsed.concurrency.group, "course-docs-site-production-runtime-release");
+  assert.equal(parsed.concurrency["cancel-in-progress"], false);
+  assert.deepEqual(parsed.permissions, { actions: "read", contents: "write" });
+  assert.equal(parsed.jobs.preflight.if.includes("github.event_name == 'workflow_dispatch'"), true);
+  assert.match(parsed.jobs.preflight.if, /workflow_run\.name == 'CI'/u);
+  assert.match(parsed.jobs.preflight.if, /workflow_run\.event == 'push'/u);
+  assert.match(parsed.jobs.preflight.if, /workflow_run\.head_branch == 'main'/u);
+  assert.match(parsed.jobs.preflight.if, /workflow_run\.conclusion == 'success'/u);
+  assert.doesNotMatch(parsed.jobs.preflight.if, /pull_request|failure|cancelled/u);
+  assert.match(
+    releaseWorkflow,
+    /github\.event_name == 'workflow_run' && github\.event\.workflow_run\.head_sha/u,
+  );
+  assert.match(releaseWorkflow, /TARGET_SHA_INPUT:-\$WORKFLOW_SHA/u);
+  assert.equal(parsed.name, "Release shared runtime");
 });
 
 test("release verifies main CI and history, dispatches exact SHA, then smoke-tests before pointer update", async () => {
