@@ -155,6 +155,7 @@ test("dispatch helper selects one correlated workflow run and verifies content a
 
 test("release smoke contract covers required site routes, assets, admin mode, comments, and exclusions", async () => {
   const smoke = await readProjectFile("scripts/smoke-production-sites.mjs");
+  const diagnostics = await readProjectFile("scripts/production-smoke-diagnostics.mjs");
   for (const required of [
     "/docs/intro/",
     "demo-complete.mp4",
@@ -171,6 +172,10 @@ test("release smoke contract covers required site routes, assets, admin mode, co
     "/docs/intro/index.mdx",
     "/_meta.ts",
   ]) {
-    assert.ok(smoke.includes(required), `Production smoke must cover ${required}.`);
+    const source = required === "/rest/v1/work_comments" ? diagnostics : smoke;
+    assert.ok(source.includes(required), `Production smoke must cover ${required}.`);
   }
+  assert.ok(smoke.indexOf("waitForCommentRead()") < smoke.indexOf("await commentButton.click()"));
+  assert.ok(diagnostics.includes('page.on("requestfailed", onRequestFailed)'));
+  assert.ok(diagnostics.includes("Programming work_comments request did not start"));
 });

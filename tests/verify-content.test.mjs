@@ -94,7 +94,7 @@ test("verify-content passes on a clean fixture", async () => {
   }
 });
 
-test("verify-content accepts heading-wrapped Evidence and still requires its heading", async () => {
+test("verify-content accepts Exercise with or without an informative heading", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-evidence-exercise-heading-"));
   try {
     await writeFixture(
@@ -160,9 +160,11 @@ test("verify-content accepts heading-wrapped Evidence and still requires its hea
     );
 
     result = await runVerifier(tempDir);
-    assert.notEqual(result.code, 0);
-    assert.match(result.stdout, /Exercise heading verification failed/u);
-    assert.match(result.stdout, /preceded by a non-empty Markdown exercise heading/u);
+    assert.equal(
+      result.code,
+      0,
+      `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -246,7 +248,7 @@ test("verify-content requires a learning model only when Learning System metadat
   }
 });
 
-test("verify-content flags <Exercise> without a preceding heading", async () => {
+test("verify-content accepts <Exercise> without a preceding heading", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
   try {
     await writeFixture(
@@ -256,10 +258,11 @@ test("verify-content flags <Exercise> without a preceding heading", async () => 
     );
 
     const result = await runVerifier(tempDir);
-    assert.notEqual(result.code, 0);
-    assert.match(result.stdout, /Exercise heading verification failed/);
-    assert.match(result.stdout, /index\.mdx/);
-    assert.match(result.stdout, /preceded by a non-empty Markdown exercise heading/);
+    assert.equal(
+      result.code,
+      0,
+      `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -276,14 +279,14 @@ test("verify-content flags a title prop on <Exercise>", async () => {
 
     const result = await runVerifier(tempDir);
     assert.notEqual(result.code, 0);
-    assert.match(result.stdout, /Exercise heading verification failed/);
+    assert.match(result.stdout, /Exercise structure verification failed/);
     assert.match(result.stdout, /must not use a title prop/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
 });
 
-test("verify-content flags a <Exercise> opening tag inside a fenced code block", async () => {
+test("verify-content ignores a <Exercise> example inside a fenced code block", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
   try {
     await writeFixture(
@@ -304,13 +307,12 @@ test("verify-content flags a <Exercise> opening tag inside a fenced code block",
     );
 
     const result = await runVerifier(tempDir);
-    assert.notEqual(result.code, 0);
-    assert.match(result.stdout, /Exercise heading verification failed/);
-    // The fenced <Exercise> must not be counted; only the real one (with no heading) should fail.
     assert.equal(
-      (result.stdout.match(/preceded by a non-empty Markdown exercise heading/g) ?? []).length,
-      1,
+      result.code,
+      0,
+      `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
     );
+    assert.match(result.stdout, /1 <Exercise> blocks/u);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -405,7 +407,7 @@ test("verify-content error paths use POSIX-style relative paths", async () => {
     await writeFixture(
       tempDir,
       "content/docs/foo/index.mdx",
-      ["<Exercise>", "本文", "</Exercise>", ""].join("\n"),
+      ['<Exercise title="Unsupported">', "本文", "</Exercise>", ""].join("\n"),
     );
 
     const result = await runVerifier(tempDir);
@@ -424,7 +426,7 @@ test("verify-content prints paths relative to repo root, not the absolute temp d
     await writeFixture(
       tempDir,
       "content/docs/foo/index.mdx",
-      ["<Exercise>", "本文", "</Exercise>", ""].join("\n"),
+      ['<Exercise title="Unsupported">', "本文", "</Exercise>", ""].join("\n"),
     );
 
     const result = await runVerifier(tempDir);
@@ -517,22 +519,23 @@ test("verify-content ignores MDX files outside content/ (does not scan scripts o
   }
 });
 
-test("verify-content reports aggregate failure but still lists all issues", async () => {
+test("verify-content reports aggregate structure failures", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
   try {
     await writeFixture(
       tempDir,
       "content/docs/foo/index.mdx",
-      ["<Exercise>", "本文", "</Exercise>", ""].join("\n"),
+      ['<Exercise title="Unsupported">', "本文", "</Exercise>", ""].join("\n"),
     );
     await writeFixture(
       tempDir,
       "content/docs/bar/index.mdx",
-      ["<Exercise>", "本文", "</Exercise>", ""].join("\n"),
+      ['<Exercise title="Unsupported">', "本文", "</Exercise>", ""].join("\n"),
     );
 
     const result = await runVerifier(tempDir);
     assert.notEqual(result.code, 0);
+    assert.match(result.stdout, /Exercise structure verification failed/);
     assert.match(result.stdout, /content\/docs\/foo\/index\.mdx/);
     assert.match(result.stdout, /content\/docs\/bar\/index\.mdx/);
   } finally {
@@ -556,7 +559,7 @@ test("verify-content exit code is 1 even when only one of multiple checks fails"
 
     const result = await runVerifier(tempDir);
     assert.notEqual(result.code, 0);
-    assert.match(result.stdout, /Exercise heading verification failed/);
+    assert.doesNotMatch(result.stdout, /Exercise structure verification failed/);
     assert.match(result.stdout, /Code block indentation verification failed/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });

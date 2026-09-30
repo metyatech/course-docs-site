@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
+import { createSupabaseSmokeMonitor } from "./production-smoke-diagnostics.mjs";
 
 const BASE_DOMAIN = ".vercel.app";
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -100,41 +101,31 @@ const smokeProgramming = async () => {
   assert.equal(adminMode.configured, true, "Programming admin mode must be configured.");
 
   const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  const supabase = createSupabaseSmokeMonitor(page, REQUEST_TIMEOUT_MS);
   try {
-    const page = await browser.newPage();
-    const supabaseErrors = [];
-    const commentReads = [];
-    page.on("response", (response) => {
-      const url = response.url();
-      if (url.includes("/rest/v1/")) {
-        if (response.status() >= 400) {
-          supabaseErrors.push(`${response.status()} ${url}`);
-        }
-        if (url.includes("/rest/v1/work_comments")) {
-          commentReads.push(response.status());
-        }
-      }
-    });
-
     await page.goto(requiredUrl(siteId, "/submissions/"), { waitUntil: "domcontentloaded" });
     const commentButton = page.getByTestId("comment-open").first();
     await expect(commentButton).toBeVisible({ timeout: REQUEST_TIMEOUT_MS });
-    await expect
-      .poll(() => commentReads.length, { timeout: REQUEST_TIMEOUT_MS })
-      .toBeGreaterThan(0);
-    assert.deepEqual(supabaseErrors, [], "Programming Supabase requests must not fail.");
-    assert.ok(
-      commentReads.every((status) => status >= 200 && status < 300),
-      `Programming comment reads must succeed; received ${commentReads.join(", ")}.`,
-    );
 
+    const commentReadOutcome = supabase.waitForCommentRead().then(
+      (response) => ({ response }),
+      (error) => ({ error }),
+    );
     await commentButton.click();
     await expect(page.getByTestId("comment-panel")).toBeVisible();
+    const { error } = await commentReadOutcome;
+    if (error) throw error;
+
+    const supabaseFailure = supabase.failureMessage();
+    if (supabaseFailure) throw new Error(supabaseFailure);
+
     await expect(page.getByText("コメントの読み込みに失敗しました。", { exact: true })).toHaveCount(
       0,
     );
     process.stdout.write("Programming comments and admin mode smoke checks passed.\n");
   } finally {
+    supabase.dispose();
     await browser.close();
   }
 };

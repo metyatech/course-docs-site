@@ -515,9 +515,9 @@ A site-owned quality gate that inspects the synced root `content/` directory
 (the same one produced by `npm run sync:content`) for content-shape invariants
 that used to live in each individual course content repo. It runs:
 
-- Exercise heading rules: every `<Exercise>` opening tag must be immediately
-  preceded by a Markdown heading (`###` through `######`), allowing only blank
-  lines between them, and must not carry a `title` prop.
+- Exercise structure: `<Exercise>` must not use the unsupported `title` prop.
+  An informative heading is recommended, but its presence is not a build
+  requirement.
 - Code-block / asset indentation: supported fenced code blocks and standalone
   code assets under `content/` must use spaces and four-space indentation steps.
   The supported fenced languages are `html`, `css`, `js`, `jsx`, `json`, `ts`,

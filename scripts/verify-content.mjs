@@ -90,7 +90,7 @@ const collectFiles = async (directory, predicate) => {
 };
 
 // --------------------------------------------------------------------------
-// Exercise heading / title-prop rules
+// Exercise structure / title-prop rules
 // --------------------------------------------------------------------------
 
 const isInFencedBlockAt = (lines, lineIndex) => {
@@ -176,7 +176,7 @@ const maskQuotedAndBraced = (text) => {
   return masked;
 };
 
-const verifyExerciseHeadings = async (mdxFiles) => {
+const verifyExerciseStructure = async (mdxFiles) => {
   const errors = [];
   let exerciseCount = 0;
   for (const filePath of mdxFiles) {
@@ -201,36 +201,6 @@ const verifyExerciseHeadings = async (mdxFiles) => {
       if (/\stitle\s*=/.test(maskedOpeningTag)) {
         errors.push(
           `${repoPosixPath(filePath)}:${i + 1}: <Exercise> opening tag must not use a title prop.`,
-        );
-      }
-      // Walk upward for the nearest non-blank line; allow blank lines in
-      // between, but require a Markdown heading `###` through `######`.
-      let cursor = i - 1;
-      while (cursor >= 0 && lines[cursor].trim() === "") cursor -= 1;
-      let headingCursor = cursor;
-      if (cursor >= 0) {
-        const previousLine = lines[cursor].trim();
-        let evidenceOpening = null;
-        if (/^<Evidence\b[^>]*>$/.test(previousLine)) {
-          evidenceOpening = cursor;
-        } else if (previousLine === ">") {
-          for (let openingCursor = cursor - 1; openingCursor >= 0; openingCursor -= 1) {
-            const candidate = lines[openingCursor].trim();
-            if (/^<Evidence\b/.test(candidate)) {
-              evidenceOpening = openingCursor;
-              break;
-            }
-            if (candidate !== "" && !/^[\w-]+\s*=/.test(candidate)) break;
-          }
-        }
-        if (evidenceOpening !== null) {
-          headingCursor = evidenceOpening - 1;
-          while (headingCursor >= 0 && lines[headingCursor].trim() === "") headingCursor -= 1;
-        }
-      }
-      if (headingCursor < 0 || !/^ {0,3}#{3,6}[ \t]+\S/.test(lines[headingCursor])) {
-        errors.push(
-          `${repoPosixPath(filePath)}:${i + 1}: <Exercise> must be immediately preceded by a non-empty Markdown exercise heading (### through ######), allowing only blank lines between them.`,
         );
       }
     }
@@ -356,14 +326,14 @@ const main = async () => {
       !isTutorialShotManifest(p),
   );
 
-  const exerciseResult = await verifyExerciseHeadings(mdxFiles);
+  const exerciseResult = await verifyExerciseStructure(mdxFiles);
   const indentationErrors = await verifyIndentationRules(mdxFiles, assetFiles);
   const learningResult = await analyzeCourseLearning({ root: process.cwd() });
 
   let exitCode = 0;
   if (exerciseResult.errors.length > 0) {
     exitCode = 1;
-    process.stdout.write("Exercise heading verification failed:\n");
+    process.stdout.write("Exercise structure verification failed:\n");
     for (const error of exerciseResult.errors) process.stdout.write(`- ${error}\n`);
   }
   if (indentationErrors.length > 0) {

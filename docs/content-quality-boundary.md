@@ -6,11 +6,11 @@ Course Docs Site syncs course content from external content repositories into a 
 
 ## Two contracts, three layers
 
-| Layer                                   | Lives in                                                                              | What it owns                                                                                                                   | Example files                                                                             |
-| --------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| Site runtime source                     | `course-docs-site/src/**`, `course-docs-site/scripts/**`, `course-docs-site/tests/**` | This repository's own formatter / lint / typecheck / build gates                                                               | `src/lib/foo.ts`, `scripts/verify-content.mjs`                                            |
-| Synced learner-facing teaching material | `content/**` (the synced mirror)                                                      | The `verify-content` four-space code-block / asset gate, Exercise heading rules, and the learner-facing MDX component contract | `content/docs/<course>/index.mdx`, `content/docs/<course>/example.ts`                     |
-| Synced runtime metadata                 | `content/**/_meta.ts`, `content/**/*.shot.json`                                       | The source content repository's formatter and the corresponding runtime tooling                                                | `content/_meta.ts`, `content/docs/_meta.ts`, `content/docs/tutorial/shots/step.shot.json` |
+| Layer                                   | Lives in                                                                              | What it owns                                                                                                                    | Example files                                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Site runtime source                     | `course-docs-site/src/**`, `course-docs-site/scripts/**`, `course-docs-site/tests/**` | This repository's own formatter / lint / typecheck / build gates                                                                | `src/lib/foo.ts`, `scripts/verify-content.mjs`                                            |
+| Synced learner-facing teaching material | `content/**` (the synced mirror)                                                      | The `verify-content` four-space code-block / asset gate, Exercise structure rule, and the learner-facing MDX component contract | `content/docs/<course>/index.mdx`, `content/docs/<course>/example.ts`                     |
+| Synced runtime metadata                 | `content/**/_meta.ts`, `content/**/*.shot.json`                                       | The source content repository's formatter and the corresponding runtime tooling                                                 | `content/_meta.ts`, `content/docs/_meta.ts`, `content/docs/tutorial/shots/step.shot.json` |
 
 The boundary consists of the `_meta.ts` file name and the `.shot.json` suffix. Files with that exact name or suffix under `content/` are runtime metadata and follow their source/runtime formatter contracts. Everything else under `content/` that is a code asset (`.css`, `.html`, `.js`, `.json`, `.ts`) follows the `verify-content` learner-code contract.
 
@@ -18,7 +18,7 @@ The boundary consists of the `_meta.ts` file name and the `.shot.json` suffix. F
 
 `scripts/verify-content.mjs` enforces the **learner-facing teaching-material** quality contract on the synced `content/` mirror:
 
-- **Exercise heading rules** — every `<Exercise>` opening tag must be immediately preceded by a Markdown heading (`###` through `######`), allowing only blank lines between them, and must not carry a `title` prop. This is a course-docs authoring contract from `course-docs-platform`.
+- **Exercise structure rule** — `<Exercise>` must not use an unsupported `title` prop. An informative Markdown heading before an Exercise is recommended authoring guidance; heading presence is not a rendering requirement and is not enforced by this gate.
 - **Code-block / asset indentation** — fenced code in `html / css / js / jsx / json / ts / tsx / typescript` blocks and standalone `*.css / *.html / *.js / *.json / *.ts` assets under `content/` MUST use spaces and four-space indentation steps.
 
 The four-space rule exists because learners read and copy the snippets. A consistent indentation width keeps the rendered output and the copy-paste result aligned across all courses. It is a **teaching-material** quality contract, not a code-quality contract.
@@ -66,7 +66,6 @@ A broken `_meta.ts` typically shows up as a Nextra build error or as a missing s
 - 2-space fenced code in MDX code blocks of any supported language.
 - Tab-indented fenced code or tab-indented asset files.
 - 2-space standalone `.css`, `.html`, `.js`, `.json`, `.ts` assets under `content/` — including ordinary `.ts` files such as `content/docs/<course>/example.ts` that learners may read or copy.
-- `<Exercise>` tags without a preceding heading.
 - `<Exercise>` tags with a `title` prop.
 - Unterminated `<Exercise>` opening tags.
 
@@ -82,11 +81,11 @@ When you see a Nextra build error caused by `_meta.ts`, fix it in the source con
 
 ## Summary
 
-| Concern                                                       | Gate                                       | Lives in                         |
-| ------------------------------------------------------------- | ------------------------------------------ | -------------------------------- |
-| Learner-facing code readability (indentation, tabs vs spaces) | `verify-content` four-space rule           | `course-docs-site`               |
-| `<Exercise>` authoring shape                                  | `verify-content` heading / title-prop rule | `course-docs-site`               |
-| Source-repo formatting (Prettier)                             | `prettier --check`                         | content repository               |
-| Source-repo linting (ESLint)                                  | `eslint`                                   | content repository               |
-| Source-repo type safety (tsc)                                 | `tsc --noEmit`                             | content repository               |
-| Nextra control metadata shape                                 | TypeScript / Nextra build                  | source repository + site runtime |
+| Concern                                                       | Gate                             | Lives in                         |
+| ------------------------------------------------------------- | -------------------------------- | -------------------------------- |
+| Learner-facing code readability (indentation, tabs vs spaces) | `verify-content` four-space rule | `course-docs-site`               |
+| `<Exercise>` component contract                               | `verify-content` title-prop rule | `course-docs-site`               |
+| Source-repo formatting (Prettier)                             | `prettier --check`               | content repository               |
+| Source-repo linting (ESLint)                                  | `eslint`                         | content repository               |
+| Source-repo type safety (tsc)                                 | `tsc --noEmit`                   | content repository               |
+| Nextra control metadata shape                                 | TypeScript / Nextra build        | source repository + site runtime |
