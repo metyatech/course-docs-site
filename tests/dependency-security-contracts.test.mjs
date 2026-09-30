@@ -44,7 +44,9 @@ test("dependency versions and patch installation stay pinned", async () => {
   assert.equal(pkg.overrides.mermaid, "11.17.2");
   assert.equal(pkg.overrides.dompurify, "3.4.15");
   assert.equal(pkg.overrides["@xmldom/xmldom"], "0.9.12");
-  assert.equal(pkg.overrides["brace-expansion"], "2.1.4");
+  assert.equal(pkg.overrides["brace-expansion"], "2.1.7");
+  const lock = JSON.parse(await readFile(packageLockPath, "utf8"));
+  assert.equal(lock.packages["node_modules/brace-expansion"].version, "2.1.7");
   assert.equal(pkg.overrides.postcss, "8.5.28");
   assert.equal(pkg.overrides["speech-rule-engine"], "5.0.0-rc.4");
   assert.equal(pkg.scripts.postinstall, "patch-package --error-on-fail && npm run platform:build");
@@ -63,7 +65,7 @@ test("npm version and install-script approvals are strict and version-pinned", a
   assert.deepEqual(pkg.allowScripts, {
     "esbuild@0.28.1": true,
     "unrs-resolver@1.11.1": true,
-    "github:metyatech/exercise-module#d4e056f966b9b89f503eb91040ac6c56c78551be": true,
+    "github:metyatech/exercise-module#3df39972c1785932717216afd6e95056455e15ff": true,
   });
   assert.match(npmrc, /^strict-allow-scripts=true$/m);
 });
@@ -96,6 +98,7 @@ test("verify:ci script contains every required CI gate", async () => {
   assert.equal(typeof verifyCi, "string", "verify:ci must be a string script definition");
   assert.doesNotMatch(verifyCi, /verify:sites|course-sites\.json/u);
   assert.match(verifyCi, /npm run build\b/, "verify:ci must run build");
+  assert.match(pkg.scripts["verify:precommit"], /npm audit$/);
   assert.match(
     verifyCi,
     /npm run verify:course:ci/,

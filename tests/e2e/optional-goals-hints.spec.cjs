@@ -48,6 +48,24 @@ test("optional goals and Hint counts render an accessible task flow", async ({ p
   await page.keyboard.press("Enter");
   await expect(answer).not.toHaveAttribute("open", "");
 
+  for (const [taskIndex, hintTexts] of [
+    [2, ["数を順に並べたときの位置を考えます。"]],
+    [3, ["数値の順番を考えます。", "7と9を順に並べます。"]],
+  ]) {
+    for (const [hintIndex, hintText] of hintTexts.entries()) {
+      const hint = tasks.nth(taskIndex).locator("details.rensyuHint").nth(hintIndex);
+      const hintSummary = hint.locator("summary");
+      await hintSummary.focus();
+      await page.keyboard.press("Enter");
+      await expect(hint).toHaveAttribute("open", "");
+      await expect(hint.getByText(hintText, { exact: true })).toBeVisible();
+      await page.keyboard.press("Space");
+      await expect(hint).not.toHaveAttribute("open", "");
+    }
+  }
+  await summary.click();
+  await expect(answer).toHaveAttribute("open", "");
+
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.keyboard.press("Control+Home");
@@ -70,5 +88,6 @@ test("optional goals and Hint counts render an accessible task flow", async ({ p
   await expect(page.locator(".tutorial-section__goal")).toHaveCount(1);
   await expect(tasks.first().locator("details.rensyuHint")).toHaveCount(0);
   await expect(tasks.first().locator("details.rensyuKaitou")).toBeVisible();
+  await expect(tasks.first().locator("details.rensyuKaitou")).not.toHaveAttribute("open", "");
   expect(errors).toEqual([]);
 });

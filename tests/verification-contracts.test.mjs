@@ -201,7 +201,7 @@ test("format scripts and staged-file tasks have separate responsibilities", asyn
   assert.equal(pkg.scripts["format:check"], "prettier --check .");
   assert.equal(
     pkg.scripts["verify:precommit"],
-    "npm run platform:verify && npm run lint && npm test",
+    "npm run platform:verify && npm run lint && npm test && npm audit",
   );
   assert.deepEqual(pkg["lint-staged"], {
     "**/*.{js,mjs,cjs,ts,tsx}": ["prettier --write", "eslint"],

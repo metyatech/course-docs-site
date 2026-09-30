@@ -65,7 +65,7 @@ test('@metyatech/exercise dependency is pinned to the optional-Hint task-structu
   const monorepoRoot = path.resolve(projectRoot, '../..');
   const lock = JSON.parse(await fs.readFile(path.join(monorepoRoot, 'package-lock.json'), 'utf8'));
 
-  const expectedSha = 'd4e056f966b9b89f503eb91040ac6c56c78551be';
+  const expectedSha = '3df39972c1785932717216afd6e95056455e15ff';
 
   assert.equal(
     packageJson.dependencies['@metyatech/exercise'],

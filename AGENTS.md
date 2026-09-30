@@ -11,7 +11,7 @@
 - Before applying any rule updates, present the planned changes first with an ANSI-colored diff-style preview, ask for explicit approval, then make the edits.
 - These tool rules live in tools/tool-rules.md in the compose-agentsmd repository; do not duplicate them in other rule modules.
 
-Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/node/module-system.md
+Source: github:metyatech/agent-rules@HEAD/rules/domains/node/module-system.md
 
 # Node module system (ESM)
 
@@ -21,7 +21,7 @@ Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/ru
 - Prefer ESM with .js extensions for JavaScript config/scripts (e.g.,
   next.config.js as ESM).
 
-Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/node/npm-packages.md
+Source: github:metyatech/agent-rules@HEAD/rules/domains/node/npm-packages.md
 
 # Node package publishing
 
@@ -34,7 +34,7 @@ Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/ru
 - Use npm pack --dry-run to inspect the package contents.
 - Run npm test when tests exist.
 
-Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/web/web-ui-and-testing.md
+Source: github:metyatech/agent-rules@HEAD/rules/domains/web/web-ui-and-testing.md
 
 # Web UI and automation
 
@@ -66,7 +66,7 @@ Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/ru
   user approval before skipping.
 - Use established icon libraries; do not handcraft custom icons or inline SVGs.
 
-Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/education/course-purpose.md
+Source: github:metyatech/agent-rules@HEAD/rules/domains/education/course-purpose.md
 
 # Course Teaching Purpose
 
@@ -86,7 +86,7 @@ Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/ru
   fully reach them.
 - Do not equate enjoyment with ease or rigor with unnecessary frustration.
 
-Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/education/question-authoring.md
+Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-authoring.md
 
 # Educational Question Authoring
 
@@ -157,7 +157,7 @@ Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/ru
   higher intrinsic load and cover multiple important taught targets rather than
   repeating one surface pattern.
 
-Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/course-docs/authoring.md
+Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
 
 # Course Docs Authoring
 
@@ -336,7 +336,7 @@ Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/ru
   callout shapes and UI-state indicators MUST meet the applicable 3:1 non-text
   contrast requirement. Prefer real text over images of text when practical.
 
-Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/course-docs/repository-and-site.md
+Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/repository-and-site.md
 
 # Course Docs Repository and Site Architecture
 

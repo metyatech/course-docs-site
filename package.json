@@ -57,7 +57,7 @@
     "preverify:content": "npm run platform:build",
     "learning:report": "node scripts/learning-report.mjs",
     "prelearning:report": "npm run platform:build",
-    "verify:precommit": "npm run platform:verify && npm run lint && npm test",
+    "verify:precommit": "npm run platform:verify && npm run lint && npm test && npm audit",
     "verify:course": "npm run lint && npm run test:course && npm run build:verified",
     "verify:course:ci": "npm run test:course:ci && npm run build:verified",
     "verify:ci": "npm run build && npm run test:production-routes && npm run verify:course:ci",
@@ -149,7 +149,7 @@
     "@chevrotain/utils": "11.1.2",
     "@mermaid-js/parser": "1.1.0",
     "@xmldom/xmldom": "0.9.12",
-    "brace-expansion": "2.1.4",
+    "brace-expansion": "2.1.7",
     "chevrotain": "11.1.2",
     "dompurify": "3.4.15",
     "flatted": "3.4.2",
@@ -177,6 +177,6 @@
   "allowScripts": {
     "esbuild@0.28.1": true,
     "unrs-resolver@1.11.1": true,
-    "github:metyatech/exercise-module#d4e056f966b9b89f503eb91040ac6c56c78551be": true
+    "github:metyatech/exercise-module#3df39972c1785932717216afd6e95056455e15ff": true
   }
 }

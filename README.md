@@ -47,12 +47,11 @@ npm run test:e2e -- tests/e2e/optional-goals-hints.spec.cjs --workers=1
 
 ### Integrate authoring rules
 
-The commit reference in `agent-ruleset.json` is temporary validation of the
-unmerged authoring rules. It does not change the long-term tracking policy.
-At final integration:
+`agent-ruleset.json` tracks `github:metyatech/agent-rules` without a commit pin.
+For shared authoring-rule updates:
 
 1. Integrate the `agent-rules` changes into its `main` branch first.
-2. Restore the site ruleset source to `github:metyatech/agent-rules`.
+2. Keep the site ruleset source as `github:metyatech/agent-rules`.
 3. Run `compose-agentsmd --refresh`, then `compose-agentsmd check`.
 4. Confirm generated instructions retain the normative educational purpose,
    optional Section goals at every depth, `problem → Hint* → Answer`,
@@ -545,7 +544,8 @@ npm run verify:precommit
 ```
 
 This is the command the Husky `pre-commit` hook runs. It executes
-`lint` + `test`. `npm test` runs the fast contract/unit subset via
+`lint` + `test` + `npm audit` (all dependency scopes, zero known vulnerabilities).
+`npm test` runs the fast contract/unit subset via
 `test:fast`; it does not start the dev-server route tests, run the production
 build, execute `scripts/test-e2e-matrix.mjs`, or iterate the full course
 Playwright matrix.
