@@ -27,10 +27,11 @@ The verifier rejects invalid or duplicate IDs, empty objectives, unknown parents
 
 A Learning Event records how a learner encounters one or more units on one occasion. Add `eventId`, `targets`, and `phase` to an existing `<Section>`. Targets are comma-separated IDs from `learning-units.yaml`; headings and titles never determine targets.
 
+Section `goal` is optional at every depth, including Event-bearing Sections. Use it only when learner-facing orientation is useful. It is neither the canonical Unit objective (which remains in `learning-units.yaml`) nor Evidence, and no Event requires it. Do not duplicate Unit objectives into Section goals. A whitespace-only goal produces no banner.
+
 ```mdx
 <Section
   title="オブジェクトを配置する"
-  goal="オブジェクトをシーン内に配置できます"
   eventId="place-object-intro"
   targets="place-object"
   phase="initial"
@@ -45,10 +46,6 @@ A Learning Event records how a learner encounters one or more units on one occas
   <ProblemSolving>
     <QuickCheck>
       配置したオブジェクトが意図した場所にあるか、何を見て確かめますか。
-
-      <Hint>
-        ビューポートでオブジェクトと周囲の位置関係を見ます。
-      </Hint>
 
       <Answer>
         周囲との位置関係を確認します。名前や一覧だけでは、画面上の場所までは確かめられません。
@@ -211,6 +208,8 @@ After the one initial introduction for a Leaf Unit, use `practice`, `retrieval`,
 An Event's `phase` describes that occurrence. The platform reports later recurrence as a fact about another non-initial Event. Without explicit session or time separation, it does not claim that recurrence was distributed practice. It may report mixed-target practice or target alternation when the Event structure makes those facts explicit; it does not infer that interleaving has been achieved.
 
 ## Bind evidence to an assessment
+
+Design appropriate evidence for each Unit at useful points in the Event/course progression. Section boundaries do not require local closure, and a goal banner does not supply evidence. QuickCheck and Exercise use `problem content -> Hint* -> Answer`: zero or more optional direct-child Hints, followed by exactly one non-empty final Answer. A task without Hints remains valid; when supplied, Hints precede Answer and contain useful support.
 
 `<Evidence>` adds metadata to exactly one existing learner-facing assessment surface: `<Verify>`, `<QuickCheck>`, `<Checkpoint>`, or `<Exercise>`. It does not replace or change that surface. The targets must be a subset of the enclosing Event's targets.
 

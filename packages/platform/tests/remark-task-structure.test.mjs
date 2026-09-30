@@ -98,15 +98,53 @@ test('multiple hints are allowed before Answer', async () => {
   );
 });
 
-test('missing Hint fails for QuickCheck and Exercise', async () => {
-  await assertStructureError(
-    root(jsxElement('QuickCheck', paragraph('問題です'), jsxElement('Answer', paragraph('答え')))),
-    /at least one <Hint> is required/,
-  );
-  await assertStructureError(
-    root(jsxElement('Exercise', paragraph('問題です'), jsxElement('Answer', paragraph('答え')))),
-    /at least one <Hint> is required/,
-  );
+test('Hint* permits zero, one, or multiple hints for both task components', async () => {
+  for (const name of ['QuickCheck', 'Exercise']) {
+    for (const count of [0, 1, 2]) {
+      await assert.doesNotReject(() =>
+        run(
+          root(
+            jsxElement(
+              name,
+              paragraph('問題です'),
+              ...Array.from({ length: count }, (_, index) =>
+                jsxElement('Hint', paragraph(`ヒント ${index + 1}`)),
+              ),
+              jsxElement('Answer', paragraph('答え')),
+            ),
+          ),
+        ),
+      );
+    }
+  }
+});
+
+test('Hint* retains every invalid-order and non-empty-body contract for both tasks', async () => {
+  for (const name of ['QuickCheck', 'Exercise']) {
+    const problem = paragraph('問題');
+    const hint = jsxElement('Hint', paragraph('支援'));
+    const answer = jsxElement('Answer', paragraph('解答'));
+    const cases = [
+      [[problem], /<Answer> is missing/],
+      [[problem, hint], /<Answer> is missing/],
+      [[problem, answer, hint], /<Hint> appears after <Answer>/],
+      [[problem, hint, problem, answer], /problem content appears after <Hint>/],
+      [[problem, answer, problem], /content appears after <Answer>/],
+      [[problem, jsxElement('Hint', paragraph('   ')), answer], /<Hint> is empty/],
+      [[problem, jsxElement('Answer', mdxComment())], /<Answer> is empty/],
+      [[problem, answer, answer], /expected exactly one <Answer>/],
+      [
+        [problem, jsxElement(forbiddenLegacyAnswerName, paragraph('旧解答'))],
+        /is no longer supported/,
+      ],
+    ];
+    for (const nested of ['QuickCheck', 'Exercise']) {
+      cases.push([[problem, jsxElement(nested, problem, answer), answer], /nested/]);
+    }
+    for (const [children, expected] of cases) {
+      await assertStructureError(root(jsxElement(name, ...children)), expected);
+    }
+  }
 });
 
 test('missing problem content fails', async () => {

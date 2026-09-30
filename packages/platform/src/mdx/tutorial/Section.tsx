@@ -10,11 +10,8 @@ export type SectionProps = LearningEventMetadata & {
    */
   title: string;
   /**
-   * What the learner will have achieved when this Section is complete.
-   *
-   * **Required at depth 0** (top-level Sections must declare a goal so the
-   * tutorial follows goal-first ordering). Optional at deeper levels, where
-   * the title alone is often sufficient.
+   * Optional learner-facing orientation at any depth. This is neither the
+   * canonical Learning Unit objective nor evidence of learning.
    */
   goal?: string;
   /**
@@ -42,17 +39,8 @@ export type SectionProps = LearningEventMetadata & {
  *   anchor links for free.
  * - Renders the optional `goal` banner immediately after the injected
  *   heading and before the rest of the body.
- * - Throws at depth 0 if `goal` is missing, so authors cannot accidentally
- *   ship a top-level Section without a goal statement.
  */
-export default function Section({ title, goal, depth = 0, children }: SectionProps) {
-  if (depth === 0 && !goal) {
-    throw new Error(
-      `<Section title="${title}"> is at depth 0 and must have a "goal" prop. ` +
-        `Top-level Sections must declare what the learner will have achieved when complete.`,
-    );
-  }
-
+export default function Section({ goal, depth = 0, children }: SectionProps) {
   // The remark plugin injects the markdown heading as the first child.
   // We split it out so we can render: heading -> goal banner -> rest.
   const childArray = Children.toArray(children);
@@ -61,7 +49,7 @@ export default function Section({ title, goal, depth = 0, children }: SectionPro
   return (
     <section className="tutorial-section" data-section-depth={depth}>
       {headingChild}
-      {goal && (
+      {goal?.trim() && (
         <div className="tutorial-section__goal" data-section-depth={depth}>
           {goal}
         </div>

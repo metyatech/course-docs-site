@@ -11,7 +11,7 @@
 - Before applying any rule updates, present the planned changes first with an ANSI-colored diff-style preview, ask for explicit approval, then make the edits.
 - These tool rules live in tools/tool-rules.md in the compose-agentsmd repository; do not duplicate them in other rule modules.
 
-Source: github:metyatech/agent-rules@HEAD/rules/domains/node/module-system.md
+Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/node/module-system.md
 
 # Node module system (ESM)
 
@@ -21,7 +21,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/node/module-system.md
 - Prefer ESM with .js extensions for JavaScript config/scripts (e.g.,
   next.config.js as ESM).
 
-Source: github:metyatech/agent-rules@HEAD/rules/domains/node/npm-packages.md
+Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/node/npm-packages.md
 
 # Node package publishing
 
@@ -34,7 +34,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/node/npm-packages.md
 - Use npm pack --dry-run to inspect the package contents.
 - Run npm test when tests exist.
 
-Source: github:metyatech/agent-rules@HEAD/rules/domains/web/web-ui-and-testing.md
+Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/web/web-ui-and-testing.md
 
 # Web UI and automation
 
@@ -63,16 +63,27 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/web/web-ui-and-testing.m
   user approval before skipping.
 - Use established icon libraries; do not handcraft custom icons or inline SVGs.
 
-Source: github:metyatech/agent-rules@HEAD/rules/domains/education/course-purpose.md
+Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/education/course-purpose.md
 
 # Course Teaching Purpose
 
-- Treat the terminal goal of every course as: by graduation, the learner can, with confidence, build the things they want or need, on their own.
-- Evaluate course content, sequencing, exercises, lesson structure, quizzes, and exams against that goal.
-- Treat the learner's own happiness as the highest-level goal this purpose ultimately serves.
-- Apply this purpose to every course, even when time or session count is insufficient to fully reach it.
+- Adopt this normative educational purpose: learners enjoy learning with a
+  positive outlook while increasing what they can actually do, and use what
+  they learn to think, create, and continue learning for themselves.
+- Treat this purpose as the system's value judgment, not a unique educational
+  purpose established by empirical research.
+- Use learning-science evidence to judge means, side effects, and boundary
+  conditions for pursuing this purpose.
+- Define terminal course outcomes as increased independence in thinking,
+  judging, building, solving, and learning within the course's domain.
+- For technical or creative courses, interpret building the things learners
+  want or need with increasing independence as a concrete domain outcome.
+- Evaluate content, sequencing, learning activities, and assessments against
+  the purpose and intended outcomes, even when course time is insufficient to
+  fully reach them.
+- Do not equate enjoyment with ease or rigor with unnecessary frustration.
 
-Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-authoring.md
+Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/education/question-authoring.md
 
 # Educational Question Authoring
 
@@ -136,7 +147,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-autho
   higher intrinsic load and cover multiple important taught targets rather than
   repeating one surface pattern.
 
-Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
+Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/course-docs/authoring.md
 
 # Course Docs Authoring
 
@@ -149,7 +160,8 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
   `<Verify>`, `<QuickCheck>`, `<Checkpoint>`, `<Exercise>`, `<Evidence>`,
   `<Hint>`, `<Answer>`, and `<Recovery>`. `<Instruction>` and `<ProblemSolving>`
   are Learning System stage markers, not general-purpose containers.
-- A top-level `<Section>` MUST declare `goal`.
+- Section `goal` is optional learner-facing orientation at every depth,
+  including Event-bearing Sections; its presence is not Evidence.
 - Learner-facing HTML examples MUST use normal HTML void elements without
   XHTML-style trailing slashes, such as `<input>` rather than `<input />`. This
   applies to HTML code fences and sample/complete files, not MDX/JSX components.
@@ -188,13 +200,15 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
   Follow the platform metadata contract without inventing an agent-side semantic
   test for whether an Event qualifies.
 
-## Tasks, evidence, and closure
+## Tasks and aligned evidence
 
-- Exercise and QuickCheck tasks MUST present the problem, then one or more
+- Exercise and QuickCheck tasks MUST present the problem, then zero or more
   `<Hint>` blocks, then exactly one `<Answer>` block. Hints MUST NOT reveal the
   answer first and MUST use material already covered in this or a guaranteed
   earlier lesson. Answers MUST explain why they are correct and address a likely
   misconception only when one genuinely exists.
+- When present, Hints MUST be non-empty direct children of the task before its
+  final Answer; they MAY provide progressively stronger support.
 - Exercise is a task/container format, not a learning phase. Near-copy and
   routine application tasks MAY use `<Exercise>`; the component name alone does
   not make a task transfer.
@@ -208,8 +222,10 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
 - A transfer task MUST require selecting and adapting a learned principle under
   different conditions. Changing only values, names, or materials in a near-copy
   is not transfer.
-- Each substantive learning goal MUST have an aligned closure that can test it.
-  Choose closure based on needed evidence: `<Verify>` for observable state,
+- Design appropriate evidence for Unit objectives at suitable points in the
+  Event/course progression; do not require Section-local closure.
+  Choose assessment surfaces based on needed evidence: `<Verify>` for
+  observable state,
   `<QuickCheck>` for retrieval or understanding, `<Checkpoint>` for a
   multi-condition milestone, or `<Exercise>` for application or transfer tasks.
   This is a selection guide; component type alone does not determine evidence
@@ -222,34 +238,37 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
   a note; do not describe that note as an enforced build failure.
 - Do not impose a fixed page-wide order for QuickCheck, Exercise, and extension
   exercises; place tasks where they support the learner's progression.
-- Exercise headings MUST use `### 演習N` for standard exercises and `### 演習-発展N`
-  for extension exercises. Exercise statements MUST give the expected result,
+- Exercise headings SHOULD identify the task; numbering is optional, for
+  example `### 演習1：価格だけ色を変える`. Extension headings MUST make the
+  extension task explicit. Exercise statements MUST give the expected result,
   success criteria, and enough context to start without guessing. Extension
   exercises MUST be optional and not required for base lesson completion.
 
 ## Learner-facing explanations and guidance
 
-- Introduce concepts when the learner needs them. A `<Concept>` MUST focus on
-  one concept and include only information needed for imminent first use. First
-  use MAY be an Action, Section, Verify, QuickCheck, or Exercise. Roughly 2–5
-  sentences or one short table is preferred; 6+ sentences SHOULD trigger review
-  for multiple concepts or reference material, not automatic rejection.
-- Write so a learner reading once from the top can understand each idea without
-  backtracking: establish the need or context, name and explain the concept,
-  then use it (`Need / Context → Name + meaning → Use`). Do not rely on an
-  unexplained concept as already known.
+- A `<Concept>` SHOULD focus on conceptual knowledge needed to understand or
+  perform a current or near learning activity. Near-first-use placement is a
+  default; earlier pre-training, summary, retrieval, or reference contexts MAY
+  be appropriate. Sentence counts are review triggers for mixed concepts or
+  reference detail, not preferred lengths, hard limits, or research thresholds.
+- Treat `Need / Context → Name + meaning → Use` as a context-dependent heuristic,
+  not a required or default authoring sequence. Do not rely on an unexplained
+  concept as already known.
 - A new term may first appear in a heading or title; its name alone does not
   introduce the concept. When first named there, the heading/title and its
-  immediately following explanation MUST work together to make the meaning
-  explicit before the learner is expected to use it. Do not assume the learner
-  already knows the term. Prefer `Need / Context → Name + meaning → Use` while
-  allowing the name to appear before its explanation. Do not require a glossary
-  or predefine every term.
+  explanation MUST make the meaning explicit before understanding of the term
+  is required. Do not assume the learner already knows it or require a glossary
+  before every first textual appearance. Headings SHOULD predict the task,
+  topic, or capability.
 - Exact literal values, identifiers, and metaphors may appear before their
   meaning is explained; explain them before relying on the learner to know what
-  they mean. Judge cold-read clarity by whether a learner reading downward from
-  the start can understand the current material without going back, not by
-  whether every string appeared only after a prior definition.
+  they mean. Use cold-read review to detect accidental difficulty: unexplained
+  prerequisites, ambiguous instructions, missing state, unnecessary backtracking,
+  undefined assumptions, terminology gaps, and visual/prose mismatches.
+- Preserve intended retrieval effort, problem solving, decision making,
+  productive struggle, and changed-condition transfer during cold-read review.
+- Prioritize clarity over brevity; retain needed causal relations, UI/state
+  correspondence, action purpose, state transitions, and term meanings.
 - Introduce only concepts and elements learners will use or engage with; do not
   add later-use realism without a learning need.
 - Before choosing representation or assistance, identify whether the intended
@@ -278,6 +297,16 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
   worked or guided support before substantial independent construction. Fade,
   retain, or restore assistance based on established prior knowledge and learner
   performance; do not use a fixed second-time/third-time rule.
+- Aim for appropriate assistance for the learner, performance, and goal;
+  guidance minimization is not an objective.
+- Design meaningful learner processing such as retrieval, explanation,
+  prediction, comparison, selection, organization, debugging, adaptation, or
+  creation where the outcome needs it; do not require it on every job-aid or
+  initial-performance-only page.
+- Support positive engagement through authentic relevance, meaningful challenge,
+  visible progress, competence-supportive feedback, or meaningful choice and
+  learner control when useful; do not impose all of these as a checklist.
+- Do not invent relevance or add choice solely for its own sake.
 - Learner-facing prose MUST NOT contain author-facing audience descriptions such
   as `受講者は〜`, `学習者は〜`, or `初学者向け` when they do not help perform the task.
   Rewrite these as direct task prose. Do not ban `ユーザー` when it refers to a real
@@ -291,7 +320,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
   callout shapes and UI-state indicators MUST meet the applicable 3:1 non-text
   contrast requirement. Prefer real text over images of text when practical.
 
-Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/repository-and-site.md
+Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/course-docs/repository-and-site.md
 
 # Course Docs Repository and Site Architecture
 

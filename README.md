@@ -37,6 +37,14 @@ at build/dev time.
 Course-level objectives, Learning Event metadata, explicit assessment evidence, and the derived progression report are
 documented in [docs/learning-system.md](./docs/learning-system.md).
 
+Section orientation goals are optional at every depth. QuickCheck and Exercise tasks accept zero or more Hints,
+followed by exactly one final Answer. To verify the rendered authoring contract against the reproducible fixture:
+
+```powershell
+$env:COURSE_CONTENT_SOURCE = './tests/fixtures/optional-goals'
+npm run test:e2e -- tests/e2e/optional-goals-hints.spec.cjs --workers=1
+```
+
 `site.config.ts` is also synced (generated) and is intentionally gitignored.
 
 Required env vars (files or environment):

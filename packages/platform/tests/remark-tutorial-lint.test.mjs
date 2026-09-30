@@ -108,18 +108,19 @@ test.after(() => {
   console.info = originalConsoleInfo;
 });
 
-test('<Section> without goal prop fails', async () => {
+test('<Section> without goal prop passes without a required-goal finding', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = tutorialRoot(section({}, paragraph('body')));
-  const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /section-goal-required/);
+  const stub = createVFileStub();
+  assert.doesNotThrow(() => plugin()(tree, stub.file));
+  assert.doesNotMatch(JSON.stringify([stub.warnings, stub.notes]), /section-goal-required/);
 });
 
-test('<Section> with an empty goal prop fails', async () => {
+test('<Section> with an empty goal prop passes', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = tutorialRoot(section({ goal: '   ' }, paragraph('body')));
   const { file } = createVFileStub();
-  assert.throws(() => plugin()(tree, file), /section-goal-required/);
+  assert.doesNotThrow(() => plugin()(tree, file));
 });
 
 test('nested <Section> without goal prop passes', async () => {
@@ -130,7 +131,7 @@ test('nested <Section> without goal prop passes', async () => {
   assert.ok(!warnings.some((warning) => warning.origin?.includes('section-goal-required')));
 });
 
-test('nested <Section> with past-tense goal emits a note', async () => {
+test('nested <Section> with past-tense goal has no tense finding', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = tutorialRoot(
     section(
@@ -147,10 +148,10 @@ test('nested <Section> with past-tense goal emits a note', async () => {
     if (previousStrict === undefined) delete process.env.TUTORIAL_LINT_STRICT;
     else process.env.TUTORIAL_LINT_STRICT = previousStrict;
   }
-  assert.ok(stub.notes.some((note) => /section-goal-tense/.test(note)));
+  assert.ok(!stub.notes.some((note) => /section-goal-tense/.test(note)));
 });
 
-test('<Section> with past-tense goal emits a note (advisory only)', async () => {
+test('<Section> with past-tense goal has no tense finding', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const tree = tutorialRoot(
     section(
@@ -163,8 +164,8 @@ test('<Section> with past-tense goal emits a note (advisory only)', async () => 
   const stub = createVFileStub();
   assert.doesNotThrow(() => plugin()(tree, stub.file));
   assert.ok(
-    stub.notes.some((n) => /section-goal-tense/.test(n)),
-    'section-goal-tense should be a note, not an error',
+    !stub.notes.some((n) => /section-goal-tense/.test(n)),
+    'goal wording is optional learner-facing orientation',
   );
 });
 
@@ -494,7 +495,9 @@ test('page opener convention flags document-description wording', async () => {
     'page-opens-with-doc-description should be a note',
   );
   assert.ok(
-    stub.notes.some((note) => /prefer learner-facing task prose as a local convention/.test(note)),
+    stub.notes.some((note) =>
+      /useful context, a problem, an example, a goal, or an action/.test(note),
+    ),
   );
 });
 
@@ -609,17 +612,17 @@ test('Concept immediately before QuickCheck does not emit concept-placement', as
   assert.ok(!stub.notes.some((note) => /concept-placement/.test(note)));
 });
 
-test('Section closure accepts only aligned closure surfaces', async () => {
+test('Section does not require local closure, with or without a feedback surface', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const cases = [
-    { name: 'Action only', closure: undefined, warns: true },
-    { name: 'Action plus Recovery', closure: 'Recovery', warns: true },
-    { name: 'Action plus Verify', closure: 'Verify', warns: false },
-    { name: 'Action plus QuickCheck', closure: 'QuickCheck', warns: false },
-    { name: 'Action plus Checkpoint', closure: 'Checkpoint', warns: false },
-    { name: 'Action plus Exercise', closure: 'Exercise', warns: false },
+    { name: 'Action only', closure: undefined },
+    { name: 'Action plus Recovery', closure: 'Recovery' },
+    { name: 'Action plus Verify', closure: 'Verify' },
+    { name: 'Action plus QuickCheck', closure: 'QuickCheck' },
+    { name: 'Action plus Checkpoint', closure: 'Checkpoint' },
+    { name: 'Action plus Exercise', closure: 'Exercise' },
   ];
-  for (const { name, closure, warns } of cases) {
+  for (const { name, closure } of cases) {
     const children = [action({}, paragraph('進めます'))];
     if (closure) children.push(jsxElement(closure, {}, paragraph('確認します')));
     const { file, warnings } = createVFileStub();
@@ -627,15 +630,39 @@ test('Section closure accepts only aligned closure surfaces', async () => {
     const closureWarning = warnings.find((warning) =>
       warning.origin?.includes('section-lacks-closure'),
     );
-    assert.equal(Boolean(closureWarning), warns, name);
-    if (warns) {
-      assert.match(closureWarning.reason, /<Verify> \/ <QuickCheck> \/ <Checkpoint> \/ <Exercise>/);
-      assert.doesNotMatch(closureWarning.reason, /Recovery/);
+    assert.equal(closureWarning, undefined, name);
+  }
+});
+
+test('goal-free Event with Action-only content passes strict and collect modes', async () => {
+  const { default: plugin } = await import(pluginModulePath);
+  const previous = [process.env.TUTORIAL_LINT_STRICT, process.env.TUTORIAL_LINT_COLLECT];
+  process.env.TUTORIAL_LINT_STRICT = '1';
+  process.env.TUTORIAL_LINT_COLLECT = '1';
+  try {
+    const stub = createVFileStub();
+    const tree = tutorialRoot(
+      section(
+        { eventId: 'example-event', targets: 'example-unit', phase: 'practice' },
+        action({}, paragraph('配置します')),
+      ),
+    );
+    assert.doesNotThrow(() => plugin()(tree, stub.file));
+    assert.deepEqual(stub.warnings, []);
+    assert.ok(
+      !stub.notes.some((note) =>
+        /section-goal-required|section-goal-tense|section-lacks-closure/.test(note),
+      ),
+    );
+  } finally {
+    for (const [index, key] of ['TUTORIAL_LINT_STRICT', 'TUTORIAL_LINT_COLLECT'].entries()) {
+      if (previous[index] === undefined) delete process.env[key];
+      else process.env[key] = previous[index];
     }
   }
 });
 
-test('nested Sections are checked locally for closure', async () => {
+test('nested Sections do not require local closure', async () => {
   const { default: plugin } = await import(pluginModulePath);
   const innerAction = section({}, action({}, paragraph('進めます')));
   const noClosure = tutorialRoot(section({ goal: 'outer goal' }, innerAction));
@@ -643,7 +670,7 @@ test('nested Sections are checked locally for closure', async () => {
   plugin()(noClosure, missing.file);
   assert.equal(
     missing.warnings.filter((warning) => warning.origin?.includes('section-lacks-closure')).length,
-    1,
+    0,
   );
 
   const withClosure = tutorialRoot(

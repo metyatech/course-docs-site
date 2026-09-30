@@ -207,10 +207,10 @@ test("verify-content requires a learning model only when Learning System metadat
       succeeds: false,
     },
     {
-      name: "configured learning model",
+      name: "configured learning model with a goal-free Event",
       model: "version: 1\nunits:\n  - id: unit-a\n    objective: Can do the task.\n",
       mdx: [
-        '<Section title="Goal" goal="Goal" eventId="event-a" targets="unit-a" phase="initial" pattern="instruction-first">',
+        '<Section title="Goal" eventId="event-a" targets="unit-a" phase="initial" pattern="instruction-first">',
         "",
         "<Instruction>",
         "Learn.",

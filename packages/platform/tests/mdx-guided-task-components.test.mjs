@@ -3,6 +3,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import Exercise, { Answer, Hint, QuickCheck } from '@metyatech/exercise/client';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourcePath = path.join(projectRoot, 'src', 'mdx', 'create-use-mdx-components.tsx');
@@ -57,12 +60,12 @@ test('create-use-mdx-components does not alias guided task components to one ano
   );
 });
 
-test('@metyatech/exercise dependency is pinned to the final task-structure SHA', async () => {
+test('@metyatech/exercise dependency is pinned to the optional-Hint task-structure SHA', async () => {
   const packageJson = JSON.parse(await fs.readFile(path.join(projectRoot, 'package.json'), 'utf8'));
   const monorepoRoot = path.resolve(projectRoot, '../..');
   const lock = JSON.parse(await fs.readFile(path.join(monorepoRoot, 'package-lock.json'), 'utf8'));
 
-  const expectedSha = '8e517022ac4b7b6e8d830e873e826c54e6d7935c';
+  const expectedSha = 'd4e056f966b9b89f503eb91040ac6c56c78551be';
 
   assert.equal(
     packageJson.dependencies['@metyatech/exercise'],
@@ -76,4 +79,29 @@ test('@metyatech/exercise dependency is pinned to the final task-structure SHA',
     lockEntry.resolved?.endsWith(`#${expectedSha}`),
     `package-lock.json resolved URL must end with #${expectedSha}; got ${lockEntry.resolved}`,
   );
+});
+
+test('installed task renderer supports the same Hint* contract as the MDX parser', () => {
+  for (const Task of [Exercise, QuickCheck]) {
+    for (const count of [0, 1, 2]) {
+      const html = renderToStaticMarkup(
+        React.createElement(
+          Task,
+          null,
+          React.createElement('p', null, 'Compare two values.'),
+          ...Array.from({ length: count }, (_, index) =>
+            React.createElement(Hint, { key: index }, `Hint ${index}`),
+          ),
+          React.createElement(Answer, null, 'Choose the larger value.'),
+        ),
+      );
+      assert.equal((html.match(/class="rensyuHint"/g) ?? []).length, count);
+      assert.equal((html.match(/class="rensyuKaitou"/g) ?? []).length, 1);
+      assert.match(html, /Choose the larger value/);
+    }
+    assert.throws(
+      () => renderToStaticMarkup(React.createElement(Task, null, 'Problem only')),
+      /exactly one Answer/,
+    );
+  }
 });

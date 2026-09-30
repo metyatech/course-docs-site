@@ -23,20 +23,17 @@ import type { Node } from 'unist';
  *           not by themselves fail the build.
  *
  * Rules implemented:
- *  - tutorial/section-goal-required       error — top-level Section metadata
  *  - tutorial/action-single-image         note  — multiple images merit review
  *  - tutorial/section-no-hrule            warn  — structure convention
  *  - tutorial/verify-no-duplicate-arrow   warn  — render bug
  *  - tutorial/verify-shot-action-role     warn  — Verify shot role mismatch
- *  - tutorial/section-lacks-closure       warn  — Action without aligned closure
- *  - tutorial/section-goal-tense          note  — heuristic endings
  *  - tutorial/reference-image-only        note  — image-role advisory
  *  - tutorial/action-bold-overuse         note  — signaling advisory
  *  - tutorial/third-person-reader         note  — local prose convention
  *  - tutorial/page-opens-with-doc-description note — opener convention
  *  - tutorial/verify-internal-mechanics   note  — pattern list heuristic
  *  - tutorial/concept-length              note  — review advisory
- *  - tutorial/concept-placement           note  — first-use judgement
+ *  - tutorial/concept-placement           note  — placement judgement
  *  - tutorial/decorative-emoji            note  — allowlist heuristic
  *  - tutorial/verify-visual-workaround-as-action note — pattern heuristic
  *  - tutorial/prerequisites-placement      warn  — page-level placement
@@ -125,19 +122,12 @@ type VFileLike = {
   message: (reason: string, place?: unknown, origin?: string) => unknown;
 };
 
-// Matches the goal-text anti-patterns listed in the tutorial-authoring
-// skill: 〜(し|さ|書か|置か...)た状態, 〜している, 〜されている, and the
-// retrospective capability form 〜できます. The allowed future capability
-// form 〜できるようになります uses 〜できる and is not matched.
-const GOAL_PAST_TENSE = /(た状態|している|されている|できます)/;
-
 // Signaling dilution: too many bold spans in one Action.
 // The specific numeric threshold has no direct empirical backing —
 // Mayer's Signaling principle says "signal the important" but not a
-// quantity. Set to 5: legitimate signaling surfaces (key-row tables,
-// 2-3 numbered callouts plus a typed value) stay under this; 6+ bold
-// spans is in "obviously diluted" territory where even without research
-// the practitioner can flag it. Emitted as a note, not an error.
+// quantity. Six or more spans trigger review of whether emphasis helps
+// the learner find important information. They do not establish dilution.
+// Emitted as a note, not an error or a scientific threshold.
 const ACTION_BOLD_MAX = 5;
 
 // Local learner-facing prose quality convention: flag author-facing
@@ -199,12 +189,12 @@ const VERIFY_WORKAROUND_AS_ACTION_PATTERNS: Array<{ pattern: RegExp; label: stri
 // that belongs in Reference material; this is advisory, not a hard limit.
 const CONCEPT_SENTENCE_MAX = 5;
 
-// Coherence: decorative emoji outside of known cueing positions.
+// Review emoji outside familiar cueing positions for competing attention.
 // We match common pictographic ranges (pictographs, misc symbols,
 // dingbats, emoticons, transport/map, supplemental symbols).
 // ✅ ❌ ⚠️ are used by course authors as deliberate signalling — they
-// are allowed in Checkpoint/Reference contexts but flagged elsewhere
-// to prevent decorative spread.
+// are allowed in Checkpoint/Reference contexts. Other uses may still
+// support signaling or affect; the heuristic requests semantic review.
 const DECORATIVE_EMOJI_PATTERN =
   /[\u{1F300}-\u{1F5FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{2700}-\u{27BF}]/u;
 // Signalling-safe emoji that are permitted even outside cueing positions.
@@ -317,28 +307,6 @@ const countTables = (node: Node): number => {
   return count;
 };
 
-const ACTION_COMPONENT_NAMES = new Set(['Action']);
-const CLOSURE_COMPONENT_NAMES = new Set(['Verify', 'QuickCheck', 'Checkpoint', 'Exercise']);
-
-// Search the current Section and its wrappers without attributing nested
-// Section content to its parent.
-const containsSectionLocalComponent = (
-  section: MdxJsxElement,
-  names: ReadonlySet<string>,
-): boolean => {
-  const walk = (node: Node): boolean => {
-    if (isJsxElement(node, 'Section')) return false;
-    if (
-      (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') &&
-      names.has((node as MdxJsxElement).name ?? '')
-    ) {
-      return true;
-    }
-    return hasChildren(node) && node.children.some(walk);
-  };
-  return section.children.some(walk);
-};
-
 // Check whether a <Reference> contains only image-bearing content.
 const isReferenceImageOnly = (node: MdxJsxElement): boolean => {
   const meaningful: Node[] = [];
@@ -427,17 +395,6 @@ const emitWarning = (file: VFileLike, reason: string, place: Node, ruleId: strin
   console.warn(`[tutorial-lint] ${where}: ${reason} (${ruleId})`);
 };
 
-const emitError = (file: VFileLike, reason: string, place: Node, ruleId: string) => {
-  const origin = `${RULE_ORIGIN}:${ruleId}`;
-  const collection = getCollection(file);
-  if (collection) {
-    collection.push({ severity: 'error', reason, ruleId, node: place });
-    return;
-  }
-  // `file.fail` throws; construct the full origin so consumers can filter.
-  file.fail(`${reason} (${ruleId})`, place, origin);
-};
-
 // Note: advisory review signal whose automated trigger is heuristic,
 // context-dependent, or intentionally low-impact. Printed via console.info
 // only, never escalated to an error or a vfile message; strict mode ignores it.
@@ -489,7 +446,7 @@ export default function remarkTutorialLint() {
       validateNextStepsPlacement(file, tree);
     }
 
-    const walk = (node: Node, sectionDepth: number) => {
+    const walk = (node: Node) => {
       if (!hasChildren(node)) return;
 
       // Track horizontal rule placement inside any <Section>.
@@ -510,26 +467,7 @@ export default function remarkTutorialLint() {
         const child = node.children[i];
 
         if (isJsxElement(child, 'Section')) {
-          const goal = getStringAttribute(child, 'goal');
-          const hasGoal = goal !== undefined && goal.trim().length > 0;
-          if (sectionDepth === 0 && !hasGoal) {
-            emitError(
-              file,
-              'Top-level <Section> is missing a non-empty `goal` prop',
-              child,
-              'section-goal-required',
-            );
-          } else if (hasGoal && GOAL_PAST_TENSE.test(goal)) {
-            emitNote(
-              file,
-              `<Section goal="..."> uses past/completed form ("${goal}"); consider future-declarative form (e.g. "〜します" / "〜できるようになります"). Specific ending patterns are heuristic, so this is advisory only`,
-              child,
-              'section-goal-tense',
-            );
-          }
-
-          walk(child, sectionDepth + 1);
-          validateSectionClosure(file, child);
+          walk(child);
           continue;
         }
 
@@ -549,11 +487,11 @@ export default function remarkTutorialLint() {
           validateConcept(file, child, node.children, i);
         }
 
-        walk(child, sectionDepth);
+        walk(child);
       }
     };
 
-    walk(tree, 0);
+    walk(tree);
 
     // Collect-all mode: throw one aggregated error listing every finding.
     flushCollection(file);
@@ -721,7 +659,7 @@ function validateConcept(
     );
   }
 
-  // Keep Concepts near an Action or closure that uses the term.
+  // A missing following usage site prompts semantic review, not rejection.
   let foundUsageSite = false;
   for (let j = indexInParent + 1; j < siblings.length; j += 1) {
     const sibling = siblings[j];
@@ -743,7 +681,7 @@ function validateConcept(
   if (!foundUsageSite) {
     emitNote(
       file,
-      '<Concept> has no following Action/Section/Verify/QuickCheck/Exercise that uses the term in its parent; place it near a first-use or retrieval opportunity when useful. This is a judgement, and a trailing summary may be intentional',
+      '<Concept> has no following usage site in its parent; review whether it is appropriately placed near meaningful use or intentionally serves pre-training, summary, retrieval, or reference. This is a contextual judgement',
       node,
       'concept-placement',
     );
@@ -771,17 +709,6 @@ function containsUsageSite(node: Node): boolean {
   return found;
 }
 
-function validateSectionClosure(file: VFileLike, section: MdxJsxElement) {
-  if (!containsSectionLocalComponent(section, ACTION_COMPONENT_NAMES)) return;
-  if (containsSectionLocalComponent(section, CLOSURE_COMPONENT_NAMES)) return;
-  emitWarning(
-    file,
-    '<Section> contains an <Action> but no aligned closure; consider <Verify> / <QuickCheck> / <Checkpoint> / <Exercise> when one can test the learning goal',
-    section,
-    'section-lacks-closure',
-  );
-}
-
 // Prefer learner-facing task prose in the page opener as a local convention.
 // We inspect the first non-empty paragraph outside of any JSX wrapper.
 function validatePageOpener(file: VFileLike, tree: Node) {
@@ -796,7 +723,7 @@ function validatePageOpener(file: VFileLike, tree: Node) {
         if (pattern.test(text)) {
           emitNote(
             file,
-            `Page opens with a document-describing sentence ("${text.slice(0, 30)}..."); prefer learner-facing task prose as a local convention, such as opening with an action or goal. Opener-only scope and the pattern list are heuristic`,
+            `Page opens with a document-describing sentence ("${text.slice(0, 30)}..."); prefer learner-relevant orientation such as useful context, a problem, an example, a goal, or an action. Opener-only scope and the pattern list are heuristic`,
             child,
             'page-opens-with-doc-description',
           );
@@ -839,9 +766,8 @@ function validateThirdPersonReader(file: VFileLike, tree: Node) {
   walk(tree);
 }
 
-// Coherence: flag decorative emoji outside of Checkpoint/Reference
-// cueing positions. A single emoji anywhere else likely indicates
-// decorative use rather than deliberate signaling.
+// Emoji outside known cueing positions prompt review. The AST cannot determine
+// whether an emoji supports goal-aligned signaling or positive engagement.
 function validateDecorativeEmoji(file: VFileLike, tree: Node) {
   const walk = (node: Node, insideSignalSurface: boolean) => {
     if (node.type === 'code' || node.type === 'inlineCode') return;
@@ -858,7 +784,7 @@ function validateDecorativeEmoji(file: VFileLike, tree: Node) {
       if (match) {
         emitNote(
           file,
-          `Decorative emoji "${match[0]}" outside a signaling surface (Checkpoint/Reference/Recovery); Coherence suggests removing ornamental elements unrelated to the learning objective. Allowlist is a cultural convention, so treat as advisory`,
+          `Emoji "${match[0]}" outside a known signaling surface (Checkpoint/Reference/Recovery); review whether it supports goal-aligned signaling or affect, or is ornament competing for attention. Emoji are not inherently a defect; allowlist is a cultural convention and this finding is advisory`,
           node,
           'decorative-emoji',
         );

@@ -74,7 +74,7 @@ test('page collector keeps legacy pages and grouping Sections unchanged', async 
   assert.deepEqual(legacy.issues, []);
 });
 
-test('page collector accepts I-PS, PS-I, and Productive Failure stage order', async () => {
+test('page collector accepts goal-free I-PS, PS-I, and Productive Failure Events', async () => {
   const { collectLearningContent } = await import(modulePath);
   const cases = [
     ['instruction-first', [jsx('Instruction'), jsx('ProblemSolving')]],
@@ -101,6 +101,8 @@ test('page collector accepts I-PS, PS-I, and Productive Failure stage order', as
       'lesson.mdx',
     );
     assert.deepEqual(result.issues, []);
+    assert.equal(result.events.length, 1);
+    assert.deepEqual(result.events[0].targets, ['unit-a']);
   }
 });
 
@@ -228,7 +230,7 @@ test('course analyzer respects Nextra metadata order and labels deterministic fa
       'utf8',
     );
     const mdx = (id) =>
-      `<Section title="Goal" goal="Goal" eventId="${id}" targets="unit-a" phase="initial" pattern="instruction-first">\n<Instruction>Learn.</Instruction>\n<ProblemSolving>Try.</ProblemSolving>\n</Section>`;
+      `<Section title="Goal" eventId="${id}" targets="unit-a" phase="initial" pattern="instruction-first">\n<Instruction>Learn.</Instruction>\n<ProblemSolving>Try.</ProblemSolving>\n</Section>`;
     await writeFile(path.join(root, 'content', 'first.mdx'), mdx('first-event'), 'utf8');
     await writeFile(path.join(root, 'content', 'second.mdx'), mdx('second-event'), 'utf8');
     await writeFile(path.join(root, 'content', 'unlisted.mdx'), mdx('unlisted-event'), 'utf8');

@@ -63,6 +63,7 @@ test("npm version and install-script approvals are strict and version-pinned", a
   assert.deepEqual(pkg.allowScripts, {
     "esbuild@0.28.1": true,
     "unrs-resolver@1.11.1": true,
+    "github:metyatech/exercise-module#d4e056f966b9b89f503eb91040ac6c56c78551be": true,
   });
   assert.match(npmrc, /^strict-allow-scripts=true$/m);
 });

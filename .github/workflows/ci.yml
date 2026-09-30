@@ -90,6 +90,11 @@ jobs:
       - name: Verify (shared)
         run: npm run test:shared
 
+      - name: Verify optional goals and Hint-free tasks
+        env:
+          COURSE_CONTENT_SOURCE: ./tests/fixtures/optional-goals
+        run: npm run test:e2e -- tests/e2e/optional-goals-hints.spec.cjs --workers=1
+
   site-verify:
     needs: platform
     runs-on: ubuntu-26.04
