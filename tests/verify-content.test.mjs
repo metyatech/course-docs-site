@@ -286,6 +286,97 @@ test("verify-content flags a title prop on <Exercise>", async () => {
   }
 });
 
+test("verify-content parses multiline Exercise opening tags without false positives", async () => {
+  const fixtures = [
+    {
+      name: "single-line Exercise",
+      mdx: "<Exercise>\n本文\n</Exercise>\n",
+      code: 0,
+    },
+    {
+      name: "multiline supported props",
+      mdx: '<Exercise\n  answerTitle="確認"\n  enableBlanks\n>\n本文\n</Exercise>\n',
+      code: 0,
+    },
+    {
+      name: "multiline unsupported title prop",
+      mdx: '<Exercise\n  title="Unsupported"\n>\n本文\n</Exercise>\n',
+      code: 1,
+      output: /must not use a title prop/u,
+    },
+    {
+      name: "data-title is not the title prop",
+      mdx: '<Exercise\n  data-title="metadata"\n>\n本文\n</Exercise>\n',
+      code: 0,
+    },
+    {
+      name: "quoted value containing title equals",
+      mdx: '<Exercise answerTitle="literal title= text">\n本文\n</Exercise>\n',
+      code: 0,
+    },
+    {
+      name: "braced string containing title equals",
+      mdx: '<Exercise answerTitle={"title="}>\n本文\n</Exercise>\n',
+      code: 0,
+    },
+    {
+      name: "quoted greater-than does not end the opening tag",
+      mdx: '<Exercise\n  answerTitle="a > b"\n  title="Unsupported"\n>\n本文\n</Exercise>\n',
+      code: 1,
+      output: /must not use a title prop/u,
+    },
+    {
+      name: "braced expression greater-than does not end the opening tag",
+      mdx: '<Exercise\n  answerTitle={"a > b"}\n  title="Unsupported"\n>\n本文\n</Exercise>\n',
+      code: 1,
+      output: /must not use a title prop/u,
+    },
+    {
+      name: "template string greater-than does not end the opening tag",
+      mdx: '<Exercise\n  answerTitle={`a > b`}\n  title="Unsupported"\n>\n本文\n</Exercise>\n',
+      code: 1,
+      output: /must not use a title prop/u,
+    },
+    {
+      name: "unterminated opening tag",
+      mdx: '<Exercise\n  answerTitle="確認"\n本文\n</Exercise>\n',
+      code: 1,
+      output: /Unterminated <Exercise> opening tag/u,
+    },
+    {
+      name: "ExerciseFoo is not Exercise",
+      mdx: '<ExerciseFoo title="metadata">\n本文\n</ExerciseFoo>\n',
+      code: 0,
+    },
+    {
+      name: "fenced multiline Exercise example is ignored",
+      mdx: '```mdx\n<Exercise\n  title="example"\n>\n```\n',
+      code: 0,
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-exercise-opening-"));
+    try {
+      await writeFixture(tempDir, "content/docs/foo/index.mdx", fixture.mdx);
+      const result = await runVerifier(tempDir);
+      assert.equal(
+        result.code,
+        fixture.code,
+        `${fixture.name}: expected ${fixture.code}, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+      );
+      if (fixture.output)
+        assert.match(
+          `${result.stdout}\n${result.stderr}`,
+          fixture.output,
+          `${fixture.name}: ${result.stdout}\n${result.stderr}`,
+        );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("verify-content ignores a <Exercise> example inside a fenced code block", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
   try {

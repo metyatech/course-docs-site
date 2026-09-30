@@ -104,11 +104,11 @@ const isInFencedBlockAt = (lines, lineIndex) => {
   return inFence;
 };
 
-const findExerciseOpeningEnd = (tagLine, startIndex) => {
+const findExerciseOpeningEnd = (text, startIndex) => {
   let inQuote = null;
   let braceDepth = 0;
-  for (let i = startIndex; i < tagLine.length; i += 1) {
-    const char = tagLine[i];
+  for (let i = startIndex; i < text.length; i += 1) {
+    const char = text[i];
     if (inQuote) {
       if (char === "\\") {
         i += 1;
@@ -131,6 +131,7 @@ const findExerciseOpeningEnd = (tagLine, startIndex) => {
       braceDepth = Math.max(0, braceDepth - 1);
       continue;
     }
+    if (char === "<" && braceDepth === 0) return -1;
     if (char === ">" && braceDepth === 0) {
       return i;
     }
@@ -182,26 +183,34 @@ const verifyExerciseStructure = async (mdxFiles) => {
   for (const filePath of mdxFiles) {
     const text = await readFile(filePath, "utf8");
     const lines = text.split(/\r?\n/);
+    const lineStartOffsets = [];
+    let offset = 0;
+    for (const line of lines) {
+      lineStartOffsets.push(offset);
+      offset += line.length;
+      if (text[offset] === "\r") offset += 1;
+      if (text[offset] === "\n") offset += 1;
+    }
+
     for (let i = 0; i < lines.length; i += 1) {
       if (isInFencedBlockAt(lines, i)) continue;
       const line = lines[i];
-      const match = line.match(/<Exercise([\s>/]|$)/);
-      if (!match) continue;
-      // Skip false positives like `<ExerciseFoo>`.
-      const followingChar = line[match.index + "<Exercise".length] ?? "";
-      if (followingChar && !/[\s>/]/.test(followingChar)) continue;
-      exerciseCount += 1;
-      const openEnd = findExerciseOpeningEnd(line, match.index + "<Exercise".length);
-      if (openEnd === -1) {
-        errors.push(`${repoPosixPath(filePath)}:${i + 1}: Unterminated <Exercise> opening tag.`);
-        continue;
-      }
-      const openingTag = line.slice(match.index, openEnd + 1);
-      const maskedOpeningTag = maskQuotedAndBraced(openingTag);
-      if (/\stitle\s*=/.test(maskedOpeningTag)) {
-        errors.push(
-          `${repoPosixPath(filePath)}:${i + 1}: <Exercise> opening tag must not use a title prop.`,
-        );
+      const matches = line.matchAll(/<Exercise(?=[\s/>]|$)/g);
+      for (const match of matches) {
+        exerciseCount += 1;
+        const startIndex = lineStartOffsets[i] + match.index;
+        const openEnd = findExerciseOpeningEnd(text, startIndex + match[0].length);
+        if (openEnd === -1) {
+          errors.push(`${repoPosixPath(filePath)}:${i + 1}: Unterminated <Exercise> opening tag.`);
+          continue;
+        }
+        const openingTag = text.slice(startIndex, openEnd + 1);
+        const maskedOpeningTag = maskQuotedAndBraced(openingTag);
+        if (/\stitle\s*=/.test(maskedOpeningTag)) {
+          errors.push(
+            `${repoPosixPath(filePath)}:${i + 1}: <Exercise> opening tag must not use a title prop.`,
+          );
+        }
       }
     }
   }
@@ -327,15 +336,17 @@ const main = async () => {
   );
 
   const exerciseResult = await verifyExerciseStructure(mdxFiles);
+  if (exerciseResult.errors.length > 0) {
+    process.stdout.write("Exercise structure verification failed:\n");
+    for (const error of exerciseResult.errors) process.stdout.write(`- ${error}\n`);
+    process.exit(1);
+    return;
+  }
+
   const indentationErrors = await verifyIndentationRules(mdxFiles, assetFiles);
   const learningResult = await analyzeCourseLearning({ root: process.cwd() });
 
   let exitCode = 0;
-  if (exerciseResult.errors.length > 0) {
-    exitCode = 1;
-    process.stdout.write("Exercise structure verification failed:\n");
-    for (const error of exerciseResult.errors) process.stdout.write(`- ${error}\n`);
-  }
   if (indentationErrors.length > 0) {
     exitCode = 1;
     process.stdout.write("Code block indentation verification failed:\n");
