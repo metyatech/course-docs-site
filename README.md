@@ -45,6 +45,20 @@ $env:COURSE_CONTENT_SOURCE = './tests/fixtures/optional-goals'
 npm run test:e2e -- tests/e2e/optional-goals-hints.spec.cjs --workers=1
 ```
 
+### Integrate authoring rules
+
+The commit reference in `agent-ruleset.json` is temporary validation of the
+unmerged authoring rules. It does not change the long-term tracking policy.
+At final integration:
+
+1. Integrate the `agent-rules` changes into its `main` branch first.
+2. Restore the site ruleset source to `github:metyatech/agent-rules`.
+3. Run `compose-agentsmd --refresh`, then `compose-agentsmd check`.
+4. Confirm generated instructions retain the normative educational purpose,
+   optional Section goals at every depth, `problem → Hint* → Answer`,
+   explicitly taught information in Hints, and concise Answers when further
+   explanation adds no learning value.
+
 `site.config.ts` is also synced (generated) and is intentionally gitignored.
 
 Required env vars (files or environment):

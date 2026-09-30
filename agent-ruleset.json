@@ -1,5 +1,5 @@
 {
-  "sources": ["github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19"],
+  "sources": ["github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563"],
   "profile": "course-docs-platform",
   "output": "AGENTS.md"
 }

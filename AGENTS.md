@@ -11,7 +11,7 @@
 - Before applying any rule updates, present the planned changes first with an ANSI-colored diff-style preview, ask for explicit approval, then make the edits.
 - These tool rules live in tools/tool-rules.md in the compose-agentsmd repository; do not duplicate them in other rule modules.
 
-Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/node/module-system.md
+Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/node/module-system.md
 
 # Node module system (ESM)
 
@@ -21,7 +21,7 @@ Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/ru
 - Prefer ESM with .js extensions for JavaScript config/scripts (e.g.,
   next.config.js as ESM).
 
-Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/node/npm-packages.md
+Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/node/npm-packages.md
 
 # Node package publishing
 
@@ -34,18 +34,21 @@ Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/ru
 - Use npm pack --dry-run to inspect the package contents.
 - Run npm test when tests exist.
 
-Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/web/web-ui-and-testing.md
+Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/web/web-ui-and-testing.md
 
 # Web UI and automation
 
 ## Browser automation
 
-- For web automation or UI verification, use the browser automation tooling available in the current agent environment.
-- If browser launch fails due to missing Playwright binaries, run `npx playwright install chromium` and retry.
+- For web automation or UI verification, use the browser automation tooling
+  available in the current agent environment.
+- If browser launch fails due to missing Playwright binaries, run
+  `npx playwright install chromium` and retry.
 
 ## UI verification and E2E
 
-- For user-visible UI changes, verify in a real browser; if not possible, explain and provide manual steps.
+- For user-visible UI changes, verify in a real browser; if not possible,
+  explain and provide manual steps.
 - Always add E2E tests for user-visible changes; if no harness exists, add one.
 - Run E2E in CI and require it for PR merges; do not defer correctness coverage
   to scheduled runs.
@@ -63,7 +66,7 @@ Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/ru
   user approval before skipping.
 - Use established icon libraries; do not handcraft custom icons or inline SVGs.
 
-Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/education/course-purpose.md
+Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/education/course-purpose.md
 
 # Course Teaching Purpose
 
@@ -83,7 +86,7 @@ Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/ru
   fully reach them.
 - Do not equate enjoyment with ease or rigor with unnecessary frustration.
 
-Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/education/question-authoring.md
+Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/education/question-authoring.md
 
 # Educational Question Authoring
 
@@ -120,9 +123,16 @@ Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/ru
   file names, message strings, instructor-assigned labels, example-specific
   constants, placements, and outputs. Replace them with generic role-based
   wording while preserving the taught technical distinction.
-- Questions, prompts, options, answers, scoring criteria, and explanations MUST NOT introduce, require, or casually reference untaught concepts, features, parameters, APIs, syntax, techniques, tools, or extension-only content unless the user explicitly requests extension-level assessment.
-- Scoring criteria (also called rubric criteria) are the individual bullet items of a question's `## Scoring` section, each describing one thing the answer must demonstrate.
-- The number of scoring criteria and their ordering determine the assessment manifest `points` array: the `points` length MUST equal the criterion count, and each `points` entry maps to the criterion at the same index.
+- Questions, prompts, options, answers, scoring criteria, and explanations MUST
+  NOT introduce, require, or casually reference untaught concepts, features,
+  parameters, APIs, syntax, techniques, tools, or extension-only content unless
+  the user explicitly requests extension-level assessment.
+- Scoring criteria (also called rubric criteria) are the individual bullet items
+  of a question's `## Scoring` section, each describing one thing the answer
+  must demonstrate.
+- The number of scoring criteria and their ordering determine the assessment
+  manifest `points` array: the `points` length MUST equal the criterion count,
+  and each `points` entry maps to the criterion at the same index.
 - Questions MUST have a single defensible answer, or explicitly state the
   accepted answer range.
 - Multiple-choice distractors MUST be plausible, close to the correct answer,
@@ -147,7 +157,7 @@ Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/ru
   higher intrinsic load and cover multiple important taught targets rather than
   repeating one surface pattern.
 
-Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/course-docs/authoring.md
+Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/course-docs/authoring.md
 
 # Course Docs Authoring
 
@@ -203,10 +213,16 @@ Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/ru
 ## Tasks and aligned evidence
 
 - Exercise and QuickCheck tasks MUST present the problem, then zero or more
-  `<Hint>` blocks, then exactly one `<Answer>` block. Hints MUST NOT reveal the
-  answer first and MUST use material already covered in this or a guaranteed
-  earlier lesson. Answers MUST explain why they are correct and address a likely
-  misconception only when one genuinely exists.
+  `<Hint>` blocks, then exactly one `<Answer>` block.
+- The first Hint SHOULD avoid unnecessarily revealing the answer immediately.
+  Multiple Hints MAY become progressively stronger or more explicit.
+- Hints SHOULD default to material already covered in this or a guaranteed
+  earlier lesson. Hints MAY explicitly teach new information; they MUST NOT
+  require unfamiliar information as already known without explaining it.
+- Answers MUST provide feedback that lets learners understand correctness.
+  Answers MAY be concise for simple, self-explanatory tasks when additional
+  explanation adds no learning value. Explain the reasoning or address a likely
+  misconception when it helps the learner; do not invent a misconception.
 - When present, Hints MUST be non-empty direct children of the task before its
   final Answer; they MAY provide progressively stronger support.
 - Exercise is a task/container format, not a learning phase. Near-copy and
@@ -320,7 +336,7 @@ Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/ru
   callout shapes and UI-state indicators MUST meet the applicable 3:1 non-text
   contrast requirement. Prefer real text over images of text when practical.
 
-Source: github:metyatech/agent-rules@b58b13b7ab3ccbb80dc95c75913c83b540fc2d19/rules/domains/course-docs/repository-and-site.md
+Source: github:metyatech/agent-rules@5253a86bcc994a936644ef6e6e64d451f40cf563/rules/domains/course-docs/repository-and-site.md
 
 # Course Docs Repository and Site Architecture
 
