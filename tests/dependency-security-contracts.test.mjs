@@ -42,7 +42,7 @@ test("dependency versions and patch installation stay pinned", async () => {
   assert.equal(pkg.devDependencies["eslint-config-next"], "^15.5.25");
   assert.equal(pkg.dependencies.sharp, "^0.35.4");
   assert.equal(pkg.overrides.mermaid, "11.17.2");
-  assert.equal(pkg.overrides.dompurify, "3.4.15");
+  assert.equal(pkg.overrides.dompurify, "3.4.16");
   assert.equal(pkg.overrides["@xmldom/xmldom"], "0.9.12");
   assert.equal(pkg.overrides["brace-expansion"], "2.1.7");
   const lock = JSON.parse(await readFile(packageLockPath, "utf8"));
