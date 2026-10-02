@@ -1,6 +1,7 @@
 const { expect, test } = require("@playwright/test");
 const AxeBuilder = require("@axe-core/playwright").default;
 const { suiteConfig } = require("./suite-config.cjs");
+const { resolveCourseKey } = require("./course-defaults.cjs");
 
 const THEMES = ["light", "dark"];
 const INTERACTIVE_SELECTOR = 'main a, main button, main [role="button"], header a, header button';
@@ -43,7 +44,13 @@ async function setThemeAndOpen(page, path, theme) {
   }
 }
 
-async function runContrastCheck(page, includeSelector, excludeSelector) {
+async function runAxeContrastCheck(
+  page,
+  includeSelector,
+  excludeSelector,
+  globalExclude,
+  filterNextraUi = true,
+) {
   const builder = new AxeBuilder({ page })
     .withRules(["color-contrast"])
     .options({ iframes: false });
@@ -52,48 +59,54 @@ async function runContrastCheck(page, includeSelector, excludeSelector) {
     builder.include(includeSelector);
   }
 
-  const globalExclude = [
-    ".nextra-code",
-    "iframe",
-    "code",
-    "pre",
-    '[class*="styles-module"]',
-    '[class*="nextra-"]',
-  ];
-
-  if (excludeSelector) {
-    if (Array.isArray(excludeSelector)) {
-      builder.exclude([...excludeSelector, ...globalExclude]);
-    } else {
-      builder.exclude([excludeSelector, ...globalExclude]);
-    }
-  } else {
-    builder.exclude(globalExclude);
+  const explicitExcludes = excludeSelector
+    ? Array.isArray(excludeSelector)
+      ? excludeSelector
+      : [excludeSelector]
+    : [];
+  for (const selector of [...explicitExcludes, ...globalExclude]) {
+    builder.exclude(selector);
   }
 
   const result = await builder.analyze();
-
-  // Filter out any remaining violations that leaked through iframes or CodePreview UI
-  result.violations = result.violations.filter((v) => {
-    if (v.id !== "color-contrast") return false;
-
-    v.nodes = v.nodes.filter((node) => {
+  result.violations = result.violations.filter((violation) => {
+    if (violation.id !== "color-contrast") {
+      return false;
+    }
+    violation.nodes = violation.nodes.filter((node) => {
       const target = Array.isArray(node.target) ? node.target.join(" ") : String(node.target);
       const targetLower = target.toLowerCase();
-
       const isIframe = target.includes("|") || targetLower.includes("iframe");
-      const isCode =
-        targetLower.includes("code") ||
-        targetLower.includes("span:nth-child") ||
-        targetLower.includes("pre");
-      const isUI = targetLower.includes("styles-module") || targetLower.includes("nextra-");
-
-      return !isIframe && !isCode && !isUI;
+      const isNonContentUi =
+        targetLower.includes("styles-module") ||
+        targetLower.includes("monaco-editor") ||
+        (filterNextraUi && targetLower.includes("nextra-"));
+      return !isIframe && !isNonContentUi;
     });
-    return v.nodes.length > 0;
+    return violation.nodes.length > 0;
   });
 
   return result;
+}
+
+const NON_CONTENT_UI_EXCLUDES = ["iframe", '[class*="styles-module"]', ".monaco-editor"];
+
+async function runGeneralUiContrastCheck(page, includeSelector, excludeSelector) {
+  return await runAxeContrastCheck(page, includeSelector, excludeSelector, [
+    ...NON_CONTENT_UI_EXCLUDES,
+    ".nextra-code",
+    "pre",
+    "code",
+    "[data-highlighted-line]",
+    '[class*="nextra-"]',
+  ]);
+}
+
+async function runCodeContrastCheck(page, includeSelector) {
+  if ((await page.locator(includeSelector).count()) === 0) {
+    return { violations: [] };
+  }
+  return runAxeContrastCheck(page, includeSelector, undefined, NON_CONTENT_UI_EXCLUDES, false);
 }
 
 async function collectBoundaryIssues(page, path, theme, selector = BOUNDARY_SELECTOR) {
@@ -445,7 +458,7 @@ async function collectStateIssues(page, path, theme) {
   };
 
   const issues = [];
-  const baseResult = await runContrastCheck(page);
+  const baseResult = await runGeneralUiContrastCheck(page);
   for (const violation of baseResult.violations) {
     issues.push({
       path,
@@ -468,7 +481,7 @@ async function collectStateIssues(page, path, theme) {
     try {
       await element.hover({ force: true });
       await page.waitForTimeout(80);
-      const hoverResult = await runContrastCheck(page, `[${markerName}="1"]`);
+      const hoverResult = await runGeneralUiContrastCheck(page, `[${markerName}="1"]`);
       for (const violation of hoverResult.violations) {
         issues.push({
           path,
@@ -481,7 +494,7 @@ async function collectStateIssues(page, path, theme) {
 
       await element.focus();
       await page.waitForTimeout(80);
-      const focusResult = await runContrastCheck(page, `[${markerName}="1"]`);
+      const focusResult = await runGeneralUiContrastCheck(page, `[${markerName}="1"]`);
       for (const violation of focusResult.violations) {
         issues.push({
           path,
@@ -593,7 +606,7 @@ if (exerciseTargetPaths.length === 0) {
 
                 let axeResult;
                 try {
-                  axeResult = await runContrastCheck(page, ".rensyuBlock");
+                  axeResult = await runGeneralUiContrastCheck(page, ".rensyuBlock");
                 } catch (error) {
                   if (!String(error?.message ?? error).includes("No elements found for include")) {
                     throw error;
@@ -620,6 +633,42 @@ if (exerciseTargetPaths.length === 0) {
                   ".rensyuBlock, .rensyuBlock *",
                 );
                 allIssues.push(...boundaryIssues);
+
+                const codeSelector = ".rensyuBlock pre code.nextra-code";
+                if (
+                  resolveCourseKey(process.env.COURSE_CONTENT_SOURCE) ===
+                    "javascript-course-docs" &&
+                  path === "/docs/basics/dom-css/"
+                ) {
+                  expect(
+                    await page
+                      .locator(
+                        ".rensyuBlock pre code.nextra-code > span:not([data-highlighted-line])",
+                      )
+                      .count(),
+                    "the JavaScript DOM/CSS exercise route must contain normal code lines",
+                  ).toBeGreaterThan(0);
+                  expect(
+                    await page
+                      .locator(".rensyuBlock pre code.nextra-code > span[data-highlighted-line]")
+                      .count(),
+                    "the JavaScript DOM/CSS exercise route must contain highlighted code lines",
+                  ).toBeGreaterThan(0);
+                }
+
+                const codeResult = await runCodeContrastCheck(page, codeSelector);
+                for (const violation of codeResult.violations) {
+                  allIssues.push({
+                    path,
+                    theme,
+                    state: "code",
+                    id: violation.id,
+                    description: violation.nodes
+                      .flatMap((node) => node.target || [])
+                      .slice(0, 3)
+                      .join(" | "),
+                  });
+                }
               }
             } finally {
               await page.close();
