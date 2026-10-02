@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cssPath = path.join(projectRoot, 'styles', 'course-site.css');
+const mdxOptionsPath = path.join(projectRoot, 'src', 'next', 'course-mdx-options.ts');
 
 const extractRuleBody = (source, selector) => {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -51,6 +52,43 @@ const assertContrast = ({ label, foreground, background, minimum }) => {
     `${label} contrast ratio ${ratio.toFixed(2)} must be at least ${minimum}:1`,
   );
 };
+
+test('highlighted code uses high-contrast themes and an AA-compliant light highlight', async () => {
+  const [mdxOptions, css] = await Promise.all([
+    fs.readFile(mdxOptionsPath, 'utf8'),
+    fs.readFile(cssPath, 'utf8'),
+  ]);
+  const compactMdxOptions = mdxOptions.replace(/\s+/g, ' ');
+
+  assert.match(
+    compactMdxOptions,
+    /rehypePrettyCodeOptions: \{ theme: \{ light: ['"]github-light-high-contrast['"], dark: ['"]github-dark['"],? \},? \}/,
+  );
+
+  const highlightedLineRule = extractRuleBody(
+    css,
+    ':root:not(.dark) pre code.nextra-code > span[data-highlighted-line]',
+  );
+  const background = '#f2f7fd';
+  const fallbackColor = '#1f2937';
+
+  assert.match(highlightedLineRule, /background-color\s*:\s*#f2f7fd\s*!important\s*;/);
+  assert.match(highlightedLineRule, /color\s*:\s*#1f2937\s*!important\s*;/);
+  assert.match(highlightedLineRule, /box-shadow\s*:\s*inset 3px 0 #2563eb\s*!important\s*;/);
+
+  [
+    { label: 'HTML comment token', foreground: '#66707b' },
+    { label: 'HTML tag token', foreground: '#024c1a' },
+    { label: 'Plaintext fallback', foreground: fallbackColor },
+  ].forEach(({ label, foreground }) =>
+    assertContrast({
+      label,
+      foreground,
+      background,
+      minimum: 4.5,
+    }),
+  );
+});
 
 test('Exercise dark-mode colors meet WCAG contrast thresholds', async () => {
   const css = await fs.readFile(cssPath, 'utf8');

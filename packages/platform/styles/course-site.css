@@ -7,6 +7,12 @@
   color: hsl(var(--nextra-primary-hue) var(--nextra-primary-saturation) 75%);
 }
 
+:root:not(.dark) pre code.nextra-code > span[data-highlighted-line] {
+  background-color: #f2f7fd !important;
+  color: #1f2937 !important;
+  box-shadow: inset 3px 0 #2563eb !important;
+}
+
 /* Add spacing around images (excluding navbar logo/icon) */
 .nextra-content img {
   margin: 1em 0;

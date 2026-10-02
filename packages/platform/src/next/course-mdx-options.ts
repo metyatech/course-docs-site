@@ -20,4 +20,10 @@ export const courseRemarkPlugins = [
 
 export const courseMdxOptions = {
   remarkPlugins: courseRemarkPlugins,
+  rehypePrettyCodeOptions: {
+    theme: {
+      light: 'github-light-high-contrast',
+      dark: 'github-dark',
+    },
+  },
 };
