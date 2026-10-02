@@ -457,6 +457,88 @@ test("verify-content flags 2-space fenced indentation and tab indentation", asyn
   }
 });
 
+test("verify-content rejects legacy Docusaurus highlight comments in standard fences", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
+  try {
+    await writeFixture(
+      tempDir,
+      "content/docs/foo/index.mdx",
+      [
+        "### 演習1",
+        "",
+        "```html",
+        "// highlight-next-line",
+        "<p>one</p>",
+        "/* highlight-start */",
+        "<p>two</p>",
+        "{/* highlight-end */}",
+        "# highlight-next-line",
+        "<!-- highlight-start -->",
+        "```",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await runVerifier(tempDir);
+    assert.notEqual(result.code, 0);
+    assert.match(result.stdout, /Legacy Docusaurus code highlighting verification failed:/);
+    for (const [lineNumber, directive] of [
+      [4, "highlight-next-line"],
+      [6, "highlight-start"],
+      [8, "highlight-end"],
+      [9, "highlight-next-line"],
+      [10, "highlight-start"],
+    ]) {
+      assert.match(
+        result.stdout,
+        new RegExp(
+          `content/docs/foo/index\\.mdx:${lineNumber}: Docusaurus magic comment \\\"${directive}\\\" is unsupported by Nextra; use code-fence line metadata such as \\{1,3-5\\}\\.`,
+        ),
+      );
+    }
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("verify-content accepts Nextra highlight metadata and ignores legacy comments in long fences", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
+  try {
+    await writeFixture(
+      tempDir,
+      "content/docs/foo/index.mdx",
+      [
+        "### 演習1",
+        "",
+        "```js {1,3-4}",
+        "const first = 1;",
+        'const note = "// highlight-next-line";',
+        'const suffix = "highlight-end"; // highlight-start',
+        "const second = 2;",
+        "const third = 3;",
+        "const fourth = 4;",
+        "```",
+        "",
+        "````mdx",
+        "```html",
+        "// highlight-next-line",
+        "```",
+        "````",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await runVerifier(tempDir);
+    assert.equal(
+      result.code,
+      0,
+      `expected 0, got ${result.code}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("verify-content flags asset files outside the four-space rule", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "course-docs-verify-content-"));
   try {

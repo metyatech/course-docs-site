@@ -221,6 +221,43 @@ const verifyExerciseStructure = async (mdxFiles) => {
 // Code-block / asset indentation rules
 // --------------------------------------------------------------------------
 
+/** @typedef {"highlight-next-line" | "highlight-start" | "highlight-end"} LegacyHighlightDirective */
+
+/**
+ * @typedef {Object} LegacyHighlightFinding
+ * @property {string} filePath
+ * @property {number} lineNumber
+ * @property {LegacyHighlightDirective} directive
+ */
+
+/**
+ * @typedef {Object} CodeBlockVerificationResult
+ * @property {string[]} indentationErrors
+ * @property {string[]} legacyHighlightErrors
+ */
+
+/**
+ * Return a Docusaurus highlight directive only when the whole line is one of
+ * the supported magic-comment forms.
+ * @param {string} line
+ * @returns {LegacyHighlightDirective | null}
+ */
+const parseLegacyDocusaurusHighlightDirective = (line) => {
+  const directive = "(highlight-next-line|highlight-start|highlight-end)";
+  const patterns = [
+    new RegExp(`^\\s*//\\s*${directive}\\s*$`),
+    new RegExp(`^\\s*#\\s*${directive}\\s*$`),
+    new RegExp(`^\\s*/\\*\\s*${directive}\\s*\\*/\\s*$`),
+    new RegExp(`^\\s*\\{\\s*/\\*\\s*${directive}\\s*\\*/\\s*\\}\\s*$`),
+    new RegExp(`^\\s*<!--\\s*${directive}\\s*-->\\s*$`),
+  ];
+  for (const pattern of patterns) {
+    const match = line.match(pattern);
+    if (match) return /** @type {LegacyHighlightDirective} */ (match[1]);
+  }
+  return null;
+};
+
 const stripFencePrefix = (line, prefix) =>
   prefix !== "" && line.startsWith(prefix) ? line.slice(prefix.length) : line;
 
@@ -253,7 +290,7 @@ const verifyIndentation = (lines, filePath, startLineNumber, errors) => {
   }
 };
 
-const verifyMarkdownFile = async (filePath, errors) => {
+const verifyMarkdownFile = async (filePath, result) => {
   const text = await readFile(filePath, "utf8");
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i += 1) {
@@ -282,10 +319,23 @@ const verifyMarkdownFile = async (filePath, errors) => {
         closeIndex = j;
         break;
       }
-      codeLines.push(stripFencePrefix(lines[j], prefix));
+      const codeLine = stripFencePrefix(lines[j], prefix);
+      codeLines.push(codeLine);
+      const directive = parseLegacyDocusaurusHighlightDirective(codeLine);
+      if (directive) {
+        /** @type {LegacyHighlightFinding} */
+        const finding = {
+          filePath: repoPosixPath(filePath),
+          lineNumber: j + 1,
+          directive,
+        };
+        result.legacyHighlightErrors.push(
+          `${finding.filePath}:${finding.lineNumber}: Docusaurus magic comment "${finding.directive}" is unsupported by Nextra; use code-fence line metadata such as {1,3-5}.`,
+        );
+      }
     }
     if (validatedFenceLanguages.has(language)) {
-      verifyIndentation(codeLines, filePath, i + 2, errors);
+      verifyIndentation(codeLines, filePath, i + 2, result.indentationErrors);
     }
     i = closeIndex;
   }
@@ -298,10 +348,11 @@ const verifyAssetFile = async (filePath, errors) => {
 };
 
 const verifyIndentationRules = async (mdxFiles, assetFiles) => {
-  const errors = [];
-  for (const filePath of mdxFiles) await verifyMarkdownFile(filePath, errors);
-  for (const filePath of assetFiles) await verifyAssetFile(filePath, errors);
-  return errors;
+  /** @type {CodeBlockVerificationResult} */
+  const result = { indentationErrors: [], legacyHighlightErrors: [] };
+  for (const filePath of mdxFiles) await verifyMarkdownFile(filePath, result);
+  for (const filePath of assetFiles) await verifyAssetFile(filePath, result.indentationErrors);
+  return result;
 };
 
 // --------------------------------------------------------------------------
@@ -343,14 +394,19 @@ const main = async () => {
     return;
   }
 
-  const indentationErrors = await verifyIndentationRules(mdxFiles, assetFiles);
+  const codeBlockResult = await verifyIndentationRules(mdxFiles, assetFiles);
   const learningResult = await analyzeCourseLearning({ root: process.cwd() });
 
   let exitCode = 0;
-  if (indentationErrors.length > 0) {
+  if (codeBlockResult.indentationErrors.length > 0) {
     exitCode = 1;
     process.stdout.write("Code block indentation verification failed:\n");
-    for (const error of indentationErrors) process.stdout.write(`- ${error}\n`);
+    for (const error of codeBlockResult.indentationErrors) process.stdout.write(`- ${error}\n`);
+  }
+  if (codeBlockResult.legacyHighlightErrors.length > 0) {
+    exitCode = 1;
+    process.stdout.write("Legacy Docusaurus code highlighting verification failed:\n");
+    for (const error of codeBlockResult.legacyHighlightErrors) process.stdout.write(`- ${error}\n`);
   }
   const learningErrors = learningResult.issues.filter((issue) => issue.severity === "error");
   if (learningErrors.length > 0) {

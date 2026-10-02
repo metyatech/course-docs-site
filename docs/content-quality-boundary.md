@@ -20,6 +20,7 @@ The boundary consists of the `_meta.ts` file name and the `.shot.json` suffix. F
 
 - **Exercise structure rule** — `<Exercise>` must not use an unsupported `title` prop. An informative Markdown heading before an Exercise is recommended authoring guidance; heading presence is not a rendering requirement and is not enforced by this gate.
 - **Code-block / asset indentation** — fenced code in `html / css / js / jsx / json / ts / tsx / typescript` blocks and standalone `*.css / *.html / *.js / *.json / *.ts` assets under `content/` MUST use spaces and four-space indentation steps.
+- **Nextra code highlighting** — learner-facing fenced code MUST NOT use the Docusaurus `highlight-next-line`, `highlight-start`, or `highlight-end` magic comments. Use Nextra code-fence line metadata such as `{1,3-5}` instead. This check prevents syntax that lost its meaning after the framework migration from remaining as a silent regression.
 
 The four-space rule exists because learners read and copy the snippets. A consistent indentation width keeps the rendered output and the copy-paste result aligned across all courses. It is a **teaching-material** quality contract, not a code-quality contract.
 
