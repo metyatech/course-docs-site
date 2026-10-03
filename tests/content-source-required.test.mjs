@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import test from "node:test";
@@ -9,43 +10,21 @@ import { createRunDevTestEnv } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const envFiles = [".env", ".env.local", ".env.course", ".env.course.local"];
-
-const fileExists = async (targetPath) => {
-  try {
-    await fs.stat(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const backupFile = async (targetPath) => {
-  if (!(await fileExists(targetPath))) {
-    return null;
-  }
-  return fs.readFile(targetPath, "utf8");
-};
-
-const restoreFile = async (targetPath, contentsOrNull) => {
-  if (contentsOrNull === null) {
-    await fs.rm(targetPath, { force: true });
-    return;
-  }
-  await fs.writeFile(targetPath, contentsOrNull, "utf8");
-};
-
-const runNodeScript = (scriptPath, args = []) =>
+const runNodeScript = (scriptPath, envFileRoot, args = []) =>
   new Promise((resolve, reject) => {
+    const childEnv = createRunDevTestEnv({
+      label: `content-source-required-${path.basename(scriptPath, ".mjs")}`,
+      env: process.env,
+      overrides: {
+        COURSE_DOCS_ENV_FILE_DIR: envFileRoot,
+        COURSE_DOCS_SITE_DEV_INNER: "stub",
+      },
+    });
+    delete childEnv.COURSE_CONTENT_SOURCE;
+
     const child = spawn(process.execPath, [scriptPath, ...args], {
       cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: `content-source-required-${path.basename(scriptPath, ".mjs")}`,
-        env: process.env,
-        overrides: {
-          COURSE_DOCS_SITE_DEV_INNER: "stub",
-        },
-      }),
+      env: childEnv,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -63,6 +42,8 @@ const runNodeScript = (scriptPath, args = []) =>
         code: code ?? 1,
         stdout,
         stderr,
+        envFileRoot: childEnv.COURSE_DOCS_ENV_FILE_DIR,
+        hasCourseContentSource: Object.hasOwn(childEnv, "COURSE_CONTENT_SOURCE"),
       });
     });
   });
@@ -71,36 +52,21 @@ test(
   "sync and dev fail fast when COURSE_CONTENT_SOURCE is omitted",
   { timeout: 60_000 },
   async (t) => {
-    const backups = new Map();
-    for (const filename of envFiles) {
-      const targetPath = path.join(projectRoot, filename);
-      backups.set(targetPath, await backupFile(targetPath));
-      await fs.rm(targetPath, { force: true });
-    }
-
-    const originalCourseContentSource = process.env.COURSE_CONTENT_SOURCE;
-    delete process.env.COURSE_CONTENT_SOURCE;
-
-    t.after(async () => {
-      for (const [targetPath, contents] of backups.entries()) {
-        await restoreFile(targetPath, contents);
-      }
-
-      if (typeof originalCourseContentSource === "string") {
-        process.env.COURSE_CONTENT_SOURCE = originalCourseContentSource;
-      } else {
-        delete process.env.COURSE_CONTENT_SOURCE;
-      }
-    });
+    const envFileRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-source-required-env-"));
+    t.after(async () => fs.rm(envFileRoot, { recursive: true, force: true }));
 
     const expectedMessage = "COURSE_CONTENT_SOURCE is required.";
 
-    const syncResult = await runNodeScript("scripts/sync-course-content.mjs");
+    const syncResult = await runNodeScript("scripts/sync-course-content.mjs", envFileRoot);
     assert.notEqual(syncResult.code, 0);
+    assert.equal(syncResult.envFileRoot, envFileRoot);
+    assert.equal(syncResult.hasCourseContentSource, false);
     assert.match(`${syncResult.stdout}\n${syncResult.stderr}`, new RegExp(expectedMessage));
 
-    const devResult = await runNodeScript("scripts/run-dev.mjs", ["--port", "3060"]);
+    const devResult = await runNodeScript("scripts/run-dev.mjs", envFileRoot, ["--port", "3060"]);
     assert.notEqual(devResult.code, 0);
+    assert.equal(devResult.envFileRoot, envFileRoot);
+    assert.equal(devResult.hasCourseContentSource, false);
     assert.match(`${devResult.stdout}\n${devResult.stderr}`, new RegExp(expectedMessage));
   },
 );

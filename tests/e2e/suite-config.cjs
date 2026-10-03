@@ -1,13 +1,12 @@
 const fs = require("node:fs");
-const path = require("node:path");
 const { resolveCourseSuiteConfig } = require("./course-defaults.cjs");
 
-const suiteConfigPath = path.join(__dirname, ".suite-config.json");
+const suiteConfigPath = process.env.E2E_MATRIX_SUITE_CONFIG_FILE;
 const defaultSuiteConfig = resolveCourseSuiteConfig(process.env.COURSE_CONTENT_SOURCE);
 
 const readSuiteConfigFile = () => {
   try {
-    if (!fs.existsSync(suiteConfigPath)) {
+    if (!suiteConfigPath || !fs.existsSync(suiteConfigPath)) {
       return {};
     }
     const raw = fs.readFileSync(suiteConfigPath, "utf8");

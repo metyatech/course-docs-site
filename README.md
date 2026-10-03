@@ -544,7 +544,11 @@ npm run verify:precommit
 ```
 
 This is the command the Husky `pre-commit` hook runs. It executes
-`lint` + `test` + `npm audit` (all dependency scopes, zero known vulnerabilities).
+`lint` + `test` + the dependency audit gate. The gate runs `npm audit` across all dependency
+scopes on every run and requires zero unwaived advisories. It permits only a structured,
+machine-checked waiver when the official package registry has no fixed release. A waiver expires
+on its recorded date, and a newly published fix makes the gate fail so the dependency can be
+updated. The source of truth for active waivers is `security/npm-audit-waivers.json`.
 `npm test` runs the fast contract/unit subset via
 `test:fast`; it does not start the dev-server route tests, run the production
 build, execute `scripts/test-e2e-matrix.mjs`, or iterate the full course

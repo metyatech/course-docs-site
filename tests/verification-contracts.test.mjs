@@ -10,6 +10,7 @@ import {
   courses,
   parseCourseTimeoutMs,
   runCourse,
+  suiteConfigPath,
 } from "../scripts/test-e2e-matrix.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -201,7 +202,7 @@ test("format scripts and staged-file tasks have separate responsibilities", asyn
   assert.equal(pkg.scripts["format:check"], "prettier --check .");
   assert.equal(
     pkg.scripts["verify:precommit"],
-    "npm run platform:verify && npm run lint && npm test && npm audit",
+    "npm run platform:verify && npm run lint && npm test && npm run audit:dependencies",
   );
   assert.deepEqual(pkg["lint-staged"], {
     "**/*.{js,mjs,cjs,ts,tsx}": ["prettier --write", "eslint"],
@@ -303,6 +304,11 @@ test("matrix runner exposes default timeout and validates timeout overrides", ()
   );
 });
 
+test("matrix suite config is written to OS temporary storage", () => {
+  assert.equal(path.dirname(suiteConfigPath), os.tmpdir());
+  assert.match(path.basename(suiteConfigPath), /^course-docs-e2e-suite-[0-9a-f-]+\.json$/u);
+});
+
 test("matrix course failures remove suite config and run cleanup around the course", async () => {
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "course-docs-matrix-contract-"));
   const configPath = path.join(temporaryRoot, "tests", "e2e", ".suite-config.json");
@@ -348,6 +354,7 @@ test("matrix course failures remove suite config and run cleanup around the cour
     assert.ok(runCalls[0].timeoutMs <= 1234);
     assert.equal(runCalls[0].env.E2E_PORT, "42321");
     assert.equal(runCalls[0].env.COURSE_CONTENT_SOURCE, expectedDefaultSource);
+    assert.equal(runCalls[0].env.E2E_MATRIX_SUITE_CONFIG_FILE, configPath);
     assert.match(runCalls[0].label, new RegExp(expectedCourseName));
     assert.match(runCalls[0].label, /E2E_PORT=42321/);
     assert.match(runCalls[0].label, /timeout=1234 ms/);

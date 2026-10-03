@@ -11,9 +11,6 @@ import { createRunDevTestEnv, killProcessTree } from "./test-harness-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const envCourseLocalPath = path.join(projectRoot, ".env.course.local");
-const envCoursePath = path.join(projectRoot, ".env.course");
-
 const fileExists = async (p) => {
   try {
     await fs.stat(p);
@@ -21,21 +18,6 @@ const fileExists = async (p) => {
   } catch {
     return false;
   }
-};
-
-const backupFile = async (p) => {
-  if (!(await fileExists(p))) {
-    return null;
-  }
-  return fs.readFile(p, "utf8");
-};
-
-const restoreFile = async (p, contentsOrNull) => {
-  if (contentsOrNull === null) {
-    await fs.rm(p, { force: true });
-    return;
-  }
-  await fs.writeFile(p, contentsOrNull, "utf8");
 };
 
 const getFreePort = () =>
@@ -185,6 +167,32 @@ const safeRm = async (targetPath) => {
   await fs.rm(targetPath, { recursive: true, force: true });
 };
 
+const createCourseEnv = async (tempRoot, courseSource) => {
+  const envFileRoot = path.join(tempRoot, "env");
+  await fs.mkdir(envFileRoot, { recursive: true });
+  await fs.writeFile(path.join(envFileRoot, ".env.course"), "", "utf8");
+  const envCourseLocalPath = path.join(envFileRoot, ".env.course.local");
+  await fs.writeFile(
+    envCourseLocalPath,
+    `COURSE_CONTENT_SOURCE=${JSON.stringify(courseSource)}\n`,
+    "utf8",
+  );
+  return { envFileRoot, envCourseLocalPath };
+};
+
+const createDevSwitchEnv = ({ label, envFileRoot }) => {
+  const childEnv = createRunDevTestEnv({
+    label,
+    env: process.env,
+    overrides: {
+      COURSE_DOCS_ENV_FILE_DIR: envFileRoot,
+      COURSE_DOCS_SITE_DEV_INNER: "stub",
+    },
+  });
+  delete childEnv.COURSE_CONTENT_SOURCE;
+  return childEnv;
+};
+
 test(
   "dev server switches course content when env file changes",
   { timeout: 2 * 60_000 },
@@ -194,16 +202,12 @@ test(
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-dev-switch-"));
     const courseA = path.join(tempRoot, "course-a");
     const courseB = path.join(tempRoot, "course-b");
+    const { envFileRoot, envCourseLocalPath } = await createCourseEnv(tempRoot, courseA);
 
     await writeCourseRepo({ rootDir: courseA, courseName: "Course A", extraDocsFolder: "a-only" });
     await writeCourseRepo({ rootDir: courseB, courseName: "Course B", extraDocsFolder: "b-only" });
 
-    const envCourseBackup = await backupFile(envCoursePath);
-    const envCourseLocalBackup = await backupFile(envCourseLocalPath);
-
     t.after(async () => {
-      await restoreFile(envCourseLocalPath, envCourseLocalBackup);
-      await restoreFile(envCoursePath, envCourseBackup);
       await safeRm(path.join(projectRoot, "content"));
       await safeRm(path.join(projectRoot, "public"));
       await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
@@ -213,25 +217,11 @@ test(
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
-    // Keep secrets in `.env.local`. For switching content, use `.env.course.local`.
-    await fs.rm(envCoursePath, { force: true });
-    await fs.writeFile(
-      envCourseLocalPath,
-      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
-      "utf8",
-    );
-
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {
       detached: process.platform !== "win32",
       windowsHide: true,
       cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: "dev-switch-course-content",
-        env: process.env,
-        overrides: {
-          COURSE_DOCS_SITE_DEV_INNER: "stub",
-        },
-      }),
+      env: createDevSwitchEnv({ label: "dev-switch-course-content", envFileRoot }),
       stdio: "inherit",
     });
 
@@ -260,7 +250,7 @@ test(
       assert.equal(b.status, 404);
     }
 
-    // Switch to Course B by writing .env.course.local.
+    // Switch to Course B by writing the isolated .env.course.local.
     // This must trigger a restart + content resync.
     await fs.writeFile(
       envCourseLocalPath,
@@ -293,12 +283,10 @@ test(
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-dev-switch-port-"));
     const courseA = path.join(tempRoot, "course-a");
     const courseB = path.join(tempRoot, "course-b");
+    const { envFileRoot, envCourseLocalPath } = await createCourseEnv(tempRoot, courseA);
 
     await writeCourseRepo({ rootDir: courseA, courseName: "Course A", extraDocsFolder: "a-only" });
     await writeCourseRepo({ rootDir: courseB, courseName: "Course B", extraDocsFolder: "b-only" });
-
-    const envCourseBackup = await backupFile(envCoursePath);
-    const envCourseLocalBackup = await backupFile(envCourseLocalPath);
 
     // Try to force the default port busy (best-effort).
     let blocker = null;
@@ -321,8 +309,6 @@ test(
           // ignore
         }
       }
-      await restoreFile(envCourseLocalPath, envCourseLocalBackup);
-      await restoreFile(envCoursePath, envCourseBackup);
       await safeRm(path.join(projectRoot, "content"));
       await safeRm(path.join(projectRoot, "public"));
       await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
@@ -332,24 +318,11 @@ test(
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
-    await fs.rm(envCoursePath, { force: true });
-    await fs.writeFile(
-      envCourseLocalPath,
-      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
-      "utf8",
-    );
-
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs"], {
       detached: process.platform !== "win32",
       windowsHide: true,
       cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: "dev-switch-port-selection",
-        env: process.env,
-        overrides: {
-          COURSE_DOCS_SITE_DEV_INNER: "stub",
-        },
-      }),
+      env: createDevSwitchEnv({ label: "dev-switch-port-selection", envFileRoot }),
       stdio: "inherit",
     });
     t.after(async () => {
@@ -404,16 +377,12 @@ test(
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-dev-switch-rev-"));
     const courseA = path.join(tempRoot, "course-a");
     const courseB = path.join(tempRoot, "course-b");
+    const { envFileRoot, envCourseLocalPath } = await createCourseEnv(tempRoot, courseA);
 
     await writeCourseRepo({ rootDir: courseA, courseName: "Course A", extraDocsFolder: "a-only" });
     await writeCourseRepo({ rootDir: courseB, courseName: "Course B", extraDocsFolder: "b-only" });
 
-    const envCourseBackup = await backupFile(envCoursePath);
-    const envCourseLocalBackup = await backupFile(envCourseLocalPath);
-
     t.after(async () => {
-      await restoreFile(envCourseLocalPath, envCourseLocalBackup);
-      await restoreFile(envCoursePath, envCourseBackup);
       await safeRm(path.join(projectRoot, "content"));
       await safeRm(path.join(projectRoot, "public"));
       await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
@@ -423,24 +392,11 @@ test(
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
-    await fs.rm(envCoursePath, { force: true });
-    await fs.writeFile(
-      envCourseLocalPath,
-      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
-      "utf8",
-    );
-
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs"], {
       detached: process.platform !== "win32",
       windowsHide: true,
       cwd: projectRoot,
-      env: createRunDevTestEnv({
-        label: "dev-switch-revision",
-        env: process.env,
-        overrides: {
-          COURSE_DOCS_SITE_DEV_INNER: "stub",
-        },
-      }),
+      env: createDevSwitchEnv({ label: "dev-switch-revision", envFileRoot }),
       stdio: "inherit",
     });
     t.after(async () => {
@@ -495,15 +451,11 @@ test(
     const port = await getFreePort();
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "course-dev-watch-"));
     const courseA = path.join(tempRoot, "course-a");
+    const { envFileRoot } = await createCourseEnv(tempRoot, courseA);
 
     await writeCourseRepo({ rootDir: courseA, courseName: "Course A", extraDocsFolder: "a-only" });
 
-    const envCourseBackup = await backupFile(envCoursePath);
-    const envCourseLocalBackup = await backupFile(envCourseLocalPath);
-
     t.after(async () => {
-      await restoreFile(envCourseLocalPath, envCourseLocalBackup);
-      await restoreFile(envCoursePath, envCourseBackup);
       await safeRm(path.join(projectRoot, "content"));
       await safeRm(path.join(projectRoot, "public"));
       await fs.mkdir(path.join(projectRoot, "content"), { recursive: true });
@@ -513,20 +465,7 @@ test(
       await fs.rm(tempRoot, { recursive: true, force: true });
     });
 
-    await fs.rm(envCoursePath, { force: true });
-    await fs.writeFile(
-      envCourseLocalPath,
-      `COURSE_CONTENT_SOURCE=${JSON.stringify(courseA)}\n`,
-      "utf8",
-    );
-
-    const devEnv = createRunDevTestEnv({
-      label: "dev-watch-local-source",
-      env: process.env,
-      overrides: {
-        COURSE_DOCS_SITE_DEV_INNER: "stub",
-      },
-    });
+    const devEnv = createDevSwitchEnv({ label: "dev-watch-local-source", envFileRoot });
     const distDirPath = path.join(projectRoot, ...devEnv.COURSE_DOCS_NEXT_DIST_DIR.split("/"));
 
     const dev = spawn(process.execPath, ["scripts/run-dev.mjs", "--port", String(port)], {

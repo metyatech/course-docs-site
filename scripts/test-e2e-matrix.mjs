@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import dotenv from "dotenv";
 import { formatContentSource, parseContentSource } from "./content-source.mjs";
@@ -19,7 +21,7 @@ const { resolveCourseSuiteConfig } = require("../tests/e2e/course-defaults.cjs")
 const { representativeSites } = require("../tests/e2e/representative-sites.cjs");
 
 export const projectRoot = process.cwd();
-export const suiteConfigPath = path.join(projectRoot, "tests", "e2e", ".suite-config.json");
+export const suiteConfigPath = path.join(os.tmpdir(), `course-docs-e2e-suite-${randomUUID()}.json`);
 export const DEFAULT_COURSE_TIMEOUT_MS = 15 * 60 * 1000;
 const COURSE_TIMEOUT_ENV = "E2E_MATRIX_COURSE_TIMEOUT_MS";
 const CLEANUP_TIMEOUT_SECONDS = 30;
@@ -261,6 +263,7 @@ export const runCourse = async (
   const { env: sourceEnv, sourceLabel } = resolveCourseEnv(course, baseEnv, root);
   const env = { ...sourceEnv };
   env.E2E_PORT = String(await resolveMatrixE2ePort(env, course));
+  env.E2E_MATRIX_SUITE_CONFIG_FILE = configPath;
   env.COURSE_DOCS_NEXT_DIST_DIR = createIsolatedNextDistDir(`playwright-${course.name}`);
   const suiteConfig = resolveCourseSuiteConfig(env.COURSE_CONTENT_SOURCE);
   const label = `${course.name} (${sourceLabel}, E2E_PORT=${env.E2E_PORT}, timeout=${timeoutMs} ms)`;
