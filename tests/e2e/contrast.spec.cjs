@@ -109,6 +109,95 @@ async function runCodeContrastCheck(page, includeSelector) {
   return runAxeContrastCheck(page, includeSelector, undefined, NON_CONTENT_UI_EXCLUDES, false);
 }
 
+async function collectCodeHighlightVisibilityIssues(page, path, theme, includeSelector) {
+  return await page.evaluate(
+    ({ path, theme, includeSelector }) => {
+      const readColor = (value) => {
+        const match = value.match(/rgba?\(([^)]+)\)/);
+        if (!match) return null;
+        const parts = match[1].split(",").map((part) => Number(part.trim()));
+        return {
+          red: parts[0],
+          green: parts[1],
+          blue: parts[2],
+          alpha: parts.length > 3 ? parts[3] : 1,
+        };
+      };
+      const colorText = (color) =>
+        color ? `rgb(${color.red}, ${color.green}, ${color.blue})` : "unknown";
+      const isTransparent = (color) => !color || color.alpha === 0;
+      const sameColor = (first, second) =>
+        first &&
+        second &&
+        first.red === second.red &&
+        first.green === second.green &&
+        first.blue === second.blue;
+      const visibleBackground = (element) => {
+        for (
+          let current = element;
+          current instanceof HTMLElement;
+          current = current.parentElement
+        ) {
+          const color = readColor(window.getComputedStyle(current).backgroundColor);
+          if (!isTransparent(color)) return color;
+        }
+        return null;
+      };
+
+      const highlightedLines = [
+        ...document.querySelectorAll(`${includeSelector} > span[data-highlighted-line]`),
+      ];
+      const issues = [];
+
+      for (const line of highlightedLines) {
+        const code = line.closest("code.nextra-code");
+        const pre = line.closest("pre");
+        const normalLine = [...(code?.children ?? [])].find(
+          (child) => child instanceof HTMLElement && !child.hasAttribute("data-highlighted-line"),
+        );
+        const highlightBackground = readColor(window.getComputedStyle(line).backgroundColor);
+        const normalBackground = normalLine
+          ? visibleBackground(normalLine)
+          : visibleBackground(code);
+        const preBackground = visibleBackground(pre);
+        const boxShadow = window.getComputedStyle(line).boxShadow;
+        const hasLeftCue =
+          boxShadow !== "none" &&
+          boxShadow.includes("inset") &&
+          /4px\s+0(?:px)?\b/u.test(boxShadow);
+
+        if (isTransparent(highlightBackground) || highlightBackground.alpha < 1) {
+          issues.push({
+            path,
+            theme,
+            reason: "highlight background is transparent or translucent",
+          });
+        } else if (
+          sameColor(highlightBackground, normalBackground) ||
+          sameColor(highlightBackground, preBackground)
+        ) {
+          issues.push({
+            path,
+            theme,
+            reason: `highlight background ${colorText(highlightBackground)} matches ordinary code background`,
+          });
+        }
+
+        if (!hasLeftCue) {
+          issues.push({
+            path,
+            theme,
+            reason: `highlight line has no 4px inset left cue (${boxShadow})`,
+          });
+        }
+      }
+
+      return issues;
+    },
+    { path, theme, includeSelector },
+  );
+}
+
 async function collectBoundaryIssues(page, path, theme, selector = BOUNDARY_SELECTOR) {
   const issues = await page.evaluate(
     ({
@@ -681,5 +770,58 @@ if (exerciseTargetPaths.length === 0) {
         });
       }
     }
+
+    test.describe("Code highlight visibility", () => {
+      for (const theme of THEMES) {
+        for (const path of exerciseTargetPaths) {
+          test(`highlighted lines are distinct from normal code on ${path} (${theme} mode)`, async ({
+            browser,
+          }) => {
+            const context = await browser.newContext({ baseURL: BASE_URL, colorScheme: theme });
+            try {
+              const page = await context.newPage();
+              try {
+                const loaded = await setThemeAndOpen(page, path, theme);
+                test.skip(!loaded, `Unable to open ${path}`);
+
+                const codeSelector = ".rensyuBlock pre code.nextra-code";
+                const normalLineCount = await page
+                  .locator(`${codeSelector} > span:not([data-highlighted-line])`)
+                  .count();
+                const highlightedLineCount = await page
+                  .locator(`${codeSelector} > span[data-highlighted-line]`)
+                  .count();
+
+                if (
+                  resolveCourseKey(process.env.COURSE_CONTENT_SOURCE) ===
+                    "javascript-course-docs" &&
+                  path === "/docs/basics/dom-css/"
+                ) {
+                  expect(normalLineCount, `${path} must contain normal code lines`).toBeGreaterThan(
+                    0,
+                  );
+                  expect(
+                    highlightedLineCount,
+                    `${path} must contain highlighted code lines`,
+                  ).toBeGreaterThan(0);
+                }
+
+                const issues = await collectCodeHighlightVisibilityIssues(
+                  page,
+                  path,
+                  theme,
+                  codeSelector,
+                );
+                expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
+              } finally {
+                await page.close();
+              }
+            } finally {
+              await context.close();
+            }
+          });
+        }
+      }
+    });
   });
 }

@@ -53,7 +53,7 @@ const assertContrast = ({ label, foreground, background, minimum }) => {
   );
 };
 
-test('highlighted code uses high-contrast themes and an AA-compliant light highlight', async () => {
+test('highlighted code has visible light and dark cues with readable syntax tokens', async () => {
   const [mdxOptions, css] = await Promise.all([
     fs.readFile(mdxOptionsPath, 'utf8'),
     fs.readFile(cssPath, 'utf8'),
@@ -65,29 +65,76 @@ test('highlighted code uses high-contrast themes and an AA-compliant light highl
     /rehypePrettyCodeOptions: \{ theme: \{ light: ['"]github-light-high-contrast['"], dark: ['"]github-dark['"],? \},? \}/,
   );
 
-  const highlightedLineRule = extractRuleBody(
+  const lightHighlightRule = extractRuleBody(
     css,
     ':root:not(.dark) pre code.nextra-code > span[data-highlighted-line]',
   );
-  const background = '#f2f7fd';
-  const fallbackColor = '#1f2937';
+  const darkHighlightRule = extractRuleBody(
+    css,
+    '.dark pre code.nextra-code > span[data-highlighted-line]',
+  );
+  const lightBackground = '#eaf5ff';
+  const darkBackground = '#0f2744';
+  const preDarkBackground = '#1e293b';
 
-  assert.match(highlightedLineRule, /background-color\s*:\s*#f2f7fd\s*!important\s*;/);
-  assert.match(highlightedLineRule, /color\s*:\s*#1f2937\s*!important\s*;/);
-  assert.match(highlightedLineRule, /box-shadow\s*:\s*inset 3px 0 #2563eb\s*!important\s*;/);
+  assert.match(lightHighlightRule, /background-color\s*:\s*#eaf5ff\s*!important\s*;/);
+  assert.match(lightHighlightRule, /color\s*:\s*#1f2937\s*!important\s*;/);
+  assert.match(lightHighlightRule, /box-shadow\s*:\s*inset 4px 0 #2563eb\s*!important\s*;/);
+  assert.match(darkHighlightRule, /background-color\s*:\s*#0f2744\s*!important\s*;/);
+  assert.match(darkHighlightRule, /box-shadow\s*:\s*inset 4px 0 #60a5fa\s*!important\s*;/);
 
   [
     { label: 'HTML comment token', foreground: '#66707b' },
     { label: 'HTML tag token', foreground: '#024c1a' },
-    { label: 'Plaintext fallback', foreground: fallbackColor },
+    { label: 'Plaintext fallback', foreground: '#1f2937' },
   ].forEach(({ label, foreground }) =>
     assertContrast({
       label,
       foreground,
-      background,
+      background: lightBackground,
       minimum: 4.5,
     }),
   );
+
+  [
+    { label: 'HTML comment token', foreground: '#8b949e' },
+    { label: 'HTML tag token', foreground: '#7ee787' },
+    { label: 'Plaintext token', foreground: '#e6edf3' },
+    { label: 'Blue syntax token', foreground: '#79c0ff' },
+    { label: 'Orange syntax token', foreground: '#ffa657' },
+  ].forEach(({ label, foreground }) =>
+    assertContrast({
+      label,
+      foreground,
+      background: darkBackground,
+      minimum: 4.5,
+    }),
+  );
+
+  assertContrast({
+    label: 'Light left accent against ordinary code background',
+    foreground: '#2563eb',
+    background: '#ffffff',
+    minimum: 3,
+  });
+  assertContrast({
+    label: 'Light left accent against highlighted background',
+    foreground: '#2563eb',
+    background: lightBackground,
+    minimum: 3,
+  });
+  assertContrast({
+    label: 'Dark left accent against ordinary Exercise code background',
+    foreground: '#60a5fa',
+    background: preDarkBackground,
+    minimum: 3,
+  });
+  assertContrast({
+    label: 'Dark left accent against highlighted background',
+    foreground: '#60a5fa',
+    background: darkBackground,
+    minimum: 3,
+  });
 });
 
 test('Exercise dark-mode colors meet WCAG contrast thresholds', async () => {

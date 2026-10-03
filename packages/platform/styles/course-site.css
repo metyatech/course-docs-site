@@ -8,9 +8,14 @@
 }
 
 :root:not(.dark) pre code.nextra-code > span[data-highlighted-line] {
-  background-color: #f2f7fd !important;
+  background-color: #eaf5ff !important;
   color: #1f2937 !important;
-  box-shadow: inset 3px 0 #2563eb !important;
+  box-shadow: inset 4px 0 #2563eb !important;
+}
+
+.dark pre code.nextra-code > span[data-highlighted-line] {
+  background-color: #0f2744 !important;
+  box-shadow: inset 4px 0 #60a5fa !important;
 }
 
 /* Add spacing around images (excluding navbar logo/icon) */
