@@ -108,8 +108,11 @@ test("dependency versions and patch installation stay pinned", async () => {
   assert.equal(pkg.scripts.postinstall, "patch-package --error-on-fail && npm run platform:build");
 });
 
-test("dependency audit waiver is structured, singular, and expires on the approved date", async () => {
-  const waiver = validateWaivers(await readWaiverDefinition());
+test("dependency audit permits zero waivers or one approved structured waiver", async () => {
+  assert.equal(validateWaivers({ schemaVersion: 1, waivers: [] }), null);
+
+  const definition = await readWaiverDefinition();
+  const waiver = validateWaivers(definition);
   assert.deepEqual(waiver, {
     advisorySource: 1240992,
     package: "braces",
@@ -119,6 +122,46 @@ test("dependency audit waiver is structured, singular, and expires on the approv
     expiresOn: "2026-11-03",
     reason: "no-official-fixed-release",
   });
+
+  assert.throws(
+    () => validateWaivers({ schemaVersion: 1, waivers: [waiver, waiver] }),
+    /At most one/u,
+  );
+  assert.throws(
+    () => validateWaivers({ schemaVersion: 1, waivers: [{ ...waiver, package: "other" }] }),
+    /does not match/u,
+  );
+  assert.throws(
+    () => validateWaivers({ schemaVersion: 1, waivers: [{ ...waiver, note: "unknown" }] }),
+    /unknown field/u,
+  );
+  assert.throws(
+    () => validateWaivers({ schemaVersion: 1, waivers: "invalid" }),
+    /advisory waiver/u,
+  );
+});
+
+test("dependency audit passes a clean report only when there are no waivers", async () => {
+  const result = await evaluate(auditReport({}), { waivers: { schemaVersion: 1, waivers: [] } });
+  assert.equal(result.ok, true, result.reason);
+  assert.deepEqual(result.rootSources, []);
+  assert.equal(result.unwaivedAdvisories, 0);
+  assert.equal(result.waiver, null);
+});
+
+test("dependency audit rejects a stale waiver when the report is clean", async () => {
+  const result = await evaluate(auditReport({}));
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /waiver.*no longer needed/iu);
+  assert.equal(result.unwaivedAdvisories, 0);
+});
+
+test("dependency audit rejects malformed waiver definitions even for a clean report", async () => {
+  const result = await evaluate(auditReport({}), {
+    waivers: { schemaVersion: 1, waivers: [{ unknownWaiver: true }] },
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /waiver/i);
 });
 
 test("dependency audit permits multiple propagated vulnerabilities with one braces root", async () => {
@@ -126,6 +169,14 @@ test("dependency audit permits multiple propagated vulnerabilities with one brac
   assert.equal(result.ok, true, result.reason);
   assert.deepEqual(result.rootSources, [1240992]);
   assert.equal(result.unwaivedAdvisories, 0);
+});
+
+test("dependency audit rejects the braces advisory when no waiver is configured", async () => {
+  const result = await evaluate(propagatedBracesReport(), {
+    waivers: { schemaVersion: 1, waivers: [] },
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /no approved waiver/u);
 });
 
 test("dependency audit rejects another independent root advisory", async () => {

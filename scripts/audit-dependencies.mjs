@@ -27,15 +27,32 @@ const validDate = (value) => {
 };
 
 export const validateWaivers = (definition) => {
-  if (!isRecord(definition) || definition.schemaVersion !== 1) {
+  if (
+    !isRecord(definition) ||
+    definition.schemaVersion !== 1 ||
+    Object.keys(definition).some((key) => !["schemaVersion", "waivers"].includes(key))
+  ) {
     throw new Error("Waiver definition must use schemaVersion 1.");
   }
-  if (!Array.isArray(definition.waivers) || definition.waivers.length !== 1) {
-    throw new Error("Exactly one structured advisory waiver is required.");
+  if (!Array.isArray(definition.waivers) || definition.waivers.length > 1) {
+    throw new Error("At most one structured advisory waiver is allowed.");
   }
+  if (definition.waivers.length === 0) return null;
 
   const [waiver] = definition.waivers;
   if (!isRecord(waiver)) throw new Error("Waiver entry must be an object.");
+  const allowedKeys = new Set([
+    "advisorySource",
+    "package",
+    "installedVersion",
+    "ghsa",
+    "cve",
+    "expiresOn",
+    "reason",
+  ]);
+  if (Object.keys(waiver).some((key) => !allowedKeys.has(key))) {
+    throw new Error("Waiver entry contains an unknown field.");
+  }
   for (const [key, expected] of Object.entries({
     advisorySource: EXPECTED_ADVISORY.source,
     package: EXPECTED_ADVISORY.package,
@@ -155,11 +172,22 @@ export const evaluateAuditReport = (
 ) => {
   try {
     const vulnerabilities = validateAuditReport(report);
+    const waiver = validateWaivers(waivers);
     if (Object.keys(vulnerabilities).length === 0) {
+      if (waiver) {
+        return {
+          ok: false,
+          rootSources: [],
+          unwaivedAdvisories: 0,
+          waiver: null,
+          reason: "audit waiver is no longer needed; remove it",
+        };
+      }
       return { ok: true, rootSources: [], unwaivedAdvisories: 0, waiver: null };
     }
 
-    const waiver = validateWaivers(waivers);
+    if (!waiver)
+      throw new Error("npm audit reported vulnerabilities but no approved waiver is configured.");
     const { rootSources, advisoryRecords } = collectRootAdvisories(vulnerabilities);
     if (rootSources.length !== 1 || rootSources[0] !== EXPECTED_ADVISORY.source) {
       throw new Error(`Unexpected root advisory sources: ${rootSources.join(", ") || "none"}.`);
