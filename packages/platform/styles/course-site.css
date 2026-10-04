@@ -14,7 +14,7 @@
 }
 
 .dark pre code.nextra-code > span[data-highlighted-line] {
-  background-color: #0f2744 !important;
+  background-color: #0a2c50 !important;
   box-shadow: inset 4px 0 #60a5fa !important;
 }
 
@@ -71,7 +71,7 @@
     em,
     span,
     div
-  ):not(.monaco-editor):not(.monaco-editor *) {
+  ):not(.monaco-editor):not(.monaco-editor *):not(.nextra-code):not(.nextra-code *) {
   color: var(--course-exercise-dark-text) !important;
 }
 

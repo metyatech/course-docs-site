@@ -132,6 +132,40 @@ async function collectCodeHighlightVisibilityIssues(page, path, theme, includeSe
         first.red === second.red &&
         first.green === second.green &&
         first.blue === second.blue;
+      const toLinear = (channel) => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      };
+      const toOklab = (color) => {
+        const red = toLinear(color.red);
+        const green = toLinear(color.green);
+        const blue = toLinear(color.blue);
+        const lightness = Math.cbrt(
+          0.4122214708 * red + 0.5363325363 * green + 0.0514459929 * blue,
+        );
+        const greenAxis = Math.cbrt(
+          0.2119034982 * red + 0.6806995451 * green + 0.1073969566 * blue,
+        );
+        const blueAxis = Math.cbrt(0.0883024619 * red + 0.2817188376 * green + 0.6299787005 * blue);
+        return [
+          0.2104542553 * lightness + 0.793617785 * greenAxis - 0.0040720468 * blueAxis,
+          1.9779984951 * lightness - 2.428592205 * greenAxis + 0.4505937099 * blueAxis,
+          0.0259040371 * lightness + 0.7827717662 * greenAxis - 0.808675766 * blueAxis,
+        ];
+      };
+      const perceptualDistance = (first, second) => {
+        const firstLab = toOklab(first);
+        const secondLab = toOklab(second);
+        return Math.hypot(...firstLab.map((channel, index) => channel - secondLab[index]));
+      };
+      const contrastRatio = (first, second) => {
+        const luminance = (color) =>
+          0.2126 * toLinear(color.red) +
+          0.7152 * toLinear(color.green) +
+          0.0722 * toLinear(color.blue);
+        const [lighter, darker] = [luminance(first), luminance(second)].sort((a, b) => b - a);
+        return (lighter + 0.05) / (darker + 0.05);
+      };
       const visibleBackground = (element) => {
         for (
           let current = element;
@@ -160,6 +194,10 @@ async function collectCodeHighlightVisibilityIssues(page, path, theme, includeSe
           ? visibleBackground(normalLine)
           : visibleBackground(code);
         const preBackground = visibleBackground(pre);
+        const backgroundDistance =
+          highlightBackground && normalBackground
+            ? perceptualDistance(highlightBackground, normalBackground)
+            : 0;
         const boxShadow = window.getComputedStyle(line).boxShadow;
         const hasLeftCue =
           boxShadow !== "none" &&
@@ -181,6 +219,15 @@ async function collectCodeHighlightVisibilityIssues(page, path, theme, includeSe
             theme,
             reason: `highlight background ${colorText(highlightBackground)} matches ordinary code background`,
           });
+        } else if (backgroundDistance < 0.035) {
+          // Repo-specific visibility contract: the intended light/dark fills measure >= 0.039
+          // in OKLab, while the previous dark fill measured 0.027. This rejects near-identical
+          // fills without treating background distinction as a WCAG contrast requirement.
+          issues.push({
+            path,
+            theme,
+            reason: `highlight background is too close to ordinary code background (OKLab Δ ${backgroundDistance.toFixed(3)})`,
+          });
         }
 
         if (!hasLeftCue) {
@@ -193,6 +240,119 @@ async function collectCodeHighlightVisibilityIssues(page, path, theme, includeSe
       }
 
       return issues;
+    },
+    { path, theme, includeSelector },
+  );
+}
+
+async function collectShikiHighlightTokenIssues(page, path, theme, includeSelector) {
+  return await page.evaluate(
+    ({ path, theme, includeSelector }) => {
+      const issues = [];
+      const colorProbe = document.createElement("span");
+      document.body.append(colorProbe);
+
+      const normalizeColor = (value) => {
+        colorProbe.style.color = "";
+        colorProbe.style.color = value;
+        if (!colorProbe.style.color) return null;
+        return window.getComputedStyle(colorProbe).color;
+      };
+      const parseColor = (value) => {
+        const match = value?.match(/rgba?\(([^)]+)\)/u);
+        if (!match) return null;
+        const channels = match[1]
+          .split(/[, ]+|\s+\/\s+/u)
+          .filter(Boolean)
+          .map(Number);
+        if (channels.length < 3 || channels.slice(0, 3).some(Number.isNaN)) return null;
+        return { red: channels[0], green: channels[1], blue: channels[2] };
+      };
+      const linearize = (channel) => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      };
+      const luminance = (color) =>
+        0.2126 * linearize(color.red) +
+        0.7152 * linearize(color.green) +
+        0.0722 * linearize(color.blue);
+      const contrastRatio = (foreground, background) => {
+        const [lighter, darker] = [luminance(foreground), luminance(background)].sort(
+          (a, b) => b - a,
+        );
+        return (lighter + 0.05) / (darker + 0.05);
+      };
+      const shikiProperty = theme === "dark" ? "--shiki-dark" : "--shiki-light";
+      const lines = [
+        ...document.querySelectorAll(`${includeSelector} > span[data-highlighted-line]`),
+      ];
+      const seenColors = new Set();
+      const contrastRatios = [];
+      let tokenCount = 0;
+
+      for (const line of lines) {
+        const background = parseColor(window.getComputedStyle(line).backgroundColor);
+        for (const token of line.querySelectorAll("span")) {
+          const declaredColor = window
+            .getComputedStyle(token)
+            .getPropertyValue(shikiProperty)
+            .trim();
+          if (!declaredColor) continue;
+          tokenCount += 1;
+          const expectedColor = normalizeColor(declaredColor);
+          const computedColor = window.getComputedStyle(token).color;
+          const tokenLabel = `${token.tagName.toLowerCase()}${token.className ? `.${String(token.className).trim().replace(/\s+/gu, ".")}` : ""}`;
+          const expected = parseColor(expectedColor);
+          const computed = parseColor(computedColor);
+          if (!expectedColor || expectedColor !== computedColor) {
+            issues.push({
+              path,
+              theme,
+              token: tokenLabel,
+              reason: `${shikiProperty} ${declaredColor} normalizes to ${expectedColor}; computed color is ${computedColor}`,
+            });
+            continue;
+          }
+          seenColors.add(expectedColor);
+          if (!expected || !background) {
+            issues.push({
+              path,
+              theme,
+              token: tokenLabel,
+              reason: "unable to parse token or highlight color",
+            });
+            continue;
+          }
+          const ratio = contrastRatio(expected, background);
+          contrastRatios.push(ratio);
+          if (ratio < 4.5) {
+            issues.push({
+              path,
+              theme,
+              token: tokenLabel,
+              sample: token.textContent.trim().slice(0, 48),
+              reason: `${shikiProperty} ${declaredColor} has ${ratio.toFixed(2)}:1 contrast against ${window.getComputedStyle(line).backgroundColor}`,
+            });
+          }
+        }
+      }
+
+      colorProbe.remove();
+      if (tokenCount === 0) {
+        issues.push({ path, theme, reason: `no highlighted tokens expose ${shikiProperty}` });
+      } else if (seenColors.size < 2) {
+        issues.push({
+          path,
+          theme,
+          reason: `expected multiple Shiki syntax colors, found ${seenColors.size}`,
+        });
+      }
+      return {
+        issues,
+        tokenCount,
+        uniqueShikiColors: seenColors.size,
+        minimumContrast: contrastRatios.length ? Math.min(...contrastRatios) : null,
+      };
     },
     { path, theme, includeSelector },
   );
@@ -813,6 +973,42 @@ if (exerciseTargetPaths.length === 0) {
                   codeSelector,
                 );
                 expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
+              } finally {
+                await page.close();
+              }
+            } finally {
+              await context.close();
+            }
+          });
+        }
+      }
+
+      if (
+        resolveCourseKey(process.env.COURSE_CONTENT_SOURCE) === "javascript-course-docs" &&
+        exerciseTargetPaths.includes("/docs/basics/dom-css/")
+      ) {
+        for (const theme of THEMES) {
+          test(`highlighted Shiki colors are preserved with AA contrast (${theme} mode)`, async ({
+            browser,
+          }) => {
+            const path = "/docs/basics/dom-css/";
+            const context = await browser.newContext({ baseURL: BASE_URL, colorScheme: theme });
+            try {
+              const page = await context.newPage();
+              try {
+                const loaded = await setThemeAndOpen(page, path, theme);
+                test.skip(!loaded, `Unable to open ${path}`);
+
+                const tokenResult = await collectShikiHighlightTokenIssues(
+                  page,
+                  path,
+                  theme,
+                  ".rensyuBlock pre code.nextra-code",
+                );
+                expect(tokenResult.issues, JSON.stringify(tokenResult.issues, null, 2)).toEqual([]);
+                expect(tokenResult.tokenCount).toBeGreaterThan(0);
+                expect(tokenResult.uniqueShikiColors).toBeGreaterThanOrEqual(2);
+                expect(tokenResult.minimumContrast).toBeGreaterThanOrEqual(4.5);
               } finally {
                 await page.close();
               }

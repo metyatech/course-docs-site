@@ -5,7 +5,9 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const siteRoot = path.resolve(projectRoot, '..', '..');
 const cssPath = path.join(projectRoot, 'styles', 'course-site.css');
+const accessibilityOverridesPath = path.join(siteRoot, 'src', 'app', 'accessibility-overrides.css');
 const mdxOptionsPath = path.join(projectRoot, 'src', 'next', 'course-mdx-options.ts');
 
 const extractRuleBody = (source, selector) => {
@@ -62,7 +64,7 @@ test('highlighted code has visible light and dark cues with readable syntax toke
 
   assert.match(
     compactMdxOptions,
-    /rehypePrettyCodeOptions: \{ theme: \{ light: ['"]github-light-high-contrast['"], dark: ['"]github-dark['"],? \},? \}/,
+    /rehypePrettyCodeOptions: \{ theme: \{ light: ['"]github-light-high-contrast['"], dark: ['"]github-dark-high-contrast['"],? \},? \}/,
   );
 
   const lightHighlightRule = extractRuleBody(
@@ -74,13 +76,13 @@ test('highlighted code has visible light and dark cues with readable syntax toke
     '.dark pre code.nextra-code > span[data-highlighted-line]',
   );
   const lightBackground = '#eaf5ff';
-  const darkBackground = '#0f2744';
+  const darkBackground = '#0a2c50';
   const preDarkBackground = '#1e293b';
 
   assert.match(lightHighlightRule, /background-color\s*:\s*#eaf5ff\s*!important\s*;/);
   assert.match(lightHighlightRule, /color\s*:\s*#1f2937\s*!important\s*;/);
   assert.match(lightHighlightRule, /box-shadow\s*:\s*inset 4px 0 #2563eb\s*!important\s*;/);
-  assert.match(darkHighlightRule, /background-color\s*:\s*#0f2744\s*!important\s*;/);
+  assert.match(darkHighlightRule, /background-color\s*:\s*#0a2c50\s*!important\s*;/);
   assert.match(darkHighlightRule, /box-shadow\s*:\s*inset 4px 0 #60a5fa\s*!important\s*;/);
 
   [
@@ -97,11 +99,10 @@ test('highlighted code has visible light and dark cues with readable syntax toke
   );
 
   [
-    { label: 'HTML comment token', foreground: '#8b949e' },
-    { label: 'HTML tag token', foreground: '#7ee787' },
-    { label: 'Plaintext token', foreground: '#e6edf3' },
-    { label: 'Blue syntax token', foreground: '#79c0ff' },
-    { label: 'Orange syntax token', foreground: '#ffa657' },
+    { label: 'HTML comment token', foreground: '#bdc4cc' },
+    { label: 'HTML tag token', foreground: '#72f088' },
+    { label: 'HTML attribute token', foreground: '#dbb7ff' },
+    { label: 'HTML value token', foreground: '#91cbff' },
   ].forEach(({ label, foreground }) =>
     assertContrast({
       label,
@@ -176,12 +177,19 @@ test('Exercise dark-mode colors meet WCAG contrast thresholds', async () => {
 });
 
 test('Exercise dark-mode CSS covers readable text, solutions, blanks, and focus states', async () => {
-  const css = await fs.readFile(cssPath, 'utf8');
+  const [css, accessibilityOverrides] = await Promise.all([
+    fs.readFile(cssPath, 'utf8'),
+    fs.readFile(accessibilityOverridesPath, 'utf8'),
+  ]);
   const compactCss = css.replace(/\s+/g, ' ').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')');
+  const compactAccessibilityOverrides = accessibilityOverrides
+    .replace(/\s+/g, ' ')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')');
 
   assert.match(
     compactCss,
-    /\.dark \.rensyuBlock :where\(\.rensyuNaiyou, \.rensyuKaitou, p, li, dd, dt, h1, h2, h3, h4, h5, h6, strong, em, span, div\):not\(\.monaco-editor\):not\(\.monaco-editor \*\)/,
+    /\.dark \.rensyuBlock :where\(\.rensyuNaiyou, \.rensyuKaitou, p, li, dd, dt, h1, h2, h3, h4, h5, h6, strong, em, span, div\):not\(\.monaco-editor\):not\(\.monaco-editor \*\):not\(\.nextra-code\):not\(\.nextra-code \*\)/,
   );
   assert.doesNotMatch(
     compactCss,
@@ -199,4 +207,16 @@ test('Exercise dark-mode CSS covers readable text, solutions, blanks, and focus 
     /\.dark \.rensyuBlock :where\(input, textarea, select, summary, \.rensyuBlank\):focus-visible/,
   );
   assert.match(compactCss, /\.dark \.rensyuBlock :where\(hr, table, th, td\)/);
+  assert.match(
+    compactAccessibilityOverrides,
+    /\.dark \.rensyuBlock :where\(pre code, pre code span\):not\(\.monaco-editor \*\):not\(\.nextra-code\):not\(\.nextra-code \*\)/,
+  );
+  assert.match(
+    compactAccessibilityOverrides,
+    /\.dark \.rensyuBlock \.rensyuNaiyou :where\(p, li, dd, dt, ul, ol, span, em, strong, b, i\):not\(\.monaco-editor \*\):not\(\.nextra-code\):not\(\.nextra-code \*\)/,
+  );
+  assert.match(
+    compactAccessibilityOverrides,
+    /\.dark \.rensyuBlock \.rensyuKaitouNaiyou :where\(p, li, dd, dt, ul, ol, span, em, strong, b, i\):not\(\.monaco-editor \*\):not\(\.nextra-code\):not\(\.nextra-code \*\)/,
+  );
 });

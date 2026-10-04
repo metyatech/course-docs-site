@@ -140,11 +140,15 @@
 .dark
   .rensyuBlock
   .rensyuNaiyou
-  :where(p, li, dd, dt, ul, ol, span, em, strong, b, i):not(.monaco-editor *),
+  :where(p, li, dd, dt, ul, ol, span, em, strong, b, i):not(.monaco-editor *):not(.nextra-code):not(
+    .nextra-code *
+  ),
 .dark
   .rensyuBlock
   .rensyuKaitouNaiyou
-  :where(p, li, dd, dt, ul, ol, span, em, strong, b, i):not(.monaco-editor *) {
+  :where(p, li, dd, dt, ul, ol, span, em, strong, b, i):not(.monaco-editor *):not(.nextra-code):not(
+    .nextra-code *
+  ) {
   color: #f8fafc !important;
 }
 
@@ -266,7 +270,9 @@
   color: #60a5fa !important;
 }
 
-.dark .rensyuBlock :where(pre code, pre code span):not(.monaco-editor *) {
+.dark
+  .rensyuBlock
+  :where(pre code, pre code span):not(.monaco-editor *):not(.nextra-code):not(.nextra-code *) {
   color: #f8fafc !important;
   background-color: transparent !important;
   border-color: transparent !important;

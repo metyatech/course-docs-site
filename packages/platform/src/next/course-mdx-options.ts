@@ -23,7 +23,7 @@ export const courseMdxOptions = {
   rehypePrettyCodeOptions: {
     theme: {
       light: 'github-light-high-contrast',
-      dark: 'github-dark',
+      dark: 'github-dark-high-contrast',
     },
   },
 };
