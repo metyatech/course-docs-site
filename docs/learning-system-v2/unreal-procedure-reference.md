@@ -83,25 +83,25 @@ mastered.
 
 ## Reference instructional flow
 
-| Stage | Shared learner experience | Main purpose / Evidence | Adaptation |
-| --- | --- | --- | --- |
-| Goal preview | Show the desired jump-pad behavior, not the finished graph. | Orientation. | None required. |
-| Baseline test | Place or use the pad and confirm it does not launch yet. | Establish initial state; causal baseline. | Recovery for placement/navigation only. |
-| Collision inspection | Select the Collision and see its detection region. | Ground the event source in a visible object. | Screenshot cue when needed. |
-| Event model | Explain that entering the Collision can trigger a begin-overlap event. | `ue-overlap-other-actor-meaning` foundation. | Extra visual explanation if needed. |
-| Guided event creation | Demonstrate the UI path for adding the first overlap event; learner performs it. | Assisted procedure Evidence. | Full screenshot sequence for novices. |
-| Result check | Verify the event node exists for the intended Collision. | Outcome Evidence for the guided step. | Recovery if wrong component/event. |
-| Other Actor reasoning | Identify what object should be checked when something enters the Collision. | Concept Evidence before wiring. | Contrast player versus unrelated actor. |
-| Guided Cast | Add `Cast To Character` from `Other Actor`. | Procedure + data-flow Evidence. | Less UI detail if pin-drag/search mechanic is already known. |
-| Launch target reasoning | Determine what should be launched after successful cast. | Target/data relationship. | Worked visual if needed. |
-| Faded node creation | Add `Launch Character` from `As Character` with less click-by-click support than the first node. | Procedural fading. | Restore detailed screenshots if learner stalls. |
-| Vertical parameter | Introduce or retrieve X/Y/Z relation, then set Z launch value. | `ue-launch-velocity-z-relation`. | Avoid testing untaught coordinate knowledge as if already known. |
-| Compile | Compile and inspect status. | Verification procedure. | Diagnostic recovery on compile failure. |
-| Predict | Before play test, predict what should happen on entering Collision. | Causal integration. | None normally. |
-| Play test | Enter the pad and observe launch. | Outcome + verification Evidence. | Recovery if behavior fails. |
-| Independent variation | Change launch strength and predict/observe resulting jump height. | Generalization of Z/value relation. | Same-Unit enrichment. |
-| Diagnostic variant | Present a realistic broken connection/value and ask learner to localize, repair, and retest. | Debugging process Evidence. | Stronger checks only after learner diagnosis attempt. |
-| Rejoin | Teacher releases the next common activity. | Classroom synchronization. | Unmet Evidence remains for later remediation. |
+| Stage                   | Shared learner experience                                                                        | Main purpose / Evidence                      | Adaptation                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------- | ---------------------------------------------------------------- |
+| Goal preview            | Show the desired jump-pad behavior, not the finished graph.                                      | Orientation.                                 | None required.                                                   |
+| Baseline test           | Place or use the pad and confirm it does not launch yet.                                         | Establish initial state; causal baseline.    | Recovery for placement/navigation only.                          |
+| Collision inspection    | Select the Collision and see its detection region.                                               | Ground the event source in a visible object. | Screenshot cue when needed.                                      |
+| Event model             | Explain that entering the Collision can trigger a begin-overlap event.                           | `ue-overlap-other-actor-meaning` foundation. | Extra visual explanation if needed.                              |
+| Guided event creation   | Demonstrate the UI path for adding the first overlap event; learner performs it.                 | Assisted procedure Evidence.                 | Full screenshot sequence for novices.                            |
+| Result check            | Verify the event node exists for the intended Collision.                                         | Outcome Evidence for the guided step.        | Recovery if wrong component/event.                               |
+| Other Actor reasoning   | Identify what object should be checked when something enters the Collision.                      | Concept Evidence before wiring.              | Contrast player versus unrelated actor.                          |
+| Guided Cast             | Add `Cast To Character` from `Other Actor`.                                                      | Procedure + data-flow Evidence.              | Less UI detail if pin-drag/search mechanic is already known.     |
+| Launch target reasoning | Determine what should be launched after successful cast.                                         | Target/data relationship.                    | Worked visual if needed.                                         |
+| Faded node creation     | Add `Launch Character` from `As Character` with less click-by-click support than the first node. | Procedural fading.                           | Restore detailed screenshots if learner stalls.                  |
+| Vertical parameter      | Introduce or retrieve X/Y/Z relation, then set Z launch value.                                   | `ue-launch-velocity-z-relation`.             | Avoid testing untaught coordinate knowledge as if already known. |
+| Compile                 | Compile and inspect status.                                                                      | Verification procedure.                      | Diagnostic recovery on compile failure.                          |
+| Predict                 | Before play test, predict what should happen on entering Collision.                              | Causal integration.                          | None normally.                                                   |
+| Play test               | Enter the pad and observe launch.                                                                | Outcome + verification Evidence.             | Recovery if behavior fails.                                      |
+| Independent variation   | Change launch strength and predict/observe resulting jump height.                                | Generalization of Z/value relation.          | Same-Unit enrichment.                                            |
+| Diagnostic variant      | Present a realistic broken connection/value and ask learner to localize, repair, and retest.     | Debugging process Evidence.                  | Stronger checks only after learner diagnosis attempt.            |
+| Rejoin                  | Teacher releases the next common activity.                                                       | Classroom synchronization.                   | Unmet Evidence remains for later remediation.                    |
 
 ## Why instruction-first can be correct here
 

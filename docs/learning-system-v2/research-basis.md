@@ -17,8 +17,8 @@ Strict enforcement does not turn an `L` decision into an empirical finding.
 
 ## Knowledge-Learning-Instruction framework
 
-Koedinger, Corbett, and Perfetti (2012), *The Knowledge-Learning-Instruction Framework:
-Bridging the Science-Practice Chasm to Enhance Robust Student Learning*.
+Koedinger, Corbett, and Perfetti (2012), _The Knowledge-Learning-Instruction Framework:
+Bridging the Science-Practice Chasm to Enhance Robust Student Learning_.
 
 https://onlinelibrary.wiley.com/doi/10.1111/j.1551-6709.2012.01245.x
 
@@ -39,8 +39,8 @@ Course Docs synthesis:
 
 ## Active learning in STEM
 
-Freeman et al. (2014), *Active learning increases student performance in science, engineering,
-and mathematics*.
+Freeman et al. (2014), _Active learning increases student performance in science, engineering,
+and mathematics_.
 
 https://pubmed.ncbi.nlm.nih.gov/24821756/
 
@@ -52,12 +52,12 @@ generation, discussion, practice, or retrieval rather than only scrolling throug
 
 ## Formative feedback
 
-Shute (2008), *Focus on Formative Feedback*.
+Shute (2008), _Focus on Formative Feedback_.
 
 https://doi.org/10.3102/0034654307313795
 
-Van der Kleij, Feskens, and Eggen (2015), *Effects of Feedback in a Computer-Based Learning
-Environment on Students' Learning Outcomes: A Meta-Analysis*.
+Van der Kleij, Feskens, and Eggen (2015), _Effects of Feedback in a Computer-Based Learning
+Environment on Students' Learning Outcomes: A Meta-Analysis_.
 
 https://journals.sagepub.com/doi/10.3102/0034654314564881
 
@@ -276,10 +276,9 @@ unresolved unless separately justified:
 - exact transfer distance for every KC;
 - exact Teacher View visualization.
 
-
 ## Programming worked examples, tracing, and completion scaffolds
 
-Muldner, Jennings, and Chiarelli (2023), *A Review of Worked Examples in Programming Activities*.
+Muldner, Jennings, and Chiarelli (2023), _A Review of Worked Examples in Programming Activities_.
 
 https://eric.ed.gov/?id=EJ1381113
 
@@ -314,8 +313,8 @@ treating whole-program correctness as one undifferentiated mastery signal. **R/S
 
 ## Programming debugging interventions
 
-Yang et al. (2024), *Decoding Debugging Instruction: A Systematic Literature Review of Debugging
-Interventions*.
+Yang et al. (2024), _Decoding Debugging Instruction: A Systematic Literature Review of Debugging
+Interventions_.
 
 https://doi.org/10.1145/3690652
 

@@ -97,7 +97,7 @@ Given:
 and:
 
 ```js
-document.querySelector('p')
+document.querySelector("p");
 ```
 
 ask which element will be returned before execution.
@@ -140,7 +140,7 @@ Before execution, ask what will change.
 Then run:
 
 ```js
-document.querySelector('.taitoru').style.color = 'blue';
+document.querySelector(".taitoru").style.color = "blue";
 ```
 
 and show the actual DOM/rendered result.
@@ -248,7 +248,7 @@ Useful novice bugs derived from the actual lesson include:
 ### Selector mismatch
 
 ```js
-document.querySelector('.titel')
+document.querySelector(".titel");
 ```
 
 when the HTML contains `class="title"`.
@@ -298,10 +298,10 @@ Debugging Evidence should record diagnosis, repair, and successful retest separa
 A novice may first see a complete worked example:
 
 ```js
-let button = document.querySelector('#calcBtn');
+let button = document.querySelector("#calcBtn");
 
-button.addEventListener('click', function () {
-    // ...
+button.addEventListener("click", function () {
+  // ...
 });
 ```
 
@@ -311,7 +311,7 @@ Then use completion:
 let button = document.querySelector(________);
 
 button.addEventListener(________, function () {
-    // ...
+  // ...
 });
 ```
 

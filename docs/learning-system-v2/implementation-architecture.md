@@ -236,10 +236,10 @@ type ClassSession = {
   bundleId: string;
 
   currentCoreStepId: string;
-  corePhase: 'collecting' | 'discussion' | 'resolved' | 'practice';
+  corePhase: "collecting" | "discussion" | "resolved" | "practice";
   revision: number;
 
-  status: 'scheduled' | 'live' | 'ended';
+  status: "scheduled" | "live" | "ended";
 };
 ```
 

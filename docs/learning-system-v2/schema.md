@@ -449,7 +449,6 @@ In v2:
 The final implementation may retain explicit author controls where justified, but should not
 preserve v1 metadata solely for backward compatibility.
 
-
 ## Runtime orchestration structure
 
 The five models describe instructional meaning, but the classroom runtime also needs an explicit
@@ -558,7 +557,6 @@ new independent variant after prior instruction
 
 A post-answer retry can be useful practice, but must not automatically satisfy an independent
 mastery claim.
-
 
 ## Stateful external-tool tasks
 
@@ -753,7 +751,6 @@ Exact names are unresolved.
 When a task is not directly observable, Course Docs can still use explicit learner responses,
 teacher checks, or later independent Evidence, but Teacher View should communicate the
 difference rather than presenting false precision.
-
 
 ## Executable-code tasks and semantic oracles
 
@@ -956,7 +953,6 @@ Requirements may include:
 - no contamination from a prior solution or scenario.
 
 This is primarily an implementation/safety contract, but it directly affects Evidence validity.
-
 
 ## Response and feedback gates
 

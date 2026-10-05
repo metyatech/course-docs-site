@@ -52,8 +52,8 @@ and CSS such as:
 
 ```css
 p {
-    background-color: #ffedd5;
-    color: #7c2d12;
+  background-color: #ffedd5;
+  color: #7c2d12;
 }
 ```
 
@@ -120,9 +120,7 @@ This staged contrast is a central acceptance requirement.
 Present:
 
 ```html
-<div class="waku">
-    ...
-</div>
+<div class="waku">...</div>
 ```
 
 and ask the learner to generate the selector without showing `.waku` first.
@@ -343,38 +341,37 @@ Treat these as regressions relative to the reference:
 
 The schema serves the experience. The experience does not exist to demonstrate the schema.
 
-
 ## Full reference lesson flow
 
 The following end-to-end flow is the current reference for a first-pass v2 box-model lesson.
 Exact copy and visuals remain local design details; the instructional relations are the important
 part.
 
-| Step | Shared learner experience | Main Evidence / purpose | Private adaptation |
-| --- | --- | --- | --- |
-| Goal preview | Show the finished product visually without exposing all solution code. | Orientation only. | None required. |
-| Tag-selector prediction | Show several elements and `p { ... }`; learner predicts every affected element before reveal. | `css-selector-tag-match`; prior-state diagnostic. | Hint only after first commitment if needed. |
-| Result and explanation | Reveal the actual affected elements, then resolve why all `p` elements changed. | Concrete feedback; rationale formation. | Additional explanation only when needed. |
-| Add class only | Add `class="nedan"` while CSS remains `p`; show that appearance is unchanged. | Controlled causal contrast. | None normally. |
-| Activate class selector | Change only `p` -> `.nedan`; show that only the price changes. | `css-class-selector-match`; rationale. | Targeted support for class/selector mapping. |
-| Generate new selector | Give `class="waku"`; learner generates `.waku`. | Independent `css-class-selector-generate`. | Hint -> worked example -> retry as needed. |
-| Minimal variation | Use a new class name and, when useful, a changed HTML structure. | Generalization check. | Early finisher can receive stronger variation. |
-| Width model | Apply `width: 300px` to the card and observe the horizontal content region change. | Meaning of `width`; rendered-effect mapping. | Worked example if property-role knowledge is absent. |
-| Height completion | Ask learner to complete the corresponding property for vertical size, then apply it. | `css-size-property-select`; generated response. | Hint can contrast horizontal/vertical. |
-| Size variation | Change width or height in a new small Task and predict the rendered direction of change. | Independent size application. | Additional variation for early finishers. |
-| Border model | Add `border: 2px solid ...`; observe the new boundary. | `css-border-role`. | None normally. |
-| Border decomposition | Vary thickness, style, or color one dimension at a time and connect each value to its effect. | `css-border-shorthand`; relational understanding. | Completion scaffold if construction is difficult. |
-| Border generation | Give a desired border and ask learner to construct the shorthand. | Independent border construction. | Progressive hints. |
-| Padding prediction | With border visible, add `padding: 20px`; learner predicts where space will appear before reveal. | `css-padding-role`. | Visual hint can point to content versus border without revealing final size. |
-| Padding result | Reveal increased space between content and border. | Concrete feedback and role resolution. | Additional explanation only when needed. |
-| Single-value check | Ask what regions `padding: 20px` affects. | `css-padding-single-value`. | Contrast with an intentionally different case if needed. |
-| Integrated box-model prediction | Show content + padding + border and ask whether adding padding/border leaves the outer box unchanged or makes it larger under the taught assumptions. | `css-box-model-layer-relation`. | Layer highlighting if needed. |
-| Layer resolution | Visually map content -> padding -> border and explain that width/height describe content while padding/border add outside it in this lesson's model. | Causal/relational Evidence. | A stronger worked visual for learners needing support. |
-| Changed-condition application | Use different dimensions/values and ask learner to predict which layer and overall region changes. | Generalization of integrated relation. | Early finisher may compute exact outer size; this need not block core progression. |
-| Independent build | Learner adds a new marker/card treatment using class selection, size, border, and padding. | Performance practice. | Private scaffolds allowed. |
-| Component-level checks | During/after the build, evaluate selector, size, border, and padding decisions separately rather than treating the working final card as proof of every KC. | Interpretable KC Evidence. | Remediation targets the failed component only. |
-| Debugging | Present a realistic fault such as a class-name mismatch or missing border style and require diagnosis -> repair -> verification. | Debugging process Evidence. | Early finisher or targeted remediation. |
-| Rejoin | Teacher releases the next common step. | Classroom synchronization. | Unmet Evidence persists for later remediation. |
+| Step                            | Shared learner experience                                                                                                                                   | Main Evidence / purpose                           | Private adaptation                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Goal preview                    | Show the finished product visually without exposing all solution code.                                                                                      | Orientation only.                                 | None required.                                                                     |
+| Tag-selector prediction         | Show several elements and `p { ... }`; learner predicts every affected element before reveal.                                                               | `css-selector-tag-match`; prior-state diagnostic. | Hint only after first commitment if needed.                                        |
+| Result and explanation          | Reveal the actual affected elements, then resolve why all `p` elements changed.                                                                             | Concrete feedback; rationale formation.           | Additional explanation only when needed.                                           |
+| Add class only                  | Add `class="nedan"` while CSS remains `p`; show that appearance is unchanged.                                                                               | Controlled causal contrast.                       | None normally.                                                                     |
+| Activate class selector         | Change only `p` -> `.nedan`; show that only the price changes.                                                                                              | `css-class-selector-match`; rationale.            | Targeted support for class/selector mapping.                                       |
+| Generate new selector           | Give `class="waku"`; learner generates `.waku`.                                                                                                             | Independent `css-class-selector-generate`.        | Hint -> worked example -> retry as needed.                                         |
+| Minimal variation               | Use a new class name and, when useful, a changed HTML structure.                                                                                            | Generalization check.                             | Early finisher can receive stronger variation.                                     |
+| Width model                     | Apply `width: 300px` to the card and observe the horizontal content region change.                                                                          | Meaning of `width`; rendered-effect mapping.      | Worked example if property-role knowledge is absent.                               |
+| Height completion               | Ask learner to complete the corresponding property for vertical size, then apply it.                                                                        | `css-size-property-select`; generated response.   | Hint can contrast horizontal/vertical.                                             |
+| Size variation                  | Change width or height in a new small Task and predict the rendered direction of change.                                                                    | Independent size application.                     | Additional variation for early finishers.                                          |
+| Border model                    | Add `border: 2px solid ...`; observe the new boundary.                                                                                                      | `css-border-role`.                                | None normally.                                                                     |
+| Border decomposition            | Vary thickness, style, or color one dimension at a time and connect each value to its effect.                                                               | `css-border-shorthand`; relational understanding. | Completion scaffold if construction is difficult.                                  |
+| Border generation               | Give a desired border and ask learner to construct the shorthand.                                                                                           | Independent border construction.                  | Progressive hints.                                                                 |
+| Padding prediction              | With border visible, add `padding: 20px`; learner predicts where space will appear before reveal.                                                           | `css-padding-role`.                               | Visual hint can point to content versus border without revealing final size.       |
+| Padding result                  | Reveal increased space between content and border.                                                                                                          | Concrete feedback and role resolution.            | Additional explanation only when needed.                                           |
+| Single-value check              | Ask what regions `padding: 20px` affects.                                                                                                                   | `css-padding-single-value`.                       | Contrast with an intentionally different case if needed.                           |
+| Integrated box-model prediction | Show content + padding + border and ask whether adding padding/border leaves the outer box unchanged or makes it larger under the taught assumptions.       | `css-box-model-layer-relation`.                   | Layer highlighting if needed.                                                      |
+| Layer resolution                | Visually map content -> padding -> border and explain that width/height describe content while padding/border add outside it in this lesson's model.        | Causal/relational Evidence.                       | A stronger worked visual for learners needing support.                             |
+| Changed-condition application   | Use different dimensions/values and ask learner to predict which layer and overall region changes.                                                          | Generalization of integrated relation.            | Early finisher may compute exact outer size; this need not block core progression. |
+| Independent build               | Learner adds a new marker/card treatment using class selection, size, border, and padding.                                                                  | Performance practice.                             | Private scaffolds allowed.                                                         |
+| Component-level checks          | During/after the build, evaluate selector, size, border, and padding decisions separately rather than treating the working final card as proof of every KC. | Interpretable KC Evidence.                        | Remediation targets the failed component only.                                     |
+| Debugging                       | Present a realistic fault such as a class-name mismatch or missing border style and require diagnosis -> repair -> verification.                            | Debugging process Evidence.                       | Early finisher or targeted remediation.                                            |
+| Rejoin                          | Teacher releases the next common step.                                                                                                                      | Classroom synchronization.                        | Unmet Evidence persists for later remediation.                                     |
 
 ### Quantitative outer-size calculation
 
