@@ -448,3 +448,113 @@ In v2:
 
 The final implementation may retain explicit author controls where justified, but should not
 preserve v1 metadata solely for backward compatibility.
+
+
+## Runtime orchestration structure
+
+The five models describe instructional meaning, but the classroom runtime also needs an explicit
+representation of the current **shared core step** and temporary private branches.
+
+A conceptual runtime object may contain:
+
+```yaml
+classStep:
+  id:
+  sharedActivity:
+  revealGate: teacher-controlled
+  privateBranches:
+    allowed: true
+    kinds:
+      - hint
+      - worked-example
+      - remediation
+      - enrichment
+  rejoin:
+    required: true
+    onTeacherRelease: true
+  progressionRole: blocking | non-blocking
+```
+
+This is not a sixth learning model. It is runtime orchestration state connecting the Pedagogical
+Policy to Presentation, Student, and Teacher Views.
+
+The runtime must support:
+
+```text
+shared core step
+    -> optional learner-private branch
+    -> rejoin
+    -> teacher releases next shared core step
+```
+
+A private branch must not silently advance a learner into a future Unit.
+
+### Blocking versus non-blocking activity
+
+The system needs to distinguish activities required for the current common progression from
+optional exploration or enrichment.
+
+A non-blocking activity:
+
+- may produce useful Evidence;
+- may deepen or broaden learning;
+- must not prevent the class from reaching the next rejoin point;
+- must not be mistaken for required mastery evidence merely because it exists.
+
+## Linked contrast sequences
+
+Some learning depends on observing a controlled sequence of changes rather than unrelated task
+variants.
+
+The Task Model therefore needs a way to represent a **linked contrast sequence** or equivalent
+semantic structure.
+
+Example:
+
+```text
+A: CSS uses p selector
+B: add class="nedan" only; CSS still uses p
+C: change selector from p to .nedan
+```
+
+The instructional value comes from knowing exactly what changed between A -> B and B -> C.
+
+A conceptual representation may include:
+
+```yaml
+contrastSequence:
+  invariantDimensions:
+    - css-declarations
+    - content
+  steps:
+    - id: tag-selector
+    - id: class-added-only
+      changedDimensions:
+        - html-class
+    - id: class-selector-active
+      changedDimensions:
+        - css-selector
+```
+
+Exact syntax is unresolved. The semantic requirement is that the system can preserve controlled
+comparisons and avoid changing multiple explanatory variables at once.
+
+## Evidence contamination and exposure
+
+An attempt made after the learner has seen the answer, canonical solution, or an
+answer-revealing worked example is not equivalent to a fresh independent attempt.
+
+Raw Evidence therefore needs enough lineage to know whether the learner had prior answer
+exposure for the same or effectively identical Task.
+
+The exact representation is unresolved, but the Evidence Model must be able to distinguish:
+
+```text
+fresh independent attempt
+assisted attempt
+post-answer retry
+new independent variant after prior instruction
+```
+
+A post-answer retry can be useful practice, but must not automatically satisfy an independent
+mastery claim.
