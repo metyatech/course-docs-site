@@ -295,6 +295,11 @@ reference experience.
 
 See [`box-model-reference.md`](./box-model-reference.md).
 
+A procedure-heavy Unreal Engine stress test is recorded in
+[`unreal-procedure-reference.md`](./unreal-procedure-reference.md). It confirms that the same
+five-model architecture can cover external-tool procedures, provided Task and Evidence models
+represent environment state, action sequences, observation channels, and recovery paths.
+
 ## Provenance
 
 Use these labels where the distinction matters:
