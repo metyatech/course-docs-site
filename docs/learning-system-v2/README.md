@@ -327,6 +327,41 @@ runtime executes a deterministic, validated Learning Bundle. The runtime may sel
 variants, support, and feedback timing, but it should not depend on an LLM inventing lesson
 content during instruction.
 
+## First implementation scope: Static v2 pilot
+
+The first implementation intentionally keeps the runtime static and shared.
+
+For this pilot:
+
+- teacher and learners see the same lesson content;
+- there is no learner identity;
+- there is no learner-specific adaptation;
+- there is no Teacher-only or Presentation-only projection;
+- there is no external persistence, database, Supabase learning state, or Realtime;
+- there is no cross-session Learner Model;
+- there is no retrieval scheduler;
+- there is no class-session orchestration.
+
+The pilot **does** keep local interaction state required for sound learning interactions, such as
+"answer before reveal", retry, locally shown feedback, and progression through one shared lesson.
+
+The pilot must still use the real v2 compile-time architecture:
+
+```text
+v2 source model
+    -> Learning Compiler
+    -> validated immutable Learning Bundle
+    -> Static Policy / fixed core path
+    -> shared interactive lesson renderer
+```
+
+Do not hard-code a one-off React reproduction of the prototype. The purpose is to validate that
+the future v2 architecture can produce the reference experience before adding identity,
+persistence, adaptation, or classroom synchronization.
+
+The initial acceptance target is the CSS box-model reference, starting with the class-selector
+flow and expanding through the rest of the lesson only after the first slice is sound.
+
 ## Open questions / not yet fixed
 
 Do not silently freeze these without further work:
