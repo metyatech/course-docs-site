@@ -317,6 +317,16 @@ Use these labels where the distinction matters:
 
 See [`research-basis.md`](./research-basis.md).
 
+## Implementation architecture
+
+The proposed runtime/compiler/persistence boundaries are documented in
+[`implementation-architecture.md`](./implementation-architecture.md).
+
+The central implementation rule is that AI authors content **before class**, while the live
+runtime executes a deterministic, validated Learning Bundle. The runtime may select activities,
+variants, support, and feedback timing, but it should not depend on an LLM inventing lesson
+content during instruction.
+
 ## Open questions / not yet fixed
 
 Do not silently freeze these without further work:
