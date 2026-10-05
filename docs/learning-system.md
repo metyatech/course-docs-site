@@ -1,5 +1,11 @@
 # Course learning model
 
+> [!NOTE]
+> This document describes the currently implemented Learning System v1 contract.
+> The proposed, not-yet-implemented Learning System v2 design is documented in
+> [`docs/learning-system-v2/README.md`](./learning-system-v2/README.md).
+> The v2 documents are design guidance, not the current production contract.
+
 Course Docs can derive a course progression report from learning objectives stored once at course level and explicit learning occurrences in MDX. Pages remain display and distribution units; they are not objectives. Existing content repositories without `learning-units.yaml` continue to build with the existing behavior as long as they do not use Learning System metadata or components.
 
 ## Define learning units
