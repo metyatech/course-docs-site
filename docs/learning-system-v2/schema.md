@@ -558,3 +558,198 @@ new independent variant after prior instruction
 
 A post-answer retry can be useful practice, but must not automatically satisfy an independent
 mastery claim.
+
+
+## Stateful external-tool tasks
+
+Procedure-heavy learning in tools such as Unreal Engine requires a Task to represent more than a
+prompt and expected answer. The same five-model architecture still applies, but the Task Model
+needs explicit **environment state transitions**.
+
+A conceptual task may include:
+
+```yaml
+environment:
+  product: unreal-engine
+  versionRange:
+  fixture:
+  prerequisites: []
+
+initialState:
+  required: []
+
+goalState:
+  required: []
+
+actionPlan:
+  subgoals: []
+  orderingConstraints: []
+  acceptablePaths: []
+
+observables: []
+```
+
+The exact serialization is unresolved. The semantic requirement is that the system can
+distinguish:
+
+```text
+required starting state
+    -> learner action or action sequence
+    -> resulting tool/artifact state
+```
+
+This prevents a procedure from being represented as a flat checklist with no understanding of
+state dependencies.
+
+### Goal semantics versus UI path
+
+When possible, keep the learning claim at the goal/capability level and keep version-specific UI
+locators in the Task/environment binding.
+
+Example:
+
+```text
+Knowledge claim:
+  add an overlap event for the intended Collision component
+
+Current Unreal UI path:
+  Collision context menu
+  -> Add Event
+  -> Add OnComponentBeginOverlap
+```
+
+The second may change across tool versions without necessarily changing the underlying learning
+claim.
+
+If the exact UI path itself is an intended skill, it can still be represented as performance
+knowledge; do not assume every click path is conceptually important.
+
+## Action plans and scaffolding levels
+
+Some response forms are ordered or partially ordered action sequences.
+
+The Task Model therefore needs to support subgoals and ordering constraints rather than treating
+all performance as one atomic response.
+
+A procedure can be scaffolded at different levels:
+
+```text
+full worked action sequence
+    -> step prompts with screenshots
+    -> subgoal prompts
+    -> goal-only instruction
+    -> independent performance
+```
+
+Fading should remove support that the learner no longer needs while preserving the same learning
+goal.
+
+Repeated tool mechanics can fade independently of new conceptual content. For example, after a
+learner has already practiced "drag from a pin -> search -> add node", later tasks can state the
+desired node connection with less click-by-click narration unless the learner needs recovery
+support.
+
+## Observation channels and evidence strength
+
+External-tool tasks are not always automatically observable by Course Docs.
+
+Raw Evidence must record **how the observation was obtained**, not only the claimed result.
+
+Candidate channels include:
+
+- direct runtime or tool telemetry;
+- artifact/state inspection;
+- screenshot or image evidence;
+- teacher observation;
+- learner-entered response;
+- learner self-confirmation.
+
+A conceptual observation may include:
+
+```yaml
+observation:
+  channel: artifact-inspection
+  targetState:
+  result:
+  evaluator:
+  reliability:
+```
+
+Exact reliability representation is unresolved.
+
+A learner clicking "done" is useful orchestration data, but it must not be silently treated as
+equivalent to an automatically or independently verified state.
+
+Likewise, a final artifact can be valid outcome Evidence without necessarily proving that the
+learner independently executed every intermediate procedure.
+
+## Process versus outcome Evidence
+
+For multi-step procedures, distinguish:
+
+- **outcome Evidence** — the final application/tool state is correct;
+- **process Evidence** — the learner selected and executed relevant intermediate actions;
+- **diagnostic Evidence** — the learner can identify why an incorrect state occurred;
+- **verification Evidence** — the learner checks that the intended behavior actually occurs.
+
+Different claims require different combinations.
+
+A working Unreal Blueprint, for example, can support an outcome claim. It does not by itself
+prove that the learner understood execution flow, data flow, diagnosis, or verification.
+
+## Failure states and recovery
+
+Stateful Tasks should be able to declare common or diagnostically meaningful failure states.
+
+Conceptually:
+
+```yaml
+failureModes:
+  - id:
+    signature:
+    likelyTargets: []
+    recovery:
+      checks: []
+      supportEscalation: []
+```
+
+A recovery path should preferably narrow the fault rather than immediately reveal the full final
+solution.
+
+Example sequence:
+
+```text
+behavior fails in play
+    -> check compile status
+    -> inspect event existence
+    -> inspect execution connection
+    -> inspect data/target connection
+    -> inspect parameter value
+    -> retest
+```
+
+Failure-mode metadata is a Task/Evidence concern, not a permanent misconception attached to every
+learner.
+
+## Instrumentation-aware orchestration
+
+Teacher View can only display trustworthy real-time completion or error information when the
+underlying Task has an observation channel that supplies it.
+
+The runtime must not pretend to know external-tool state that it cannot observe.
+
+Therefore each classroom Task should expose its orchestration capability, for example:
+
+```text
+machine-observable
+artifact-observable
+response-observable
+self-reported-only
+not observable
+```
+
+Exact names are unresolved.
+
+When a task is not directly observable, Course Docs can still use explicit learner responses,
+teacher checks, or later independent Evidence, but Teacher View should communicate the
+difference rather than presenting false precision.
