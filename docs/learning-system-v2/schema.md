@@ -753,3 +753,206 @@ Exact names are unresolved.
 When a task is not directly observable, Course Docs can still use explicit learner responses,
 teacher checks, or later independent Evidence, but Teacher View should communicate the
 difference rather than presenting false precision.
+
+
+## Executable-code tasks and semantic oracles
+
+Executable programming tasks add an important distinction: the system may be able to execute the
+learner's submission and observe behavior directly, but **behavioral correctness and evidence for
+a specific KC are not always the same thing**.
+
+The Task/Evidence contract therefore needs explicit evaluation layers.
+
+### Evaluation layers
+
+Candidate layers include:
+
+- **parse / syntax** — can the program be parsed?
+- **runtime safety** — does execution complete without an uncaught exception for the scenario?
+- **behavior** — does the observable output/DOM/state match the required behavior?
+- **structure / mechanism** — did the learner use a required construct or relationship when that
+  construct itself is the target?
+- **explanation / diagnosis** — can the learner explain or localize why the behavior occurs?
+
+A conceptual evaluator may contain:
+
+```yaml
+evaluator:
+  syntax:
+    required: true
+
+  scenarios:
+    - setup:
+      htmlFixture:
+      inputState:
+    - actions: []
+      expected:
+        domState:
+        console:
+        returnValue:
+
+  structuralRequirements: []
+  forbiddenShortcuts: []
+
+  isolation:
+    resetBetweenScenarios: true
+```
+
+Exact syntax is unresolved.
+
+### Behavior oracle versus mechanism oracle
+
+If the learning claim is:
+
+```text
+clicking the Calculate button updates #total to the correct value
+```
+
+then behavior can be primary Evidence.
+
+If the learning claim is:
+
+```text
+register a click handler with addEventListener
+```
+
+then equivalent output produced by unrelated means does not establish that KC. Structural or
+instrumented Evidence is needed.
+
+Likewise, if the target is `document.querySelector`, a correct final DOM state produced without
+selecting the intended element does not by itself prove selector knowledge.
+
+Do not impose source-code shape constraints unless the mechanism is genuinely part of the
+learning target. Multiple semantically valid solutions should remain acceptable when the target
+is behavioral.
+
+## Temporal scenarios for event-driven code
+
+Event-driven programs must often be evaluated as a **state trajectory**, not one final snapshot.
+
+Conceptual form:
+
+```text
+initial DOM
+    -> learner code loads
+    -> user changes input
+    -> input event fires
+    -> DOM updates
+    -> user clicks
+    -> click event fires
+    -> DOM updates again
+```
+
+A Task Family should be able to define scenario actions and expected checkpoints.
+
+Candidate actions include:
+
+- click;
+- type/change input;
+- keydown/keyup;
+- dispatch event;
+- wait for a bounded async transition.
+
+Candidate checkpoints include:
+
+- DOM property/attribute/text/style;
+- console output;
+- thrown error;
+- application state;
+- callback/event count.
+
+The evaluator must reset or isolate state between scenarios so one scenario cannot accidentally
+make another pass.
+
+## Multi-case evaluation and hard-coded success
+
+One example input is weak Evidence for variable-condition programming knowledge.
+
+Where the target requires a general rule, evaluate several meaningful variants or generated test
+cases.
+
+Example for a price calculator:
+
+```text
+adult=1, child=2 -> 1100
+adult=0, child=3 -> 900
+adult=2, child=0 -> 1000
+```
+
+The purpose is not maximal test volume. It is to distinguish a general implementation from a
+hard-coded answer or one-example imitation.
+
+The Task Model should record which input/context dimensions vary and why.
+
+## Runtime failures as diagnostic Evidence
+
+Programming Tasks should preserve distinct failure classes when observable.
+
+Candidate categories:
+
+- syntax / parse error;
+- reference or null-access error;
+- selector mismatch;
+- wrong element selected;
+- event not registered;
+- wrong event type;
+- handler registered on wrong element;
+- missing value conversion;
+- incorrect calculation;
+- assignment to wrong DOM property;
+- correct code but wrong fixture/initial state.
+
+These categories can route targeted remediation. They are observations or diagnostic hypotheses,
+not permanent labels on the learner.
+
+## Program tracing and prediction
+
+For executable code, `ELICIT` can often use a short trace/prediction before execution:
+
+```text
+Which element will querySelector('p') return?
+What will this element's style be after the line executes?
+Will the total change before or only after the click?
+What value/type does input.value produce?
+```
+
+After commitment, run the code and show the actual result.
+
+This can create the same prediction -> observation -> explanation structure used in the CSS
+reference while grounding it in program execution.
+
+Do not require tracing for every line. Use it when execution order, selection, state change, or
+data transformation is the intended learning target.
+
+## Code-generation scaffolds
+
+Programming support can fade across several response forms:
+
+```text
+worked code example
+    -> completion / missing expression
+    -> Parsons or reorderable subgoals when appropriate
+    -> partial code generation
+    -> independent code generation
+```
+
+These are optional policy tools, not mandatory stages.
+
+When a learner struggles with code generation, a scaffold may reduce the search space while
+preserving the targeted relationship. A later fresh variant is still needed before claiming
+independent generation.
+
+## Execution sandbox requirements
+
+Any executable evaluator must define enough isolation to make Evidence trustworthy.
+
+Requirements may include:
+
+- deterministic fixture initialization;
+- reset between attempts/scenarios;
+- bounded execution time;
+- controlled network/storage access as appropriate;
+- captured exceptions and console output;
+- no contamination from a prior solution or scenario.
+
+This is primarily an implementation/safety contract, but it directly affects Evidence validity.
