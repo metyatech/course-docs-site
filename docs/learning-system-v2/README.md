@@ -329,6 +329,9 @@ content during instruction.
 
 ## First implementation scope: Static v2 pilot
 
+The concrete implementation brief and handoff contract for this milestone is
+[`static-v2-pilot.md`](./static-v2-pilot.md).
+
 The first implementation intentionally keeps the runtime static and shared.
 
 For this pilot:
