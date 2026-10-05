@@ -956,3 +956,32 @@ Requirements may include:
 - no contamination from a prior solution or scenario.
 
 This is primarily an implementation/safety contract, but it directly affects Evidence validity.
+
+
+## Response and feedback gates
+
+Classroom activities need an explicit distinction between **collecting a response** and
+**revealing correctness/solution information**.
+
+A conceptual activity contract may include:
+
+```yaml
+feedbackGate:
+  mode: immediate-private | teacher-release | after-discussion
+
+progression:
+  blocking: true | false
+```
+
+Exact syntax is unresolved.
+
+Examples:
+
+- a synchronized concept prediction can accept each learner's answer immediately while
+  withholding correctness and class distribution until the teacher releases resolution;
+- ordinary private practice can give immediate learner-specific feedback;
+- an optional enrichment activity can be non-blocking.
+
+The authoritative session state must record whether solution-revealing information had already
+been released when an attempt was accepted. This allows the Evidence Model to distinguish a
+fresh pre-reveal response from a post-reveal retry without trusting client timestamps alone.
