@@ -118,8 +118,9 @@ test('stable authored IDs and core-plan ordering survive compilation', () => {
 
   assert.ok(ids.includes('css-class-selector'));
   assert.ok(ids.includes('css-class-selector-match'));
+  assert.ok(ids.includes('css-selector-tag-match'));
   assert.ok(ids.includes('css-class-selector-generate'));
-  assert.ok(ids.includes('css-class-selector-prediction'));
+  assert.ok(ids.includes('css-selector-tag-prediction'));
   assert.ok(ids.includes('css-class-selector-match-evidence'));
   assert.ok(ids.includes('css-class-selector-generate-evidence'));
   assert.ok(ids.includes('class-selector-contrast'));
@@ -133,7 +134,9 @@ test('stable authored IDs and core-plan ordering survive compilation', () => {
   assert.ok(ids.includes('minimal-orientation'));
   assert.ok(ids.includes('step-minimal-orientation'));
   assert.ok(ids.includes('class-selector-css-evaluator'));
-  assert.ok(ids.includes('box-model-class-selector-rendering'));
+  assert.ok(ids.includes('box-model-tag-selector-rendering'));
+  assert.ok(ids.includes('box-model-class-added-only-rendering'));
+  assert.ok(ids.includes('box-model-class-selector-active-rendering'));
   assert.deepEqual(
     bundle.corePlan.map(({ activityId }) => activityId),
     [
@@ -145,6 +148,11 @@ test('stable authored IDs and core-plan ordering survive compilation', () => {
       'waku-independent-generation',
       'price-fresh-variation',
     ],
+  );
+  assert.equal(
+    bundle.evidenceSpecs.find(({ id }) => id === 'css-selector-tag-prediction')
+      .targetKnowledgeComponentId,
+    'css-selector-tag-match',
   );
 });
 
@@ -185,6 +193,105 @@ test('independent answer-revealing activities require commit-before-reveal seman
     const activity = bundle.activityCatalog.find((item) => item.id === id);
     assert.equal(activity.feedbackGate.revealMode, 'after-commit');
   }
+});
+
+test('tag-selector and class-selector Evidence have correct Knowledge Component attribution', () => {
+  const { bundle } = compileLearningSourceV2(loadFixture());
+  const evidenceById = new Map(bundle.evidenceSpecs.map((evidence) => [evidence.id, evidence]));
+  const classMatch = bundle.knowledge.knowledgeComponents.find(
+    ({ id }) => id === 'css-class-selector-match',
+  );
+  const predictionEvidence = evidenceById.get('css-selector-tag-prediction');
+  const classMatchEvidence = evidenceById.get('css-class-selector-match-evidence');
+
+  assert.equal(predictionEvidence.targetKnowledgeComponentId, 'css-selector-tag-match');
+  assert.deepEqual(classMatch.prerequisites, ['css-selector-tag-match']);
+  assert.equal(classMatchEvidence.targetKnowledgeComponentId, 'css-class-selector-match');
+  assert.equal(predictionEvidence.observable.response, 'selection');
+  assert.equal(classMatchEvidence.observable.response, 'selection');
+  assert.equal(classMatchEvidence.observable.correctness, 'exact');
+  assert.equal(classMatchEvidence.supports.dimension, 'independent-performance');
+  assert.equal(classMatchEvidence.requires.assistance, 'none');
+  assert.equal(classMatchEvidence.requires.freshBeforeAnswerExposure, true);
+});
+
+test('contrast Activities, Task Family, and attached Evidence use compatible selection responses', () => {
+  const { bundle } = compileLearningSourceV2(loadFixture());
+  const family = bundle.taskFamilies.find(({ id }) => id === 'class-selector-contrast');
+  const prediction = bundle.activityCatalog.find(({ id }) => id === 'p-selector-prediction');
+  const active = bundle.activityCatalog.find(({ id }) => id === 'class-selector-active');
+  const evidenceById = new Map(bundle.evidenceSpecs.map((evidence) => [evidence.id, evidence]));
+
+  assert.equal(family.response.kind, 'selection');
+  for (const activity of [prediction, active]) {
+    assert.equal(activity.response.kind, 'selection');
+    assert.equal(evidenceById.get(activity.evidenceSpecIds[0]).observable.response, 'selection');
+  }
+});
+
+test('box-model resources preserve the three concrete class-selector rendering states', () => {
+  const { bundle } = compileLearningSourceV2(loadFixture());
+  const resources = new Map(
+    bundle.resourceManifest.map((resource) => [resource.id, resource.payload]),
+  );
+  const tag = resources.get('box-model-tag-selector-rendering');
+  const classAddedOnly = resources.get('box-model-class-added-only-rendering');
+  const active = resources.get('box-model-class-selector-active-rendering');
+
+  assert.equal(tag.css, classAddedOnly.css);
+  assert.notEqual(tag.html, classAddedOnly.html);
+  assert.equal(classAddedOnly.html, active.html);
+  assert.notEqual(classAddedOnly.css, active.css);
+  assert.match(tag.css, /^p\b/m);
+  assert.match(classAddedOnly.css, /^p\b/m);
+  assert.match(active.css, /^\.nedan\b/m);
+  assert.equal(tag.css, 'p {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}');
+  assert.equal(active.css, '.nedan {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}');
+  assert.doesNotMatch(tag.html, /class="nedan"/);
+  assert.match(classAddedOnly.html, /class="nedan"/);
+  assert.match(active.html, /class="nedan"/);
+  for (const resource of [tag, classAddedOnly, active]) {
+    assert.equal((resource.html.match(/<h2\b/g) ?? []).length, 1);
+    assert.equal((resource.html.match(/<p\b/g) ?? []).length, 3);
+  }
+});
+
+test('activities separate pre-commit prompts from post-commit reveal content', () => {
+  const { bundle } = compileLearningSourceV2(loadFixture());
+  const activityById = new Map(bundle.activityCatalog.map((activity) => [activity.id, activity]));
+  const tagPrediction = activityById.get('p-selector-prediction');
+  const active = activityById.get('class-selector-active');
+  const waku = activityById.get('waku-independent-generation');
+  const price = activityById.get('price-fresh-variation');
+
+  assert.equal(
+    tagPrediction.content.some(
+      (node) => node.kind === 'resource' && node.resourceId === 'box-model-tag-selector-rendering',
+    ),
+    false,
+  );
+  assert.ok(tagPrediction.content.some((node) => node.kind === 'code' && node.language === 'html'));
+  assert.ok(tagPrediction.content.some((node) => node.kind === 'code' && node.language === 'css'));
+  assert.ok(
+    tagPrediction.revealContent.some(
+      (node) => node.kind === 'resource' && node.resourceId === 'box-model-tag-selector-rendering',
+    ),
+  );
+  assert.ok(
+    active.revealContent.some(
+      (node) =>
+        node.kind === 'resource' && node.resourceId === 'box-model-class-selector-active-rendering',
+    ),
+  );
+  assert.ok(waku.revealContent.some((node) => node.kind === 'code' && node.code === '.waku'));
+  assert.ok(price.revealContent.some((node) => node.kind === 'code' && node.code === '.price'));
+  for (const activity of [tagPrediction, active, waku, price])
+    assert.equal(activity.feedbackGate.revealMode, 'after-commit');
+  assert.deepEqual(activityById.get('minimal-orientation').revealContent, []);
+  assert.deepEqual(activityById.get('concrete-result-reasoning').revealContent, []);
+  assert.deepEqual(activityById.get('class-added-only').revealContent, []);
+  assert.equal(activityById.get('class-added-only').response, undefined);
+  assert.deepEqual(activityById.get('class-added-only').evidenceSpecIds, []);
 });
 
 test('compiled fixture matches its reviewed golden Bundle contract', () => {

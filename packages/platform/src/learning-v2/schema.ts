@@ -103,7 +103,13 @@ export interface ActivitySourceV2 {
   taskFamilyId?: StableId;
   taskVariantId?: StableId;
   evidenceSpecIds: StableId[];
+  /** Before-commit/common prompt content. */
   content: LearningContentNodeV2[];
+  /**
+   * Content revealed according to feedbackGate. For after-commit activities this is not visible
+   * before commitment.
+   */
+  revealContent: LearningContentNodeV2[];
   response?: { kind: ResponseKind };
   feedbackGate: { revealMode: RevealMode };
 }

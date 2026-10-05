@@ -362,6 +362,12 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
     }
   });
 
+  const evidenceById = new Map<string, UnknownRecord>();
+  evidenceSpecs.forEach((candidate) => {
+    if (isRecord(candidate) && typeof candidate.id === 'string')
+      evidenceById.set(candidate.id, candidate);
+  });
+
   evaluatorSpecs.forEach((candidate, index) => {
     const path = `evaluatorSpecs[${index}]`;
     const row = requireObject(candidate, path);
@@ -415,6 +421,38 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
       'UNKNOWN_EVIDENCE_SPEC',
       'EvidenceSpec',
     );
+    const targets = Array.isArray(row.targetKnowledgeComponentIds)
+      ? row.targetKnowledgeComponentIds
+      : [];
+    const familyResponse = isRecord(row.response) ? row.response.kind : undefined;
+    const producibleEvidenceIds = Array.isArray(row.canProduceEvidenceIds)
+      ? row.canProduceEvidenceIds
+      : [];
+    producibleEvidenceIds.forEach((evidenceId, evidenceIndex) => {
+      if (typeof evidenceId !== 'string') return;
+      const evidence = evidenceById.get(evidenceId);
+      if (!evidence) return;
+      if (
+        typeof evidence.targetKnowledgeComponentId === 'string' &&
+        !targets.includes(evidence.targetKnowledgeComponentId)
+      )
+        add(
+          'TASK_FAMILY_EVIDENCE_TARGET_MISMATCH',
+          `${path}.canProduceEvidenceIds[${evidenceIndex}]`,
+          `EvidenceSpec "${evidenceId}" targets a Knowledge Component outside this Task Family's targets.`,
+        );
+      const observable = isRecord(evidence.observable) ? evidence.observable : undefined;
+      if (
+        typeof familyResponse === 'string' &&
+        typeof observable?.response === 'string' &&
+        familyResponse !== observable.response
+      )
+        add(
+          'TASK_FAMILY_EVIDENCE_RESPONSE_MISMATCH',
+          `${path}.canProduceEvidenceIds[${evidenceIndex}]`,
+          `EvidenceSpec "${evidenceId}" response does not match this Task Family response.`,
+        );
+    });
 
     const variants = requireArray(row, 'variants', `${path}.variants`);
     const variantIds = new Map<string, string>();
@@ -608,12 +646,6 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
     )
       evaluatorById.set(candidate.id, candidate.kind);
   });
-  const evidenceById = new Map<string, UnknownRecord>();
-  evidenceSpecs.forEach((candidate) => {
-    if (isRecord(candidate) && typeof candidate.id === 'string')
-      evidenceById.set(candidate.id, candidate);
-  });
-
   activities.forEach((candidate, index) => {
     const path = `activities[${index}]`;
     const activity = requireObject(candidate, path);
@@ -634,6 +666,20 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
           );
       }
     }
+    const response =
+      activity.response === undefined
+        ? undefined
+        : requireObject(activity.response, `${path}.response`);
+    const responseKind = response
+      ? requireEnum(response, 'kind', `${path}.response.kind`, responseKinds)
+      : undefined;
+    const familyResponse = isRecord(family?.response) ? family.response.kind : undefined;
+    if (responseKind && typeof familyResponse === 'string' && responseKind !== familyResponse)
+      add(
+        'ACTIVITY_RESPONSE_KIND_MISMATCH',
+        `${path}.response.kind`,
+        'Activity response kind must match its Task Family response kind.',
+      );
     if (activity.taskVariantId !== undefined) {
       const variantId = requireString(activity, 'taskVariantId', `${path}.taskVariantId`, {
         stableId: true,
@@ -661,11 +707,37 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
       }
     }
     const evidenceIds = requireStringArray(activity, 'evidenceSpecIds', `${path}.evidenceSpecIds`);
+    if (evidenceIds.length > 0 && responseKind === undefined)
+      add(
+        'ACTIVITY_EVIDENCE_WITHOUT_RESPONSE',
+        `${path}.evidenceSpecIds`,
+        'An Activity that produces Evidence must define a learner response.',
+      );
+    const producibleEvidenceIds = Array.isArray(family?.canProduceEvidenceIds)
+      ? family.canProduceEvidenceIds
+      : [];
     evidenceIds.forEach((evidenceId, evidenceIndex) => {
       const evidencePath = `${path}.evidenceSpecIds[${evidenceIndex}]`;
       if (!ids.evidenceSpecs.has(evidenceId))
         add('UNKNOWN_EVIDENCE_SPEC', evidencePath, `Unknown EvidenceSpec "${evidenceId}".`);
       const evidence = evidenceById.get(evidenceId);
+      if (family && !producibleEvidenceIds.includes(evidenceId))
+        add(
+          'ACTIVITY_EVIDENCE_NOT_PRODUCIBLE_BY_TASK_FAMILY',
+          evidencePath,
+          `Task Family "${familyId}" cannot produce EvidenceSpec "${evidenceId}".`,
+        );
+      const observable = isRecord(evidence?.observable) ? evidence.observable : undefined;
+      if (
+        responseKind &&
+        typeof observable?.response === 'string' &&
+        responseKind !== observable.response
+      )
+        add(
+          'ACTIVITY_EVIDENCE_RESPONSE_MISMATCH',
+          evidencePath,
+          `Activity response kind does not match EvidenceSpec "${evidenceId}" response.`,
+        );
       const requires = isRecord(evidence?.requires) ? evidence.requires : undefined;
       if (requires?.freshBeforeAnswerExposure === true) {
         const gate = isRecord(activity.feedbackGate) ? activity.feedbackGate : undefined;
@@ -676,11 +748,9 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
             'Fresh independent Evidence requires feedbackGate.revealMode to be after-commit.',
           );
       }
-      const observable = isRecord(evidence?.observable) ? evidence.observable : undefined;
-      const response = isRecord(activity.response) ? activity.response : undefined;
       const evaluatorId = typeof family?.evaluatorId === 'string' ? family.evaluatorId : undefined;
       if (
-        response?.kind === 'explanation' &&
+        responseKind === 'explanation' &&
         observable?.correctness === 'semantic' &&
         evaluatorId !== undefined &&
         evaluatorById.get(evaluatorId) === 'not-scored'
@@ -691,29 +761,30 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
           'An ungraded evaluator cannot claim semantic correctness for an explanation response.',
         );
     });
-    const content = requireArray(activity, 'content', `${path}.content`);
-    content.forEach((contentCandidate, contentIndex) => {
-      const contentPath = `${path}.content[${contentIndex}]`;
-      const item = requireObject(contentCandidate, contentPath);
-      if (!item) return;
-      const kind = requireEnum(item, 'kind', `${contentPath}.kind`, contentKinds);
-      if (kind === 'text') requireString(item, 'text', `${contentPath}.text`);
-      else if (kind === 'code') {
-        requireEnum(item, 'language', `${contentPath}.language`, ['html', 'css', 'text']);
-        requireString(item, 'code', `${contentPath}.code`);
-      } else if (kind === 'resource') {
-        const resourceId = requireString(item, 'resourceId', `${contentPath}.resourceId`, {
-          stableId: true,
-        });
-        if (resourceId && stableIdPattern.test(resourceId) && !ids.resources.has(resourceId))
-          add('UNKNOWN_RESOURCE', `${contentPath}.resourceId`, `Unknown Resource "${resourceId}".`);
-      }
-    });
-    const response =
-      activity.response === undefined
-        ? undefined
-        : requireObject(activity.response, `${path}.response`);
-    if (response) requireEnum(response, 'kind', `${path}.response.kind`, responseKinds);
+    for (const contentField of ['content', 'revealContent']) {
+      const content = requireArray(activity, contentField, `${path}.${contentField}`);
+      content.forEach((contentCandidate, contentIndex) => {
+        const contentPath = `${path}.${contentField}[${contentIndex}]`;
+        const item = requireObject(contentCandidate, contentPath);
+        if (!item) return;
+        const kind = requireEnum(item, 'kind', `${contentPath}.kind`, contentKinds);
+        if (kind === 'text') requireString(item, 'text', `${contentPath}.text`);
+        else if (kind === 'code') {
+          requireEnum(item, 'language', `${contentPath}.language`, ['html', 'css', 'text']);
+          requireString(item, 'code', `${contentPath}.code`);
+        } else if (kind === 'resource') {
+          const resourceId = requireString(item, 'resourceId', `${contentPath}.resourceId`, {
+            stableId: true,
+          });
+          if (resourceId && stableIdPattern.test(resourceId) && !ids.resources.has(resourceId))
+            add(
+              'UNKNOWN_RESOURCE',
+              `${contentPath}.resourceId`,
+              `Unknown Resource "${resourceId}".`,
+            );
+        }
+      });
+    }
     const feedbackGate = requireObject(activity.feedbackGate, `${path}.feedbackGate`);
     if (feedbackGate)
       requireEnum(feedbackGate, 'revealMode', `${path}.feedbackGate.revealMode`, [

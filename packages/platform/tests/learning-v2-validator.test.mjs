@@ -105,10 +105,17 @@ test('unknown references are rejected at every declared relationship boundary', 
   );
   expectIssue(
     (source) => {
-      source.activities[1].content[0].resourceId = 'missing-resource';
+      source.activities[3].content[0].resourceId = 'missing-resource';
     },
     'UNKNOWN_RESOURCE',
-    'activities[1].content[0].resourceId',
+    'activities[3].content[0].resourceId',
+  );
+  expectIssue(
+    (source) => {
+      source.activities[1].revealContent[0].resourceId = 'missing-resource';
+    },
+    'UNKNOWN_RESOURCE',
+    'activities[1].revealContent[0].resourceId',
   );
   expectIssue(
     (source) => {
@@ -140,7 +147,11 @@ test('variable-response Knowledge Components cannot use recognition-only Evidenc
 
   assert.deepEqual(
     validateLearningSourceV2(source).map(({ code }) => code),
-    ['VARIABLE_RESPONSE_RECOGNITION_ONLY_EVIDENCE'],
+    [
+      'ACTIVITY_EVIDENCE_RESPONSE_MISMATCH',
+      'VARIABLE_RESPONSE_RECOGNITION_ONLY_EVIDENCE',
+      'TASK_FAMILY_EVIDENCE_RESPONSE_MISMATCH',
+    ],
   );
 });
 
@@ -200,6 +211,66 @@ test('ungraded free-text explanations cannot claim semantic correctness', () => 
   );
 });
 
+test('Task Family Evidence targets must be among the family targets', () => {
+  expectIssue(
+    (source) => {
+      source.taskFamilies[0].canProduceEvidenceIds.push('css-class-selector-generate-evidence');
+    },
+    'TASK_FAMILY_EVIDENCE_TARGET_MISMATCH',
+    'taskFamilies[0].canProduceEvidenceIds[2]',
+  );
+});
+
+test('Activity Evidence must be producible by its Task Family', () => {
+  expectIssue(
+    (source) => {
+      source.activities[1].evidenceSpecIds = ['css-class-selector-generate-evidence'];
+    },
+    'ACTIVITY_EVIDENCE_NOT_PRODUCIBLE_BY_TASK_FAMILY',
+    'activities[1].evidenceSpecIds[0]',
+  );
+});
+
+test('Activity response must match its Task Family response', () => {
+  expectIssue(
+    (source) => {
+      source.activities[1].response.kind = 'generated-code';
+    },
+    'ACTIVITY_RESPONSE_KIND_MISMATCH',
+    'activities[1].response.kind',
+  );
+});
+
+test('Task Family response must match every producible Evidence response', () => {
+  expectIssue(
+    (source) => {
+      source.taskFamilies[0].response.kind = 'generated-code';
+    },
+    'TASK_FAMILY_EVIDENCE_RESPONSE_MISMATCH',
+    'taskFamilies[0].canProduceEvidenceIds[0]',
+  );
+});
+
+test('Activity response must match every attached Evidence response', () => {
+  expectIssue(
+    (source) => {
+      source.activities[1].response.kind = 'generated-code';
+    },
+    'ACTIVITY_EVIDENCE_RESPONSE_MISMATCH',
+    'activities[1].evidenceSpecIds[0]',
+  );
+});
+
+test('Activities with Evidence require a learner response', () => {
+  expectIssue(
+    (source) => {
+      delete source.activities[1].response;
+    },
+    'ACTIVITY_EVIDENCE_WITHOUT_RESPONSE',
+    'activities[1].evidenceSpecIds',
+  );
+});
+
 test('structural errors cover versions, required values, malformed stable IDs, and non-JSON data', () => {
   expectIssue(
     (source) => {
@@ -242,6 +313,13 @@ test('structural errors cover versions, required values, malformed stable IDs, a
     },
     'REQUIRED_ARRAY',
     'resources',
+  );
+  expectIssue(
+    (source) => {
+      delete source.activities[0].revealContent;
+    },
+    'REQUIRED_ARRAY',
+    'activities[0].revealContent',
   );
   expectIssue(
     (source) => {

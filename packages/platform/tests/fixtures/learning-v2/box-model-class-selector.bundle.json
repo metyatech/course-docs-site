@@ -24,7 +24,30 @@
         },
         "response": {
           "variability": "constant",
-          "form": "diagnosis"
+          "form": "selection"
+        },
+        "forms": {
+          "performance": "required",
+          "verbal": "optional"
+        },
+        "rationale": {
+          "available": true,
+          "required": false
+        },
+        "prerequisites": ["css-selector-tag-match"]
+      },
+      {
+        "id": "css-selector-tag-match",
+        "claim": {
+          "learnerCan": "Match a CSS tag selector to elements of that tag."
+        },
+        "condition": {
+          "variability": "variable",
+          "relevantFeatures": ["tagName", "cssSelector"]
+        },
+        "response": {
+          "variability": "constant",
+          "form": "selection"
         },
         "forms": {
           "performance": "required",
@@ -63,8 +86,8 @@
   },
   "evidenceSpecs": [
     {
-      "id": "css-class-selector-prediction",
-      "targetKnowledgeComponentId": "css-class-selector-match",
+      "id": "css-selector-tag-prediction",
+      "targetKnowledgeComponentId": "css-selector-tag-match",
       "observable": {
         "response": "selection",
         "correctness": "exact"
@@ -81,15 +104,15 @@
       "id": "css-class-selector-match-evidence",
       "targetKnowledgeComponentId": "css-class-selector-match",
       "observable": {
-        "response": "diagnosis",
-        "correctness": "behavioral"
+        "response": "selection",
+        "correctness": "exact"
       },
       "supports": {
         "dimension": "independent-performance"
       },
       "requires": {
-        "assistance": "allowed",
-        "freshBeforeAnswerExposure": false
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
       }
     },
     {
@@ -111,7 +134,7 @@
   "taskFamilies": [
     {
       "id": "class-selector-contrast",
-      "targetKnowledgeComponentIds": ["css-class-selector-match"],
+      "targetKnowledgeComponentIds": ["css-selector-tag-match", "css-class-selector-match"],
       "dimensions": {
         "htmlClass": {
           "role": "relevant"
@@ -130,18 +153,15 @@
         "kind": "selection"
       },
       "evaluatorId": "class-selector-css-evaluator",
-      "canProduceEvidenceIds": [
-        "css-class-selector-prediction",
-        "css-class-selector-match-evidence"
-      ],
+      "canProduceEvidenceIds": ["css-selector-tag-prediction", "css-class-selector-match-evidence"],
       "variants": [
         {
           "id": "tag-selector",
           "dimensions": {
             "htmlClass": null,
             "cssSelector": "p",
-            "cssDeclarations": "color: #b45309",
-            "content": "りんごの価格"
+            "cssDeclarations": "background-color: #ffedd5; color: #7c2d12",
+            "content": "おすすめ/チョコドーナツ/ふんわり生地にチョコがけ。/180円"
           }
         },
         {
@@ -149,8 +169,8 @@
           "dimensions": {
             "htmlClass": "nedan",
             "cssSelector": "p",
-            "cssDeclarations": "color: #b45309",
-            "content": "りんごの価格"
+            "cssDeclarations": "background-color: #ffedd5; color: #7c2d12",
+            "content": "おすすめ/チョコドーナツ/ふんわり生地にチョコがけ。/180円"
           }
         },
         {
@@ -158,8 +178,8 @@
           "dimensions": {
             "htmlClass": "nedan",
             "cssSelector": ".nedan",
-            "cssDeclarations": "color: #b45309",
-            "content": "りんごの価格"
+            "cssDeclarations": "background-color: #ffedd5; color: #7c2d12",
+            "content": "おすすめ/チョコドーナツ/ふんわり生地にチョコがけ。/180円"
           }
         }
       ],
@@ -229,6 +249,7 @@
           "text": "Class names let a CSS rule target selected HTML elements."
         }
       ],
+      "revealContent": [],
       "feedbackGate": {
         "revealMode": "immediate"
       }
@@ -237,11 +258,27 @@
       "id": "p-selector-prediction",
       "taskFamilyId": "class-selector-contrast",
       "taskVariantId": "tag-selector",
-      "evidenceSpecIds": ["css-class-selector-prediction"],
+      "evidenceSpecIds": ["css-selector-tag-prediction"],
       "content": [
         {
+          "kind": "text",
+          "text": "Select every element that receives the style."
+        },
+        {
+          "kind": "code",
+          "language": "html",
+          "code": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p>180円</p>"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "p {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+        }
+      ],
+      "revealContent": [
+        {
           "kind": "resource",
-          "resourceId": "box-model-class-selector-rendering"
+          "resourceId": "box-model-tag-selector-rendering"
         }
       ],
       "response": {
@@ -260,6 +297,7 @@
           "text": "The p selector matches every paragraph element."
         }
       ],
+      "revealContent": [],
       "feedbackGate": {
         "revealMode": "immediate"
       }
@@ -272,9 +310,10 @@
       "content": [
         {
           "kind": "resource",
-          "resourceId": "box-model-class-selector-rendering"
+          "resourceId": "box-model-class-added-only-rendering"
         }
       ],
+      "revealContent": [],
       "feedbackGate": {
         "revealMode": "immediate"
       }
@@ -286,15 +325,31 @@
       "evidenceSpecIds": ["css-class-selector-match-evidence"],
       "content": [
         {
+          "kind": "text",
+          "text": "Select every element matched by .nedan."
+        },
+        {
+          "kind": "code",
+          "language": "html",
+          "code": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p class=\"nedan\">180円</p>"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".nedan {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+        }
+      ],
+      "revealContent": [
+        {
           "kind": "resource",
-          "resourceId": "box-model-class-selector-rendering"
+          "resourceId": "box-model-class-selector-active-rendering"
         }
       ],
       "response": {
-        "kind": "diagnosis"
+        "kind": "selection"
       },
       "feedbackGate": {
-        "revealMode": "immediate"
+        "revealMode": "after-commit"
       }
     },
     {
@@ -306,6 +361,13 @@
         {
           "kind": "text",
           "text": "Generate the CSS selector for class=\"waku\"."
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".waku"
         }
       ],
       "response": {
@@ -324,6 +386,13 @@
         {
           "kind": "text",
           "text": "Generate the CSS selector for class=\"price\"."
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".price"
         }
       ],
       "response": {
@@ -383,13 +452,29 @@
   ],
   "resourceManifest": [
     {
-      "id": "box-model-class-selector-rendering",
+      "id": "box-model-tag-selector-rendering",
       "kind": "rendered-html-css",
       "payload": {
-        "html": "<p>りんごの価格</p>",
-        "css": "p { color: #b45309; }"
+        "html": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p>180円</p>",
+        "css": "p {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+      }
+    },
+    {
+      "id": "box-model-class-added-only-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p class=\"nedan\">180円</p>",
+        "css": "p {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+      }
+    },
+    {
+      "id": "box-model-class-selector-active-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p class=\"nedan\">180円</p>",
+        "css": ".nedan {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
       }
     }
   ],
-  "bundleId": "sha256:d1bdae6b3fa8125614ba14024ef88cc84141c0eef5c31a67b4ceb87c08e29b96"
+  "bundleId": "sha256:d908b23c254645032fd9d97105b2e35d1af8756982811b9d61181b1d6bbf729b"
 }

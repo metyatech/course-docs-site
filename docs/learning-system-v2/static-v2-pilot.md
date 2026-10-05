@@ -188,6 +188,13 @@ whitespace. `bundleId` is `sha256:` followed by the lowercase SHA-256 digest of 
 Bundle JSON with `bundleId` omitted. The checked-in class-selector fixture and golden Bundle pin
 this initial representation; they do not settle future authoring formats.
 
+In the initial Gate A Activity contract, `content` holds pre-commit/common content and
+`revealContent` holds content gated by `feedbackGate`. The semantic validator enforces Task Family,
+Evidence target/response, and attached Activity response compatibility. The reference fixture
+stores its tag-selector, class-added-only, and class-selector-active rendering states as concrete
+resources so a future generic renderer does not infer box-model transformations from Task
+dimension names. This is an initial contract, not a final Content IR decision.
+
 Gate A validation errors cover required structure and enums, stable IDs and duplicates, all
 declared cross-references, variable-response Knowledge Components with only recognition-level
 Evidence, fresh Evidence reveal gates, ungraded semantic claims for explanation responses, and
