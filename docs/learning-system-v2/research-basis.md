@@ -275,3 +275,57 @@ unresolved unless separately justified:
 - exact number of worked examples before fading;
 - exact transfer distance for every KC;
 - exact Teacher View visualization.
+
+
+## Programming worked examples, tracing, and completion scaffolds
+
+Muldner, Jennings, and Chiarelli (2023), *A Review of Worked Examples in Programming Activities*.
+
+https://eric.ed.gov/?id=EJ1381113
+
+The review distinguishes code-tracing and code-generation worked examples and reports established
+lines of work around program visualization/tracing, subgoal support, and incomplete examples such
+as Parsons problems. **R**
+
+Adaptive Parsons work has also investigated using rearrangement problems as optional scaffolds
+for learners struggling with write-code tasks:
+
+https://doi.org/10.1145/3501385.3543977
+
+Course Docs synthesis:
+
+- executable programming lessons may use tracing/prediction when execution or state change is
+  the target; **S**
+- worked code, completion, Parsons-like scaffolds, and partial generation can be support levels
+  on the path to fresh independent code generation; **S**
+- scaffolded success must not be relabeled as independent generation without a later unassisted
+  variant. **S**
+
+## Programming knowledge tracing
+
+A systematic review of knowledge tracing in programming education describes work that models
+student knowledge from programming-exercise performance and highlights differences in knowledge
+representation, KC granularity, and performance measures.
+
+https://doi.org/10.1109/FIE49875.2021.9637323
+
+This supports keeping programming evidence tied to explicit knowledge representations rather than
+treating whole-program correctness as one undifferentiated mastery signal. **R/S**
+
+## Programming debugging interventions
+
+Yang et al. (2024), *Decoding Debugging Instruction: A Systematic Literature Review of Debugging
+Interventions*.
+
+https://doi.org/10.1145/3690652
+
+The review describes debugging as a complex activity involving program understanding, fault
+localization, strategies, and iterative testing, and reviews interventions including modeling,
+worked examples, tracing/comprehension support, and scaffolding. **R**
+
+Course Docs synthesis:
+
+- preserve syntax/runtime/logical failure classes when observable; **S**
+- use runtime errors and behavioral mismatches as diagnostic Evidence rather than only showing a
+  finished answer; **S**
+- debugging Tasks should include diagnosis and verification, not merely repair. **S**
