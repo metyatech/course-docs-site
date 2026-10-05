@@ -35,6 +35,8 @@ await run(process.execPath, [
   'tests/mdx-code-preview-boundary.test.mjs',
   'tests/mdx-guided-task-components.test.mjs',
   'tests/learning-model.test.mjs',
+  'tests/learning-v2-compiler.test.mjs',
+  'tests/learning-v2-validator.test.mjs',
   'tests/package-quality-contract.test.mjs',
   'tests/remark-admonitions-to-mdx.test.mjs',
   'tests/remark-inject-tutorial-shot-legend.test.mjs',

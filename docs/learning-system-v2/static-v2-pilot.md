@@ -181,6 +181,21 @@ Gate A passes when:
 - existing v1 behavior is unchanged;
 - existing repository verification remains green.
 
+The Gate A source representation is a checked-in JSON fixture with `sourceSchemaVersion: 1`.
+Its compiler emits Bundle `schemaVersion: 1` using compiler version `0.1.0`. Canonical JSON
+recursively sorts object keys by Unicode code point, preserves array order, and contains no
+whitespace. `bundleId` is `sha256:` followed by the lowercase SHA-256 digest of that canonical
+Bundle JSON with `bundleId` omitted. The checked-in class-selector fixture and golden Bundle pin
+this initial representation; they do not settle future authoring formats.
+
+Gate A validation errors cover required structure and enums, stable IDs and duplicates, all
+declared cross-references, variable-response Knowledge Components with only recognition-level
+Evidence, fresh Evidence reveal gates, ungraded semantic claims for explanation responses, and
+linked-contrast dimension declarations and actual value changes. Evidence sufficiency for
+required rationales, pedagogical transfer adequacy, meaningful retention delay, prerequisite
+confounding, debugging sufficiency, final-artifact attribution, mastery thresholds, Learner Model
+inference, and Task difficulty remain deferred.
+
 **Stop and review Gate A before implementing Gate B.**
 
 ### Gate B — shared interactive runtime

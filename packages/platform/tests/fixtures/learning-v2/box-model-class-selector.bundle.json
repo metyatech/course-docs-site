@@ -1,0 +1,395 @@
+{
+  "schemaVersion": 1,
+  "compilerVersion": "0.1.0",
+  "courseId": "box-model",
+  "contentRevision": "class-selector-reference-1",
+  "knowledge": {
+    "units": [
+      {
+        "id": "css-class-selector",
+        "title": "CSS class selectors",
+        "goal": "Match and generate CSS class selectors.",
+        "knowledgeComponentIds": ["css-class-selector-match", "css-class-selector-generate"]
+      }
+    ],
+    "knowledgeComponents": [
+      {
+        "id": "css-class-selector-match",
+        "claim": {
+          "learnerCan": "Match a CSS class selector to elements with that class."
+        },
+        "condition": {
+          "variability": "variable",
+          "relevantFeatures": ["htmlClass", "cssSelector"]
+        },
+        "response": {
+          "variability": "constant",
+          "form": "diagnosis"
+        },
+        "forms": {
+          "performance": "required",
+          "verbal": "optional"
+        },
+        "rationale": {
+          "available": true,
+          "required": false
+        },
+        "prerequisites": []
+      },
+      {
+        "id": "css-class-selector-generate",
+        "claim": {
+          "learnerCan": "Generate a class selector from an HTML class name."
+        },
+        "condition": {
+          "variability": "variable",
+          "relevantFeatures": ["className"]
+        },
+        "response": {
+          "variability": "variable",
+          "form": "code"
+        },
+        "forms": {
+          "performance": "required",
+          "verbal": "not-required"
+        },
+        "rationale": {
+          "available": false,
+          "required": false
+        },
+        "prerequisites": ["css-class-selector-match"]
+      }
+    ]
+  },
+  "evidenceSpecs": [
+    {
+      "id": "css-class-selector-prediction",
+      "targetKnowledgeComponentId": "css-class-selector-match",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-class-selector-match-evidence",
+      "targetKnowledgeComponentId": "css-class-selector-match",
+      "observable": {
+        "response": "diagnosis",
+        "correctness": "behavioral"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "allowed",
+        "freshBeforeAnswerExposure": false
+      }
+    },
+    {
+      "id": "css-class-selector-generate-evidence",
+      "targetKnowledgeComponentId": "css-class-selector-generate",
+      "observable": {
+        "response": "generated-code",
+        "correctness": "semantic"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    }
+  ],
+  "taskFamilies": [
+    {
+      "id": "class-selector-contrast",
+      "targetKnowledgeComponentIds": ["css-class-selector-match"],
+      "dimensions": {
+        "htmlClass": {
+          "role": "relevant"
+        },
+        "cssSelector": {
+          "role": "relevant"
+        },
+        "cssDeclarations": {
+          "role": "surface"
+        },
+        "content": {
+          "role": "surface"
+        }
+      },
+      "response": {
+        "kind": "selection"
+      },
+      "evaluatorId": "class-selector-css-evaluator",
+      "canProduceEvidenceIds": [
+        "css-class-selector-prediction",
+        "css-class-selector-match-evidence"
+      ],
+      "variants": [
+        {
+          "id": "tag-selector",
+          "dimensions": {
+            "htmlClass": null,
+            "cssSelector": "p",
+            "cssDeclarations": "color: #b45309",
+            "content": "りんごの価格"
+          }
+        },
+        {
+          "id": "class-added-only",
+          "dimensions": {
+            "htmlClass": "nedan",
+            "cssSelector": "p",
+            "cssDeclarations": "color: #b45309",
+            "content": "りんごの価格"
+          }
+        },
+        {
+          "id": "class-selector-active",
+          "dimensions": {
+            "htmlClass": "nedan",
+            "cssSelector": ".nedan",
+            "cssDeclarations": "color: #b45309",
+            "content": "りんごの価格"
+          }
+        }
+      ],
+      "linkedContrastSequences": [
+        {
+          "id": "class-selector-causal-contrast",
+          "invariantDimensions": ["cssDeclarations", "content"],
+          "steps": [
+            {
+              "variantId": "tag-selector",
+              "changedDimensions": []
+            },
+            {
+              "variantId": "class-added-only",
+              "changedDimensions": ["htmlClass"]
+            },
+            {
+              "variantId": "class-selector-active",
+              "changedDimensions": ["cssSelector"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "class-selector-generate",
+      "targetKnowledgeComponentIds": ["css-class-selector-generate"],
+      "dimensions": {
+        "className": {
+          "role": "relevant"
+        },
+        "expectedSelector": {
+          "role": "surface"
+        }
+      },
+      "response": {
+        "kind": "generated-code"
+      },
+      "evaluatorId": "class-selector-generation-evaluator",
+      "canProduceEvidenceIds": ["css-class-selector-generate-evidence"],
+      "variants": [
+        {
+          "id": "waku",
+          "dimensions": {
+            "className": "waku",
+            "expectedSelector": ".waku"
+          }
+        },
+        {
+          "id": "price",
+          "dimensions": {
+            "className": "price",
+            "expectedSelector": ".price"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    }
+  ],
+  "activityCatalog": [
+    {
+      "id": "minimal-orientation",
+      "evidenceSpecIds": [],
+      "content": [
+        {
+          "kind": "text",
+          "text": "Class names let a CSS rule target selected HTML elements."
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "immediate"
+      }
+    },
+    {
+      "id": "p-selector-prediction",
+      "taskFamilyId": "class-selector-contrast",
+      "taskVariantId": "tag-selector",
+      "evidenceSpecIds": ["css-class-selector-prediction"],
+      "content": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-class-selector-rendering"
+        }
+      ],
+      "response": {
+        "kind": "selection"
+      },
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      }
+    },
+    {
+      "id": "concrete-result-reasoning",
+      "evidenceSpecIds": [],
+      "content": [
+        {
+          "kind": "text",
+          "text": "The p selector matches every paragraph element."
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "immediate"
+      }
+    },
+    {
+      "id": "class-added-only",
+      "taskFamilyId": "class-selector-contrast",
+      "taskVariantId": "class-added-only",
+      "evidenceSpecIds": [],
+      "content": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-class-selector-rendering"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "immediate"
+      }
+    },
+    {
+      "id": "class-selector-active",
+      "taskFamilyId": "class-selector-contrast",
+      "taskVariantId": "class-selector-active",
+      "evidenceSpecIds": ["css-class-selector-match-evidence"],
+      "content": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-class-selector-rendering"
+        }
+      ],
+      "response": {
+        "kind": "diagnosis"
+      },
+      "feedbackGate": {
+        "revealMode": "immediate"
+      }
+    },
+    {
+      "id": "waku-independent-generation",
+      "taskFamilyId": "class-selector-generate",
+      "taskVariantId": "waku",
+      "evidenceSpecIds": ["css-class-selector-generate-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "Generate the CSS selector for class=\"waku\"."
+        }
+      ],
+      "response": {
+        "kind": "generated-code"
+      },
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      }
+    },
+    {
+      "id": "price-fresh-variation",
+      "taskFamilyId": "class-selector-generate",
+      "taskVariantId": "price",
+      "evidenceSpecIds": ["css-class-selector-generate-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "Generate the CSS selector for class=\"price\"."
+        }
+      ],
+      "response": {
+        "kind": "generated-code"
+      },
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      }
+    }
+  ],
+  "corePlan": [
+    {
+      "id": "step-minimal-orientation",
+      "activityId": "minimal-orientation",
+      "blocking": true
+    },
+    {
+      "id": "step-p-selector-prediction",
+      "activityId": "p-selector-prediction",
+      "blocking": true
+    },
+    {
+      "id": "step-concrete-result-reasoning",
+      "activityId": "concrete-result-reasoning",
+      "blocking": true
+    },
+    {
+      "id": "step-class-added-only",
+      "activityId": "class-added-only",
+      "blocking": true
+    },
+    {
+      "id": "step-class-selector-active",
+      "activityId": "class-selector-active",
+      "blocking": true
+    },
+    {
+      "id": "step-waku-independent-generation",
+      "activityId": "waku-independent-generation",
+      "blocking": true
+    },
+    {
+      "id": "step-price-fresh-variation",
+      "activityId": "price-fresh-variation",
+      "blocking": true
+    }
+  ],
+  "evaluatorSpecs": [
+    {
+      "id": "class-selector-css-evaluator",
+      "kind": "css-selector"
+    },
+    {
+      "id": "class-selector-generation-evaluator",
+      "kind": "exact-response"
+    }
+  ],
+  "resourceManifest": [
+    {
+      "id": "box-model-class-selector-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<p>りんごの価格</p>",
+        "css": "p { color: #b45309; }"
+      }
+    }
+  ],
+  "bundleId": "sha256:d1bdae6b3fa8125614ba14024ef88cc84141c0eef5c31a67b4ceb87c08e29b96"
+}

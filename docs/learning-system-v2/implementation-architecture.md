@@ -73,7 +73,8 @@ v2 core architecture.
 
 ### Compiler input
 
-The exact serialization remains unresolved, but compiler input must be able to represent:
+The long-term authoring serialization remains unresolved. Gate A starts from a checked-in JSON
+fixture; compiler input must be able to represent:
 
 - Units and KCs;
 - prerequisites and relations;
