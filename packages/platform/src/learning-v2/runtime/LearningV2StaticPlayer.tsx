@@ -42,12 +42,7 @@ export function LearningV2StaticPlayer({ bundle }: LearningV2StaticPlayerProps) 
           activity.feedbackGate.revealMode === 'immediate' || activityState?.answerExposed === true;
 
         return (
-          <section
-            className="learning-v2__activity"
-            key={step.id}
-            aria-label={activity.id}
-            data-activity-id={activity.id}
-          >
+          <section className="learning-v2__activity" key={step.id} data-activity-id={activity.id}>
             <LearningContentRenderer bundle={bundle} nodes={activity.content} />
             {isRevealed && activity.revealContent.length > 0 ? (
               <LearningContentRenderer bundle={bundle} nodes={activity.revealContent} />

@@ -74,6 +74,7 @@ test(
       "none",
     );
     assert.equal(await page.locator("[data-activity-id]").count(), 1);
+    assert.equal(await page.getByRole("region", { name: "minimal-orientation" }).count(), 0);
     assert.equal(await page.locator('[data-activity-id="p-selector-prediction"]').count(), 0);
     assert.equal(await page.title(), "CSSの学習");
     let axe;

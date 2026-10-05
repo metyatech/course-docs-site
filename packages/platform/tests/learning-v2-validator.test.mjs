@@ -302,6 +302,27 @@ test('selection option IDs, correct references, labels, and arrays are validated
   );
 });
 
+test('selection responses require at least one option', () => {
+  expectIssue(
+    (source) => {
+      source.activities[1].response.options = [];
+      source.activities[1].response.correctOptionIds = [];
+    },
+    'EMPTY_SELECTION_OPTIONS',
+    'activities[1].response.options',
+  );
+});
+
+test('selection responses require at least one correct option', () => {
+  expectIssue(
+    (source) => {
+      source.activities[1].response.correctOptionIds = [];
+    },
+    'EMPTY_CORRECT_OPTION_IDS',
+    'activities[1].response.correctOptionIds',
+  );
+});
+
 test('generated-code response requires nonempty input and expected response', () => {
   expectIssue(
     (source) => {

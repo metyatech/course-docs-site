@@ -687,6 +687,12 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
       : undefined;
     if (responseKind === 'selection' && response) {
       const options = requireArray(response, 'options', `${path}.response.options`);
+      if (options.length === 0)
+        add(
+          'EMPTY_SELECTION_OPTIONS',
+          `${path}.response.options`,
+          'Selection response must declare at least one option.',
+        );
       const optionIds = new Set<string>();
       options.forEach((optionCandidate, optionIndex) => {
         const optionPath = `${path}.response.options[${optionIndex}]`;
@@ -711,6 +717,12 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
         'correctOptionIds',
         `${path}.response.correctOptionIds`,
       );
+      if (correctOptionIds.length === 0)
+        add(
+          'EMPTY_CORRECT_OPTION_IDS',
+          `${path}.response.correctOptionIds`,
+          'Selection response must declare at least one correct option.',
+        );
       const correctSeen = new Set<string>();
       correctOptionIds.forEach((optionId, optionIndex) => {
         const optionPath = `${path}.response.correctOptionIds[${optionIndex}]`;

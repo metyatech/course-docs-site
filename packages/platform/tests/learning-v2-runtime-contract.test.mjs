@@ -30,6 +30,13 @@ test('runtime and engine preserve their import and persistence boundaries', () =
   }
 });
 
+test('Activity sections keep internal IDs out of accessible names', () => {
+  const playerSource = readSource('src/learning-v2/runtime/LearningV2StaticPlayer.tsx');
+
+  assert.doesNotMatch(playerSource, /aria-label=\{activity\.id\}/);
+  assert.match(playerSource, /data-activity-id=\{activity\.id\}/);
+});
+
 test('HTML/CSS preview is sandboxed and blocks network-capable resources', () => {
   const rendererSource = readSource('src/learning-v2/runtime/content-renderer.tsx');
   const document = buildRenderedHtmlCssDocument('<p>preview</p>', 'p { color: red; }');
