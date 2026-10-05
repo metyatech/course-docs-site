@@ -300,6 +300,11 @@ A procedure-heavy Unreal Engine stress test is recorded in
 five-model architecture can cover external-tool procedures, provided Task and Evidence models
 represent environment state, action sequences, observation channels, and recovery paths.
 
+An executable-code stress test is recorded in
+[`javascript-dom-reference.md`](./javascript-dom-reference.md). It confirms that the same
+architecture can also cover code generation, runtime behavior, DOM state, events, automated
+semantic evaluation, and programming-specific debugging.
+
 ## Provenance
 
 Use these labels where the distinction matters:
