@@ -795,15 +795,163 @@ Recommended migration shape:
 2. add v2 compiler to content verification/build;
 3. compile one reference course/page into a Bundle;
 4. add generic v2 Activity renderer;
-5. add Student Runtime with local Evidence first;
-6. add durable learner state;
-7. add class session/realtime;
-8. add Presentation and Teacher Views;
-9. migrate content deliberately;
-10. remove v1 only after v2 acceptance criteria pass.
+5. ship the Static v2 pilot with ephemeral interaction state only;
+6. validate the box-model reference experience;
+7. add learner identity/adaptation only in a later milestone;
+8. add durable learner state;
+9. add class session/realtime and separate Presentation/Teacher projections;
+10. migrate content deliberately;
+11. remove v1 only after v2 acceptance criteria pass.
 
 Backward compatibility is not an educational requirement; this temporary coexistence is an
 implementation safety strategy.
+
+## Static v2 pilot: first implementation milestone
+
+Before introducing learner-specific state or classroom infrastructure, implement a deliberately
+smaller **Static v2 pilot**.
+
+### Scope
+
+The pilot has exactly one shared learner-facing experience.
+
+Teacher and learners render the same material and follow the same fixed core path.
+
+Explicitly excluded:
+
+- learner accounts or IDs;
+- learner-specific Learner Model;
+- adaptive branching by learner;
+- private hints/remediation/enrichment;
+- Teacher View;
+- separate Presentation View;
+- ClassSession persistence;
+- Supabase learning-state tables;
+- Realtime;
+- external object storage for learning state;
+- cross-device or cross-session learning history;
+- retrieval scheduling;
+- external-tool telemetry.
+
+No new external data store is required for this milestone.
+
+### Local state is allowed
+
+"Static" does **not** mean "non-interactive".
+
+The browser may keep ephemeral local state needed to preserve the instructional sequence, for
+example:
+
+- whether a prediction has been submitted;
+- the submitted local answer;
+- whether feedback/result has been revealed;
+- current local retry state;
+- current shared-path activity position.
+
+Reloading the page may reset this pilot state.
+
+Do not persist learner Evidence to localStorage/IndexedDB merely to simulate the later
+persistence layer unless a narrowly scoped implementation need is demonstrated.
+
+### Real v2 compiler, simplified runtime policy
+
+The compile-time path must already be production-shaped:
+
+```text
+authoring/model source
+    -> semantic validation
+    -> Learning Compiler
+    -> immutable Learning Bundle
+    -> renderer
+```
+
+The runtime policy for the pilot is intentionally simple:
+
+```text
+StaticPolicy
+  -> follow the authored/compiled core path
+  -> same path for every viewer
+```
+
+There is no learner-specific routing.
+
+This keeps the architecture extensible without prematurely implementing adaptive infrastructure.
+
+### Evidence during the pilot
+
+The semantic model may describe intended Evidence and evaluators, and interactions may compute
+local correctness for feedback.
+
+However, the pilot does not claim a durable Learner Model.
+
+Any in-memory observation exists only to drive the current page interaction or validate the
+compiler/evaluator contract.
+
+### Reveal semantics
+
+Because there is no synchronized ClassSession yet, teacher-controlled class reveal is deferred.
+
+For the pilot, activities that require answer secrecy use a local interaction gate:
+
+```text
+prompt
+  -> viewer commits answer/prediction
+  -> local reveal becomes available
+  -> common result/explanation is shown
+```
+
+This preserves the educational property "commit before answer" without pretending that 40
+browsers are synchronized.
+
+A later classroom milestone will replace the local gate with authoritative teacher-controlled
+session release while keeping the same activity semantics.
+
+### Acceptance target
+
+The first accepted experience is the class-selector portion of the box-model reference:
+
+```text
+minimal orientation
+-> p-selector prediction
+-> concrete result
+-> learner reasoning where useful
+-> canonical explanation
+-> add class only / no visual change
+-> switch p to .nedan / isolated visual change
+-> independent .waku generation
+-> one fresh variation
+```
+
+All viewers follow this same path.
+
+The implementation passes only if this experience is at least as coherent as the v6.13
+reference and is generated through v2 schema/compiler/Bundle/renderer boundaries rather than
+page-specific hard-coding.
+
+### Pilot architecture
+
+The first runtime therefore reduces to:
+
+```text
+Course v2 source
+      |
+      v
+Learning Compiler
+      |
+      v
+immutable Learning Bundle
+      |
+      v
+Static Policy
+      |
+      v
+shared interactive renderer
+      |
+      v
+ephemeral browser state only
+```
+
+Persistence/Realtime remain future adapters, not hidden dependencies of the pilot.
 
 ## First vertical slice
 
@@ -813,15 +961,15 @@ It should include:
 
 - immutable compiled Bundle;
 - prediction response before reveal;
-- teacher-controlled reveal in a local/single-session harness;
+- local commit-before-reveal interaction (no teacher/session synchronization yet);
 - concrete result feedback;
 - linked class-added-only -> selector-changed contrast;
 - independent `.waku` generation;
 - one fresh variation;
-- adaptive hint escalation;
-- raw attempt/Evidence record;
-- answer-exposure lineage;
-- deterministic Policy;
+- one shared, non-adaptive support path where support is needed;
+- ephemeral local attempt/observation representation sufficient to validate Evidence contracts;
+- local answer-exposure lineage within the page interaction;
+- deterministic Static Policy;
 - acceptance comparison against v6.13.
 
 Do **not** begin by implementing all Teacher View analytics, all identity providers, all retrieval
@@ -844,17 +992,21 @@ Build:
 
 Exit condition: invalid KC/Evidence/Task relationships fail before runtime.
 
-### Phase B — single-learner runtime
+### Phase B — Static v2 interactive runtime
 
 Build:
 
 - Activity renderer;
-- deterministic Policy;
-- attempt/Evidence reducer;
-- browser persistence/outbox;
-- CSS class-selector reference flow.
+- deterministic Static Policy;
+- ephemeral local interaction/Evidence reducer;
+- CSS class-selector reference flow;
+- local commit-before-reveal gates.
 
-Exit condition: v6.13 acceptance fixture is matched or improved without server state.
+Do not add learner identity, adaptive branches, browser persistence/outbox, Supabase learning
+state, Realtime, or separate teacher/student projections in this phase.
+
+Exit condition: the shared static experience matches or improves the v6.13 acceptance fixture
+through the real Bundle/renderer path.
 
 ### Phase C — evaluator layer
 
