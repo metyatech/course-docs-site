@@ -98,6 +98,26 @@ export interface TaskFamilySourceV2 {
 
 export type RevealMode = 'immediate' | 'after-commit';
 
+export interface SelectionOptionV2 {
+  readonly id: StableId;
+  readonly label: string;
+}
+
+export type ActivityResponseSourceV2 =
+  | {
+      readonly kind: 'selection';
+      readonly options: readonly SelectionOptionV2[];
+      readonly correctOptionIds: readonly StableId[];
+    }
+  | {
+      readonly kind: 'generated-code';
+      readonly inputLabel: string;
+      readonly expectedResponse: string;
+    }
+  | {
+      readonly kind: 'recognition' | 'execution' | 'explanation' | 'diagnosis';
+    };
+
 export interface ActivitySourceV2 {
   id: StableId;
   taskFamilyId?: StableId;
@@ -110,7 +130,7 @@ export interface ActivitySourceV2 {
    * before commitment.
    */
   revealContent: LearningContentNodeV2[];
-  response?: { kind: ResponseKind };
+  response?: ActivityResponseSourceV2;
   feedbackGate: { revealMode: RevealMode };
 }
 
@@ -130,11 +150,19 @@ export interface EvaluatorSpecSourceV2 {
   kind: 'exact-response' | 'css-selector' | 'selection-set' | 'not-scored';
 }
 
-export interface ResourceSourceV2 {
+export interface RenderedHtmlCssResourceSourceV2 {
   id: StableId;
-  kind: 'rendered-html-css' | 'static-text';
-  payload: unknown;
+  kind: 'rendered-html-css';
+  payload: { html: string; css: string };
 }
+
+export interface StaticTextResourceSourceV2 {
+  id: StableId;
+  kind: 'static-text';
+  payload: string;
+}
+
+export type ResourceSourceV2 = RenderedHtmlCssResourceSourceV2 | StaticTextResourceSourceV2;
 
 type DeepReadonly<T> = T extends (...args: never[]) => unknown
   ? T

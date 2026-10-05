@@ -210,11 +210,24 @@ inference, and Task difficulty remain deferred.
 Only after Gate A review, implement:
 
 - generic Activity renderer for the primitives needed by the reference;
+- Bundle-defined selection and generated-code response contracts, with matching local evaluators;
 - deterministic Static Policy;
 - ephemeral local interaction reducer/state;
 - local commit-before-reveal behavior;
 - common feedback/result rendering;
 - class-selector reference flow through the actual Bundle/renderer path.
+
+The Gate B response contract provides selection options and correct option IDs, or a generated-code
+input label and expected response, as data in each Activity. Selection Tasks require a
+`selection-set` evaluator. Rendered HTML/CSS Resources carry validated string payloads and are
+shown in a sandboxed preview. The runtime uses `content` before commitment and shows
+`revealContent` only according to the Activity's reveal gate. These are initial Static v2 pilot
+contracts, not a decision that the long-term Content IR is final.
+
+The browser pilot compiles the checked-in JSON source fixture with the Gate A compiler and renders
+that Bundle through the shared player. Its resource states contain the authored HTML/CSS directly;
+the runtime does not transform Task dimensions or know selector-specific rules. Retry attempts
+remain local to memory and record whether the answer had already been exposed before the attempt.
 
 No identity, database, Realtime, or adaptive learner branches.
 

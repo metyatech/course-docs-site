@@ -59,7 +59,7 @@
     {
       "id": "css-class-selector-generate-evidence",
       "targetKnowledgeComponentId": "css-class-selector-generate",
-      "observable": { "response": "generated-code", "correctness": "semantic" },
+      "observable": { "response": "generated-code", "correctness": "exact" },
       "supports": { "dimension": "independent-performance" },
       "requires": { "assistance": "none", "freshBeforeAnswerExposure": true }
     }
@@ -75,7 +75,7 @@
         "content": { "role": "surface" }
       },
       "response": { "kind": "selection" },
-      "evaluatorId": "class-selector-css-evaluator",
+      "evaluatorId": "class-selector-selection-evaluator",
       "canProduceEvidenceIds": ["css-selector-tag-prediction", "css-class-selector-match-evidence"],
       "variants": [
         {
@@ -140,7 +140,7 @@
       "id": "minimal-orientation",
       "evidenceSpecIds": [],
       "content": [
-        { "kind": "text", "text": "Class names let a CSS rule target selected HTML elements." }
+        { "kind": "text", "text": "CSSのセレクターが、どの要素を選ぶか見てみましょう。" }
       ],
       "revealContent": [],
       "feedbackGate": { "revealMode": "immediate" }
@@ -151,7 +151,7 @@
       "taskVariantId": "tag-selector",
       "evidenceSpecIds": ["css-selector-tag-prediction"],
       "content": [
-        { "kind": "text", "text": "Select every element that receives the style." },
+        { "kind": "text", "text": "このCSSで色が付く要素をすべて選んでください。" },
         {
           "kind": "code",
           "language": "html",
@@ -164,13 +164,24 @@
         }
       ],
       "revealContent": [{ "kind": "resource", "resourceId": "box-model-tag-selector-rendering" }],
-      "response": { "kind": "selection" },
+      "response": {
+        "kind": "selection",
+        "options": [
+          { "id": "recommendation", "label": "<p>おすすめ</p>" },
+          { "id": "title", "label": "<h2>チョコドーナツ</h2>" },
+          { "id": "description", "label": "<p>ふんわり生地にチョコがけ。</p>" },
+          { "id": "price", "label": "<p>180円</p>" }
+        ],
+        "correctOptionIds": ["recommendation", "description", "price"]
+      },
       "feedbackGate": { "revealMode": "after-commit" }
     },
     {
       "id": "concrete-result-reasoning",
       "evidenceSpecIds": [],
-      "content": [{ "kind": "text", "text": "The p selector matches every paragraph element." }],
+      "content": [
+        { "kind": "text", "text": "p セレクターは、HTML内のすべての p 要素を選びます。" }
+      ],
       "revealContent": [],
       "feedbackGate": { "revealMode": "immediate" }
     },
@@ -179,7 +190,20 @@
       "taskFamilyId": "class-selector-contrast",
       "taskVariantId": "class-added-only",
       "evidenceSpecIds": [],
-      "content": [{ "kind": "resource", "resourceId": "box-model-class-added-only-rendering" }],
+      "content": [
+        { "kind": "text", "text": "class=\"nedan\" だけを追加します。" },
+        {
+          "kind": "code",
+          "language": "html",
+          "code": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p class=\"nedan\">180円</p>"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "p {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+        },
+        { "kind": "resource", "resourceId": "box-model-class-added-only-rendering" }
+      ],
       "revealContent": [],
       "feedbackGate": { "revealMode": "immediate" }
     },
@@ -189,7 +213,10 @@
       "taskVariantId": "class-selector-active",
       "evidenceSpecIds": ["css-class-selector-match-evidence"],
       "content": [
-        { "kind": "text", "text": "Select every element matched by .nedan." },
+        {
+          "kind": "text",
+          "text": "次に、CSSのセレクターだけを .nedan に変えます。どの要素に色が付くか選んでください。"
+        },
         {
           "kind": "code",
           "language": "html",
@@ -204,7 +231,16 @@
       "revealContent": [
         { "kind": "resource", "resourceId": "box-model-class-selector-active-rendering" }
       ],
-      "response": { "kind": "selection" },
+      "response": {
+        "kind": "selection",
+        "options": [
+          { "id": "recommendation", "label": "<p>おすすめ</p>" },
+          { "id": "title", "label": "<h2>チョコドーナツ</h2>" },
+          { "id": "description", "label": "<p>ふんわり生地にチョコがけ。</p>" },
+          { "id": "price", "label": "<p class=\"nedan\">180円</p>" }
+        ],
+        "correctOptionIds": ["price"]
+      },
       "feedbackGate": { "revealMode": "after-commit" }
     },
     {
@@ -212,9 +248,15 @@
       "taskFamilyId": "class-selector-generate",
       "taskVariantId": "waku",
       "evidenceSpecIds": ["css-class-selector-generate-evidence"],
-      "content": [{ "kind": "text", "text": "Generate the CSS selector for class=\"waku\"." }],
+      "content": [
+        { "kind": "text", "text": "class=\"waku\" の要素を選ぶCSSセレクターを書いてください。" }
+      ],
       "revealContent": [{ "kind": "code", "language": "css", "code": ".waku" }],
-      "response": { "kind": "generated-code" },
+      "response": {
+        "kind": "generated-code",
+        "inputLabel": "CSSセレクター",
+        "expectedResponse": ".waku"
+      },
       "feedbackGate": { "revealMode": "after-commit" }
     },
     {
@@ -222,9 +264,15 @@
       "taskFamilyId": "class-selector-generate",
       "taskVariantId": "price",
       "evidenceSpecIds": ["css-class-selector-generate-evidence"],
-      "content": [{ "kind": "text", "text": "Generate the CSS selector for class=\"price\"." }],
+      "content": [
+        { "kind": "text", "text": "class=\"price\" の要素を選ぶCSSセレクターを書いてください。" }
+      ],
       "revealContent": [{ "kind": "code", "language": "css", "code": ".price" }],
-      "response": { "kind": "generated-code" },
+      "response": {
+        "kind": "generated-code",
+        "inputLabel": "CSSセレクター",
+        "expectedResponse": ".price"
+      },
       "feedbackGate": { "revealMode": "after-commit" }
     }
   ],
@@ -246,7 +294,7 @@
     { "id": "step-price-fresh-variation", "activityId": "price-fresh-variation", "blocking": true }
   ],
   "evaluatorSpecs": [
-    { "id": "class-selector-css-evaluator", "kind": "css-selector" },
+    { "id": "class-selector-selection-evaluator", "kind": "selection-set" },
     { "id": "class-selector-generation-evaluator", "kind": "exact-response" }
   ],
   "resources": [

@@ -133,7 +133,7 @@ test('stable authored IDs and core-plan ordering survive compilation', () => {
   assert.ok(ids.includes('price'));
   assert.ok(ids.includes('minimal-orientation'));
   assert.ok(ids.includes('step-minimal-orientation'));
-  assert.ok(ids.includes('class-selector-css-evaluator'));
+  assert.ok(ids.includes('class-selector-selection-evaluator'));
   assert.ok(ids.includes('box-model-tag-selector-rendering'));
   assert.ok(ids.includes('box-model-class-added-only-rendering'));
   assert.ok(ids.includes('box-model-class-selector-active-rendering'));
@@ -225,8 +225,28 @@ test('contrast Activities, Task Family, and attached Evidence use compatible sel
   assert.equal(family.response.kind, 'selection');
   for (const activity of [prediction, active]) {
     assert.equal(activity.response.kind, 'selection');
+    assert.equal(activity.response.options.length, 4);
     assert.equal(evidenceById.get(activity.evidenceSpecIds[0]).observable.response, 'selection');
   }
+  assert.deepEqual(prediction.response.correctOptionIds, [
+    'recommendation',
+    'description',
+    'price',
+  ]);
+  assert.deepEqual(active.response.correctOptionIds, ['price']);
+  assert.deepEqual(
+    [prediction, active].map((activity) => activity.response.options.map(({ id }) => id)),
+    [
+      ['recommendation', 'title', 'description', 'price'],
+      ['recommendation', 'title', 'description', 'price'],
+    ],
+  );
+  assert.equal(bundle.taskFamilies[0].evaluatorId, 'class-selector-selection-evaluator');
+  assert.equal(bundle.evaluatorSpecs[0].kind, 'selection-set');
+  assert.equal(
+    evidenceById.get('css-class-selector-generate-evidence').observable.correctness,
+    'exact',
+  );
 });
 
 test('box-model resources preserve the three concrete class-selector rendering states', () => {

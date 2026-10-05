@@ -1,0 +1,156 @@
+.learning-v2 {
+  background-color: Canvas;
+  color: CanvasText;
+  color-scheme: light dark;
+  margin-inline: auto;
+  max-width: 52rem;
+  padding: clamp(1rem, 4vw, 2.5rem);
+}
+
+.learning-v2__activity {
+  display: grid;
+  gap: 1.25rem;
+  margin-block: 0 2rem;
+}
+
+.learning-v2__content {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.learning-v2__content p {
+  margin: 0;
+  line-height: 1.75;
+}
+
+.learning-v2__code {
+  background: color-mix(in srgb, CanvasText 7%, Canvas);
+  border: 1px solid color-mix(in srgb, CanvasText 22%, Canvas);
+  border-radius: 0.5rem;
+  margin: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 1rem;
+}
+
+.learning-v2__code code {
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  white-space: pre;
+}
+
+.learning-v2__preview {
+  background: Canvas;
+  border: 1px solid color-mix(in srgb, CanvasText 35%, Canvas);
+  border-radius: 0.5rem;
+  color-scheme: light;
+  display: block;
+  min-height: 15rem;
+  width: 100%;
+}
+
+.learning-v2__response {
+  border: 0;
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.learning-v2__response legend,
+.learning-v2__input-label {
+  font-weight: 650;
+  margin-block-end: 0.25rem;
+}
+
+.learning-v2__option {
+  align-items: flex-start;
+  border: 1px solid color-mix(in srgb, CanvasText 28%, Canvas);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  gap: 0.75rem;
+  line-height: 1.55;
+  padding: 0.9rem 1rem;
+}
+
+.learning-v2__option:has(input:checked) {
+  border-color: LinkText;
+  outline: 2px solid color-mix(in srgb, LinkText 50%, transparent);
+  outline-offset: 1px;
+}
+
+.learning-v2__option input {
+  flex: 0 0 auto;
+  margin-block-start: 0.25rem;
+  min-height: 1rem;
+  min-width: 1rem;
+}
+
+.learning-v2__option code {
+  overflow-wrap: anywhere;
+}
+
+.learning-v2__response input[type='text'] {
+  background: Canvas;
+  border: 1px solid color-mix(in srgb, CanvasText 40%, Canvas);
+  border-radius: 0.375rem;
+  color: CanvasText;
+  font: inherit;
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  max-width: 100%;
+  padding: 0.75rem;
+  width: 100%;
+}
+
+.learning-v2__input-label {
+  display: block;
+}
+
+.learning-v2__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.learning-v2 button {
+  background: ButtonFace;
+  border: 1px solid ButtonText;
+  border-radius: 0.4rem;
+  color: ButtonText;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  min-height: 2.75rem;
+  padding: 0.55rem 1rem;
+}
+
+.learning-v2 button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.learning-v2__result {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .learning-v2__activity {
+    animation: learning-v2-enter 160ms ease-out;
+  }
+
+  @keyframes learning-v2-enter {
+    from {
+      opacity: 0.72;
+      transform: translateY(0.25rem);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

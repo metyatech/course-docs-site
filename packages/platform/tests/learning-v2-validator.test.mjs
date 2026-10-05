@@ -105,10 +105,10 @@ test('unknown references are rejected at every declared relationship boundary', 
   );
   expectIssue(
     (source) => {
-      source.activities[3].content[0].resourceId = 'missing-resource';
+      source.activities[3].content[3].resourceId = 'missing-resource';
     },
     'UNKNOWN_RESOURCE',
-    'activities[3].content[0].resourceId',
+    'activities[3].content[3].resourceId',
   );
   expectIssue(
     (source) => {
@@ -201,6 +201,7 @@ test('ungraded free-text explanations cannot claim semantic correctness', () => 
   const source = loadFixture();
   source.taskFamilies[1].evaluatorId = 'class-selector-generation-evaluator';
   source.evaluatorSpecs[1].kind = 'not-scored';
+  source.evidenceSpecs[2].observable.correctness = 'semantic';
   source.activities[5].response.kind = 'explanation';
 
   assert.ok(
@@ -248,6 +249,97 @@ test('Task Family response must match every producible Evidence response', () =>
     },
     'TASK_FAMILY_EVIDENCE_RESPONSE_MISMATCH',
     'taskFamilies[0].canProduceEvidenceIds[0]',
+  );
+});
+
+test('selection Task Families require the selection-set evaluator', () => {
+  const source = loadFixture();
+  source.taskFamilies[0].evaluatorId = 'class-selector-generation-evaluator';
+  assert.ok(
+    validateLearningSourceV2(source).some(
+      ({ code, path }) =>
+        code === 'TASK_FAMILY_EVALUATOR_RESPONSE_MISMATCH' &&
+        path === 'taskFamilies[0].evaluatorId',
+    ),
+  );
+});
+
+test('selection option IDs, correct references, labels, and arrays are validated', () => {
+  expectIssue(
+    (source) => {
+      source.activities[1].response.options[1].id = 'recommendation';
+    },
+    'DUPLICATE_SELECTION_OPTION_ID',
+    'activities[1].response.options[1].id',
+  );
+  expectIssue(
+    (source) => {
+      source.activities[1].response.correctOptionIds[1] = 'missing-option';
+    },
+    'UNKNOWN_SELECTION_OPTION',
+    'activities[1].response.correctOptionIds[1]',
+  );
+  expectIssue(
+    (source) => {
+      source.activities[1].response.correctOptionIds[1] = 'recommendation';
+    },
+    'DUPLICATE_CORRECT_OPTION_ID',
+    'activities[1].response.correctOptionIds[1]',
+  );
+  expectIssue(
+    (source) => {
+      source.activities[1].response.options[2].label = '  ';
+    },
+    'REQUIRED_STRING',
+    'activities[1].response.options[2].label',
+  );
+  expectIssue(
+    (source) => {
+      source.activities[1].response.options = 'not-an-array';
+    },
+    'REQUIRED_ARRAY',
+    'activities[1].response.options',
+  );
+});
+
+test('generated-code response requires nonempty input and expected response', () => {
+  expectIssue(
+    (source) => {
+      source.activities[5].response.inputLabel = ' ';
+    },
+    'REQUIRED_STRING',
+    'activities[5].response.inputLabel',
+  );
+  expectIssue(
+    (source) => {
+      source.activities[5].response.expectedResponse = '';
+    },
+    'REQUIRED_STRING',
+    'activities[5].response.expectedResponse',
+  );
+});
+
+test('renderer resource payloads must match their declared resource kind', () => {
+  expectIssue(
+    (source) => {
+      source.resources[0].payload.css = null;
+    },
+    'INVALID_RESOURCE_PAYLOAD',
+    'resources[0].payload.css',
+  );
+  expectIssue(
+    (source) => {
+      source.resources[0].payload = 'not-an-object';
+    },
+    'INVALID_RESOURCE_PAYLOAD',
+    'resources[0].payload',
+  );
+  expectIssue(
+    (source) => {
+      source.resources[0].kind = 'static-text';
+    },
+    'INVALID_RESOURCE_PAYLOAD',
+    'resources[0].payload',
   );
 });
 

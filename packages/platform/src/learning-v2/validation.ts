@@ -646,6 +646,18 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
     )
       evaluatorById.set(candidate.id, candidate.kind);
   });
+  taskFamilies.forEach((candidate, index) => {
+    if (!isRecord(candidate) || !isRecord(candidate.response)) return;
+    const evaluatorId = candidate.evaluatorId;
+    const evaluatorKind =
+      typeof evaluatorId === 'string' ? evaluatorById.get(evaluatorId) : undefined;
+    if (candidate.response.kind === 'selection' && evaluatorKind !== 'selection-set')
+      add(
+        'TASK_FAMILY_EVALUATOR_RESPONSE_MISMATCH',
+        `taskFamilies[${index}].evaluatorId`,
+        'A selection Task Family requires a selection-set evaluator.',
+      );
+  });
   activities.forEach((candidate, index) => {
     const path = `activities[${index}]`;
     const activity = requireObject(candidate, path);
@@ -673,6 +685,60 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
     const responseKind = response
       ? requireEnum(response, 'kind', `${path}.response.kind`, responseKinds)
       : undefined;
+    if (responseKind === 'selection' && response) {
+      const options = requireArray(response, 'options', `${path}.response.options`);
+      const optionIds = new Set<string>();
+      options.forEach((optionCandidate, optionIndex) => {
+        const optionPath = `${path}.response.options[${optionIndex}]`;
+        const option = requireObject(optionCandidate, optionPath);
+        if (!option) return;
+        const optionId = requireString(option, 'id', `${optionPath}.id`, { stableId: true });
+        const label = requireString(option, 'label', `${optionPath}.label`);
+        if (typeof label === 'string' && label.trim() === '')
+          add('REQUIRED_STRING', `${optionPath}.label`, `${optionPath}.label must not be empty.`);
+        if (optionId && stableIdPattern.test(optionId)) {
+          if (optionIds.has(optionId))
+            add(
+              'DUPLICATE_SELECTION_OPTION_ID',
+              `${optionPath}.id`,
+              `Selection option ID "${optionId}" is duplicated in this Activity.`,
+            );
+          optionIds.add(optionId);
+        }
+      });
+      const correctOptionIds = requireStringArray(
+        response,
+        'correctOptionIds',
+        `${path}.response.correctOptionIds`,
+      );
+      const correctSeen = new Set<string>();
+      correctOptionIds.forEach((optionId, optionIndex) => {
+        const optionPath = `${path}.response.correctOptionIds[${optionIndex}]`;
+        if (correctSeen.has(optionId))
+          add(
+            'DUPLICATE_CORRECT_OPTION_ID',
+            optionPath,
+            `Correct selection option ID "${optionId}" is duplicated.`,
+          );
+        correctSeen.add(optionId);
+        if (!optionIds.has(optionId))
+          add(
+            'UNKNOWN_SELECTION_OPTION',
+            optionPath,
+            `Correct selection option ID "${optionId}" is not declared in options.`,
+          );
+      });
+    } else if (responseKind === 'generated-code' && response) {
+      for (const key of ['inputLabel', 'expectedResponse']) {
+        const value = requireString(response, key, `${path}.response.${key}`);
+        if (typeof value === 'string' && value.trim() === '')
+          add(
+            'REQUIRED_STRING',
+            `${path}.response.${key}`,
+            `${path}.response.${key} must not be empty.`,
+          );
+      }
+    }
     const familyResponse = isRecord(family?.response) ? family.response.kind : undefined;
     if (responseKind && typeof familyResponse === 'string' && responseKind !== familyResponse)
       add(
@@ -807,9 +873,35 @@ export const validateLearningSourceV2 = (input: unknown): ValidationIssue[] => {
     const path = `resources[${index}]`;
     const resource = requireObject(candidate, path);
     if (!resource) return;
-    requireEnum(resource, 'kind', `${path}.kind`, ['rendered-html-css', 'static-text']);
-    if (!Object.hasOwn(resource, 'payload'))
+    const kind = requireEnum(resource, 'kind', `${path}.kind`, [
+      'rendered-html-css',
+      'static-text',
+    ]);
+    if (!Object.hasOwn(resource, 'payload')) {
       add('REQUIRED_FIELD', `${path}.payload`, `${path}.payload is required.`);
+      return;
+    }
+    if (kind === 'rendered-html-css') {
+      const payload = requireObject(resource.payload, `${path}.payload`);
+      if (!payload) {
+        add(
+          'INVALID_RESOURCE_PAYLOAD',
+          `${path}.payload`,
+          'Rendered HTML/CSS payload must be an object.',
+        );
+        return;
+      }
+      for (const key of ['html', 'css']) {
+        if (typeof payload[key] !== 'string')
+          add(
+            'INVALID_RESOURCE_PAYLOAD',
+            `${path}.payload.${key}`,
+            `${path}.payload.${key} must be a string.`,
+          );
+      }
+    } else if (kind === 'static-text' && typeof resource.payload !== 'string') {
+      add('INVALID_RESOURCE_PAYLOAD', `${path}.payload`, 'Static text payload must be a string.');
+    }
   });
 
   for (const [index, candidate] of knowledgeComponents.entries()) {

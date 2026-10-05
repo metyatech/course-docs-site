@@ -3,6 +3,7 @@ import '../../styles/course-base.css';
 import '../../styles/course-admonition.css';
 import '../../styles/course-site.css';
 import '../../styles/course-tutorial.css';
+import '../../styles/course-learning-v2.css';
 import type { ReactNode } from 'react';
 import { Head } from 'nextra/components';
 import SearchSlashShortcutGuard from '../shared/search-slash-shortcut-guard.js';

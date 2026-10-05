@@ -40,6 +40,7 @@ test("production manifests do not discover tutorial-shots routes", async () => {
 
   assert.doesNotMatch(manifestText, /(?:^|[/\\])dev[/\\]tutorial-shots/);
   assert.doesNotMatch(manifestText, /api[/\\]dev[/\\]tutorial-shots/);
+  assert.doesNotMatch(manifestText, /(?:^|[/\\])dev[/\\]learning-v2/);
 });
 
 test("production manifests and function traces do not discover dev revision routes", async () => {
@@ -52,7 +53,7 @@ test("production manifests and function traces do not discover dev revision rout
     .flatMap(allStrings)
     .join("\n");
 
-  for (const routePath of ["api/dev/revision", "api/dev/revision/stream"]) {
+  for (const routePath of ["api/dev/revision", "api/dev/revision/stream", "dev/learning-v2"]) {
     assert.doesNotMatch(
       manifestText,
       new RegExp(routePath.replaceAll("/", "[/\\\\]")),
