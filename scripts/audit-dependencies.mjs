@@ -7,16 +7,36 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, "..");
 const waiverFilePath = path.join(projectRoot, "security", "npm-audit-waivers.json");
-const EXPECTED_ADVISORY = {
-  source: 1240992,
-  package: "braces",
-  version: "3.0.3",
-  ghsa: "GHSA-vfj7-8cjw-p6xm",
-  cve: "CVE-2026-93687",
-  url: "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
-  range: "<=3.0.3",
-  reason: "no-official-fixed-release",
-};
+const EXPECTED_ADVISORIES = new Map([
+  [
+    1240992,
+    {
+      package: "braces",
+      installedVersion: "3.0.3",
+      ghsa: "GHSA-vfj7-8cjw-p6xm",
+      cve: "CVE-2026-93687",
+      severity: "high",
+      url: "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      range: "<=3.0.3",
+      expiresOn: "2026-11-03",
+      reason: "no-official-fixed-release",
+    },
+  ],
+  [
+    1241206,
+    {
+      package: "katex",
+      installedVersion: "0.16.47",
+      ghsa: "GHSA-238p-pmpm-9mq7",
+      cve: "CVE-2026-103923",
+      severity: "low",
+      url: "https://github.com/advisories/GHSA-238p-pmpm-9mq7",
+      range: ">=0.11.0 <0.18.2",
+      expiresOn: "2026-10-20",
+      reason: "upstream-range-incompatible-fixed-release",
+    },
+  ],
+]);
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -34,13 +54,10 @@ export const validateWaivers = (definition) => {
   ) {
     throw new Error("Waiver definition must use schemaVersion 1.");
   }
-  if (!Array.isArray(definition.waivers) || definition.waivers.length > 1) {
-    throw new Error("At most one structured advisory waiver is allowed.");
+  if (!Array.isArray(definition.waivers)) {
+    throw new Error("Waiver definition must contain a waivers array.");
   }
-  if (definition.waivers.length === 0) return null;
-
-  const [waiver] = definition.waivers;
-  if (!isRecord(waiver)) throw new Error("Waiver entry must be an object.");
+  const validated = new Map();
   const allowedKeys = new Set([
     "advisorySource",
     "package",
@@ -50,24 +67,32 @@ export const validateWaivers = (definition) => {
     "expiresOn",
     "reason",
   ]);
-  if (Object.keys(waiver).some((key) => !allowedKeys.has(key))) {
-    throw new Error("Waiver entry contains an unknown field.");
+  for (const waiver of definition.waivers) {
+    if (!isRecord(waiver)) throw new Error("Waiver entry must be an object.");
+    if (Object.keys(waiver).some((key) => !allowedKeys.has(key))) {
+      throw new Error("Waiver entry contains an unknown field.");
+    }
+    const expected = EXPECTED_ADVISORIES.get(waiver.advisorySource);
+    if (!expected) throw new Error(`Unknown advisory waiver source ${waiver.advisorySource}.`);
+    if (validated.has(waiver.advisorySource)) {
+      throw new Error(`Duplicate waiver advisory source ${waiver.advisorySource}.`);
+    }
+    if (!validDate(waiver.expiresOn))
+      throw new Error("Waiver expiresOn must be a real YYYY-MM-DD date.");
+    for (const [key, value] of Object.entries({
+      package: expected.package,
+      installedVersion: expected.installedVersion,
+      ghsa: expected.ghsa,
+      cve: expected.cve,
+      expiresOn: expected.expiresOn,
+      reason: expected.reason,
+    })) {
+      if (waiver[key] !== value)
+        throw new Error(`Waiver ${key} does not match the approved advisory.`);
+    }
+    validated.set(waiver.advisorySource, waiver);
   }
-  for (const [key, expected] of Object.entries({
-    advisorySource: EXPECTED_ADVISORY.source,
-    package: EXPECTED_ADVISORY.package,
-    installedVersion: EXPECTED_ADVISORY.version,
-    ghsa: EXPECTED_ADVISORY.ghsa,
-    cve: EXPECTED_ADVISORY.cve,
-    reason: EXPECTED_ADVISORY.reason,
-  })) {
-    if (waiver[key] !== expected)
-      throw new Error(`Waiver ${key} does not match the approved advisory.`);
-  }
-  if (!validDate(waiver.expiresOn))
-    throw new Error("Waiver expiresOn must be a real YYYY-MM-DD date.");
-
-  return waiver;
+  return validated;
 };
 
 const validateAuditReport = (report) => {
@@ -145,24 +170,29 @@ const collectRootAdvisories = (vulnerabilities) => {
   return { rootSources: [...allRoots].sort((left, right) => left - right), advisoryRecords };
 };
 
-const validateAdvisoryIdentity = (advisory) => {
+const validateAdvisoryIdentity = (advisory, source, expected) => {
   if (
-    advisory.name !== EXPECTED_ADVISORY.package ||
-    advisory.dependency !== EXPECTED_ADVISORY.package ||
-    advisory.url !== EXPECTED_ADVISORY.url ||
-    advisory.range !== EXPECTED_ADVISORY.range ||
-    advisory.severity !== "high"
+    !isRecord(advisory) ||
+    advisory.source !== source ||
+    advisory.name !== expected.package ||
+    advisory.dependency !== expected.package ||
+    advisory.url !== expected.url ||
+    advisory.range !== expected.range ||
+    advisory.severity !== expected.severity
   ) {
-    throw new Error("Root advisory metadata does not match the approved braces advisory identity.");
+    throw new Error(`Root advisory metadata does not match approved ${expected.package} identity.`);
   }
 };
 
-const validateInstalledVersions = (installedVersions) => {
-  if (!Array.isArray(installedVersions) || installedVersions.length === 0) {
-    throw new Error("Could not resolve an installed braces package version.");
+const validateInstalledVersions = (installedVersions, expected) => {
+  const versions = installedVersions?.[expected.package];
+  if (!Array.isArray(versions) || versions.length === 0) {
+    throw new Error(`Could not resolve an installed ${expected.package} package version.`);
   }
-  if (installedVersions.some((version) => version !== EXPECTED_ADVISORY.version)) {
-    throw new Error(`Installed braces version must be exactly ${EXPECTED_ADVISORY.version}.`);
+  if (versions.some((version) => version !== expected.installedVersion)) {
+    throw new Error(
+      `Installed ${expected.package} version must be exactly ${expected.installedVersion}.`,
+    );
   }
 };
 
@@ -172,42 +202,56 @@ export const evaluateAuditReport = (
 ) => {
   try {
     const vulnerabilities = validateAuditReport(report);
-    const waiver = validateWaivers(waivers);
+    const validatedWaivers = validateWaivers(waivers);
     if (Object.keys(vulnerabilities).length === 0) {
-      if (waiver) {
+      if (validatedWaivers.size > 0) {
         return {
           ok: false,
           rootSources: [],
           unwaivedAdvisories: 0,
-          waiver: null,
+          waivedAdvisories: 0,
           reason: "audit waiver is no longer needed; remove it",
         };
       }
-      return { ok: true, rootSources: [], unwaivedAdvisories: 0, waiver: null };
+      return { ok: true, rootSources: [], unwaivedAdvisories: 0, waivedAdvisories: 0 };
     }
 
-    if (!waiver)
-      throw new Error("npm audit reported vulnerabilities but no approved waiver is configured.");
     const { rootSources, advisoryRecords } = collectRootAdvisories(vulnerabilities);
-    if (rootSources.length !== 1 || rootSources[0] !== EXPECTED_ADVISORY.source) {
+    const unknownSources = rootSources.filter((source) => !EXPECTED_ADVISORIES.has(source));
+    if (unknownSources.length > 0) {
       throw new Error(`Unexpected root advisory sources: ${rootSources.join(", ") || "none"}.`);
     }
-    validateAdvisoryIdentity(advisoryRecords.get(EXPECTED_ADVISORY.source));
-    validateInstalledVersions(installedVersions);
-    if (latestVersion !== EXPECTED_ADVISORY.version) {
-      throw new Error(`Registry latest braces version must remain ${EXPECTED_ADVISORY.version}.`);
-    }
+    if (rootSources.length === 0) throw new Error("npm audit reported no root advisory sources.");
     if (!validDate(today)) throw new Error("Current date could not be evaluated.");
-    if (today > waiver.expiresOn)
-      throw new Error(`The advisory waiver expired on ${waiver.expiresOn}.`);
+    for (const source of rootSources) {
+      const expected = EXPECTED_ADVISORIES.get(source);
+      const waiver = validatedWaivers.get(source);
+      if (!waiver) throw new Error(`No approved waiver is configured for advisory ${source}.`);
+      validateAdvisoryIdentity(advisoryRecords.get(source), source, expected);
+      validateInstalledVersions(installedVersions, expected);
+      if (today > waiver.expiresOn)
+        throw new Error(`The advisory waiver expired on ${waiver.expiresOn}.`);
+      if (source === 1240992 && latestVersion !== expected.installedVersion) {
+        throw new Error(`Registry latest braces version must remain ${expected.installedVersion}.`);
+      }
+    }
+    if (rootSources.length !== validatedWaivers.size) {
+      throw new Error("npm audit root advisories and configured approved waivers do not match.");
+    }
 
-    return { ok: true, rootSources, unwaivedAdvisories: 0, waiver };
+    return {
+      ok: true,
+      rootSources,
+      unwaivedAdvisories: 0,
+      waivedAdvisories: validatedWaivers.size,
+      waivers: [...validatedWaivers.values()],
+    };
   } catch (error) {
     return {
       ok: false,
       rootSources: [],
       unwaivedAdvisories: 1,
-      waiver: null,
+      waivedAdvisories: 0,
       reason: error instanceof Error ? error.message : String(error),
     };
   }
@@ -310,19 +354,38 @@ export const runAuditGate = async ({ today = new Date().toISOString().slice(0, 1
     });
   }
 
-  const installed = await runNpm(["ls", "braces", "--all", "--json"]);
-  if (installed.code !== 0)
-    throw new Error(`npm ls braces could not complete (exit code ${installed.code}).`);
-  const installedVersions = findInstalledVersions(
-    parseJsonOutput(installed.stdout, "npm ls"),
-    "braces",
-  );
-  const latest = await runNpm(["view", "braces", "dist-tags.latest", "--json"]);
-  if (latest.code !== 0)
-    throw new Error(`npm view braces could not complete (exit code ${latest.code}).`);
-  const latestVersion = parseJsonOutput(latest.stdout, "npm view braces");
-  if (typeof latestVersion !== "string")
-    throw new Error("npm view braces returned no latest version.");
+  const vulnerabilities = validateAuditReport(report);
+  const { rootSources } = collectRootAdvisories(vulnerabilities);
+  if (rootSources.some((source) => !EXPECTED_ADVISORIES.has(source))) {
+    return evaluateAuditReport(report, {
+      waivers: waiverDefinition,
+      installedVersions: {},
+      latestVersion: "",
+      today,
+    });
+  }
+  const installedVersions = {};
+  for (const source of rootSources) {
+    const expected = EXPECTED_ADVISORIES.get(source);
+    const installed = await runNpm(["ls", expected.package, "--all", "--json"]);
+    if (installed.code !== 0)
+      throw new Error(
+        `npm ls ${expected.package} could not complete (exit code ${installed.code}).`,
+      );
+    installedVersions[expected.package] = findInstalledVersions(
+      parseJsonOutput(installed.stdout, "npm ls"),
+      expected.package,
+    );
+  }
+  let latestVersion = "";
+  if (rootSources.includes(1240992)) {
+    const latest = await runNpm(["view", "braces", "dist-tags.latest", "--json"]);
+    if (latest.code !== 0)
+      throw new Error(`npm view braces could not complete (exit code ${latest.code}).`);
+    latestVersion = parseJsonOutput(latest.stdout, "npm view braces");
+    if (typeof latestVersion !== "string")
+      throw new Error("npm view braces returned no latest version.");
+  }
 
   return evaluateAuditReport(report, {
     waivers: waiverDefinition,
@@ -341,12 +404,12 @@ export const main = async () => {
       process.exitCode = 1;
       return;
     }
-    if (result.waiver) {
-      console.log("npm audit: 1 known root advisory temporarily waived");
-      console.log(
-        `${result.waiver.ghsa} / ${result.waiver.package}@${result.waiver.installedVersion}`,
-      );
-      console.log(`expires: ${result.waiver.expiresOn}`);
+    if (result.waivedAdvisories > 0) {
+      console.log(`npm audit: ${result.waivedAdvisories} known root advisories temporarily waived`);
+      for (const waiver of result.waivers) {
+        console.log(`${waiver.ghsa} / ${waiver.package}@${waiver.installedVersion}`);
+        console.log(`expires: ${waiver.expiresOn}`);
+      }
     } else {
       console.log("npm audit: 0 known root advisories");
     }

@@ -9,6 +9,15 @@
       "cve": "CVE-2026-93687",
       "expiresOn": "2026-11-03",
       "reason": "no-official-fixed-release"
+    },
+    {
+      "advisorySource": 1241206,
+      "package": "katex",
+      "installedVersion": "0.16.47",
+      "ghsa": "GHSA-238p-pmpm-9mq7",
+      "cve": "CVE-2026-103923",
+      "expiresOn": "2026-10-20",
+      "reason": "upstream-range-incompatible-fixed-release"
     }
   ]
 }

@@ -19,8 +19,41 @@ const advisory = {
   severity: "high",
   range: "<=3.0.3",
 };
+const katexAdvisory = {
+  source: 1241206,
+  name: "katex",
+  dependency: "katex",
+  title: "CVE-2026-103923",
+  url: "https://github.com/advisories/GHSA-238p-pmpm-9mq7",
+  severity: "low",
+  range: ">=0.11.0 <0.18.2",
+};
+const approvedWaivers = [
+  {
+    advisorySource: 1240992,
+    package: "braces",
+    installedVersion: "3.0.3",
+    ghsa: "GHSA-vfj7-8cjw-p6xm",
+    cve: "CVE-2026-93687",
+    expiresOn: "2026-11-03",
+    reason: "no-official-fixed-release",
+  },
+  {
+    advisorySource: 1241206,
+    package: "katex",
+    installedVersion: "0.16.47",
+    ghsa: "GHSA-238p-pmpm-9mq7",
+    cve: "CVE-2026-103923",
+    expiresOn: "2026-10-20",
+    reason: "upstream-range-incompatible-fixed-release",
+  },
+];
 
 const readWaiverDefinition = async () => JSON.parse(await readFile(waiversPath, "utf8"));
+const bracesWaiverDefinition = {
+  schemaVersion: 1,
+  waivers: [approvedWaivers[0]],
+};
 
 const vulnerability = (name, via, effects = []) => ({
   name,
@@ -56,14 +89,25 @@ const propagatedBracesReport = () =>
     nextra: vulnerability("nextra", ["fast-glob"]),
   });
 
+const combinedApprovedReport = () => {
+  const report = propagatedBracesReport();
+  report.vulnerabilities.katex = vulnerability("katex", [{ ...katexAdvisory }]);
+  report.metadata.vulnerabilities.low = 1;
+  report.metadata.vulnerabilities.total += 1;
+  return report;
+};
+
 const evaluate = async (report, overrides = {}) =>
   evaluateAuditReport(report, {
     waivers: await readWaiverDefinition(),
-    installedVersions: ["3.0.3"],
+    installedVersions: { braces: ["3.0.3"], katex: ["0.16.47"] },
     latestVersion: "3.0.3",
     today: "2026-10-03",
     ...overrides,
   });
+
+const evaluateBracesOnly = async (report, overrides = {}) =>
+  evaluate(report, { waivers: bracesWaiverDefinition, ...overrides });
 
 const compareVersions = (left, right) => {
   for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
@@ -103,42 +147,77 @@ test("dependency versions and patch installation stay pinned", async () => {
   assert.equal(pkg.overrides["brace-expansion"], "2.1.7");
   const lock = JSON.parse(await readFile(packageLockPath, "utf8"));
   assert.equal(lock.packages["node_modules/brace-expansion"].version, "2.1.7");
+  assert.equal(lock.packages["node_modules/source-map-js"].version, "1.2.2");
   assert.equal(pkg.overrides.postcss, "8.5.28");
+  assert.equal(pkg.overrides["source-map-js"], "1.2.2");
   assert.equal(pkg.overrides["speech-rule-engine"], "5.0.0-rc.4");
   assert.equal(pkg.scripts.postinstall, "patch-package --error-on-fail && npm run platform:build");
 });
 
-test("dependency audit permits zero waivers or one approved structured waiver", async () => {
-  assert.equal(validateWaivers({ schemaVersion: 1, waivers: [] }), null);
-
+test("dependency audit accepts multiple exact structured waivers", async () => {
   const definition = await readWaiverDefinition();
-  const waiver = validateWaivers(definition);
-  assert.deepEqual(waiver, {
-    advisorySource: 1240992,
-    package: "braces",
-    installedVersion: "3.0.3",
-    ghsa: "GHSA-vfj7-8cjw-p6xm",
-    cve: "CVE-2026-93687",
-    expiresOn: "2026-11-03",
-    reason: "no-official-fixed-release",
-  });
+  assert.deepEqual(
+    validateWaivers(definition),
+    new Map(approvedWaivers.map((waiver) => [waiver.advisorySource, waiver])),
+  );
 
   assert.throws(
-    () => validateWaivers({ schemaVersion: 1, waivers: [waiver, waiver] }),
-    /At most one/u,
+    () =>
+      validateWaivers({
+        schemaVersion: 1,
+        waivers: [approvedWaivers[0], approvedWaivers[1], approvedWaivers[1]],
+      }),
+    /duplicate|approved advisory/iu,
   );
   assert.throws(
-    () => validateWaivers({ schemaVersion: 1, waivers: [{ ...waiver, package: "other" }] }),
-    /does not match/u,
+    () =>
+      validateWaivers({
+        schemaVersion: 1,
+        waivers: [{ ...approvedWaivers[1], advisorySource: 9999999 }],
+      }),
+    /unknown|approved advisory/iu,
   );
   assert.throws(
-    () => validateWaivers({ schemaVersion: 1, waivers: [{ ...waiver, note: "unknown" }] }),
+    () =>
+      validateWaivers({
+        schemaVersion: 1,
+        waivers: [{ ...approvedWaivers[1], expiresOn: "2026-02-30" }],
+      }),
+    /YYYY-MM-DD/u,
+  );
+  assert.throws(
+    () =>
+      validateWaivers({
+        schemaVersion: 1,
+        waivers: [{ ...approvedWaivers[1], expiresOn: "2026-10-21" }],
+      }),
+    /expiresOn does not match/u,
+  );
+  assert.throws(
+    () =>
+      validateWaivers({ schemaVersion: 1, waivers: [{ ...approvedWaivers[1], note: "unknown" }] }),
     /unknown field/u,
   );
   assert.throws(
-    () => validateWaivers({ schemaVersion: 1, waivers: "invalid" }),
-    /advisory waiver/u,
+    () =>
+      validateWaivers({
+        schemaVersion: 1,
+        waivers: [
+          ...approvedWaivers,
+          {
+            advisorySource: 1241209,
+            package: "source-map-js",
+            installedVersion: "1.2.1",
+            ghsa: "GHSA-68fv-2mgg-jv7q",
+            cve: "CVE-2026-93749",
+            expiresOn: "2026-10-20",
+            reason: "upstream-range-incompatible-fixed-release",
+          },
+        ],
+      }),
+    /Unknown advisory/u,
   );
+  assert.throws(() => validateWaivers({ schemaVersion: 1, waivers: "invalid" }), /waivers array/iu);
 });
 
 test("dependency audit passes a clean report only when there are no waivers", async () => {
@@ -146,7 +225,7 @@ test("dependency audit passes a clean report only when there are no waivers", as
   assert.equal(result.ok, true, result.reason);
   assert.deepEqual(result.rootSources, []);
   assert.equal(result.unwaivedAdvisories, 0);
-  assert.equal(result.waiver, null);
+  assert.equal(result.waivedAdvisories, 0);
 });
 
 test("dependency audit rejects a stale waiver when the report is clean", async () => {
@@ -164,19 +243,27 @@ test("dependency audit rejects malformed waiver definitions even for a clean rep
   assert.match(result.reason, /waiver/i);
 });
 
+test("dependency audit passes the two expected root advisories", async () => {
+  const result = await evaluate(combinedApprovedReport());
+  assert.equal(result.ok, true, result.reason);
+  assert.deepEqual(result.rootSources, [1240992, 1241206]);
+  assert.equal(result.unwaivedAdvisories, 0);
+  assert.equal(result.waivedAdvisories, 2);
+});
+
 test("dependency audit permits multiple propagated vulnerabilities with one braces root", async () => {
-  const result = await evaluate(propagatedBracesReport());
+  const result = await evaluateBracesOnly(propagatedBracesReport());
   assert.equal(result.ok, true, result.reason);
   assert.deepEqual(result.rootSources, [1240992]);
   assert.equal(result.unwaivedAdvisories, 0);
 });
 
 test("dependency audit rejects the braces advisory when no waiver is configured", async () => {
-  const result = await evaluate(propagatedBracesReport(), {
+  const result = await evaluateBracesOnly(propagatedBracesReport(), {
     waivers: { schemaVersion: 1, waivers: [] },
   });
   assert.equal(result.ok, false);
-  assert.match(result.reason, /no approved waiver/u);
+  assert.match(result.reason, /No approved waiver/u);
 });
 
 test("dependency audit rejects another independent root advisory", async () => {
@@ -197,6 +284,81 @@ test("dependency audit rejects another independent root advisory", async () => {
   const result = await evaluate(report);
   assert.equal(result.ok, false);
   assert.match(result.reason, /Unexpected root advisory sources/u);
+});
+
+test("dependency audit rejects an unexpected source-map-js root even with approved waivers", async () => {
+  const report = combinedApprovedReport();
+  report.vulnerabilities["source-map-js"] = vulnerability("source-map-js", [
+    {
+      source: 1241209,
+      name: "source-map-js",
+      dependency: "source-map-js",
+      title: "CVE-2026-93749",
+      url: "https://github.com/advisories/GHSA-68fv-2mgg-jv7q",
+      severity: "high",
+      range: ">=1.0.0 <1.2.2",
+    },
+  ]);
+  report.metadata.vulnerabilities.high += 1;
+  report.metadata.vulnerabilities.total += 1;
+  const result = await evaluate(report);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /Unexpected root advisory sources.*1241209/u);
+});
+
+test("dependency audit rejects an expired KaTeX waiver", async () => {
+  const result = await evaluate(combinedApprovedReport(), { today: "2026-10-21" });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /expired on 2026-10-20/u);
+});
+
+test("dependency audit rejects a mismatched KaTeX waiver version", async () => {
+  assert.throws(
+    () =>
+      validateWaivers({
+        schemaVersion: 1,
+        waivers: [{ ...approvedWaivers[1], installedVersion: "0.16.46" }],
+      }),
+    /installedVersion does not match/u,
+  );
+});
+
+test("dependency audit rejects a mismatched KaTeX waiver reason", async () => {
+  assert.throws(
+    () =>
+      validateWaivers({
+        schemaVersion: 1,
+        waivers: [{ ...approvedWaivers[1], reason: "no-official-fixed-release" }],
+      }),
+    /reason does not match/u,
+  );
+});
+
+test("dependency audit rejects mismatched KaTeX report metadata", async () => {
+  const report = combinedApprovedReport();
+  report.vulnerabilities.katex.via[0].severity = "moderate";
+  const result = await evaluate(report);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /katex identity/u);
+});
+
+test("dependency audit rejects a temporary expired-date mutation", async () => {
+  const waivers = await readWaiverDefinition();
+  waivers.waivers[1].expiresOn = "2026-10-05";
+  const result = await evaluate(combinedApprovedReport(), {
+    waivers,
+    today: "2026-10-06",
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /expiresOn does not match/u);
+});
+
+test("dependency audit rejects a wrong installed KaTeX version", async () => {
+  const result = await evaluate(combinedApprovedReport(), {
+    installedVersions: { braces: ["3.0.3"], katex: ["0.16.46"] },
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /katex.*0\.16\.47/iu);
 });
 
 test("dependency audit rejects braces plus an unrelated advisory", async () => {
@@ -228,19 +390,21 @@ test("dependency audit rejects a mismatched advisory source and identity", async
 });
 
 test("dependency audit rejects an unexpected installed braces version", async () => {
-  const result = await evaluate(propagatedBracesReport(), { installedVersions: ["3.0.4"] });
+  const result = await evaluateBracesOnly(propagatedBracesReport(), {
+    installedVersions: { braces: ["3.0.4"] },
+  });
   assert.equal(result.ok, false);
   assert.match(result.reason, /installed braces version/iu);
 });
 
 test("dependency audit rejects a newer registry braces release", async () => {
-  const result = await evaluate(propagatedBracesReport(), { latestVersion: "3.0.4" });
+  const result = await evaluateBracesOnly(propagatedBracesReport(), { latestVersion: "3.0.4" });
   assert.equal(result.ok, false);
   assert.match(result.reason, /Registry latest/u);
 });
 
 test("dependency audit rejects an expired waiver", async () => {
-  const result = await evaluate(propagatedBracesReport(), { today: "2026-11-04" });
+  const result = await evaluateBracesOnly(propagatedBracesReport(), { today: "2026-11-04" });
   assert.equal(result.ok, false);
   assert.match(result.reason, /expired on 2026-11-03/u);
 });
