@@ -47,4 +47,9 @@ test('HTML/CSS preview is sandboxed and blocks network-capable resources', () =>
   assert.match(document, /connect-src 'none'/);
   assert.match(document, /<p>preview<\/p>/);
   assert.match(document, /p \{ color: red; \}/);
+  const playerStyles = fs.readFileSync(
+    path.join(packageRoot, 'styles/course-learning-v2.css'),
+    'utf8',
+  );
+  assert.match(playerStyles, /\.learning-v2__preview\s*\{[^}]*min-height:\s*22rem;/s);
 });

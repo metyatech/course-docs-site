@@ -107,7 +107,7 @@ export function LearningV2StaticPlayer({ bundle }: LearningV2StaticPlayerProps) 
                     >
                       もう一度
                     </button>
-                    {current.canAdvance ? (
+                    {current.canAdvance && !current.isFinal ? (
                       <button type="button" onClick={() => dispatch({ type: 'advance' })}>
                         次へ
                       </button>
@@ -130,7 +130,7 @@ export function LearningV2StaticPlayer({ bundle }: LearningV2StaticPlayerProps) 
                 </button>
               )
             ) : null}
-            {isCurrent && !activity.response && current.canAdvance ? (
+            {isCurrent && !activity.response && current.canAdvance && !current.isFinal ? (
               <div className="learning-v2__actions">
                 <button type="button" onClick={() => dispatch({ type: 'advance' })}>
                   次へ

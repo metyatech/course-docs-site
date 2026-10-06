@@ -257,7 +257,23 @@ Only after Gate B review, extend the same architecture through:
 
 Still no learner-specific or server-side learning state.
 
-Gate C is the completion of the first user-approved "Static v2" milestone.
+Gate C is the completion of the first user-approved "Static v2" milestone. **The first Static v2
+milestone is complete.**
+
+The checked-in `box-model-static.json` source and its compiler-generated golden Bundle add the
+width/height, border, padding, integrated content/padding/border relation, border-style omission
+variation, and fresh final component practice. The original class-selector source and golden
+remain the Gate A/B regression fixture. The browser pilot compiles the full Static source and
+renders it through the shared player.
+
+The current core path records component-level Evidence separately for the final selector, size
+property, border shorthand, and padding value. The final artifact alone is not treated as proof of
+all component Knowledge Components. The border-style omission is a bounded variation and does
+not establish debugging sufficiency. Exact outer-size arithmetic is not a blocking response.
+
+This milestone remains ephemeral and shared: it adds no persistence, learner identity, adaptive
+routing, Teacher View, or Realtime behavior. Retention, mastery, long-term generalization,
+debugging sufficiency, and exact outer-size calculation remain deferred.
 
 ## Suggested code-boundary shape
 

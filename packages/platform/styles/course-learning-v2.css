@@ -45,7 +45,7 @@
   border-radius: 0.5rem;
   color-scheme: light;
   display: block;
-  min-height: 15rem;
+  min-height: 22rem;
   width: 100%;
 }
 
@@ -135,6 +135,13 @@
   font-size: 1.125rem;
   font-weight: 700;
   margin: 0;
+}
+
+@media (max-width: 28rem) {
+  .learning-v2__preview {
+    margin-inline: -1rem;
+    width: calc(100% + 2rem);
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

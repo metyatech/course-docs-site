@@ -1,0 +1,2001 @@
+{
+  "sourceSchemaVersion": 1,
+  "courseId": "box-model",
+  "contentRevision": "static-v2-reference-1",
+  "units": [
+    {
+      "id": "css-class-selector",
+      "title": "CSS class selectors",
+      "goal": "Match HTML classes to CSS class selectors and apply styles.",
+      "knowledgeComponentIds": ["css-class-selector-match", "css-class-selector-generate"]
+    },
+    {
+      "id": "css-box-size",
+      "title": "CSS box size",
+      "goal": "Use width and height to set horizontal and vertical content dimensions.",
+      "knowledgeComponentIds": ["css-size-property-select", "css-content-box-size"]
+    },
+    {
+      "id": "css-border",
+      "title": "CSS border",
+      "goal": "Use border to set thickness, style, and color.",
+      "knowledgeComponentIds": ["css-border-role", "css-border-shorthand"]
+    },
+    {
+      "id": "css-padding",
+      "title": "CSS padding",
+      "goal": "Use padding to set inner space between content and border.",
+      "knowledgeComponentIds": [
+        "css-padding-role",
+        "css-padding-single-value",
+        "css-box-model-layer-relation"
+      ]
+    }
+  ],
+  "knowledgeComponents": [
+    {
+      "id": "css-class-selector-match",
+      "claim": {
+        "learnerCan": "Match a CSS class selector to elements with that class."
+      },
+      "condition": {
+        "variability": "variable",
+        "relevantFeatures": ["htmlClass", "cssSelector"]
+      },
+      "response": {
+        "variability": "constant",
+        "form": "selection"
+      },
+      "forms": {
+        "performance": "required",
+        "verbal": "optional"
+      },
+      "rationale": {
+        "available": true,
+        "required": false
+      },
+      "prerequisites": ["css-selector-tag-match"]
+    },
+    {
+      "id": "css-selector-tag-match",
+      "claim": {
+        "learnerCan": "Match a CSS tag selector to elements of that tag."
+      },
+      "condition": {
+        "variability": "variable",
+        "relevantFeatures": ["tagName", "cssSelector"]
+      },
+      "response": {
+        "variability": "constant",
+        "form": "selection"
+      },
+      "forms": {
+        "performance": "required",
+        "verbal": "optional"
+      },
+      "rationale": {
+        "available": true,
+        "required": false
+      },
+      "prerequisites": []
+    },
+    {
+      "id": "css-class-selector-generate",
+      "claim": {
+        "learnerCan": "Generate a class selector from an HTML class name."
+      },
+      "condition": {
+        "variability": "variable",
+        "relevantFeatures": ["className"]
+      },
+      "response": {
+        "variability": "variable",
+        "form": "code"
+      },
+      "forms": {
+        "performance": "required",
+        "verbal": "not-required"
+      },
+      "rationale": {
+        "available": false,
+        "required": false
+      },
+      "prerequisites": ["css-class-selector-match"]
+    },
+    {
+      "id": "css-size-property-select",
+      "claim": {
+        "learnerCan": "Choose width for horizontal size and height for vertical size."
+      },
+      "condition": {
+        "variability": "variable",
+        "relevantFeatures": ["axis", "propertyName"]
+      },
+      "response": {
+        "variability": "variable",
+        "form": "code"
+      },
+      "forms": {
+        "performance": "required",
+        "verbal": "optional"
+      },
+      "rationale": {
+        "available": true,
+        "required": false
+      },
+      "prerequisites": []
+    },
+    {
+      "id": "css-content-box-size",
+      "claim": {
+        "learnerCan": "Predict that width and height set content-box dimensions under the lesson assumptions."
+      },
+      "condition": {
+        "variability": "variable",
+        "relevantFeatures": ["propertyName", "value", "axis"]
+      },
+      "response": {
+        "variability": "constant",
+        "form": "selection"
+      },
+      "forms": {
+        "performance": "required",
+        "verbal": "optional"
+      },
+      "rationale": {
+        "available": true,
+        "required": false
+      },
+      "prerequisites": ["css-size-property-select"]
+    },
+    {
+      "id": "css-border-role",
+      "claim": {
+        "learnerCan": "Predict that border creates the visible boundary around the element."
+      },
+      "condition": {
+        "variability": "variable",
+        "relevantFeatures": ["borderPresence", "element"]
+      },
+      "response": {
+        "variability": "constant",
+        "form": "selection"
+      },
+      "forms": {
+        "performance": "required",
+        "verbal": "optional"
+      },
+      "rationale": {
+        "available": true,
+        "required": false
+      },
+      "prerequisites": []
+    },
+    {
+      "id": "css-border-shorthand",
+      "claim": {
+        "learnerCan": "Construct a border shorthand value from thickness, style, and color."
+      },
+      "condition": {
+        "variability": "variable",
+        "relevantFeatures": ["thickness", "style", "color"]
+      },
+      "response": {
+        "variability": "variable",
+        "form": "code"
+      },
+      "forms": {
+        "performance": "required",
+        "verbal": "optional"
+      },
+      "rationale": {
+        "available": true,
+        "required": false
+      },
+      "prerequisites": ["css-border-role"]
+    },
+    {
+      "id": "css-padding-role",
+      "claim": {
+        "learnerCan": "Predict that padding creates space between content and border."
+      },
+      "condition": {
+        "variability": "variable",
+        "relevantFeatures": ["padding", "content", "border"]
+      },
+      "response": {
+        "variability": "constant",
+        "form": "selection"
+      },
+      "forms": {
+        "performance": "required",
+        "verbal": "optional"
+      },
+      "rationale": {
+        "available": true,
+        "required": false
+      },
+      "prerequisites": []
+    },
+    {
+      "id": "css-padding-single-value",
+      "claim": {
+        "learnerCan": "Apply one padding value to all four sides."
+      },
+      "condition": {
+        "variability": "variable",
+        "relevantFeatures": ["value", "side"]
+      },
+      "response": {
+        "variability": "variable",
+        "form": "code"
+      },
+      "forms": {
+        "performance": "required",
+        "verbal": "optional"
+      },
+      "rationale": {
+        "available": true,
+        "required": false
+      },
+      "prerequisites": []
+    },
+    {
+      "id": "css-box-model-layer-relation",
+      "claim": {
+        "learnerCan": "Relate content, padding, and border and predict how padding and border affect outer size under the lesson assumptions."
+      },
+      "condition": {
+        "variability": "variable",
+        "relevantFeatures": ["content", "padding", "border", "outerSize"]
+      },
+      "response": {
+        "variability": "constant",
+        "form": "selection"
+      },
+      "forms": {
+        "performance": "required",
+        "verbal": "optional"
+      },
+      "rationale": {
+        "available": true,
+        "required": false
+      },
+      "prerequisites": ["css-content-box-size", "css-border-role", "css-padding-role"]
+    }
+  ],
+  "evidenceSpecs": [
+    {
+      "id": "css-selector-tag-prediction",
+      "targetKnowledgeComponentId": "css-selector-tag-match",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-class-selector-match-evidence",
+      "targetKnowledgeComponentId": "css-class-selector-match",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-class-selector-generate-evidence",
+      "targetKnowledgeComponentId": "css-class-selector-generate",
+      "observable": {
+        "response": "generated-code",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-size-property-select-evidence",
+      "targetKnowledgeComponentId": "css-size-property-select",
+      "observable": {
+        "response": "generated-code",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-content-box-size-evidence",
+      "targetKnowledgeComponentId": "css-content-box-size",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-content-box-size-generalization-evidence",
+      "targetKnowledgeComponentId": "css-content-box-size",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "generalization"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-border-role-evidence",
+      "targetKnowledgeComponentId": "css-border-role",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-border-shorthand-evidence",
+      "targetKnowledgeComponentId": "css-border-shorthand",
+      "observable": {
+        "response": "generated-code",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-border-shorthand-generalization-evidence",
+      "targetKnowledgeComponentId": "css-border-shorthand",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "generalization"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-padding-role-evidence",
+      "targetKnowledgeComponentId": "css-padding-role",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-padding-single-value-evidence",
+      "targetKnowledgeComponentId": "css-padding-single-value",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-padding-single-value-generate-evidence",
+      "targetKnowledgeComponentId": "css-padding-single-value",
+      "observable": {
+        "response": "generated-code",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-box-model-layer-relation-evidence",
+      "targetKnowledgeComponentId": "css-box-model-layer-relation",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "independent-performance"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    },
+    {
+      "id": "css-box-model-layer-generalization-evidence",
+      "targetKnowledgeComponentId": "css-box-model-layer-relation",
+      "observable": {
+        "response": "selection",
+        "correctness": "exact"
+      },
+      "supports": {
+        "dimension": "generalization"
+      },
+      "requires": {
+        "assistance": "none",
+        "freshBeforeAnswerExposure": true
+      }
+    }
+  ],
+  "taskFamilies": [
+    {
+      "id": "class-selector-contrast",
+      "targetKnowledgeComponentIds": ["css-selector-tag-match", "css-class-selector-match"],
+      "dimensions": {
+        "htmlClass": {
+          "role": "relevant"
+        },
+        "cssSelector": {
+          "role": "relevant"
+        },
+        "cssDeclarations": {
+          "role": "surface"
+        },
+        "content": {
+          "role": "surface"
+        }
+      },
+      "response": {
+        "kind": "selection"
+      },
+      "evaluatorId": "class-selector-selection-evaluator",
+      "canProduceEvidenceIds": ["css-selector-tag-prediction", "css-class-selector-match-evidence"],
+      "variants": [
+        {
+          "id": "tag-selector",
+          "dimensions": {
+            "htmlClass": null,
+            "cssSelector": "p",
+            "cssDeclarations": "background-color: #ffedd5; color: #7c2d12",
+            "content": "おすすめ/チョコドーナツ/ふんわり生地にチョコがけ。/180円"
+          }
+        },
+        {
+          "id": "class-added-only",
+          "dimensions": {
+            "htmlClass": "nedan",
+            "cssSelector": "p",
+            "cssDeclarations": "background-color: #ffedd5; color: #7c2d12",
+            "content": "おすすめ/チョコドーナツ/ふんわり生地にチョコがけ。/180円"
+          }
+        },
+        {
+          "id": "class-selector-active",
+          "dimensions": {
+            "htmlClass": "nedan",
+            "cssSelector": ".nedan",
+            "cssDeclarations": "background-color: #ffedd5; color: #7c2d12",
+            "content": "おすすめ/チョコドーナツ/ふんわり生地にチョコがけ。/180円"
+          }
+        }
+      ],
+      "linkedContrastSequences": [
+        {
+          "id": "class-selector-causal-contrast",
+          "invariantDimensions": ["cssDeclarations", "content"],
+          "steps": [
+            {
+              "variantId": "tag-selector",
+              "changedDimensions": []
+            },
+            {
+              "variantId": "class-added-only",
+              "changedDimensions": ["htmlClass"]
+            },
+            {
+              "variantId": "class-selector-active",
+              "changedDimensions": ["cssSelector"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "class-selector-generate",
+      "targetKnowledgeComponentIds": ["css-class-selector-generate"],
+      "dimensions": {
+        "className": {
+          "role": "relevant"
+        },
+        "expectedSelector": {
+          "role": "surface"
+        }
+      },
+      "response": {
+        "kind": "generated-code"
+      },
+      "evaluatorId": "class-selector-generation-evaluator",
+      "canProduceEvidenceIds": ["css-class-selector-generate-evidence"],
+      "variants": [
+        {
+          "id": "waku",
+          "dimensions": {
+            "className": "waku",
+            "expectedSelector": ".waku"
+          }
+        },
+        {
+          "id": "price",
+          "dimensions": {
+            "className": "price",
+            "expectedSelector": ".price"
+          }
+        },
+        {
+          "id": "profile-card",
+          "dimensions": {
+            "className": "profile-card",
+            "expectedSelector": ".profile-card"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    },
+    {
+      "id": "box-size-effect",
+      "targetKnowledgeComponentIds": ["css-content-box-size"],
+      "dimensions": {
+        "propertyName": {
+          "role": "relevant"
+        },
+        "axis": {
+          "role": "relevant"
+        },
+        "valuePx": {
+          "role": "variation"
+        },
+        "content": {
+          "role": "surface"
+        }
+      },
+      "response": {
+        "kind": "selection"
+      },
+      "evaluatorId": "class-selector-selection-evaluator",
+      "canProduceEvidenceIds": [
+        "css-content-box-size-evidence",
+        "css-content-box-size-generalization-evidence"
+      ],
+      "variants": [
+        {
+          "id": "width-300",
+          "dimensions": {
+            "propertyName": "width",
+            "axis": "horizontal",
+            "valuePx": 300,
+            "content": "product"
+          }
+        },
+        {
+          "id": "width-240",
+          "dimensions": {
+            "propertyName": "width",
+            "axis": "horizontal",
+            "valuePx": 240,
+            "content": "product"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    },
+    {
+      "id": "box-size-property-generate",
+      "targetKnowledgeComponentIds": ["css-size-property-select"],
+      "dimensions": {
+        "axis": {
+          "role": "relevant"
+        },
+        "propertyName": {
+          "role": "relevant"
+        }
+      },
+      "response": {
+        "kind": "generated-code"
+      },
+      "evaluatorId": "class-selector-generation-evaluator",
+      "canProduceEvidenceIds": ["css-size-property-select-evidence"],
+      "variants": [
+        {
+          "id": "height-for-vertical",
+          "dimensions": {
+            "axis": "vertical",
+            "propertyName": "height"
+          }
+        },
+        {
+          "id": "width-for-final-card",
+          "dimensions": {
+            "axis": "horizontal",
+            "propertyName": "width"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    },
+    {
+      "id": "border-effect",
+      "targetKnowledgeComponentIds": ["css-border-role"],
+      "dimensions": {
+        "borderPresence": {
+          "role": "relevant"
+        },
+        "content": {
+          "role": "surface"
+        }
+      },
+      "response": {
+        "kind": "selection"
+      },
+      "evaluatorId": "class-selector-selection-evaluator",
+      "canProduceEvidenceIds": ["css-border-role-evidence"],
+      "variants": [
+        {
+          "id": "boundary-added",
+          "dimensions": {
+            "borderPresence": true,
+            "content": "product"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    },
+    {
+      "id": "border-shorthand-generate",
+      "targetKnowledgeComponentIds": ["css-border-shorthand"],
+      "dimensions": {
+        "thickness": {
+          "role": "relevant"
+        },
+        "style": {
+          "role": "relevant"
+        },
+        "color": {
+          "role": "relevant"
+        }
+      },
+      "response": {
+        "kind": "generated-code"
+      },
+      "evaluatorId": "class-selector-generation-evaluator",
+      "canProduceEvidenceIds": ["css-border-shorthand-evidence"],
+      "variants": [
+        {
+          "id": "dashed-orange",
+          "dimensions": {
+            "thickness": "3px",
+            "style": "dashed",
+            "color": "#c2410c"
+          }
+        },
+        {
+          "id": "profile-blue",
+          "dimensions": {
+            "thickness": "3px",
+            "style": "solid",
+            "color": "#2563eb"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    },
+    {
+      "id": "border-fault-variation",
+      "targetKnowledgeComponentIds": ["css-border-shorthand"],
+      "dimensions": {
+        "missingComponent": {
+          "role": "relevant"
+        },
+        "declaration": {
+          "role": "surface"
+        }
+      },
+      "response": {
+        "kind": "selection"
+      },
+      "evaluatorId": "class-selector-selection-evaluator",
+      "canProduceEvidenceIds": ["css-border-shorthand-generalization-evidence"],
+      "variants": [
+        {
+          "id": "missing-style",
+          "dimensions": {
+            "missingComponent": "style",
+            "declaration": "border: 2px #7a4b2a;"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    },
+    {
+      "id": "padding-effect",
+      "targetKnowledgeComponentIds": ["css-padding-role"],
+      "dimensions": {
+        "padding": {
+          "role": "relevant"
+        },
+        "content": {
+          "role": "surface"
+        }
+      },
+      "response": {
+        "kind": "selection"
+      },
+      "evaluatorId": "class-selector-selection-evaluator",
+      "canProduceEvidenceIds": ["css-padding-role-evidence"],
+      "variants": [
+        {
+          "id": "padding-20",
+          "dimensions": {
+            "padding": "20px",
+            "content": "product"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    },
+    {
+      "id": "padding-single-value",
+      "targetKnowledgeComponentIds": ["css-padding-single-value"],
+      "dimensions": {
+        "value": {
+          "role": "relevant"
+        },
+        "side": {
+          "role": "relevant"
+        }
+      },
+      "response": {
+        "kind": "selection"
+      },
+      "evaluatorId": "class-selector-selection-evaluator",
+      "canProduceEvidenceIds": ["css-padding-single-value-evidence"],
+      "variants": [
+        {
+          "id": "four-sides",
+          "dimensions": {
+            "value": "20px",
+            "side": "all"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    },
+    {
+      "id": "padding-value-generate",
+      "targetKnowledgeComponentIds": ["css-padding-single-value"],
+      "dimensions": {
+        "value": {
+          "role": "relevant"
+        },
+        "side": {
+          "role": "relevant"
+        }
+      },
+      "response": {
+        "kind": "generated-code"
+      },
+      "evaluatorId": "class-selector-generation-evaluator",
+      "canProduceEvidenceIds": ["css-padding-single-value-generate-evidence"],
+      "variants": [
+        {
+          "id": "profile-16",
+          "dimensions": {
+            "value": "16px",
+            "side": "all"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    },
+    {
+      "id": "box-model-layer-relation",
+      "targetKnowledgeComponentIds": ["css-box-model-layer-relation"],
+      "dimensions": {
+        "padding": {
+          "role": "variation"
+        },
+        "width": {
+          "role": "relevant"
+        },
+        "border": {
+          "role": "relevant"
+        },
+        "content": {
+          "role": "surface"
+        }
+      },
+      "response": {
+        "kind": "selection"
+      },
+      "evaluatorId": "class-selector-selection-evaluator",
+      "canProduceEvidenceIds": [
+        "css-box-model-layer-relation-evidence",
+        "css-box-model-layer-generalization-evidence"
+      ],
+      "variants": [
+        {
+          "id": "padding-20",
+          "dimensions": {
+            "padding": "20px",
+            "width": "300px",
+            "border": "2px",
+            "content": "product"
+          }
+        },
+        {
+          "id": "padding-30",
+          "dimensions": {
+            "padding": "30px",
+            "width": "300px",
+            "border": "2px",
+            "content": "product"
+          }
+        }
+      ],
+      "linkedContrastSequences": []
+    }
+  ],
+  "activities": [
+    {
+      "id": "goal-preview",
+      "evidenceSpecIds": [],
+      "content": [
+        {
+          "kind": "text",
+          "text": "最後はこの商品カードを作ります。まず見た目だけ確認します。"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-goal-preview-rendering"
+        }
+      ],
+      "revealContent": [],
+      "feedbackGate": {
+        "revealMode": "immediate"
+      }
+    },
+    {
+      "id": "minimal-orientation",
+      "evidenceSpecIds": [],
+      "content": [
+        {
+          "kind": "text",
+          "text": "CSSのセレクターが、どの要素を選ぶか見てみましょう。"
+        }
+      ],
+      "revealContent": [],
+      "feedbackGate": {
+        "revealMode": "immediate"
+      }
+    },
+    {
+      "id": "p-selector-prediction",
+      "taskFamilyId": "class-selector-contrast",
+      "taskVariantId": "tag-selector",
+      "evidenceSpecIds": ["css-selector-tag-prediction"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "このCSSで色が付く要素をすべて選んでください。"
+        },
+        {
+          "kind": "code",
+          "language": "html",
+          "code": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p>180円</p>"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "p {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-tag-selector-rendering"
+        }
+      ],
+      "response": {
+        "kind": "selection",
+        "options": [
+          {
+            "id": "recommendation",
+            "label": "<p>おすすめ</p>"
+          },
+          {
+            "id": "title",
+            "label": "<h2>チョコドーナツ</h2>"
+          },
+          {
+            "id": "description",
+            "label": "<p>ふんわり生地にチョコがけ。</p>"
+          },
+          {
+            "id": "price",
+            "label": "<p>180円</p>"
+          }
+        ],
+        "correctOptionIds": ["recommendation", "description", "price"]
+      },
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      }
+    },
+    {
+      "id": "concrete-result-reasoning",
+      "evidenceSpecIds": [],
+      "content": [
+        {
+          "kind": "text",
+          "text": "p セレクターは、HTML内のすべての p 要素を選びます。"
+        }
+      ],
+      "revealContent": [],
+      "feedbackGate": {
+        "revealMode": "immediate"
+      }
+    },
+    {
+      "id": "class-added-only",
+      "taskFamilyId": "class-selector-contrast",
+      "taskVariantId": "class-added-only",
+      "evidenceSpecIds": [],
+      "content": [
+        {
+          "kind": "text",
+          "text": "class=\"nedan\" だけを追加します。"
+        },
+        {
+          "kind": "code",
+          "language": "html",
+          "code": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p class=\"nedan\">180円</p>"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "p {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-class-added-only-rendering"
+        }
+      ],
+      "revealContent": [],
+      "feedbackGate": {
+        "revealMode": "immediate"
+      }
+    },
+    {
+      "id": "class-selector-active",
+      "taskFamilyId": "class-selector-contrast",
+      "taskVariantId": "class-selector-active",
+      "evidenceSpecIds": ["css-class-selector-match-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "次に、CSSのセレクターだけを .nedan に変えます。どの要素に色が付くか選んでください。"
+        },
+        {
+          "kind": "code",
+          "language": "html",
+          "code": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p class=\"nedan\">180円</p>"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".nedan {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-class-selector-active-rendering"
+        }
+      ],
+      "response": {
+        "kind": "selection",
+        "options": [
+          {
+            "id": "recommendation",
+            "label": "<p>おすすめ</p>"
+          },
+          {
+            "id": "title",
+            "label": "<h2>チョコドーナツ</h2>"
+          },
+          {
+            "id": "description",
+            "label": "<p>ふんわり生地にチョコがけ。</p>"
+          },
+          {
+            "id": "price",
+            "label": "<p class=\"nedan\">180円</p>"
+          }
+        ],
+        "correctOptionIds": ["price"]
+      },
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      }
+    },
+    {
+      "id": "waku-independent-generation",
+      "taskFamilyId": "class-selector-generate",
+      "taskVariantId": "waku",
+      "evidenceSpecIds": ["css-class-selector-generate-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "class=\"waku\" の要素を選ぶCSSセレクターを書いてください。"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".waku"
+        }
+      ],
+      "response": {
+        "kind": "generated-code",
+        "inputLabel": "CSSセレクター",
+        "expectedResponse": ".waku"
+      },
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      }
+    },
+    {
+      "id": "price-fresh-variation",
+      "taskFamilyId": "class-selector-generate",
+      "taskVariantId": "price",
+      "evidenceSpecIds": ["css-class-selector-generate-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "class=\"price\" の要素を選ぶCSSセレクターを書いてください。"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".price"
+        }
+      ],
+      "response": {
+        "kind": "generated-code",
+        "inputLabel": "CSSセレクター",
+        "expectedResponse": ".price"
+      },
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      }
+    },
+    {
+      "id": "width-effect-prediction",
+      "evidenceSpecIds": ["css-content-box-size-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": ".waku に width: 300px を加えると、どこが変わると思いますか。"
+        },
+        {
+          "kind": "code",
+          "language": "html",
+          "code": "<div class=\"waku\">\n  <p>おすすめ</p>\n  <h2>チョコドーナツ</h2>\n  <p>ふんわり生地にチョコがけ。</p>\n  <p class=\"nedan\">180円</p>\n</div>"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".waku {\n  background-color: #fff7ed;\n}"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-card-base-rendering"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-width-300-rendering"
+        },
+        {
+          "kind": "text",
+          "text": "width はcontent部分の横幅を決めます。"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "box-size-effect",
+      "taskVariantId": "width-300",
+      "response": {
+        "kind": "selection",
+        "options": [
+          {
+            "id": "horizontal",
+            "label": "横方向のcontent部分"
+          },
+          {
+            "id": "vertical",
+            "label": "縦方向のcontent部分"
+          },
+          {
+            "id": "border",
+            "label": "枠線の太さ"
+          },
+          {
+            "id": "space",
+            "label": "内容と枠線の間"
+          }
+        ],
+        "correctOptionIds": ["horizontal"]
+      }
+    },
+    {
+      "id": "height-completion",
+      "evidenceSpecIds": ["css-size-property-select-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "縦方向のcontentの大きさを220pxにするとき、使うプロパティ名を書いてください。"
+        },
+        {
+          "kind": "code",
+          "language": "html",
+          "code": "<div class=\"waku\">\n  <p>おすすめ</p>\n  <h2>チョコドーナツ</h2>\n  <p>ふんわり生地にチョコがけ。</p>\n  <p class=\"nedan\">180円</p>\n</div>"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".waku {\n  background-color: #fff7ed;\n  width: 300px;\n}"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-width-300-rendering"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "height: 220px;"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-height-220-rendering"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "box-size-property-generate",
+      "taskVariantId": "height-for-vertical",
+      "response": {
+        "kind": "generated-code",
+        "inputLabel": "プロパティ名",
+        "expectedResponse": "height"
+      }
+    },
+    {
+      "id": "size-variation",
+      "evidenceSpecIds": ["css-content-box-size-generalization-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "widthだけを300pxから240pxに変えます。どの変化が起きますか。"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-height-220-rendering"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-width-240-rendering"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "box-size-effect",
+      "taskVariantId": "width-240",
+      "response": {
+        "kind": "selection",
+        "options": [
+          {
+            "id": "narrower",
+            "label": "横方向のcontent部分が狭くなる"
+          },
+          {
+            "id": "same",
+            "label": "heightは220pxのまま"
+          },
+          {
+            "id": "vertical",
+            "label": "縦方向だけが狭くなる"
+          },
+          {
+            "id": "thicker",
+            "label": "borderが太くなる"
+          }
+        ],
+        "correctOptionIds": ["narrower", "same"]
+      }
+    },
+    {
+      "id": "border-effect-prediction",
+      "evidenceSpecIds": ["css-border-role-evidence"],
+      "content": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-height-220-rendering"
+        },
+        {
+          "kind": "text",
+          "text": "border: 2px solid #7a4b2a を加えると、どこに変化が出ると思いますか。"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-border-added-rendering"
+        },
+        {
+          "kind": "text",
+          "text": "border は要素のまわりの枠線です。"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "border-effect",
+      "taskVariantId": "boundary-added",
+      "response": {
+        "kind": "selection",
+        "options": [
+          {
+            "id": "line",
+            "label": "要素のまわりに線が出る"
+          },
+          {
+            "id": "padding",
+            "label": "contentと線の間だけが20px広がる"
+          },
+          {
+            "id": "size",
+            "label": "横幅が300pxから自動で220pxになる"
+          },
+          {
+            "id": "color",
+            "label": "文字色だけが変わる"
+          }
+        ],
+        "correctOptionIds": ["line"]
+      }
+    },
+    {
+      "id": "border-generation",
+      "evidenceSpecIds": ["css-border-shorthand-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "3pxの破線を #c2410c で付けます。border: の後ろに入る値を、太さ → 種類 → 色の順で書いてください。"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-border-added-rendering"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "border: 3px dashed #c2410c;"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "border-shorthand-generate",
+      "taskVariantId": "dashed-orange",
+      "response": {
+        "kind": "generated-code",
+        "inputLabel": "border の値",
+        "expectedResponse": "3px dashed #c2410c"
+      }
+    },
+    {
+      "id": "border-missing-style-variation",
+      "evidenceSpecIds": ["css-border-shorthand-generalization-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "この指定では枠線が見えません。足りないものを選んでください。"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "border: 2px #7a4b2a;"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-height-220-rendering"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "border: 2px solid #7a4b2a;"
+        },
+        {
+          "kind": "text",
+          "text": "線の種類がない場合、今回の指定では見える枠線になりません。"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "border-fault-variation",
+      "taskVariantId": "missing-style",
+      "response": {
+        "kind": "selection",
+        "options": [
+          {
+            "id": "style",
+            "label": "線の種類"
+          },
+          {
+            "id": "width",
+            "label": "width"
+          },
+          {
+            "id": "padding",
+            "label": "padding"
+          },
+          {
+            "id": "hash",
+            "label": "classの先頭の#"
+          }
+        ],
+        "correctOptionIds": ["style"]
+      }
+    },
+    {
+      "id": "padding-prediction",
+      "evidenceSpecIds": ["css-padding-role-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "padding: 20px を加えると、どこに空間が増えると思いますか。"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-border-added-rendering"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-padding-20-rendering"
+        },
+        {
+          "kind": "text",
+          "text": "padding はcontentとborderの間の内側余白です。"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "padding-effect",
+      "taskVariantId": "padding-20",
+      "response": {
+        "kind": "selection",
+        "options": [
+          {
+            "id": "between",
+            "label": "contentとborderの間"
+          },
+          {
+            "id": "outside",
+            "label": "borderの外側"
+          },
+          {
+            "id": "thickness",
+            "label": "borderそのものの太さ"
+          },
+          {
+            "id": "height",
+            "label": "文字の高さだけ"
+          }
+        ],
+        "correctOptionIds": ["between"]
+      }
+    },
+    {
+      "id": "padding-four-sides",
+      "evidenceSpecIds": ["css-padding-single-value-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "padding: 20px のように値を1つだけ書いたとき、20pxになる方向をすべて選んでください。"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "padding: 20px;"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "text",
+          "text": "値が1つなら4方向すべてに同じpaddingが付きます。"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "padding-single-value",
+      "taskVariantId": "four-sides",
+      "response": {
+        "kind": "selection",
+        "options": [
+          {
+            "id": "top",
+            "label": "上"
+          },
+          {
+            "id": "right",
+            "label": "右"
+          },
+          {
+            "id": "bottom",
+            "label": "下"
+          },
+          {
+            "id": "left",
+            "label": "左"
+          }
+        ],
+        "correctOptionIds": ["top", "right", "bottom", "left"]
+      }
+    },
+    {
+      "id": "integrated-box-model-prediction",
+      "evidenceSpecIds": ["css-box-model-layer-relation-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "このレッスンの前提では、外側の横幅は300pxのままでしょうか。"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".waku {\n  width: 300px;\n  height: 220px;\n  border: 2px solid #7a4b2a;\n  padding: 20px;\n}"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-padding-20-rendering"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "text",
+          "text": "widthはcontent部分の横幅です。paddingとborderはその外側に加わります。"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "box-model-layer-relation",
+      "taskVariantId": "padding-20",
+      "response": {
+        "kind": "selection",
+        "options": [
+          {
+            "id": "larger",
+            "label": "300pxより大きくなる"
+          },
+          {
+            "id": "same",
+            "label": "ちょうど300px"
+          },
+          {
+            "id": "smaller",
+            "label": "300pxより小さくなる"
+          }
+        ],
+        "correctOptionIds": ["larger"]
+      }
+    },
+    {
+      "id": "layer-resolution",
+      "evidenceSpecIds": [],
+      "content": [
+        {
+          "kind": "text",
+          "text": "内側から content → padding → border の順です。width と height は、このレッスンではcontent部分の大きさを表します。"
+        },
+        {
+          "kind": "code",
+          "language": "text",
+          "code": "border\n└─ padding\n   └─ content"
+        }
+      ],
+      "revealContent": [],
+      "feedbackGate": {
+        "revealMode": "immediate"
+      }
+    },
+    {
+      "id": "changed-condition-application",
+      "evidenceSpecIds": ["css-box-model-layer-generalization-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "paddingだけを20pxから30pxに変えると、正しいものをすべて選んでください。"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-padding-20-rendering"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "resource",
+          "resourceId": "box-model-padding-30-rendering"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "box-model-layer-relation",
+      "taskVariantId": "padding-30",
+      "response": {
+        "kind": "selection",
+        "options": [
+          {
+            "id": "content",
+            "label": "contentのwidthは300pxのまま"
+          },
+          {
+            "id": "padding",
+            "label": "padding部分が広がる"
+          },
+          {
+            "id": "outer",
+            "label": "外側のboxは大きくなる"
+          },
+          {
+            "id": "border",
+            "label": "borderが30pxの太さになる"
+          }
+        ],
+        "correctOptionIds": ["content", "padding", "outer"]
+      }
+    },
+    {
+      "id": "final-profile-selector",
+      "evidenceSpecIds": ["css-class-selector-generate-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "class=\"profile-card\" の要素だけを選ぶCSSセレクターを書いてください。"
+        },
+        {
+          "kind": "code",
+          "language": "html",
+          "code": "<section class=\"profile-card\">\n  <h2>山田 花子</h2>\n  <p>Webデザインコース</p>\n</section>"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".profile-card {"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "class-selector-generate",
+      "taskVariantId": "profile-card",
+      "response": {
+        "kind": "generated-code",
+        "inputLabel": "CSSセレクター",
+        "expectedResponse": ".profile-card"
+      }
+    },
+    {
+      "id": "final-profile-width",
+      "evidenceSpecIds": ["css-size-property-select-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "content部分の横幅を280pxにするとき、使うプロパティ名を書いてください。"
+        },
+        {
+          "kind": "code",
+          "language": "html",
+          "code": "<section class=\"profile-card\">\n  <h2>山田 花子</h2>\n  <p>Webデザインコース</p>\n</section>"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".profile-card {"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "  width: 280px;"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "box-size-property-generate",
+      "taskVariantId": "width-for-final-card",
+      "response": {
+        "kind": "generated-code",
+        "inputLabel": "プロパティ名",
+        "expectedResponse": "width"
+      }
+    },
+    {
+      "id": "final-profile-border",
+      "evidenceSpecIds": ["css-border-shorthand-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "3pxの実線を #2563eb で付けます。border: の後ろに入る値を書いてください。"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".profile-card {\n  width: 280px;"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": "  border: 3px solid #2563eb;"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "border-shorthand-generate",
+      "taskVariantId": "profile-blue",
+      "response": {
+        "kind": "generated-code",
+        "inputLabel": "border の値",
+        "expectedResponse": "3px solid #2563eb"
+      }
+    },
+    {
+      "id": "final-profile-padding",
+      "evidenceSpecIds": ["css-padding-single-value-generate-evidence"],
+      "content": [
+        {
+          "kind": "text",
+          "text": "4方向すべてに16pxの内側余白を付けます。padding: の後ろに入る値を書いてください。"
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".profile-card {\n  width: 280px;\n  border: 3px solid #2563eb;"
+        }
+      ],
+      "revealContent": [
+        {
+          "kind": "code",
+          "language": "css",
+          "code": ".profile-card {\n  width: 280px;\n  border: 3px solid #2563eb;\n  padding: 16px;\n}"
+        },
+        {
+          "kind": "resource",
+          "resourceId": "box-model-final-profile-rendering"
+        }
+      ],
+      "feedbackGate": {
+        "revealMode": "after-commit"
+      },
+      "taskFamilyId": "padding-value-generate",
+      "taskVariantId": "profile-16",
+      "response": {
+        "kind": "generated-code",
+        "inputLabel": "padding の値",
+        "expectedResponse": "16px"
+      }
+    }
+  ],
+  "corePlan": [
+    {
+      "id": "step-goal-preview",
+      "activityId": "goal-preview",
+      "blocking": true
+    },
+    {
+      "id": "step-minimal-orientation",
+      "activityId": "minimal-orientation",
+      "blocking": true
+    },
+    {
+      "id": "step-p-selector-prediction",
+      "activityId": "p-selector-prediction",
+      "blocking": true
+    },
+    {
+      "id": "step-concrete-result-reasoning",
+      "activityId": "concrete-result-reasoning",
+      "blocking": true
+    },
+    {
+      "id": "step-class-added-only",
+      "activityId": "class-added-only",
+      "blocking": true
+    },
+    {
+      "id": "step-class-selector-active",
+      "activityId": "class-selector-active",
+      "blocking": true
+    },
+    {
+      "id": "step-waku-independent-generation",
+      "activityId": "waku-independent-generation",
+      "blocking": true
+    },
+    {
+      "id": "step-price-fresh-variation",
+      "activityId": "price-fresh-variation",
+      "blocking": true
+    },
+    {
+      "id": "step-width-effect-prediction",
+      "activityId": "width-effect-prediction",
+      "blocking": true
+    },
+    {
+      "id": "step-height-completion",
+      "activityId": "height-completion",
+      "blocking": true
+    },
+    {
+      "id": "step-size-variation",
+      "activityId": "size-variation",
+      "blocking": true
+    },
+    {
+      "id": "step-border-effect-prediction",
+      "activityId": "border-effect-prediction",
+      "blocking": true
+    },
+    {
+      "id": "step-border-generation",
+      "activityId": "border-generation",
+      "blocking": true
+    },
+    {
+      "id": "step-border-missing-style-variation",
+      "activityId": "border-missing-style-variation",
+      "blocking": true
+    },
+    {
+      "id": "step-padding-prediction",
+      "activityId": "padding-prediction",
+      "blocking": true
+    },
+    {
+      "id": "step-padding-four-sides",
+      "activityId": "padding-four-sides",
+      "blocking": true
+    },
+    {
+      "id": "step-integrated-box-model-prediction",
+      "activityId": "integrated-box-model-prediction",
+      "blocking": true
+    },
+    {
+      "id": "step-layer-resolution",
+      "activityId": "layer-resolution",
+      "blocking": true
+    },
+    {
+      "id": "step-changed-condition-application",
+      "activityId": "changed-condition-application",
+      "blocking": true
+    },
+    {
+      "id": "step-final-profile-selector",
+      "activityId": "final-profile-selector",
+      "blocking": true
+    },
+    {
+      "id": "step-final-profile-width",
+      "activityId": "final-profile-width",
+      "blocking": true
+    },
+    {
+      "id": "step-final-profile-border",
+      "activityId": "final-profile-border",
+      "blocking": true
+    },
+    {
+      "id": "step-final-profile-padding",
+      "activityId": "final-profile-padding",
+      "blocking": true
+    }
+  ],
+  "evaluatorSpecs": [
+    {
+      "id": "class-selector-selection-evaluator",
+      "kind": "selection-set"
+    },
+    {
+      "id": "class-selector-generation-evaluator",
+      "kind": "exact-response"
+    }
+  ],
+  "resources": [
+    {
+      "id": "box-model-tag-selector-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p>180円</p>",
+        "css": "p {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+      }
+    },
+    {
+      "id": "box-model-class-added-only-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p class=\"nedan\">180円</p>",
+        "css": "p {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+      }
+    },
+    {
+      "id": "box-model-class-selector-active-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<p>おすすめ</p>\n<h2>チョコドーナツ</h2>\n<p>ふんわり生地にチョコがけ。</p>\n<p class=\"nedan\">180円</p>",
+        "css": ".nedan {\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+      }
+    },
+    {
+      "id": "box-model-goal-preview-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<div class=\"waku\">\n  <p>おすすめ</p>\n  <h2>チョコドーナツ</h2>\n  <p>ふんわり生地にチョコがけ。</p>\n  <p class=\"nedan\">180円</p>\n</div>",
+        "css": ".waku {\n  width: 300px;\n  height: 220px;\n  border: 2px solid #7a4b2a;\n  padding: 20px;\n  background-color: #fff7ed;\n}\n.nedan {\n  border: 2px solid #c2410c;\n  padding: 8px;\n  background-color: #ffedd5;\n  color: #7c2d12;\n}"
+      }
+    },
+    {
+      "id": "box-model-card-base-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<div class=\"waku\">\n  <p>おすすめ</p>\n  <h2>チョコドーナツ</h2>\n  <p>ふんわり生地にチョコがけ。</p>\n  <p class=\"nedan\">180円</p>\n</div>",
+        "css": ".waku {\n  background-color: #fff7ed;\n}"
+      }
+    },
+    {
+      "id": "box-model-width-300-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<div class=\"waku\">\n  <p>おすすめ</p>\n  <h2>チョコドーナツ</h2>\n  <p>ふんわり生地にチョコがけ。</p>\n  <p class=\"nedan\">180円</p>\n</div>",
+        "css": ".waku {\n  background-color: #fff7ed;\n  width: 300px;\n}"
+      }
+    },
+    {
+      "id": "box-model-height-220-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<div class=\"waku\">\n  <p>おすすめ</p>\n  <h2>チョコドーナツ</h2>\n  <p>ふんわり生地にチョコがけ。</p>\n  <p class=\"nedan\">180円</p>\n</div>",
+        "css": ".waku {\n  background-color: #fff7ed;\n  width: 300px;\n  height: 220px;\n}"
+      }
+    },
+    {
+      "id": "box-model-width-240-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<div class=\"waku\">\n  <p>おすすめ</p>\n  <h2>チョコドーナツ</h2>\n  <p>ふんわり生地にチョコがけ。</p>\n  <p class=\"nedan\">180円</p>\n</div>",
+        "css": ".waku {\n  background-color: #fff7ed;\n  width: 240px;\n  height: 220px;\n}"
+      }
+    },
+    {
+      "id": "box-model-border-added-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<div class=\"waku\">\n  <p>おすすめ</p>\n  <h2>チョコドーナツ</h2>\n  <p>ふんわり生地にチョコがけ。</p>\n  <p class=\"nedan\">180円</p>\n</div>",
+        "css": ".waku {\n  background-color: #fff7ed;\n  width: 300px;\n  height: 220px;\n  border: 2px solid #7a4b2a;\n}"
+      }
+    },
+    {
+      "id": "box-model-padding-20-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<div class=\"waku\">\n  <p>おすすめ</p>\n  <h2>チョコドーナツ</h2>\n  <p>ふんわり生地にチョコがけ。</p>\n  <p class=\"nedan\">180円</p>\n</div>",
+        "css": ".waku {\n  background-color: #fff7ed;\n  width: 300px;\n  height: 220px;\n  border: 2px solid #7a4b2a;\n  padding: 20px;\n}"
+      }
+    },
+    {
+      "id": "box-model-padding-30-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<div class=\"waku\">\n  <p>おすすめ</p>\n  <h2>チョコドーナツ</h2>\n  <p>ふんわり生地にチョコがけ。</p>\n  <p class=\"nedan\">180円</p>\n</div>",
+        "css": ".waku {\n  background-color: #fff7ed;\n  width: 300px;\n  height: 220px;\n  border: 2px solid #7a4b2a;\n  padding: 30px;\n}"
+      }
+    },
+    {
+      "id": "box-model-final-profile-rendering",
+      "kind": "rendered-html-css",
+      "payload": {
+        "html": "<section class=\"profile-card\">\n  <h2>山田 花子</h2>\n  <p>Webデザインコース</p>\n</section>",
+        "css": ".profile-card {\n  width: 280px;\n  border: 3px solid #2563eb;\n  padding: 16px;\n}"
+      }
+    }
+  ]
+}

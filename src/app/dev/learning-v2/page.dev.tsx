@@ -10,7 +10,7 @@ const source = JSON.parse(
   readFileSync(
     path.resolve(
       process.cwd(),
-      "packages/platform/tests/fixtures/learning-v2/box-model-class-selector.json",
+      "packages/platform/tests/fixtures/learning-v2/box-model-static.json",
     ),
     "utf8",
   ),
