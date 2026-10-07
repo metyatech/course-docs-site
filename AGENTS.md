@@ -176,11 +176,13 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
   XHTML-style trailing slashes, such as `<input>` rather than `<input />`. This
   applies to HTML code fences and sample/complete files, not MDX/JSX components.
 - Course docs MUST NOT use `<Solution>` or `authoringMode`.
-- Treat learner-visible content as Course Docs content regardless of storage format or path.
-  Prompts, labels, code context, feedback, explanations, and visible state text in
-  JSON/YAML/TypeScript fixtures, Bundle source, test fixtures, or generated source
-  MUST follow the same learner-facing authoring rules as MDX. A file under a test
-  directory is not exempt merely because it is also used as fixture data.
+- Treat learner-visible content as Course Docs content regardless of storage
+  format or path.
+  Prompts, labels, code context, feedback, explanations, and visible state text
+  in JSON/YAML/TypeScript fixtures, Bundle source, test fixtures, or generated
+  source MUST follow the same learner-facing authoring rules as
+  MDX. A file under a test directory is not exempt merely because it is also
+  used as fixture data.
 
 ## Research provenance
 
@@ -342,6 +344,13 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
   Neutral platform/accessibility fallback wording is allowed only when it cannot
   misstate the task. Missing or mismatched task meaning is an authoring/validation
   defect, not a renderer convenience.
+- Learner-facing structure SHOULD distinguish document/lesson identity,
+  meaningful activity or task headings, task prompts, response surfaces, and
+  results/feedback when those roles are present. Do not flatten these roles into
+  visually equivalent body paragraphs or generic cards merely because a shared
+  runtime renders them. A heading SHOULD orient the learner to the current
+  purpose/action without mechanically repeating the prompt. Exact typography,
+  level choice, and grouping are local design decisions.
 - As a Course Docs research synthesis, review whether a learner-facing
   heading, its immediate explanation, the task statement, and relevant UI cues
   ask for the same learner action at the same stage. Treat a mismatch as a
@@ -467,17 +476,28 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/authoring.md
   concise text mapping or accessibility equivalent as gratuitous duplication.
   These coherence/redundancy rules remove pointless narration, not useful
   verification or performance feedback.
-- After commitment, preserve the learner's response in place or in an immediately
-  comparable representation when comparison is instructionally useful. Do not
-  replace it with a detached summary merely for renderer uniformity. Do not repeat
+- After commitment, preserve the learner's response in place or in an
+  immediately comparable representation when comparison is instructionally
+  useful. Do not replace it with a detached summary merely for renderer
+  uniformity. Do not repeat
   an identical canonical answer immediately after an already-visible correct
-  learner answer unless the second representation adds a distinct instructional or
-  accessibility role such as explanation, normalization, or explicit comparison.
+  learner answer unless the second representation adds a distinct
+  instructional or accessibility role such as explanation, normalization, or
+  explicit comparison.
 - Feedback findings from Shute (2008) and Van der Kleij, Feskens, and Eggen
   (2015) are R-level guidance within their stated boundary conditions. The
   staged verification → generation/self-explanation → canonical explanation
   sequence is an S Course Docs synthesis; exact wording, tone, colour, and icon
   styling are L local decisions.
+- In a controlled visual comparison, preserve not only authored content
+  invariants but also presentation conditions that affect the observed result,
+  such as preview/container width, scale, zoom, clipping, or viewport. Do not
+  force a universal side-by-side layout when putting states into columns changes
+  the thing being compared. Stack or otherwise preserve an equivalent rendering
+  environment when needed. When rendered size/space carries instructional
+  meaning, browser review SHOULD inspect actual geometry rather than only the
+  existence of two panels. This is a local Course Docs visual-validity contract;
+  exact layout is not a research-prescribed form.
 - Divide material at meaningful semantic or causal boundaries rather than by
   arbitrary screen-sized chunks. Separate simultaneous changes when needed to
   show which change caused which result; preserve meaningful unchanged states
@@ -648,13 +668,25 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/course-docs/repository-a
   prompts, labels, explanations, or feedback from generic response/evaluator kinds.
   Required instructional meaning belongs in validated authored content; generic
   runtime fallbacks must remain semantically neutral.
+- Shared learner-facing runtimes MUST preserve explicit semantic hierarchy for
+  lesson/page identity, meaningful activity/task headings, prompts, responses,
+  and results rather than deriving hierarchy from internal IDs or flattening all
+  roles into generic body text.
+- Shared comparison renderers MUST NOT force one layout on every controlled
+  contrast. When viewport/container width, scale, clipping, or another
+  presentation condition affects the observed behavior, preserve that
+  environment across compared states; use stacking or another layout when
+  columns would invalidate the comparison.
 - Site/platform cross-boundary changes MUST be committed and verified atomically
   in the same repository. Platform, site, course build, and end-to-end
   verification MUST run together for changes crossing this boundary.
 - When a learner-facing instructional runtime has an explicit visual/reference
   acceptance contract, automated tests are necessary but not sufficient for final
   acceptance. Inspect the required rendered states in a real browser against the
-  reference. Until the designated visual reviewer accepts them, report
+  reference. Where size, spacing, clipping, or responsive behavior is part of
+  the instructional relation, acceptance MUST inspect the actual rendered
+  geometry/environment rather than only DOM structure or screenshots of labels.
+  Until the designated visual reviewer accepts them, report
   `RESULT=WAITING_FOR_HUMAN_VISUAL_ACCEPTANCE` rather than final `RESULT=PASS`.
 - The archived `metyatech/course-docs-platform` repository is historical only.
   Active code MUST NOT depend on it through Git, GitHub SHA dependencies,
