@@ -374,6 +374,27 @@ later make valid Evidence impossible.
 
 The implementation should be checked in an actual browser, not only through unit tests.
 
+Visual acceptance is **semantic**, not cosmetic. Passing the fixed step order and reveal tests is
+not enough if the implementation turns the lesson into a generic sequence of text, code blocks,
+iframes, answer controls, and "Next" buttons while losing the visual relationships that make the
+reference understandable.
+
+The renderer/Content IR must preserve instructional visual semantics such as:
+
+- meaningful code/result proximity;
+- before/after comparability;
+- persistent context required for a causal contrast;
+- isolated visibility of the changed dimension;
+- visual mapping of spatial concepts such as content, padding, and border;
+- clear hierarchy between explanation, prediction, manipulation, and result.
+
+Exact surface styling is not frozen. These relations are.
+
+For the v6.13 acceptance review, inspect both the historical reference and the current
+`/dev/learning-v2/` rendering. Do not approve merely because both contain the same facts or
+steps. The current implementation must preserve or improve the reference's instructional visual
+mechanisms.
+
 For the class-selector slice, capture/inspect the meaningful states:
 
 1. prediction before response;
@@ -398,6 +419,11 @@ Review for:
 
 Passing tests is necessary but not sufficient; the actual rendered experience must satisfy the
 v6.13 acceptance intent.
+
+A manual/visual acceptance pass is therefore a release gate for the Static v2 pilot. Automated
+tests should protect objective invariants such as reveal order, accessibility, responsive
+behavior, and required visual-comparison structure, but they must not be treated as proof that
+the learner experience is coherent.
 
 ## What the next implementer may decide
 
