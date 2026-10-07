@@ -91,7 +91,7 @@ minimal orientation
 -> predict which elements p selects
 -> commit answer
 -> concrete result
--> learner reasoning where useful
+-> learner reasoning about what p selects (required for this reference slice)
 -> canonical explanation
 -> add class="nedan" only
 -> observe that appearance does not change
@@ -111,6 +111,29 @@ add class only
 ```
 
 is a required acceptance property.
+
+## Normative contract precedence
+
+The detailed learner-experience requirements in
+[`box-model-reference.md`](./box-model-reference.md) are normative for this pilot. In particular,
+the stable `BM-CLS-*` acceptance IDs define the class-selector slice.
+
+This handoff document may summarize that reference for implementation sequencing, but a summary
+must not weaken an acceptance contract. Words such as "when useful", "optional", or a shortened
+table row do not override a requirement that the detailed reference marks as required. If two
+documents appear inconsistent, stop and reconcile the documents before implementation.
+
+Any learner-visible prose, labels, code context, feedback, or task instructions stored in a JSON
+fixture, Bundle source, test fixture, or other data file are **course content**. They are subject to
+the same cold-read, clarity, feedback, answer-leakage, and coherence rules as learner-facing MDX.
+A file being under `tests/fixtures/` does not make its learner-facing content "test data" for
+quality purposes.
+
+The runtime must not invent domain-specific instructional meaning from a response type. It may
+provide neutral platform wording only where that wording cannot change the task meaning. A missing
+task prompt, misleading response label, or missing required instructional feedback should be
+fixed in authored content/schema validation rather than hidden behind a domain-specific runtime
+fallback.
 
 ## Explicitly out of scope
 
@@ -239,6 +262,12 @@ Gate B passes when:
 - the `class="nedan"`-only state and selector-change state remain separate;
 - `.waku` is generated before its answer is revealed;
 - one fresh variation exists after `.waku`;
+- `BM-CLS-REASON-01` is present: after the concrete result, the learner reasons about what `p`
+  selects before the canonical explanation;
+- every response-bearing Activity is understandable on a cold read: the learner can tell what
+  content the question concerns, what action is required, and the expected response form;
+- runtime fallback copy does not inject domain-specific task meaning such as a class-selector
+  instruction into an unrelated width/border/padding Task;
 - reload may reset interaction state without breaking the page;
 - v1 pages remain unaffected.
 
@@ -408,6 +437,16 @@ For the class-selector slice, capture/inspect the meaningful states:
 Review for:
 
 - no answer leakage;
+- every response-bearing Activity is understandable from its visible pre-attempt state without
+  guessing the task;
+- the class-selector result includes `BM-CLS-REASON-01` before the canonical explanation;
+- response labels describe the current Task rather than leaking a domain-specific generic
+  fallback from another Task;
+- where the learning target is causal/relational, feedback states the concrete outcome or useful
+  causal relation instead of ending at generic "correct/incorrect";
+- post-commit presentation preserves the learner's response when it is useful for comparison and
+  does not duplicate an identical canonical answer unless the second representation has a
+  distinct instructional or accessibility role;
 - no unnecessary status narration;
 - no duplicate result sentence;
 - causal changes are visually isolated;
@@ -424,6 +463,19 @@ A manual/visual acceptance pass is therefore a release gate for the Static v2 pi
 tests should protect objective invariants such as reveal order, accessibility, responsive
 behavior, and required visual-comparison structure, but they must not be treated as proof that
 the learner experience is coherent.
+
+Completion reporting must make this gate explicit. Until the designated visual reviewer has
+inspected the required rendered states against v6.13, an implementer must report:
+
+```text
+AUTOMATED_VERIFY=PASS
+VISUAL_ACCEPTANCE=WAITING
+RESULT=WAITING_FOR_HUMAN_VISUAL_ACCEPTANCE
+```
+
+and must **not** report final `RESULT=PASS`. Only after visual acceptance may the milestone be
+reported as PASS. This remains true even when all unit, contract, accessibility, and browser E2E
+tests are green.
 
 ## What the next implementer may decide
 

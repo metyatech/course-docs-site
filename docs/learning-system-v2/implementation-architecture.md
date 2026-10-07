@@ -93,6 +93,11 @@ fixture; compiler input must be able to represent:
 Content source can use YAML/JSON/MDX or another authoring format, but the runtime must not depend
 on parsing arbitrary authoring syntax.
 
+Learner-facing content remains course content regardless of storage location. A prompt or
+feedback string inside `tests/fixtures/*.json`, a typed fixture, or generated Bundle source must
+receive the same instructional review as learner-facing MDX; test-oriented file placement does
+not lower its quality contract.
+
 ### Compiler output: Learning Bundle
 
 The compiler emits a **serializable, immutable Learning Bundle**.
@@ -174,6 +179,24 @@ instructional contract whenever it carries meaning.
 
 Renderer types are registered platform capabilities. Authoring syntax may still be MDX, but the
 compiler should reduce v2 learning activities to data that can be validated and versioned.
+
+### Renderer fallback boundary
+
+Generic renderers own interaction mechanics, accessibility behavior, and neutral platform
+presentation. They do **not** own domain-specific instructional copy.
+
+A renderer must not derive a task prompt such as "色が付く要素を選ぶ", a causal explanation, or a
+subject-specific feedback sentence merely from a response/evaluator kind. Required instructional
+meaning must come from the validated Bundle. If the Bundle lacks meaning needed to make the Task
+understandable, the preferred failure mode is authoring/validation failure rather than a
+plausible-but-wrong runtime fallback.
+
+Neutral fallback text is allowed only when it cannot misstate the Task, for example a generic
+accessibility name whose semantic role is already established by adjacent authored content.
+
+Post-commit rendering should also follow authored instructional relationships. Preserve a
+learner response when comparison matters, and avoid duplicating the same answer as a separate
+canonical block unless that second representation has a distinct instructional purpose.
 
 This allows an old Bundle to remain renderable after the source repository changes, provided its
 IR schema version is still supported.

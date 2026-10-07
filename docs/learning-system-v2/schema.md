@@ -431,7 +431,13 @@ Some properties should remain AI/human review rather than fake machine certainty
 - whether an explanation is genuinely clear;
 - whether a context change is meaningful enough for a specific transfer claim;
 - whether a distractor reflects a realistic misconception;
-- whether a worked example is optimally segmented.
+- whether a worked example is optimally segmented;
+- whether a learner-facing task is understandable on a cold read beyond structural prompt
+  presence;
+- whether post-commit comparison keeps the learner's response and canonical result close enough
+  to support the intended reasoning;
+- whether a response/control label semantically matches the current Task rather than merely being
+  non-empty.
 
 ## Relationship to v1 metadata
 
@@ -982,6 +988,61 @@ The authoritative session state must record whether solution-revealing informati
 been released when an attempt was accepted. This allows the Evidence Model to distinguish a
 fresh pre-reveal response from a post-reveal retry without trusting client timestamps alone.
 
+
+## Learner-facing activity and fallback semantics
+
+Learner-facing strings do not become implementation metadata merely because they are stored in
+JSON, a fixture, a compiled Bundle, or another non-MDX source. Prompts, labels, code context,
+feedback, explanations, and visible state descriptions are course content and must satisfy the
+same instructional authoring standards as other learner-facing material.
+
+A response-bearing Activity must author enough semantics that its pre-attempt state makes clear:
+
+```text
+what content/object the learner is responding about
++ what action/judgment/generation is requested
++ what response form is expected
+```
+
+The exact serialization is not frozen. The schema may represent this through prompt nodes,
+response-slot metadata, response metadata, or another validated structure. What is not acceptable
+is leaving the instructional meaning absent and expecting a generic renderer to guess it.
+
+### Runtime fallback boundary
+
+The renderer may supply neutral platform wording such as an accessibility-only name for a generic
+control when that wording does not alter the instructional meaning. It must not infer
+domain-specific prompts, labels, explanations, or feedback from `response.kind`, the evaluator
+kind, or a renderer default.
+
+For example, a generic selection renderer must not label every selection Task as "色が付く要素を
+選ぶ". If the authored Activity does not provide the Task-specific meaning required for a clear
+learner action, validation should fail or acceptance should block rather than silently borrowing a
+label from another domain example.
+
+### Feedback semantics
+
+Correctness is not always the instructional result. When an Activity is designed to support a
+prediction, causal relation, rationale, or misconception repair, its feedback contract must be
+able to require concrete outcome and/or causal information in addition to correctness.
+
+A generic "正解" / "不正解" fallback is insufficient when the learning claim depends on why a
+result occurred or what changed. The exact feedback wording remains local; the presence of the
+needed informational role does not.
+
+### Post-commit representation
+
+After commitment, the runtime should preserve the learner's response in place or in an
+immediately comparable representation when that comparison is instructionally useful. Replacing
+the response with a detached summary is not automatically equivalent.
+
+Likewise, do not show an identical canonical answer immediately after an already-visible correct
+learner answer unless the canonical representation adds a distinct role such as explanation,
+normalization, comparison, or accessibility. The schema/IR should be able to express the intended
+relationship rather than leaving it to a generic renderer heuristic.
+
+These requirements are semantic. Exact component names, layout, typography, and animation remain
+implementation decisions.
 
 ## Instructional visual semantics
 

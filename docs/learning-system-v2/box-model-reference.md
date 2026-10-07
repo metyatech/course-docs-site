@@ -30,6 +30,28 @@ v2 should produce an experience at least as coherent, concise, and learnable as 
 If an abstraction, schema, compiler, or adaptive feature makes the learner experience worse,
 revise the model rather than degrading this reference.
 
+## Normative reference contracts
+
+This file is the normative learner-experience contract for the box-model reference. Summaries in
+other v2 documents may point to these contracts, but they must not silently weaken, optionalize,
+or omit them. If a summary and this detailed reference disagree, stop and reconcile the documents
+before implementation rather than choosing the weaker interpretation.
+
+Stable acceptance IDs for the class-selector slice:
+
+| Contract ID | Required relation |
+| --- | --- |
+| `BM-CLS-ORIENT-01` | Minimal orientation gives enough context without pre-explaining the target rule. |
+| `BM-CLS-PREDICT-01` | Learner predicts every element selected by `p` before the result is revealed. |
+| `BM-CLS-OUTCOME-01` | Post-attempt feedback shows the concrete rendered outcome, not correctness alone. |
+| `BM-CLS-REASON-01` | Learner infers or explains what `p` selects before the canonical explanation is shown. |
+| `BM-CLS-CLASS-ONLY-01` | Adding `class="nedan"` alone leaves the rendered result unchanged while CSS still selects `p`. |
+| `BM-CLS-ACTIVATE-01` | Changing only `p` to `.nedan` makes only the intended element change. |
+| `BM-CLS-GENERATE-01` | Learner generates `.waku` from `class="waku"` before seeing the answer. |
+| `BM-CLS-VARY-01` | A fresh class-name variation checks that the learner can apply the relation again. |
+
+These IDs name instructional contracts, not UI components or serialization fields.
+
 ## Reference flow: class selector
 
 ### 1. Minimal orientation
@@ -76,11 +98,13 @@ Possible incorrect-prediction wording:
 Exact wording is local. The requirement is concrete outcome feedback rather than only
 "correct/incorrect".
 
-### 4. Generation before canonical explanation when useful
+### 4. Learner generation before canonical explanation
 
-Prompt the learner to infer or explain what `p` is selecting.
+For this reference slice, prompt the learner to infer or explain what `p` is selecting before
+showing the canonical explanation. This is the required `BM-CLS-REASON-01` contract, not an
+optional embellishment.
 
-Do not reveal the full canonical explanation first when that would eliminate the intended
+Do not reveal the full canonical explanation first because that would eliminate the intended
 generation.
 
 Then resolve:
@@ -381,7 +405,7 @@ preserves the step order but weakens those relations is a regression.
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Goal preview                    | Show the finished product visually without exposing all solution code.                                                                                      | Orientation only.                                 | None required.                                                                     |
 | Tag-selector prediction         | Show several elements and `p { ... }`; learner predicts every affected element before reveal.                                                               | `css-selector-tag-match`; prior-state diagnostic. | Hint only after first commitment if needed.                                        |
-| Result and explanation          | Reveal the actual affected elements, then resolve why all `p` elements changed.                                                                             | Concrete feedback; rationale formation.           | Additional explanation only when needed.                                           |
+| Result and explanation          | Reveal the actual affected elements, then require the learner to infer/explain what `p` selects before showing the canonical explanation.                  | Concrete feedback; `BM-CLS-REASON-01`; rationale formation. | Additional explanation only when needed.                                           |
 | Add class only                  | Add `class="nedan"` while CSS remains `p`; show that appearance is unchanged.                                                                               | Controlled causal contrast.                       | None normally.                                                                     |
 | Activate class selector         | Change only `p` -> `.nedan`; show that only the price changes.                                                                                              | `css-class-selector-match`; rationale.            | Targeted support for class/selector mapping.                                       |
 | Generate new selector           | Give `class="waku"`; learner generates `.waku`.                                                                                                             | Independent `css-class-selector-generate`.        | Hint -> worked example -> retry as needed.                                         |
