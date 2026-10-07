@@ -268,6 +268,11 @@ Gate B passes when:
   content the question concerns, what action is required, and the expected response form;
 - runtime fallback copy does not inject domain-specific task meaning such as a class-selector
   instruction into an unrelated width/border/padding Task;
+- `BM-VIS-HIERARCHY-01` is present: lesson/page identity and the current meaningful task are
+  rendered as semantic hierarchy rather than as undifferentiated body text;
+- `BM-VIS-COMPARE-01` is present: controlled comparisons preserve the relevant preview/rendering
+  environment. A column layout must not shrink the baseline viewport in a way that masks the
+  authored width/padding/border effect;
 - reload may reset interaction state without breaking the page;
 - v1 pages remain unaffected.
 
@@ -442,6 +447,8 @@ Review for:
 - the class-selector result includes `BM-CLS-REASON-01` before the canonical explanation;
 - response labels describe the current Task rather than leaking a domain-specific generic
   fallback from another Task;
+- the page has a visible learner-facing lesson identity and meaningful activity/task headings;
+  headings are not reconstructed from internal IDs or generic renderer copy;
 - where the learning target is causal/relational, feedback states the concrete outcome or useful
   causal relation instead of ending at generic "correct/incorrect";
 - post-commit presentation preserves the learner's response when it is useful for comparison and

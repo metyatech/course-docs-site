@@ -989,6 +989,32 @@ been released when an attempt was accepted. This allows the Evidence Model to di
 fresh pre-reveal response from a post-reveal retry without trusting client timestamps alone.
 
 
+## Learner-facing lesson and activity hierarchy
+
+The Knowledge/Task/Evidence models do not replace learner-facing document structure. A compiled
+Bundle needs explicit presentation semantics for at least:
+
+- learner-facing lesson/page title;
+- optional concise lesson orientation/summary when it adds value;
+- learner-facing Activity/task title or heading role;
+- task prompt/instruction distinct from supporting context;
+- response surface;
+- revealed result/feedback/explanation roles.
+
+These are presentation semantics, not a sixth educational model. Unit titles and internal stable
+IDs are not substitutes for learner-facing lesson/task headings.
+
+A response-bearing Activity must expose an **authored task-prompt semantic**. An arbitrary text node
+somewhere in `content` is not enough to prove that the learner has been told what to do. The exact
+serialization may be an Activity field, a dedicated prompt node/role, or another validated
+representation, but the compiler/validator must be able to distinguish "task prompt exists" from
+"some prose exists".
+
+A meaningful Activity heading should predict the current task/purpose without merely repeating the
+prompt. Fine-grained internal Activities may intentionally share one learner-facing heading when
+they are compiled/rendered as one coherent episode, but that grouping must be explicit rather than
+an accidental absence of hierarchy.
+
 ## Learner-facing activity and fallback semantics
 
 Learner-facing strings do not become implementation metadata merely because they are stored in
@@ -1043,6 +1069,32 @@ relationship rather than leaving it to a generic renderer heuristic.
 
 These requirements are semantic. Exact component names, layout, typography, and animation remain
 implementation decisions.
+
+## Controlled-comparison environment semantics
+
+A controlled contrast has two kinds of invariants:
+
+1. **content/task invariants** — dimensions such as HTML, declarations, content, or values that the
+   Task Model says remain unchanged;
+2. **presentation-environment invariants** — conditions such as preview viewport/container width,
+   scale, zoom, clipping, and other rendering constraints that must remain stable so the observed
+   difference is attributable to the authored change.
+
+The Content IR must be able to express when a comparison depends on a stable rendering environment.
+Exact field names are not frozen, but the semantic requirement is.
+
+For the Static v2 CSS pilot, before/after renderer previews that teach width/height/padding/border
+must preserve an equivalent effective preview environment unless viewport/container size itself is
+the target variable. A generic two-column layout is invalid when it changes that environment
+enough to alter or mask the target effect.
+
+The runtime may choose side-by-side, stacked, fixed-reference viewport, or another responsive
+layout. The choice is correct only if the comparison semantics remain valid.
+
+Browser acceptance for such comparisons must inspect the **actual rendered environment and target
+geometry**, not merely DOM structure or the existence of two iframes. For example, a width lesson
+should fail acceptance if an auto-width baseline is forced from roughly full-width to ~300px only
+because the reveal renderer moved it into a narrow comparison column.
 
 ## Instructional visual semantics
 

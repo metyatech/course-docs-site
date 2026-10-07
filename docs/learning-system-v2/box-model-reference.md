@@ -49,6 +49,8 @@ Stable acceptance IDs for the class-selector slice:
 | `BM-CLS-ACTIVATE-01` | Changing only `p` to `.nedan` makes only the intended element change. |
 | `BM-CLS-GENERATE-01` | Learner generates `.waku` from `class="waku"` before seeing the answer. |
 | `BM-CLS-VARY-01` | A fresh class-name variation checks that the learner can apply the relation again. |
+| `BM-VIS-HIERARCHY-01` | The learner can distinguish lesson purpose, current activity/task, response, and result from the rendered hierarchy rather than reconstructing those roles from body prose. |
+| `BM-VIS-COMPARE-01` | A controlled visual comparison preserves the relevant rendering environment (for example preview viewport/container width and scale) unless that environment is itself the intended changed variable. |
 
 These IDs name instructional contracts, not UI components or serialization fields.
 
@@ -359,6 +361,12 @@ Preserve these semantics:
 - code, the learner action, and the rendered consequence should be visually associated closely
   enough that the learner does not have to reconstruct the relation from memory;
 - before/after states should remain comparable when comparison is the learning mechanism;
+- the comparison layout itself is part of the controlled environment: do not change preview
+  viewport/container width, scale, zoom, clipping, or another presentation condition in a way
+  that changes the observed outcome unless that condition is the intended variable;
+- side-by-side is not a universal comparison layout. Use side-by-side only when it preserves the
+  required rendering environment for both states; otherwise use stacked/full-width or another
+  arrangement that keeps the instructional comparison valid;
 - when a controlled contrast changes one explanatory variable, visual emphasis should make that
   change observable without introducing unrelated visual changes;
 - a reveal should preserve useful prior context instead of replacing it with an unrelated
@@ -367,6 +375,11 @@ Preserve these semantics:
   visual relation is what the learner is expected to understand;
 - interaction controls should support the lesson flow rather than making the experience feel
   primarily like a form or quiz dashboard;
+- learner-facing hierarchy should expose lesson/page identity, the current meaningful activity or
+  task, the task prompt, the response surface, and the resulting feedback as distinct semantic
+  roles. Do not flatten all of these roles into visually equivalent body paragraphs/cards;
+- headings/titles are instructional orientation, not decoration. They should predict the current
+  task or purpose without merely repeating adjacent prose;
 - information that would reveal a future answer remains hidden, but information needed to
   understand the current comparison remains visible.
 
@@ -389,6 +402,10 @@ Treat these as regressions relative to the reference:
 - adaptive routing becoming learner-facing complexity;
 - extra interactions whose only purpose is to expose the internal model;
 - replacing concrete rendered results with abstract system-state text;
+- shrinking or otherwise changing a preview merely because a comparison renderer switched to
+  columns, when that change masks or alters the CSS/rendering effect being compared;
+- rendering the lesson as an undifferentiated sequence of body text, form controls, and result
+  cards without a learner-facing activity hierarchy;
 - making the page less natural merely to make schema boundaries visible.
 
 The schema serves the experience. The experience does not exist to demonstrate the schema.
@@ -410,7 +427,7 @@ preserves the step order but weakens those relations is a regression.
 | Activate class selector         | Change only `p` -> `.nedan`; show that only the price changes.                                                                                              | `css-class-selector-match`; rationale.            | Targeted support for class/selector mapping.                                       |
 | Generate new selector           | Give `class="waku"`; learner generates `.waku`.                                                                                                             | Independent `css-class-selector-generate`.        | Hint -> worked example -> retry as needed.                                         |
 | Minimal variation               | Use a new class name and, when useful, a changed HTML structure.                                                                                            | Generalization check.                             | Early finisher can receive stronger variation.                                     |
-| Width model                     | Apply `width: 300px` to the card and observe the horizontal content region change.                                                                          | Meaning of `width`; rendered-effect mapping.      | Worked example if property-role knowledge is absent.                               |
+| Width model                     | Apply `width: 300px` to the card and observe the horizontal content region change. Before/after previews keep the same effective rendering viewport/container so the comparison UI itself does not collapse the baseline toward 300px. | Meaning of `width`; rendered-effect mapping; `BM-VIS-COMPARE-01`. | Worked example if property-role knowledge is absent.                               |
 | Height completion               | Ask learner to complete the corresponding property for vertical size, then apply it.                                                                        | `css-size-property-select`; generated response.   | Hint can contrast horizontal/vertical.                                             |
 | Size variation                  | Change width or height in a new small Task and predict the rendered direction of change.                                                                    | Independent size application.                     | Additional variation for early finishers.                                          |
 | Border model                    | Add `border: 2px solid ...`; observe the new boundary.                                                                                                      | `css-border-role`.                                | None normally.                                                                     |

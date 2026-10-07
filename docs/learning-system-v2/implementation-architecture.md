@@ -180,10 +180,26 @@ instructional contract whenever it carries meaning.
 Renderer types are registered platform capabilities. Authoring syntax may still be MDX, but the
 compiler should reduce v2 learning activities to data that can be validated and versioned.
 
+### Controlled-comparison rendering boundary
+
+A generic comparison renderer must not impose one visual layout on every comparison.
+
+When the Bundle declares that the rendering environment is invariant, the renderer must preserve
+an equivalent preview viewport/container, scale, zoom, and clipping context across compared states.
+Side-by-side columns are appropriate only when they can satisfy those invariants. Otherwise stack
+the states, reserve a fixed reference viewport, or use another responsive arrangement that keeps
+the observed outcome attributable to the authored change.
+
+For browser/code resources, acceptance tests should measure the actual iframe/content viewport and
+relevant target geometry when those dimensions carry instructional meaning. DOM presence,
+matching outer card sizes, or screenshot-free structural assertions are not sufficient to prove
+that a width/padding/border comparison remains valid.
+
 ### Renderer fallback boundary
 
-Generic renderers own interaction mechanics, accessibility behavior, and neutral platform
-presentation. They do **not** own domain-specific instructional copy.
+Generic renderers own interaction mechanics, accessibility behavior, neutral platform
+presentation, and semantic heading/prompt/result rendering. They do **not** own
+domain-specific instructional copy.
 
 A renderer must not derive a task prompt such as "色が付く要素を選ぶ", a causal explanation, or a
 subject-specific feedback sentence merely from a response/evaluator kind. Required instructional
