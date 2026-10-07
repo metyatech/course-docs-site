@@ -325,6 +325,34 @@ When the teacher releases the next core step:
 - unmet Evidence remains in the Learner Model;
 - later practice, retrieval, or prerequisite support can revisit it.
 
+## Instructional visual contract
+
+Visual presentation is not automatically a local styling detail. When a visual or spatial
+relationship carries instructional meaning, it is part of the acceptance contract.
+
+Preserve these semantics:
+
+- code, the learner action, and the rendered consequence should be visually associated closely
+  enough that the learner does not have to reconstruct the relation from memory;
+- before/after states should remain comparable when comparison is the learning mechanism;
+- when a controlled contrast changes one explanatory variable, visual emphasis should make that
+  change observable without introducing unrelated visual changes;
+- a reveal should preserve useful prior context instead of replacing it with an unrelated
+  generic result card when the comparison itself matters;
+- content/padding/border and similar spatial relations must be represented visually when the
+  visual relation is what the learner is expected to understand;
+- interaction controls should support the lesson flow rather than making the experience feel
+  primarily like a form or quiz dashboard;
+- information that would reveal a future answer remains hidden, but information needed to
+  understand the current comparison remains visible.
+
+Exact typography, decorative color choices, corner radii, shadows, and similar styling remain
+local decisions **only when changing them does not weaken these instructional relations**.
+
+The reference does not require a pixel-for-pixel copy of v6.13. It does require preservation or
+improvement of the visual/spatial mechanisms through which v6.13 made the targeted relationships
+easy to notice.
+
 ## Regression conditions
 
 Treat these as regressions relative to the reference:
@@ -344,8 +372,10 @@ The schema serves the experience. The experience does not exist to demonstrate t
 ## Full reference lesson flow
 
 The following end-to-end flow is the current reference for a first-pass v2 box-model lesson.
-Exact copy and visuals remain local design details; the instructional relations are the important
-part.
+Exact wording and purely presentational styling remain local design details. The instructional
+sequence, information availability, causal contrasts, spatial relationships, and visual states
+needed to make those relationships observable are acceptance requirements. A generic layout that
+preserves the step order but weakens those relations is a regression.
 
 | Step                            | Shared learner experience                                                                                                                                   | Main Evidence / purpose                           | Private adaptation                                                                 |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------- |
