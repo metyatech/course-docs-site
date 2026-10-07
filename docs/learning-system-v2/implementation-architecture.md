@@ -151,6 +151,27 @@ The IR can represent approved renderable primitives such as:
 - hints;
 - result visualizations.
 
+The IR must also be able to preserve **instructional visual semantics**. A list of otherwise
+correct content nodes is not sufficient when the learning mechanism depends on relationships
+between them.
+
+It therefore needs a way to represent, directly or through equivalent composition metadata:
+
+- code-and-result coupling;
+- before/after or A/B comparison;
+- persistent comparison context;
+- which dimension changed and which dimensions remained invariant;
+- spatial/layer relations;
+- learner action -> visible consequence;
+- reveal relationships that preserve useful prior state.
+
+Exact node names and layout primitives are local implementation choices. The semantic
+relationships are not.
+
+Do not make the generic fallback renderer a single vertical stack when doing so destroys a
+relationship required by the Evidence/Task design. The visual composition is part of the
+instructional contract whenever it carries meaning.
+
 Renderer types are registered platform capabilities. Authoring syntax may still be MDX, but the
 compiler should reduce v2 learning activities to data that can be validated and versioned.
 
