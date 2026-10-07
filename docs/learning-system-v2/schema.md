@@ -981,3 +981,42 @@ Examples:
 The authoritative session state must record whether solution-revealing information had already
 been released when an attempt was accepted. This allows the Evidence Model to distinguish a
 fresh pre-reveal response from a post-reveal retry without trusting client timestamps alone.
+
+
+## Instructional visual semantics
+
+Task and activity semantics sometimes depend on visual/spatial relationships, not just on the
+presence and order of content nodes.
+
+The v2 schema/IR must therefore be capable of expressing enough structure for the renderer to
+preserve relationships such as:
+
+```text
+code <-> rendered result
+before <-> after
+invariant dimensions <-> changed dimension
+learner action -> visible consequence
+content -> padding -> border
+```
+
+A renderer that receives only an ordered list of `text | code | resource` nodes may be
+insufficient when it cannot know which nodes form one instructional comparison.
+
+The exact serialization is not frozen, but the semantic contract should support, directly or by
+reference:
+
+- a composition/group identity;
+- a comparison role such as baseline / changed / result where relevant;
+- persistent context across a reveal when the learner must compare states;
+- the intended changed dimension for controlled contrasts;
+- spatial/layer semantics when a diagram or rendered state is instructional Evidence;
+- proximity/association between prompts, editable/generated code, and their visible result.
+
+These fields are not decorative layout preferences. They exist only where the visual relation
+contributes to the learning claim or Evidence.
+
+Purely presentational choices such as exact typography, decorative colors, shadows, or corner
+radii remain renderer-level decisions unless they themselves encode required meaning.
+
+A content representation that preserves all words and step order but loses the instructional
+visual relation should fail acceptance.
