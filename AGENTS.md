@@ -107,6 +107,12 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-autho
 - Each question MUST focus on one concept, skill, judgment, or misconception.
 - Prompts MUST be answerable from the question context without relying on
   hidden classroom-event memory.
+- For every factual claim about an assessed target, its initial state, or its
+  result in prompts, choices, answers, or explanations, verify that the claim
+  follows from stated conditions, shown code/data, or guaranteed domain behavior.
+  A name is not evidence of runtime identity: a variable named `heading` does
+  not establish an `h1` element. Do not silently import facts from the teaching
+  example.
 - Prompts, answers, and explanations MUST stand alone without referring to
   "this material", "the attached document", "lesson N", or other external
   source context unless that source context is included in the prompt itself.
@@ -135,6 +141,12 @@ Source: github:metyatech/agent-rules@HEAD/rules/domains/education/question-autho
   and each `points` entry maps to the criterion at the same index.
 - Questions MUST have a single defensible answer, or explicitly state the
   accepted answer range.
+- For technical execution or appearance claims, actively seek a plausible
+  counterexample that satisfies all stated conditions but makes the marked
+  answer false or another answer defensible (e.g., a child with an overriding
+  text color can defeat an inherited color animation on its parent). If one
+  exists, state the missing decisive condition or narrow the claim; do not
+  mechanically demand full code or add irrelevant details.
 - Multiple-choice distractors MUST be plausible, close to the correct answer,
   and based on likely misconceptions or mistakes.
 - Each multiple-choice distractor MUST differ from the correct answer by one
