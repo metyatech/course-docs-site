@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { getNpmInvocation } from './npm-invocation.mjs';
 
 const run = (command, args) =>
   new Promise((resolve, reject) => {
@@ -15,12 +16,8 @@ const run = (command, args) =>
   });
 
 const runNpm = async (args) => {
-  if (process.platform === 'win32') {
-    await run('cmd.exe', ['/d', '/s', '/c', 'npm', ...args]);
-    return;
-  }
-
-  await run('npm', args);
+  const invocation = getNpmInvocation(args);
+  await run(invocation.command, invocation.args);
 };
 
 await runNpm(['run', 'build']);

@@ -138,9 +138,9 @@ const parsePatchFileName = (fileName) => {
 test("dependency versions and patch installation stay pinned", async () => {
   const pkg = JSON.parse(await readFile(packageJsonPath, "utf8"));
 
-  assert.equal(pkg.dependencies.next, "^15.5.25");
-  assert.equal(pkg.devDependencies["eslint-config-next"], "^15.5.25");
-  assert.equal(pkg.dependencies.sharp, "^0.35.4");
+  assert.equal(pkg.dependencies.next, "^15.5.27");
+  assert.equal(pkg.devDependencies["eslint-config-next"], "^15.5.27");
+  assert.equal(pkg.dependencies.sharp, "^0.35.5");
   assert.equal(pkg.overrides.mermaid, "11.17.2");
   assert.equal(pkg.overrides.dompurify, "3.4.16");
   assert.equal(pkg.overrides["@xmldom/xmldom"], "0.9.12");
@@ -470,7 +470,15 @@ test("verify:ci script contains every required CI gate", async () => {
   assert.doesNotMatch(verifyCi, /verify:sites|course-sites\.json/u);
   assert.match(verifyCi, /npm run build\b/, "verify:ci must run build");
   assert.equal(pkg.scripts["audit:dependencies"], "node scripts/audit-dependencies.mjs");
-  assert.match(pkg.scripts["verify:precommit"], /npm run audit:dependencies$/u);
+  assert.equal(pkg.scripts["verify:precommit"], "node scripts/verify-precommit.mjs");
+  const precommitRunner = await readFile(
+    path.join(projectRoot, "scripts", "verify-precommit.mjs"),
+    "utf8",
+  );
+  assert.match(precommitRunner, /\["run", "platform:verify"\]/u);
+  assert.match(precommitRunner, /\["run", "lint"\]/u);
+  assert.match(precommitRunner, /\["test"\]/u);
+  assert.match(precommitRunner, /\["run", "audit:dependencies"\]/u);
   assert.match(
     verifyCi,
     /npm run verify:course:ci/,

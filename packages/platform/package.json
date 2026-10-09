@@ -91,7 +91,7 @@
     "globals": "^17.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "next": "^15.5.25",
+    "next": "^15.5.27",
     "nextra": "^4.6.1",
     "nextra-theme-docs": "^4.6.1",
     "prettier": "^3.8.1",
