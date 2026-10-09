@@ -1,3 +1,6 @@
+#!/usr/bin/env sh
+set -e
+
 npx lint-staged
 
 _IDX=$(git rev-parse --git-path index)
@@ -5,7 +8,6 @@ _SNAP=${_IDX}.snap
 cp "$_IDX" "$_SNAP"
 trap 'if [ -f "$_SNAP" ]; then cp "$_SNAP" "$_IDX"; rm -f "$_SNAP"; fi' EXIT
 
-npm run verify:precommit
 compose-agentsmd --compose
 
 python -c "

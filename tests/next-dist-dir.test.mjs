@@ -354,13 +354,13 @@ test("package.json exposes verify:precommit (fast local gate) and verify:ci (CI-
   );
 });
 
-test("pre-commit hook formats staged files before snapshot and then runs existing gates", async () => {
+test("pre-commit hook formats staged files, preserves the index snapshot, and composes rules", async () => {
   const hook = await readFile(preCommitHookPath, "utf8");
   const lintStagedPosition = hook.indexOf("npx lint-staged");
   const snapshotPosition = hook.indexOf("_IDX=$(git rev-parse --git-path index)");
   const restoreTrapPosition = hook.indexOf("trap '");
-  const verifyPosition = hook.indexOf("npm run verify:precommit");
   const composePosition = hook.indexOf("compose-agentsmd --compose");
+  const indexRepairPosition = hook.indexOf('python -c "');
 
   assert.match(hook, /^npx lint-staged$/m, "pre-commit hook MUST invoke lint-staged.");
   assert.ok(
@@ -369,14 +369,14 @@ test("pre-commit hook formats staged files before snapshot and then runs existin
   );
   assert.ok(
     snapshotPosition < restoreTrapPosition &&
-      restoreTrapPosition < verifyPosition &&
-      verifyPosition < composePosition,
-    "The existing snapshot, verify, and compose ordering MUST be preserved.",
+      restoreTrapPosition < composePosition &&
+      composePosition < indexRepairPosition,
+    "The snapshot, failure recovery, compose, and generated AGENTS index update ordering MUST be preserved.",
   );
-  assert.match(
+  assert.doesNotMatch(
     hook,
-    /^npm run verify:precommit$/m,
-    "pre-commit hook MUST invoke `npm run verify:precommit`.",
+    /npm\s+run\s+(?:verify:precommit|platform:verify|lint|test|build:verified|audit:dependencies)/,
+    "The pre-commit hook MUST NOT run full verification gates.",
   );
   assert.equal(
     /^npm run verify(?::ci|:course(?::ci)?)?$/m.test(hook),

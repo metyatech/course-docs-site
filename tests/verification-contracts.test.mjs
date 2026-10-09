@@ -200,10 +200,15 @@ test("format scripts and staged-file tasks have separate responsibilities", asyn
 
   assert.equal(pkg.scripts.format, "prettier --write .");
   assert.equal(pkg.scripts["format:check"], "prettier --check .");
-  assert.equal(
-    pkg.scripts["verify:precommit"],
-    "npm run platform:verify && npm run lint && npm test && npm run audit:dependencies",
+  assert.equal(pkg.scripts["verify:precommit"], "node scripts/verify-precommit.mjs");
+  const precommitRunner = await readFile(
+    path.join(projectRoot, "scripts", "verify-precommit.mjs"),
+    "utf8",
   );
+  assert.match(precommitRunner, /\["run", "platform:verify"\]/u);
+  assert.match(precommitRunner, /\["run", "lint"\]/u);
+  assert.match(precommitRunner, /\["test"\]/u);
+  assert.match(precommitRunner, /\["run", "audit:dependencies"\]/u);
   assert.deepEqual(pkg["lint-staged"], {
     "**/*.{js,mjs,cjs,ts,tsx}": ["prettier --write", "eslint"],
     "**/*.{jsx,json,jsonc,md,mdx,yaml,yml,css,scss,html}": ["prettier --write"],
