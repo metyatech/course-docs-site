@@ -988,7 +988,6 @@ The authoritative session state must record whether solution-revealing informati
 been released when an attempt was accepted. This allows the Evidence Model to distinguish a
 fresh pre-reveal response from a post-reveal retry without trusting client timestamps alone.
 
-
 ## Learner-facing lesson and activity hierarchy
 
 The Knowledge/Task/Evidence models do not replace learner-facing document structure. A compiled
