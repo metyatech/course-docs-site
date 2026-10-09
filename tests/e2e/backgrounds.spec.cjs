@@ -32,35 +32,68 @@ const expectServedImageBytes = async (response, expectedKind) => {
 };
 
 const findBackgroundImageInPreview = async (page, expectedText, selector) => {
-  const handle = await page.waitForFunction(
-    ({ frameText, targetSelector }) => {
-      const frames = Array.from(document.querySelectorAll("iframe"));
-      for (const frame of frames) {
-        try {
-          const doc = frame.contentDocument;
-          const bodyText = doc?.body?.innerText ?? "";
-          if (!bodyText.includes(frameText)) {
+  let backgroundImage = null;
+  await expect
+    .poll(
+      async () => {
+        for (const frame of page.frames()) {
+          if (frame === page.mainFrame()) {
             continue;
           }
-          const element = doc.querySelector(targetSelector);
-          if (!element) {
-            continue;
-          }
-          const backgroundImage = getComputedStyle(element).backgroundImage;
-          if (backgroundImage && backgroundImage !== "none") {
-            return backgroundImage;
-          }
-        } catch {
-          // Ignore transient iframe reloads and keep polling.
-        }
-      }
-      return null;
-    },
-    { frameText: expectedText, targetSelector: selector },
-    { timeout: 30_000 },
-  );
 
-  return handle.jsonValue();
+          try {
+            const bodyText = await frame.locator("body").innerText();
+            if (!bodyText.includes(expectedText)) {
+              continue;
+            }
+
+            const image = await frame
+              .locator(selector)
+              .first()
+              .evaluate((element) => getComputedStyle(element).backgroundImage);
+            if (image && image !== "none") {
+              backgroundImage = image;
+              return image;
+            }
+          } catch {
+            // Ignore transient iframe reloads and keep polling.
+          }
+        }
+
+        return null;
+      },
+      { timeout: 30_000 },
+    )
+    .not.toBeNull();
+
+  return backgroundImage;
+};
+
+const scrollPreviewContainingTextIntoView = async (page, expectedText) => {
+  await expect
+    .poll(
+      async () => {
+        for (const frame of page.frames()) {
+          if (frame === page.mainFrame()) {
+            continue;
+          }
+
+          try {
+            const bodyText = await frame.locator("body").innerText();
+            if (bodyText.includes(expectedText)) {
+              await (await frame.frameElement()).scrollIntoViewIfNeeded();
+              return true;
+            }
+          } catch {
+            // Ignore transient iframe reloads and keep polling.
+          }
+        }
+
+        return false;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true);
 };
 
 test("backgrounds page keeps background images visible in code previews", async ({ page }) => {
@@ -82,7 +115,7 @@ test("backgrounds page keeps background images visible in code previews", async 
   const backgroundAssetResponse = await page.request.get(backgroundAssetUrl);
   await expectServedImageBytes(backgroundAssetResponse, "png");
 
-  await page.getByText("背景が固定されている領域1").scrollIntoViewIfNeeded();
+  await scrollPreviewContainingTextIntoView(page, "背景が固定されている領域1");
 
   const parallaxImage = await findBackgroundImageInPreview(
     page,
